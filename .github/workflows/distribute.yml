@@ -1,0 +1,274 @@
+name: Distribute
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (vX.Y.Z) or latest'
+        type: string
+        default: latest
+      channel:
+        description: 'Release channel'
+        type: choice
+        options:
+          - stable
+          - beta
+        default: stable
+      wago:
+        description: 'Upload to Wago'
+        type: boolean
+        default: true
+      curseforge:
+        description: 'Upload to CurseForge'
+        type: boolean
+        default: true
+      dry_run:
+        description: 'Validate only, no reservation and no upload'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: distribute-${{ inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  WAGO_PROJECT_ID: qGZAwdKd
+  CF_PROJECT_ID: '1734295'
+  # Game build the uploads are labelled for. Set the repository variables to change them without a new release.
+  FOREVER_PATCH: ${{ vars.FOREVER_PATCH || '1.60.1' }}
+  CF_FOREVER_VERSION_ID: ${{ vars.CF_FOREVER_VERSION_ID || '17053' }}
+
+jobs:
+  distribute:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check options and secrets
+        env:
+          WANT_WAGO: ${{ inputs.wago }}
+          WANT_CURSEFORGE: ${{ inputs.curseforge }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ "$WANT_WAGO" != true ] && [ "$WANT_CURSEFORGE" != true ]; then
+            echo "::error::Select at least one target (wago or curseforge)."
+            exit 1
+          fi
+          if [ "$WANT_WAGO" = true ] && [ -z "$WAGO_API_TOKEN" ]; then
+            echo "::error::The secret WAGO_API_TOKEN is not set in this repository."
+            exit 1
+          fi
+          if [ "$WANT_CURSEFORGE" = true ] && [ -z "$CF_API_TOKEN" ]; then
+            echo "::error::The secret CF_API_TOKEN is not set in this repository."
+            exit 1
+          fi
+          if ! [[ "$FOREVER_PATCH" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::FOREVER_PATCH '$FOREVER_PATCH' is not a version number."
+            exit 1
+          fi
+          if ! [[ "$CF_FOREVER_VERSION_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::CF_FOREVER_VERSION_ID '$CF_FOREVER_VERSION_ID' is not a number."
+            exit 1
+          fi
+
+      - name: Download and validate the release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          set +x
+          tag="$TAG_INPUT"
+          if [ "$tag" = latest ]; then
+            tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
+          fi
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$tag' is not of the form vX.Y.Z."
+            exit 1
+          fi
+          version="${tag#v}"
+          dist="${RUNNER_TEMP}/dist"
+          mkdir -p "$dist"
+
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern release.json --dir "$dist"
+          zip_name=$(jq -r '.releases[0].filename' "$dist/release.json")
+          if [ "$zip_name" != "ForeverGuides-${version}.zip" ]; then
+            echo "::error::release.json names '$zip_name', expected ForeverGuides-${version}.zip."
+            exit 1
+          fi
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$zip_name" --dir "$dist"
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body > "$dist/notes.md"
+          if ! grep -q '[^[:space:]]' "$dist/notes.md"; then
+            echo "::error::The release ${tag} has no notes."
+            exit 1
+          fi
+
+          zip_path="$dist/$zip_name"
+          entries=$(unzip -Z1 "$zip_path")
+          if grep -Eq '(^/|(^|/)\.\.(/|$))' <<< "$entries"; then
+            echo "::error::The zip holds unsafe paths."
+            exit 1
+          fi
+          expected=$(printf '%s\n' ForeverGuides ForeverGuides_GildenManager ForeverGuides_MapData ForeverGuides_Professions ForeverGuides_Recipes | sort)
+          actual=$(cut -d/ -f1 <<< "$entries" | sort -u)
+          if [ "$expected" != "$actual" ]; then
+            echo "::error::Unexpected top-level entries in the zip:"
+            echo "$actual"
+            exit 1
+          fi
+          toc=$(unzip -p "$zip_path" ForeverGuides/ForeverGuides.toc | tr -d '\r')
+          toc_version=$(printf '%s\n' "$toc" | sed -n 's/^## Version:[[:space:]]*//p')
+          if [ "$toc_version" != "$version" ]; then
+            echo "::error::TOC version '$toc_version' does not match the tag ${tag}."
+            exit 1
+          fi
+          interface=$(printf '%s\n' "$toc" | sed -n 's/^## Interface:[[:space:]]*//p')
+          if ! [[ "$interface" =~ ^[0-9]+$ ]]; then
+            echo "::error::The TOC has no numeric Interface line."
+            exit 1
+          fi
+          if ! jq -e --argjson interface "$interface" \
+            '(.releases | length) == 1 and .releases[0].metadata[0].flavor == "forever" and .releases[0].metadata[0].interface == $interface' \
+            "$dist/release.json" > /dev/null; then
+            echo "::error::release.json does not name flavor forever with Interface ${interface}."
+            exit 1
+          fi
+
+          {
+            echo "TAG=$tag"
+            echo "VERSION=$version"
+            echo "ZIP_PATH=$zip_path"
+            echo "NOTES_PATH=$dist/notes.md"
+          } >> "$GITHUB_ENV"
+          echo "Validated ${tag}: ${zip_name}, Interface ${interface}"
+
+      - name: Upload to Wago
+        if: ${{ inputs.wago }}
+        env:
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TARGET: wago
+        run: |
+          set -euo pipefail
+          set +x
+          metadata=$(jq -n \
+            --arg label "$VERSION" \
+            --arg stability "$CHANNEL" \
+            --rawfile changelog "$NOTES_PATH" \
+            --arg patch "$FOREVER_PATCH" \
+            '{label: $label, stability: $stability, changelog: $changelog, supported_forever_patch: $patch}')
+          echo "Wago metadata:"
+          echo "$metadata"
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: nothing reserved, nothing uploaded."
+            exit 0
+          fi
+
+          reservation="distribute/${TARGET}/${TAG}"
+          release_commit=$(git rev-parse "refs/tags/${TAG}^{commit}")
+          if ! reserved=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/${reservation}" -f "sha=${release_commit}" 2>&1); then
+            if grep -qi 'already exists' <<< "$reserved"; then
+              echo "::error::${TARGET} was already uploaded or started for ${TAG} (tag ${reservation} exists)."
+            else
+              echo "::error::Could not reserve ${reservation}: $reserved"
+            fi
+            echo "Check the project page first. If ${TAG} is not there, remove the reservation and run again:"
+            echo "  git push origin --delete refs/tags/${reservation}"
+            exit 1
+          fi
+
+          status=$(curl -sS -o "${RUNNER_TEMP}/wago-response.txt" -w '%{http_code}' \
+            -X POST "https://addons.wago.io/api/projects/${WAGO_PROJECT_ID}/version" \
+            -H "Authorization: Bearer ${WAGO_API_TOKEN}" \
+            -H 'Accept: application/json' \
+            -F "file=@${ZIP_PATH}" \
+            --form-string "metadata=${metadata}") || status=000
+          cat "${RUNNER_TEMP}/wago-response.txt" || true
+          echo
+          if [ "$status" != 200 ] && [ "$status" != 201 ]; then
+            echo "::error::Wago answered HTTP ${status}. The reservation ${reservation} stays."
+            echo "Check the project page first. If ${TAG} is not there, remove the reservation and run again:"
+            echo "  git push origin --delete refs/tags/${reservation}"
+            exit 1
+          fi
+          echo "Wago accepted ${TAG} (HTTP ${status})."
+
+      - name: Upload to CurseForge
+        if: ${{ !cancelled() && steps.release.conclusion == 'success' && inputs.curseforge }}
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          CHANNEL: ${{ inputs.channel }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          TARGET: curseforge
+        run: |
+          set -euo pipefail
+          set +x
+          # A wrong version ID would label the file with another game build.
+          found=$(curl -fsS -H "X-Api-Token: ${CF_API_TOKEN}" 'https://wow.curseforge.com/api/game/versions' \
+            | jq -r --argjson id "$CF_FOREVER_VERSION_ID" '.[] | select(.id == $id) | .name')
+          if [ "$found" != "$FOREVER_PATCH" ]; then
+            echo "::error::CurseForge game version ${CF_FOREVER_VERSION_ID} is '${found}', expected '${FOREVER_PATCH}'."
+            exit 1
+          fi
+
+          name="Forever Guides ${VERSION}"
+          release_type=release
+          if [ "$CHANNEL" = beta ]; then
+            name="${name} (Beta)"
+            release_type=beta
+          fi
+          metadata=$(jq -n \
+            --arg name "$name" \
+            --arg type "$release_type" \
+            --rawfile changelog "$NOTES_PATH" \
+            --argjson version "$CF_FOREVER_VERSION_ID" \
+            '{displayName: $name, releaseType: $type, changelog: $changelog, changelogType: "markdown", gameVersions: [$version]}')
+          echo "CurseForge metadata:"
+          echo "$metadata"
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: nothing reserved, nothing uploaded."
+            exit 0
+          fi
+
+          reservation="distribute/${TARGET}/${TAG}"
+          release_commit=$(git rev-parse "refs/tags/${TAG}^{commit}")
+          if ! reserved=$(gh api "repos/${GITHUB_REPOSITORY}/git/refs" -f "ref=refs/tags/${reservation}" -f "sha=${release_commit}" 2>&1); then
+            if grep -qi 'already exists' <<< "$reserved"; then
+              echo "::error::${TARGET} was already uploaded or started for ${TAG} (tag ${reservation} exists)."
+            else
+              echo "::error::Could not reserve ${reservation}: $reserved"
+            fi
+            echo "Check the project page first. If ${TAG} is not there, remove the reservation and run again:"
+            echo "  git push origin --delete refs/tags/${reservation}"
+            exit 1
+          fi
+
+          status=$(curl -sS -o "${RUNNER_TEMP}/curseforge-response.txt" -w '%{http_code}' \
+            -X POST "https://wow.curseforge.com/api/projects/${CF_PROJECT_ID}/upload-file" \
+            -H "X-Api-Token: ${CF_API_TOKEN}" \
+            -F "file=@${ZIP_PATH}" \
+            --form-string "metadata=${metadata}") || status=000
+          cat "${RUNNER_TEMP}/curseforge-response.txt" || true
+          echo
+          if [ "$status" != 200 ]; then
+            echo "::error::CurseForge answered HTTP ${status}. The reservation ${reservation} stays."
+            echo "Check the project page first. If ${TAG} is not there, remove the reservation and run again:"
+            echo "  git push origin --delete refs/tags/${reservation}"
+            exit 1
+          fi
+          echo "CurseForge accepted ${TAG} (HTTP ${status})."

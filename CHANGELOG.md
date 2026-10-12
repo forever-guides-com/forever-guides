@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.2
+
+### Added
+
+- Wago Addons project link in the add-on files, so the download matches the Wago listing.
+- Add-on manager metadata for the Forever client (release manifest), so managers such as WoWUp detect the client.
+
+### Changed
+
+- Releases are published as normal releases by default, beta releases stay available as a separate channel.
+
 ## 0.1.1 (Beta)
 
 The in-game companion for [forever-guides.com](https://forever-guides.com), made by Wosande for the Forever client.
