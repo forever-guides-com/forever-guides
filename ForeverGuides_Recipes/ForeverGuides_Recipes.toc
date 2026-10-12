@@ -1,0 +1,27 @@
+## Interface: 16001
+## Title: Forever Guides: Recipes
+## Title-deDE: Forever Guides: Rezepte
+## Notes: Recipe database of all professions. Loads by itself when you open the professions page.
+## Notes-deDE: Rezeptdatenbank aller Berufe. Wird von selbst geladen, sobald du die Berufe-Seite öffnest.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.1.1
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+Recipes_alchemy.lua
+Recipes_blacksmithing.lua
+Recipes_cooking.lua
+Recipes_enchanting.lua
+Recipes_engineering.lua
+Recipes_first-aid.lua
+Recipes_fishing.lua
+Recipes_herbalism.lua
+Recipes_leatherworking.lua
+Recipes_mining.lua
+Recipes_skinning.lua
+Recipes_tailoring.lua

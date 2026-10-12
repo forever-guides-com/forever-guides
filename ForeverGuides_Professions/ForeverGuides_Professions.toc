@@ -1,0 +1,28 @@
+## Interface: 16001
+## Title: Forever Guides: Profession data
+## Title-deDE: Forever Guides: Berufsdaten
+## Notes: Profession routes and shopping list data. Loads by itself when you open the profession route page.
+## Notes-deDE: Daten für Berufsrouten und Einkaufsliste. Wird von selbst geladen, sobald du die Berufsroute öffnest.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.1.1
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+
+Routes_alchemy.lua
+Routes_blacksmithing.lua
+Routes_cooking.lua
+Routes_enchanting.lua
+Routes_engineering.lua
+Routes_first-aid.lua
+Routes_fishing.lua
+Routes_herbalism.lua
+Routes_leatherworking.lua
+Routes_mining.lua
+Routes_skinning.lua
+Routes_tailoring.lua

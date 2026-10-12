@@ -1,0 +1,42 @@
+-- Manifest (generiert, nicht bearbeiten)
+local _, ns = ...
+ns.Data = ns.Data or {}
+ns.Data.Manifest = {
+  build="1.60.1.70338",
+  dataStamp="2026-10-11",
+  files={
+    ["Abilities_DRUID.lua"]={bytes=6824,hash="fc321454da0e8a75"},
+    ["Abilities_HUNTER.lua"]={bytes=7832,hash="481485b5031ff862"},
+    ["Abilities_MAGE.lua"]={bytes=6638,hash="903f89ed9ffea8ca"},
+    ["Abilities_PALADIN.lua"]={bytes=6495,hash="b45c12024775e4e2"},
+    ["Abilities_PRIEST.lua"]={bytes=5796,hash="207ff655fc6af7f3"},
+    ["Abilities_ROGUE.lua"]={bytes=4125,hash="1340f513fc79b52d"},
+    ["Abilities_SHAMAN.lua"]={bytes=6873,hash="78c8787c9b5f68ab"},
+    ["Abilities_WARLOCK.lua"]={bytes=8646,hash="a832216e88cb405e"},
+    ["Abilities_WARRIOR.lua"]={bytes=4556,hash="883370f5ec99d95b"},
+    ["Builds.lua"]={bytes=5100,hash="4d792da5fb89b8a9"},
+    ["Instances.lua"]={bytes=89897,hash="65981f1992bad66c"},
+    ["Macros.lua"]={bytes=16003,hash="1c2af0f6199d6e68"},
+    ["Meta.lua"]={bytes=1906,hash="aa9bb3b895ec007c"},
+    ["Spells_DRUID.lua"]={bytes=45413,hash="aab2a767d0266de3"},
+    ["Spells_GENERAL.lua"]={bytes=25620,hash="59674adfbb449dab"},
+    ["Spells_HUNTER.lua"]={bytes=63615,hash="e6055df769362b08"},
+    ["Spells_MAGE.lua"]={bytes=40447,hash="28ef9e94d28b13ef"},
+    ["Spells_PALADIN.lua"]={bytes=40929,hash="230ed52893d63b28"},
+    ["Spells_PRIEST.lua"]={bytes=53845,hash="2ea9ad40a8534b6c"},
+    ["Spells_ROGUE.lua"]={bytes=31512,hash="a0aae62c112ddc40"},
+    ["Spells_SHAMAN.lua"]={bytes=45092,hash="ee2721c8ed516222"},
+    ["Spells_WARLOCK.lua"]={bytes=42372,hash="9922ec0c3d6c7e71"},
+    ["Spells_WARRIOR.lua"]={bytes=36176,hash="f1dafc5600876a31"},
+    ["Trainers.lua"]={bytes=35067,hash="f3df71d9137190d1"},
+    ["Travel.lua"]={bytes=100632,hash="a947bb02966b0ccc"},
+    ["Weapons.lua"]={bytes=20552,hash="ada92017cae08425"},
+  },
+  generatedAt="2026-10-11T00:00:00Z",
+  generator="1.2.0",
+  schema=1,
+  sources={
+    trainers={basis="Classic-Era-Daten (1.12); Forever-Anpassungen nicht verifiziert / Classic-era data (1.12); Forever changes not verified",schema=1},
+    weapons={generated="2026-10-02",version=1},
+  },
+}

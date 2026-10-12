@@ -1,0 +1,25 @@
+## Interface: 16001
+## Title: Forever Guides: GildenManager
+## Notes: Guild tools for Forever Guides: main and alt links, own notes, an inactivity list and guild actions with preview.
+## Notes-deDE: Gildenwerkzeuge für Forever Guides: Main und Alt, eigene Notizen, Inaktivitätsliste und Gildenaktionen mit Vorschau.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.1.1
+## Dependencies: ForeverGuides
+## DefaultState: disabled
+## LoadOnDemand: 1
+## SavedVariables: ForeverGuidesGMDB
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guild
+
+Core.lua
+MembersLogic.lua
+InactivityLogic.lua
+ActionsLogic.lua
+Members.lua
+Inactivity.lua
+Actions.lua
+ActionLog.lua
+Demo.lua

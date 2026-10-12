@@ -1,0 +1,62 @@
+<Bindings>
+  <Binding name="FOREVERGUIDES_TOGGLE" header="FOREVERGUIDES" category="ADDONS">
+    ForeverGuides.Main.Toggle()
+  </Binding>
+  <Binding name="FOREVERGUIDES_SEARCH" category="ADDONS">
+    ForeverGuides.BindingSearch()
+  </Binding>
+  <Binding name="FOREVERGUIDES_DOCK" category="ADDONS">
+    ForeverGuides.Dock.Toggle()
+  </Binding>
+  <Binding name="FOREVERGUIDES_SHOT" category="ADDONS">
+    ForeverGuides.Shot.Binding()
+  </Binding>
+  <Binding name="FOREVERGUIDES_NOTES" category="ADDONS">
+    ForeverGuides.KeyBindings.Notes()
+  </Binding>
+  <Binding name="FOREVERGUIDES_NOTE_NEW" category="ADDONS">
+    ForeverGuides.KeyBindings.NewNote()
+  </Binding>
+  <Binding name="FOREVERGUIDES_DRAWINGS" category="ADDONS">
+    ForeverGuides.KeyBindings.Drawings()
+  </Binding>
+  <Binding name="FOREVERGUIDES_DRAWING_NEW" category="ADDONS">
+    ForeverGuides.KeyBindings.NewDrawing()
+  </Binding>
+  <Binding name="FOREVERGUIDES_TALENTS" category="ADDONS">
+    ForeverGuides.KeyBindings.Talents()
+  </Binding>
+  <Binding name="FOREVERGUIDES_LEVELS" category="ADDONS">
+    ForeverGuides.KeyBindings.Levels()
+  </Binding>
+  <Binding name="FOREVERGUIDES_MAP" category="ADDONS">
+    ForeverGuides.KeyBindings.Map()
+  </Binding>
+  <Binding name="FOREVERGUIDES_ROUTE" category="ADDONS">
+    ForeverGuides.KeyBindings.Route()
+  </Binding>
+  <Binding name="FOREVERGUIDES_WEAPONS" category="ADDONS">
+    ForeverGuides.KeyBindings.Weapons()
+  </Binding>
+  <Binding name="FOREVERGUIDES_TRAINERS" category="ADDONS">
+    ForeverGuides.KeyBindings.Trainers()
+  </Binding>
+  <Binding name="FOREVERGUIDES_SHARE" category="ADDONS">
+    ForeverGuides.KeyBindings.Share()
+  </Binding>
+  <Binding name="FOREVERGUIDES_WAYPOINT_NEXT" category="ADDONS">
+    ForeverGuides.KeyBindings.WaypointNext()
+  </Binding>
+  <Binding name="FOREVERGUIDES_WAYPOINT_ARROW" category="ADDONS">
+    ForeverGuides.KeyBindings.WaypointArrow()
+  </Binding>
+  <Binding name="FOREVERGUIDES_WAYPOINT_HERE" category="ADDONS">
+    ForeverGuides.KeyBindings.WaypointHere()
+  </Binding>
+  <Binding name="FOREVERGUIDES_CALC" category="ADDONS">
+    ForeverGuides.KeyBindings.Calc()
+  </Binding>
+  <Binding name="FOREVERGUIDES_DURABILITY" category="ADDONS">
+    ForeverGuides.KeyBindings.Durability()
+  </Binding>
+</Bindings>

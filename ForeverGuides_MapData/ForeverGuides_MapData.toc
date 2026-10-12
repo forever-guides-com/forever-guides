@@ -1,0 +1,16 @@
+## Interface: 16001
+## Title: Forever Guides: Map data
+## Title-deDE: Forever Guides: Kartendaten
+## Notes: Overlay pictures that reveal the zone maps. Loads by itself when you open the map.
+## Notes-deDE: Gebietsbilder, die die Zonenkarten aufdecken. Wird von selbst geladen, sobald du die Karte öffnest.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.1.1
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+Overlays.lua

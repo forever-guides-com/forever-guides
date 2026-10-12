@@ -1,0 +1,133 @@
+Forever Guides: World of Warcraft addon
+Copyright (c) 2026 Wosande. All rights reserved.
+
+Deutsch (English version below)
+===============================
+
+Geltungsbereich: Diese Lizenz gilt für das gesamte Paket Forever Guides, also
+für alle mitgelieferten Ordner (ForeverGuides, ForeverGuides_GildenManager,
+ForeverGuides_MapData, ForeverGuides_Professions, ForeverGuides_Recipes) und
+alle darin enthaltenen eigenen Dateien, Daten und Texte. Komponenten Dritter
+siehe Abschnitt 4.
+
+Dieses Addon ist "Source-available": Der Quelltext ist einsehbar, aber nicht
+frei lizenziert. Alle Rechte bleiben beim Rechteinhaber, soweit unten nichts
+anderes erlaubt ist.
+
+1. Erlaubt
+   a) Das Addon herunterladen, installieren und im Spiel World of Warcraft
+      verwenden, privat und kostenlos.
+   b) Den Quelltext lesen und für den eigenen, privaten Gebrauch auf dem
+      eigenen Rechner anpassen.
+
+2. Nicht erlaubt (ohne vorherige schriftliche Zustimmung des Rechteinhabers)
+   a) Das Addon oder Teile davon weitergeben, veröffentlichen, hochladen,
+      verkaufen oder vermieten, auch nicht kostenlos und auch nicht über
+      Addon-Plattformen (z. B. CurseForge, Wago, WoWInterface, GitHub).
+   b) Veränderte Versionen weitergeben oder veröffentlichen, auch nicht als
+      Fork, Patch, Paket oder unter neuem Namen.
+   c) Den Code oder Teile davon in andere Addons, Programme oder Dienste
+      übernehmen.
+   d) Den Namen "Forever Guides", das Logo oder andere Kennzeichen des Addons
+      bzw. von forever-guides.com verwenden, insbesondere für eigene Addons,
+      Projekte oder Veröffentlichungen.
+
+3. Daten und Inhalte
+   Die mitgelieferten Daten und Texte (z. B. Lehrer-, Waffen-, Klassen- und
+   Fähigkeitsdaten, Übersetzungen, Hilfetexte) stammen von forever-guides.com
+   und sind ebenfalls urheberrechtlich geschützt. Sie dürfen nur innerhalb
+   dieses Addons genutzt und nicht ausgelesen, gesammelt oder als Datenbank
+   weiterverwendet werden.
+
+4. Drittkomponenten
+   Mitgelieferte Komponenten Dritter bleiben unter ihren eigenen Lizenzen
+   (siehe THIRD-PARTY-NOTICES, z. B. LibDeflate unter der zlib-Lizenz). Diese
+   Lizenz schränkt die Rechte an diesen Komponenten nicht ein.
+
+5. Keine Gewährleistung
+   Das Addon wird ohne Gewähr bereitgestellt, so wie es ist. Die Haftung ist
+   im gesetzlich zulässigen Umfang ausgeschlossen.
+
+6. Marken
+   World of Warcraft und Blizzard Entertainment sind Marken von Blizzard
+   Entertainment, Inc. Dieses Addon ist nicht mit Blizzard Entertainment
+   verbunden.
+
+7. Weitere Rechte und Kontakt
+   Wer das Addon oder Teile davon ändern, weiterverarbeiten, weitergeben oder
+   in andere Projekte übernehmen möchte, braucht dafür vorab eine ausdrückliche
+   Erlaubnis des Rechteinhabers in Textform (zum Beispiel per E-Mail). Eine
+   Erlaubnis gilt nur für den darin genannten Umfang. Schweigen oder eine
+   Nachricht ohne ausdrückliche Bestätigung des Rechteinhabers ist keine
+   Erlaubnis. Anfragen sowie Fehlermeldungen und Ideen bitte an:
+   contact@forever-guides.com
+
+8. Offizielle Veröffentlichung
+   Der Rechteinhaber darf das Addon unverändert über Addon-Plattformen und
+   Addon-Manager (z. B. CurseForge, Wago, WoWInterface) bereitstellen. Das ist
+   keine Erlaubnis für Dritte nach Abschnitt 2.
+
+English
+=======
+
+Scope: This license applies to the entire Forever Guides package, that is, to
+all bundled folders (ForeverGuides, ForeverGuides_GildenManager,
+ForeverGuides_MapData, ForeverGuides_Professions, ForeverGuides_Recipes) and to
+all original files, data and texts in them. For third-party components see
+section 4.
+
+This addon is "source-available": the source code can be read, but it is
+not freely licensed. All rights are reserved by the copyright holder except
+as expressly permitted below.
+
+1. Permitted
+   a) Download, install and use the addon in the game World of Warcraft,
+      privately and free of charge.
+   b) Read the source code and modify it for your own private use on your
+      own computer.
+
+2. Not permitted (without prior written consent of the copyright holder)
+   a) Redistributing, publishing, uploading, selling or renting the addon or
+      any part of it, including free of charge and including addon platforms
+      (e.g. CurseForge, Wago, WoWInterface, GitHub).
+   b) Redistributing or publishing modified versions, including as a fork,
+      patch, package or under a different name.
+   c) Copying the code or parts of it into other addons, programs or
+      services.
+   d) Using the name "Forever Guides", its logo or other marks of the addon or
+      of forever-guides.com, in particular for your own addons, projects or
+      publications.
+
+3. Data and content
+   The bundled data and texts (e.g. trainer, weapon, class and ability data,
+   translations, help texts) come from forever-guides.com and are protected
+   as well. They may only be used within this addon and must not be
+   extracted, collected or reused as a database.
+
+4. Third-party components
+   Bundled third-party components remain under their own licenses (see
+   THIRD-PARTY-NOTICES, e.g. LibDeflate under the zlib license). This license
+   does not restrict the rights to those components.
+
+5. No warranty
+   The addon is provided "as is", without warranty of any kind. Liability is
+   excluded to the extent permitted by law.
+
+6. Trademarks
+   World of Warcraft and Blizzard Entertainment are trademarks of Blizzard
+   Entertainment, Inc. This addon is not affiliated with Blizzard
+   Entertainment.
+
+7. Further rights and contact
+   Anyone who wishes to modify, process further, redistribute or incorporate
+   the addon or parts of it into other projects needs the prior express
+   permission of the copyright holder in text form (for example by email). A
+   permission applies only to the scope stated in it. Silence, or a message
+   without the copyright holder's express confirmation, is not a permission.
+   Please send requests, bug reports and ideas to:
+   contact@forever-guides.com
+
+8. Official publication
+   The copyright holder may provide the addon, unchanged, through addon
+   platforms and addon managers (e.g. CurseForge, Wago, WoWInterface). This is
+   not a permission for third parties under section 2.

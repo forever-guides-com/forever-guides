@@ -1,0 +1,24 @@
+Third-party components in Forever Guides
+========================================
+
+LibDeflate 1.0.2
+  Path:    ForeverGuides/Libs/LibDeflate/
+  Author:  Haoqian He
+  License: zlib License, full text in ForeverGuides/Libs/LibDeflate/LICENSE.txt
+  Source:  https://github.com/safeteeWow/LibDeflate
+  Changed: yes (all marked "Altered by Forever Guides" in the file).
+           1. The last lines hand the library to the addon namespace
+              instead of creating the global "LibDeflate".
+           2. The copy is private: it is not registered with LibStub and
+              does not defer to a copy from another addon.
+           3. DecompressDeflate(str, max_output) stops with status -20 once
+              more than max_output bytes would be produced (protection
+              against decompression bombs). Without the argument the
+              behavior is unchanged.
+
+Fonts
+  No font files are bundled, the addon uses the game's own fonts.
+
+Game assets
+  Icons and textures referenced by path (Interface\Icons\..., Interface\
+  Buttons\..., Fonts\...) belong to the game client and are not bundled.
