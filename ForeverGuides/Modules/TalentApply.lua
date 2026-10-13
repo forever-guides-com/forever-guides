@@ -1,8 +1,9 @@
--- Talent apply and read-back through C_Traits. Stages a build in the active
--- config (ResetTree / PurchaseRank on node IDs), opens Blizzard's own talent
--- window, checks the staged points and commits them. Also reads the active
--- config back for the editor. Every game call is defensive: a missing API
--- degrades to "staged only" or to an error message, never to a Lua error.
+-- Talent apply and read-back through C_Traits. Adds the missing points of a build to the active
+-- config (PurchaseRank on node IDs), opens Blizzard's own talent window, checks the staged
+-- points and commits them. Points the character already spent are never taken back: the game
+-- only refunds them at the class trainer for gold, so a build is applied as far as it fits (see
+-- TL.Plan). Also reads the active config back for the editor. Every game call is defensive: a
+-- missing API degrades to "staged only" or to an error message, never to a Lua error.
 -- Errors are returned as (false, localeKey, arg1, arg2).
 local _, ns = ...
 
@@ -11,12 +12,12 @@ ns.AddLocale("enUS", {
   ["talents.err.noconfig"] = "Talent data cannot be read in this game version.",
   ["talents.err.notree"] = "Talent tree could not be determined.",
   ["talents.err.empty"] = "There is nothing to apply.",
-  ["talents.err.points"] = "Build needs %d points, you have %d: not applied",
-  ["talents.err.pointsunknown"] = "Build needs %d points, at least %d spent, rest unreadable: not applied",
-  ["talents.err.partial"] = "Only %d of %d talents settable: nothing applied",
-  ["talents.err.mismatch"] = "Talent window does not match the build: nothing applied",
-  ["talents.apply.committed"] = "%d of %d talents set and applied",
-  ["talents.apply.unchanged"] = "This build is already active, nothing was changed.",
+  ["talents.err.pointsunknown"] = "Your free talent points cannot be read in this game version: nothing applied",
+  ["talents.err.nothing"] = "None of the missing points can be bought right now: nothing applied",
+  ["talents.err.partial"] = "Only %d of %d points could be set: nothing applied",
+  ["talents.err.mismatch"] = "Talent window does not match the plan: nothing applied",
+  ["talents.apply.committed"] = "%d of %d missing points set and applied",
+  ["talents.apply.unchanged"] = "All points of this build are already set, nothing was changed.",
   ["talents.apply.staged"] = "Points prepared: click Apply in the talent window",
 })
 
@@ -25,12 +26,12 @@ ns.AddLocale("deDE", {
   ["talents.err.noconfig"] = "Talentdaten sind in dieser Spielversion nicht auslesbar.",
   ["talents.err.notree"] = "Talentbaum konnte nicht ermittelt werden.",
   ["talents.err.empty"] = "Es gibt nichts anzuwenden.",
-  ["talents.err.points"] = "Build braucht %d Punkte, du hast %d: nicht angewendet",
-  ["talents.err.pointsunknown"] = "Build braucht %d Punkte, mindestens %d investiert, Rest unlesbar: nicht angewendet",
-  ["talents.err.partial"] = "Nur %d von %d Talenten setzbar: nichts angewendet",
-  ["talents.err.mismatch"] = "Talentfenster passt nicht zum Build: nichts angewendet",
-  ["talents.apply.committed"] = "%d von %d Talenten gesetzt und angewendet",
-  ["talents.apply.unchanged"] = "Dieser Build ist bereits aktiv, es wurde nichts geändert.",
+  ["talents.err.pointsunknown"] = "Deine freien Talentpunkte sind in dieser Spielversion nicht auslesbar: nichts angewendet",
+  ["talents.err.nothing"] = "Von den fehlenden Punkten ist gerade keiner kaufbar: nichts angewendet",
+  ["talents.err.partial"] = "Nur %d von %d Punkten setzbar: nichts angewendet",
+  ["talents.err.mismatch"] = "Talentfenster passt nicht zum Plan: nichts angewendet",
+  ["talents.apply.committed"] = "%d von %d fehlenden Punkten gesetzt und angewendet",
+  ["talents.apply.unchanged"] = "Alle Punkte dieser Skillung sind schon gesetzt, es wurde nichts geändert.",
   ["talents.apply.staged"] = "Punkte vorbereitet: im Talentfenster auf Anwenden klicken",
 })
 
@@ -168,38 +169,26 @@ function TalentApply.readNodeRanks()
   return ranks
 end
 
--- Staging ----------------------------------------------------------------------------
-
-local function purchaseEntries(configId, entries)
-  local done = 0
-  for i, node in pairs(entries) do
-    local success = false
-    if node.selectionEntryID then
-      local ok, res = call("C_Traits", "SetSelection", configId, node.nodeID, node.selectionEntryID)
-      success = ok and res
-    elseif node.ranksPurchased then
-      -- Buy only missing ranks: an earlier pass may have placed some.
-      local function current()
-        local ok, info = call("C_Traits", "GetNodeInfo", configId, node.nodeID)
-        return ok and type(info) == "table" and info.ranksPurchased or 0
-      end
-      local guard = node.ranksPurchased
-      while current() < node.ranksPurchased and guard > 0 do
-        guard = guard - 1
-        local ok, res = call("C_Traits", "PurchaseRank", configId, node.nodeID)
-        if not (ok and res) then
-          break
-        end
-      end
-      success = current() >= node.ranksPurchased
-    end
-    if success then
-      done = done + 1
-      entries[i] = nil
-    end
+-- Unspent points of the tree's currency, nil when the game does not report it.
+-- The config info has no currency field; the tree currency call is what the
+-- game's own talent UI reads (staged changes included).
+local function unspentOf(configId, treeId)
+  local ok, list = call("C_Traits", "GetTreeCurrencyInfo", configId, treeId, false)
+  local currency = ok and type(list) == "table" and list[1] or nil
+  if type(currency) == "table" and type(currency.quantity) == "number" then
+    return currency.quantity
   end
-  return done
+  return nil
 end
+
+-- Unspent talent points of the active config, nil when they cannot be read.
+function TalentApply.unspentPoints()
+  local configId = activeConfigId()
+  local treeId = configId and treeIdOf(configId)
+  return treeId and unspentOf(configId, treeId) or nil
+end
+
+-- Plan and staging ------------------------------------------------------------------
 
 local function count(map)
   local n = 0
@@ -209,101 +198,87 @@ local function count(map)
   return n
 end
 
-local function stage(configId, treeId, entries)
-  -- purchaseEntries empties what it placed, the caller's list stays intact.
-  local pending = {}
-  for i, e in pairs(entries) do
-    pending[i] = e
+-- { [nodeID] = ranks } of entries { nodeID, ranksPurchased }.
+local function nodeRanksOf(entries)
+  local ranks = {}
+  for _, e in ipairs(entries) do
+    ranks[e.nodeID] = (ranks[e.nodeID] or 0) + (e.ranksPurchased or 1)
   end
-  local total = count(pending)
-  if total == 0 then
-    return false, "talents.err.empty"
-  end
-  if not call("C_Traits", "ResetTree", configId, treeId) then
-    return false, "talents.err.notree"
-  end
-  -- Purchasing unlocks further nodes, so repeat until a pass places nothing.
-  while purchaseEntries(configId, pending) > 0 do
-  end
-  return true, total - count(pending), total
+  return ranks
 end
 
-local function sumRanks(entries)
-  local n = 0
-  for _, e in pairs(entries) do
-    n = n + (e.ranksPurchased or 1)
-  end
-  return n
-end
-
-local function sumValues(map)
-  local n = 0
-  for _, v in pairs(map) do
-    n = n + v
-  end
-  return n
-end
-
--- Unspent points of the tree's currency, nil when the game does not report it.
--- The config info has no currency field; the tree currency call is what the
--- game's own talent UI reads (staged changes included).
-local function unspentPoints(configId, treeId)
-  local ok, list = call("C_Traits", "GetTreeCurrencyInfo", configId, treeId, false)
-  local currency = ok and type(list) == "table" and list[1] or nil
-  if type(currency) == "table" and type(currency.quantity) == "number" then
-    return currency.quantity
-  end
-  return nil
-end
-
--- Refuses a build that needs more points than invested plus unspent ones, and
--- one that cannot be measured at all, so the reset in stage() never leaves the
--- player with fewer talents than before.
-local function stageWithinBudget(configId, treeId, entries)
-  local current = readRanks(configId, treeId)
-  if not current then
-    return false, "talents.err.noconfig"
-  end
-  local required, invested = sumRanks(entries), sumValues(current)
-  local unspent = unspentPoints(configId, treeId)
-  if unspent then
-    if required > invested + unspent then
-      return false, "talents.err.points", required, invested + unspent
-    end
-  elseif required > invested then
-    return false, "talents.err.pointsunknown", required, invested
-  end
-  return stage(configId, treeId, entries)
-end
-
--- Stages entries of the shape { nodeID, ranksPurchased, selectionEntryID? }
--- (for example from the talent editor) in the active, uncommitted config.
--- Returns true, applied, total or false, localeKey, arg1, arg2.
-function TalentApply.applyEntries(entries)
+-- What applying the entries (the build as { nodeID, ranksPurchased }, see TL.NodeEntries) would do
+-- to the character right now, as a TL.Plan. Nothing is changed and no window is opened. `specs`
+-- are the trees of the build's class (default: the player's class). Returns the plan and the
+-- node ranks it was made from, or nil plus a locale key.
+function TalentApply.preview(entries, specs)
   if inCombat() then
-    return false, "talents.err.combat"
+    return nil, "talents.err.combat"
+  end
+  local TL = ns.TalentLogic
+  specs = specs or TL.Specs(ns.PageKit.PlayerClass())
+  if not specs then
+    return nil, "talents.err.notree"
+  end
+  if type(entries) ~= "table" or #entries == 0 then
+    return nil, "talents.err.empty"
   end
   loadTalentUi()
-  local configId = activeConfigId()
-  local treeId = configId and treeIdOf(configId)
-  if not treeId then
-    return false, "talents.err.notree"
+  local current, key = TalentApply.readNodeRanks()
+  if not current then
+    return nil, key
   end
-  return stageWithinBudget(configId, treeId, entries)
+  local free = TalentApply.unspentPoints()
+  if not free then
+    return nil, "talents.err.pointsunknown"
+  end
+  local want = TL.RanksFromNodes(specs, nodeRanksOf(entries))
+  local have = TL.RanksFromNodes(specs, current)
+  return TL.Plan(specs, want, have, free), current
+end
+
+-- The game's own answer whether this rank can be bought. A client without the call leaves it to
+-- PurchaseRank and the read-back.
+local function canPurchase(configId, step)
+  if type(C_Traits) ~= "table" or type(C_Traits.CanPurchaseRank) ~= "function" then
+    return true
+  end
+  local ok, res = pcall(C_Traits.CanPurchaseRank, configId, step.node, step.entry)
+  return ok and res and true or false
+end
+
+-- Buys the steps in their order and stops at the first one the game refuses. Never refunds a
+-- point. Returns how many ranks were bought.
+local function purchase(configId, steps)
+  local bought = 0
+  for _, step in ipairs(steps) do
+    if not canPurchase(configId, step) then
+      break
+    end
+    local ok, res = call("C_Traits", "PurchaseRank", configId, step.node)
+    if not (ok and res) then
+      break
+    end
+    bought = bought + 1
+  end
+  return bought
 end
 
 -- Commit -----------------------------------------------------------------------------
 
--- True when the tree holds exactly the wanted ranks, nothing more or less.
-local function stagedMatches(configId, entries)
+-- True when the tree holds exactly the ranks before plus the steps, nothing more or less.
+local function stagedMatches(configId, before, steps)
   local treeId = treeIdOf(configId)
   local have = treeId and readRanks(configId, treeId)
   if not have then
     return false
   end
   local want = {}
-  for _, e in ipairs(entries) do
-    want[e.nodeID] = (want[e.nodeID] or 0) + (e.ranksPurchased or 1)
+  for node, ranks in pairs(before) do
+    want[node] = ranks
+  end
+  for _, step in ipairs(steps) do
+    want[step.node] = step.rank
   end
   for nodeId, ranks in pairs(want) do
     if have[nodeId] ~= ranks then
@@ -323,29 +298,31 @@ local function commit(configId)
   return ok and res and true or false
 end
 
--- Opens the talent window, places the entries, checks them and commits.
--- Returns true, state, applied, total with state "committed" (the game took
--- the commit request), "unchanged" (the build was already active) or
--- "staged" (points are placed, commit refused or unavailable: the player
--- presses Apply). Failures return false, localeKey, arg1, arg2 and leave
--- the character's talents untouched (staged points are rolled back).
-function TalentApply.applyAndCommit(entries)
-  if inCombat() then
-    return false, "talents.err.combat"
+-- Buys the points of the build that can be bought now, opens the talent window, checks the
+-- result and commits. Never resets the tree: points the character spent elsewhere stay.
+-- Returns true, state, applied, total with state "committed" (the game took the commit request),
+-- "unchanged" (every point of the build is already set) or "staged" (points are placed, commit
+-- refused or unavailable: the player presses Apply); applied counts the points bought, total
+-- the points the build lacked. Failures return false, localeKey, arg1, arg2 and leave the
+-- character's talents untouched (staged points are rolled back).
+function TalentApply.applyAndCommit(entries, specs)
+  local plan, current = TalentApply.preview(entries, specs)
+  if not plan then
+    return false, current
+  end
+  local sum = plan.summary
+  if sum.total == 0 then
+    return true, "unchanged", 0, 0
+  end
+  if sum.now == 0 then
+    return false, "talents.err.nothing"
   end
   TalentApply.openTalentFrame()
-  local ok, applied, total, extra = TalentApply.applyEntries(entries)
-  if not ok then
-    return false, applied, total, extra
-  end
   local configId = activeConfigId()
-  if applied < total or not stagedMatches(configId, entries) then
+  local applied = purchase(configId, plan.steps)
+  if applied < sum.now or not stagedMatches(configId, current, plan.steps) then
     call("C_Traits", "RollbackConfig", configId)
-    return false, applied < total and "talents.err.partial" or "talents.err.mismatch", applied, total
+    return false, applied < sum.now and "talents.err.partial" or "talents.err.mismatch", applied, sum.now
   end
-  local hasChanges, changed = call("C_Traits", "ConfigHasStagedChanges", configId)
-  if hasChanges and changed == false then
-    return true, "unchanged", applied, total
-  end
-  return true, commit(configId) and "committed" or "staged", applied, total
+  return true, commit(configId) and "committed" or "staged", applied, sum.total
 end

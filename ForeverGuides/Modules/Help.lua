@@ -247,7 +247,7 @@ local function build(container)
       end
     end,
   })
-  -- Player commands only, grouped by area (probes and dumps stay under /fg help dev).
+  -- Player commands only, grouped by area.
   local rows = {}
   for _, area in ipairs(ns.Commands.activeAreas()) do
     rows[#rows + 1] = { header = area.id }
@@ -272,22 +272,17 @@ local function build(container)
     }),
     { height = 26, width = 200 }
   )
-  add(
-    "diag",
-    W.Button(view.content, {
-      key = "instexport.open",
-      width = 200,
-      onClick = function()
-        ns.InstanceExport.Run()
-      end,
-    }),
-    { height = 26, width = 200 }
-  )
   -- Registered extension tools: one button each, none without an extension.
-  for _, tool in ipairs(ns.DevTools.list) do
+  for _, tool in ipairs(ns.DevTools.Slot("help")) do
     add(
       "diag",
-      W.Button(view.content, { key = tool.key, width = 200, onClick = tool.run }),
+      W.Button(view.content, {
+        key = tool.key,
+        width = 200,
+        onClick = function()
+          tool.run()
+        end,
+      }),
       { height = 26, width = 200 }
     )
   end
@@ -371,7 +366,7 @@ end
 
 ns.RegisterPage({
   id = "help",
-  order = 220,
+  order = 730,
   group = "system",
   title = "page.help",
   icon = ns.ICONS.help,

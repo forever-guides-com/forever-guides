@@ -14,10 +14,19 @@ local function register(id, fn)
   end
 end
 
--- For add-ons that load after this one: the registry entry and the handler in one call.
+-- "/fg <command> <word>" answered by an add-on: { name of the command, word, handler }.
+local SUBS = {}
+
+-- For add-ons that load after this one: the registry entry and the handler in one call. entry.sub =
+-- { of = id of a command, word = word } makes the handler answer "/fg <that command> <word> ..." too.
 function ns.RegisterCommand(entry, fn)
   ns.Commands.Add(entry)
   register(entry.id, fn)
+  if entry.sub then
+    for _, name in ipairs(ns.Commands.byId[entry.sub.of].names) do
+      SUBS[#SUBS + 1] = { name = name, word = entry.sub.word, fn = fn }
+    end
+  end
 end
 
 register("show", function()
@@ -123,9 +132,6 @@ register("fenster", function(rest)
 end)
 register("flighttimer", function()
   ns.FlightTimer.TogglePreview()
-end)
-register("instexport", function(rest)
-  ns.InstanceExport.Run({ instance = rest ~= "" and rest or nil })
 end)
 register("route", function()
   ns.RouteBuilder.Toggle()
@@ -248,12 +254,12 @@ end)
 register("profession", function()
   ns.Main.Show("professionroute")
 end)
+register("proftrainers", function(rest)
+  local slug = ns.ProfessionRouteLogic.SlugFromText(rest)
+  ns.Main.Show(slug and "proftrainers/" .. slug or "proftrainers")
+end)
 register("guild", function(rest)
   if not areaHelp(rest, "guild") then
-    -- "/fg guild demo": sample guild in memory, see GuildDemo.lua.
-    if rest:lower() == "demo" then
-      ns.GuildData.SetDemo(true)
-    end
     ns.Main.Show("guild")
   end
 end)
@@ -345,14 +351,12 @@ function ns.HandleSlash(msg)
     return
   end
   rest = rest or ""
-  if cmd == "dev" then
-    -- Hidden (developer) commands also answer under /fg dev <name>.
-    if rest == "" then
-      ns.CommandHelp.Show("dev")
-    else
-      ns.HandleSlash(rest)
+  local lowered = rest:lower()
+  for _, sub in ipairs(SUBS) do
+    if sub.name == cmd and (lowered == sub.word or lowered:sub(1, #sub.word + 1) == sub.word .. " ") then
+      sub.fn(U.trim(rest:sub(#sub.word + 1)))
+      return
     end
-    return
   end
   if COMMANDS[cmd] then
     COMMANDS[cmd](rest)

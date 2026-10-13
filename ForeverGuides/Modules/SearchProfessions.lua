@@ -7,6 +7,7 @@
 local _, ns = ...
 local L, S, K, W = ns.L, ns.SearchLogic, ns.PageKit, ns.W
 local R, RL, Shop, U = ns.ProfessionRouteLogic, ns.RecipeLogic, ns.ProfessionShop, ns.PackageUI
+local PL = ns.ProfessionTrainersLogic
 
 local SP = {}
 ns.SearchProfessions = SP
@@ -140,15 +141,6 @@ local function noteItem(items, id, slug, names, icon)
   return it
 end
 
--- Position as fractions of the zone map; many trainers have none in the data (nil, nil).
-local function fractions(t)
-  local x, y = t.x, t.y
-  if type(x) == "number" and type(y) == "number" and x > 0 and x <= 100 and y > 0 and y <= 100 then
-    return x / 100, y / 100
-  end
-  return nil, nil
-end
-
 local function slugOrder()
   local order = {}
   for i, slug in ipairs(R.SLUGS) do
@@ -206,7 +198,7 @@ local function prepare()
   for _, kind in ipairs(SP.KINDS) do
     batch[kind] = S.NewBatch(kind)
   end
-  local items, trainers, trainerSeen = {}, {}, {}
+  local items, sources = {}, {}
   -- Names { de, en } of the recipes by result item.
   local products = {}
 
@@ -222,18 +214,7 @@ local function prepare()
           it.shop = it.shop or (crafts and slug) or nil
         end
       end
-      for _, rank in ipairs(type(d.ranks) == "table" and d.ranks or {}) do
-        for _, t in ipairs(type(rank.trainers) == "table" and rank.trainers or {}) do
-          if type(t) == "table" and nonEmpty(t.n) then
-            local zone = type(t.zone) == "table" and t.zone or { de = t.locDe, en = t.loc }
-            local key = slug .. "|" .. t.n .. "|" .. tostring(zone.en)
-            if not trainerSeen[key] then
-              trainerSeen[key] = true
-              trainers[#trainers + 1] = { slug = slug, t = t, zone = zone }
-            end
-          end
-        end
-      end
+      sources[#sources + 1] = { slug = slug, data = d, name = R.PROFESSIONS[slug] }
       tick()
     end
   end
@@ -300,25 +281,29 @@ local function prepare()
     end
   end
 
+  -- One entry per trainer and profession: the trainer data file joined with the route trainers.
+  local trainers = PL.Collect(sources, rawget(ns, "ProfessionTrainers"))
   table.sort(trainers, function(a, b)
-    if a.slug ~= b.slug then
-      return (order[a.slug] or 99) < (order[b.slug] or 99)
+    if a.order ~= b.order then
+      return a.order < b.order
     end
-    return a.t.n < b.t.n
+    if a.name ~= b.name then
+      return a.name < b.name
+    end
+    return a.key < b.key
   end)
   for _, e in ipairs(trainers) do
     local p = R.PROFESSIONS[e.slug]
     local parts = { R.Name(e.slug), ns.T(e.zone) or "" }
-    if e.t.f == "A" or e.t.f == "H" then
-      parts[#parts + 1] = L["kit.faction." .. e.t.f]
+    if e.faction == "A" or e.faction == "H" then
+      parts[#parts + 1] = L["kit.faction." .. e.faction]
     end
-    local x, y = fractions(e.t)
     batch.professionTrainer.add(
-      e.t.n,
+      { de = e.nameDe or e.name, en = e.name },
       table.concat(parts, ", "),
       "professionroute/" .. e.slug,
       p and { p.de .. " Lehrer", p.en .. " trainer" } or nil,
-      { slug = e.slug, n = e.t.n, x = x, y = y, zone = e.zone }
+      { slug = e.slug, n = e.name, nDe = e.nameDe, x = e.x, y = e.y, zone = e.zone, mapId = e.mapId, npc = e.npc }
     )
     tick()
   end
@@ -484,30 +469,15 @@ end
 
 -- Actions ----------------------------------------------------------------------------------------
 
--- Map of a zone by its name in either language; only a unique hit counts (a wrong pin is worse
--- than none).
-local function zoneMap(zone)
-  local index = ns.Waypoints.ZoneIndex()
-  for _, name in ipairs({ ns.T(zone) or "", zone.de or "", zone.en or "" }) do
-    if name ~= "" then
-      local hits = ns.WaypointLogic.matchZones(index, name)
-      if #hits == 1 then
-        return hits[1].id
-      end
-    end
-  end
-  return nil
-end
-
 -- { map, x, y, label } of a trainer (x, y nil without a position), nil (with a warning) when the
 -- zone has no unique map.
 local function trainerPlace(d)
-  local map = type(d.zone) == "table" and zoneMap(d.zone) or nil
+  local map = PL.MapOf(d)
   if not map then
     ns.Notify(ns.Waypoints.ErrorText("unknownZone", type(d.zone) == "table" and ns.T(d.zone) or d.n), "warning")
     return nil
   end
-  return { map = map, x = d.x, y = d.y, label = d.n }
+  return { map = map, x = d.x, y = d.y, label = PL.DisplayName({ name = d.n, nameDe = d.nDe }) }
 end
 
 -- The primary action of a hit that is more than opening a page: a trainer sets the waypoint (when

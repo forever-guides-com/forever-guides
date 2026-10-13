@@ -328,8 +328,8 @@ end
 
 ns.RegisterPage({
   id = "loot",
-  order = 98,
-  group = "tools",
+  order = 510,
+  group = "inventory",
   title = "page.loot",
   icon = ns.ICONS.loot,
   aliases = { "beute", "loot", "lootcapture" },

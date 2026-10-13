@@ -120,6 +120,13 @@ function D.Instances(kind)
   return out
 end
 
+-- { display = displayID, icon = FileDataID or nil } of a boss (English instance and boss name) from the
+-- boss model data, nil without an entry.
+function D.BossModel(instance, boss)
+  local list = ns.Data and ns.Data.BossModels and ns.Data.BossModels[instance]
+  return list and list[boss] or nil
+end
+
 function D.TravelNode(slug)
   for _, n in ipairs((ns.Data and ns.Data.Travel and ns.Data.Travel.nodes) or {}) do
     if n.s == slug then

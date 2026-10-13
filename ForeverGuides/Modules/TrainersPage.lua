@@ -14,6 +14,7 @@ ns.AddLocale("enUS", {
   ["trainers.sub"] = "%s · %s · position %s",
   ["trainers.noPos"] = "no position",
   ["trainers.kind.own"] = "recorded by you",
+  ["trainers.kind.pet"] = "Pet trainer",
   ["trainers.emptyTitle"] = "Not recorded in Forever yet",
   ["trainers.races"] = "Playable as: %s (website 2026-10-06, no trainer known)",
   ["trainers.emptyHint"] = "Visit a trainer in game and the addon remembers it.",
@@ -40,6 +41,7 @@ ns.AddLocale("deDE", {
   ["trainers.sub"] = "%s · %s · Position %s",
   ["trainers.noPos"] = "keine Position",
   ["trainers.kind.own"] = "selbst erfasst",
+  ["trainers.kind.pet"] = "Begleiter-Lehrer",
   ["trainers.emptyTitle"] = "In Forever noch nicht erfasst",
   ["trainers.races"] = "Spielbar als: %s (Website 06.10.2026, kein Lehrer belegt)",
   ["trainers.emptyHint"] = "Besuche einen Lehrer im Spiel, das Addon merkt ihn sich.",
@@ -84,10 +86,12 @@ end
 local ROW_HEIGHT = 48
 local ROW_ACTION_TOP = 5
 
-local KIND_BADGE_COLOR = { start = "success", town = "textMuted", capital = "accent2", own = "accent2" }
+local KIND_BADGE_COLOR =
+  { start = "success", town = "textMuted", capital = "accent2", own = "accent2", pet = "warning" }
 
 -- Shared by the card and list views so both always show the exact same
--- title/sub text for a given trainer entry.
+-- title/sub text for a given trainer entry. A pet trainer shows its role
+-- where the others show the kind of place, and carries a note.
 local function trainerTexts(t)
   local pos = K.Coord(t.x, t.y) or L["trainers.noPos"]
   local zone = R.zoneName(t.z) or t.p or "?"
@@ -95,11 +99,13 @@ local function trainerTexts(t)
   if t.nt then
     title = title .. "  " .. Theme.hexText("warning", "!")
   end
-  local kind = t.k or "town"
+  local isPet = R.roleOf(t) == "pet"
+  local kind = isPet and "pet" or t.k or "town"
   return {
     title = title,
     kind = kind,
     sub = string.format(L["trainers.sub"], zone, L["trainers.kind." .. kind], pos),
+    note = isPet and ns.T(t.nt) or nil,
   }
 end
 
@@ -233,6 +239,10 @@ local function build(container)
   end
   s:Add(levelsLink, { gap = 10 })
 
+  -- Shown while pet trainers are in the list: in the list view they are told apart by the sub line only.
+  local petHint = ns.AddParagraph(view, nil, { role = "micro", color = "textSecondary", gap = 10 })
+  K.Anchor("FG.Trainers.PetHint", petHint)
+
   local viewToggle = K.ViewToggle(view.content, {
     get = function()
       return state.view
@@ -269,6 +279,7 @@ local function build(container)
     card.title:SetText(tx.title)
     card.badge:SetKey("trainers.kind." .. tx.kind, KIND_BADGE_COLOR[tx.kind] or "textMuted")
     card.sub:SetText(tx.sub)
+    card.note:SetText(tx.note or "")
     card.dot:SetCf(t.cf)
   end
 
@@ -284,6 +295,9 @@ local function build(container)
     card.sub = W.Text(card, { role = "micro", color = "textSecondary", wrap = true })
     card.sub:SetPoint("TOPLEFT", card.badge, "BOTTOMLEFT", 0, -6)
     card.sub:SetPoint("RIGHT", -12, 0)
+    card.note = W.Text(card, { role = "micro", color = "textMuted", wrap = true })
+    card.note:SetPoint("TOPLEFT", card.sub, "BOTTOMLEFT", 0, -4)
+    card.note:SetPoint("RIGHT", -12, 0)
     card.dot = K.ConfidenceDot(card, 2)
     card.dot:SetPoint("TOPRIGHT", -10, -10)
     -- No-op activate, matches the old K.NewList rows: Tab still reaches
@@ -365,7 +379,7 @@ local function build(container)
       return h
     end
     s:Add(p.list, { gap = 14 })
-    p.grid = K.GridPool(view.content, 112, makeTrainerCard)
+    p.grid = K.GridPool(view.content, 136, makeTrainerCard)
     s:Add(p.grid, { gap = 14 })
     p.empty = makeEmptyCard(view.content)
     s:Add(p.empty, { gap = 14 })
@@ -400,6 +414,7 @@ local function build(container)
   function refresh()
     if not K.HasData("Trainers") then
       paintPanels({})
+      petHint:Hide()
       note:SetText(L["kit.noData"])
       note:Show()
       view:Layout()
@@ -409,6 +424,12 @@ local function build(container)
     basis:SetText(ns.T(ns.Data.Trainers.basis) or "")
     local groups = R.TrainerGroups(state.class, faction)
     paintPanels(groups)
+    local hasPets = false
+    for _, g in ipairs(groups) do
+      hasPets = hasPets or #g.pets > 0
+    end
+    petHint:SetText(ns.T(ns.TrainerRoles.NOTE_PET) or "")
+    petHint:SetShown(hasPets)
     note:Hide()
     classButtons.Refresh()
     factionButtons.Refresh()
@@ -428,8 +449,8 @@ end
 
 ns.RegisterPage({
   id = "trainers",
-  order = 50,
-  group = "character",
+  order = 320,
+  group = "learn",
   title = "page.trainers",
   icon = ns.ICONS.trainers,
   aliases = { "lehrer", "trainer", "trainers" },

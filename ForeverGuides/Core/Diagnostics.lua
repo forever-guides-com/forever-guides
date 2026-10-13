@@ -99,6 +99,10 @@ function ns.DiagReport()
     local okLinks, links = pcall(ns.BlizzardLinks.Report)
     line(out, "%s", okLinks and links or "blizzard links: ?")
   end
+  if ns.HostSkin then
+    local okSkin, skin = pcall(ns.HostSkin.Report)
+    line(out, "%s", okSkin and skin or "host skin: ?")
+  end
   if ns.EscStack then
     local okEsc, esc = pcall(ns.EscStack.Report)
     line(out, "%s", okEsc and esc or "esc stack: ?")

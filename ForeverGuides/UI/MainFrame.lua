@@ -7,11 +7,28 @@ local Main = {}
 ns.Main = Main
 ns.MainLayout = Layout.compute(Layout.DEFAULT_W, false)
 
-local frame, sidebar, contentHost, header, footer, search
+local frame, sidebar, content, contentHost, header, footer, search
 local views = {}
 local currentView
 
+-- Skin "forever": the title bar moves into the metal band above the window (see "Title bar" below), the page
+-- header stays under it. band.on = true while the bar sits in the band, band.rect = Skins.BandRect, band.tier = how
+-- many reductions the width needed (in both styles), band.state = what is still shown. parts = the controls of the
+-- title bar, built once in buildTitleBar (tests and diagnostics read band and band.parts).
+local band = { on = false, tier = 0 }
+local parts = {}
+band.parts = parts
+Main.band = band
+local layoutBar, applyHeaderMode
+
 local ICON = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
+
+-- The author's own channel, the second link field of the title bar (text and address for the copy dialog). The one
+-- place of the address; the texts are added here, so this file is the only one of the release with the name
+-- (tools/build_release.py ALLOWED_HITS).
+local CHANNEL = { text = "twitch.tv/wosande", address = "https://twitch.tv/wosande" }
+ns.AddLocale("enUS", { ["bar.channel"] = "Copy Twitch channel" })
+ns.AddLocale("deDE", { ["bar.channel"] = "Twitch-Kanal kopieren" })
 
 local function frameDB()
   return ns.db.frames.main
@@ -171,6 +188,7 @@ function Main.Relayout()
   ns.MainLayout = lay
   sidebar:SetWidth(lay.sidebarWidth)
   sidebar:Layout(lay.sidebar == "icons")
+  layoutBar()
   if currentView and currentView.Layout then
     ns.Safe("view-layout", currentView.Layout, currentView, lay)
   end
@@ -180,14 +198,36 @@ end
 -- Routing ------------------------------------------------------------------
 
 local crumbButtons = {}
+local crumbCount = 0
+parts.crumbs = crumbButtons
+
+-- Flat: the trail sits above the page title, each crumb right of the one before.
+local function placeCrumbs()
+  local prev
+  for i, b in ipairs(crumbButtons) do
+    local on = i <= crumbCount
+    b:SetShown(on)
+    if on then
+      b:SetHeight(16)
+      b:ClearAllPoints()
+      b:SetPoint(
+        "BOTTOMLEFT",
+        prev or header.title,
+        prev and "BOTTOMRIGHT" or "TOPLEFT",
+        prev and 4 or 0,
+        prev and 0 or 4
+      )
+      prev = b
+    end
+  end
+end
 
 local function renderCrumbs(path)
   local crumbs = ns.Router:crumbs(path)
-  local prev
-  for i = 1, math.max(#crumbs, #crumbButtons) do
-    local c = crumbs[i]
+  crumbCount = #crumbs
+  for i, c in ipairs(crumbs) do
     local b = crumbButtons[i]
-    if c and not b then
+    if not b then
       b = CreateFrame("Button", nil, header)
       b:SetHeight(16)
       b.text = W.Text(b, { role = "micro", color = "textMuted" })
@@ -200,29 +240,16 @@ local function renderCrumbs(path)
       end)
       crumbButtons[i] = b
     end
-    if c then
-      local label = c.isKey and L[c.label] or c.label
-      b.text:SetText((i > 1 and "> " or "") .. label)
-      b:SetWidth(b.text:GetStringWidth() + 6)
-      b.isLast = i == #crumbs
-      W.SetColor(b.text, b.isLast and "textSecondary" or "textMuted")
-      b:ClearAllPoints()
-      b:SetPoint(
-        "BOTTOMLEFT",
-        prev or header.title,
-        prev and "BOTTOMRIGHT" or "TOPLEFT",
-        prev and 4 or 0,
-        prev and 0 or 4
-      )
-      b:SetScript("OnClick", function()
-        ns.Router:navigate(c.path)
-      end)
-      b:Show()
-      prev = b
-    elseif b then
-      b:Hide()
-    end
+    local label = c.isKey and L[c.label] or c.label
+    b.text:SetText((i > 1 and "> " or "") .. label)
+    b:SetWidth(b.text:GetStringWidth() + 6)
+    b.isLast = i == #crumbs
+    W.SetColor(b.text, b.isLast and "textSecondary" or "textMuted")
+    b:SetScript("OnClick", function()
+      ns.Router:navigate(c.path)
+    end)
   end
+  header.place()
 end
 
 local function getView(page)
@@ -355,6 +382,14 @@ end
 
 -- Construction ---------------------------------------------------------------
 
+local SEARCH_WIDTH, SEARCH_HEIGHT, LOGO_SIZE = 220, 26, 26
+
+-- Anchors of a control, replaced as a whole.
+local function put(f, ...)
+  f:ClearAllPoints()
+  f:SetPoint(...)
+end
+
 local function buildTitleBar()
   local shell = ns.WindowShell.Of(frame)
   local bar = shell.titleBar
@@ -373,41 +408,41 @@ local function buildTitleBar()
       Main.SetScale(frame:GetScale() + delta * 0.05)
     end
   end)
+  parts.bar = bar
 
   local logo = bar:CreateTexture(nil, "ARTWORK")
-  logo:SetSize(26, 26)
-  logo:SetPoint("LEFT", 10, 0)
   logo:SetTexture(ICON)
-  local title = shell.titleText
-  title:ClearAllPoints()
-  title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
+  parts.logo = logo
   ns.Anchors["FG.Title"] = bar
 
-  -- Plain credit text, same copy-dialog mechanism as the Help page's own
-  -- website button (ns.Website, set in Modules/Help.lua). WoW addons can't
-  -- write to the OS clipboard directly, clicking opens the usual
-  -- pre-selected copy box instead of a real silent clipboard write.
-  local website = W.Button(bar, {
-    text = "forever-guides.com",
-    variant = "ghost",
-    width = 160,
-    height = 22,
-    onClick = function()
-      ns.Dialogs.Copy("help.websiteButton", ns.Website)
-    end,
-  })
-  website:SetPoint("LEFT", title, "RIGHT", 10, 0)
+  -- The two link fields in the middle of the bar (both styles): a text and the address its copy dialog shows, the
+  -- same mechanism as the Help page's own website button (ns.Website, set in Modules/Help.lua). WoW addons can't
+  -- write to the OS clipboard directly, clicking opens the usual pre-selected copy box instead.
+  -- Main.SetBarLink changes the text and the address of the website field.
+  -- When the text has no room, a symbol with the same action takes its place, the name in its tooltip.
+  local function linkField(titleKey, icon, text, copy)
+    local field = W.Button(bar, { text = text, variant = "ghost", width = 160, height = 22, onClick = copy })
+    local symbol = W.Action(bar, { icon = icon, size = 24, tooltip = titleKey, onClick = copy })
+    return field, symbol
+  end
+  parts.link = { text = "forever-guides.com" }
+  parts.website, parts.websiteIcon = linkField("help.websiteButton", "share", parts.link.text, function()
+    ns.Dialogs.Copy("help.websiteButton", parts.link.address or ns.Website)
+  end)
+  parts.channel, parts.channelIcon = linkField("bar.channel", "play", CHANNEL.text, function()
+    ns.Dialogs.Copy("bar.channel", CHANNEL.address)
+  end)
 
   local close = W.Action(bar, { icon = "close", size = W.CLOSE_SIZE, tooltip = "common.close" })
-  close:SetPoint("RIGHT", -8, 0)
   close:SetScript("OnClick", function()
     frame:Hide()
   end)
+  parts.close = close
   local settings = W.Action(bar, { icon = "gear", size = 24, tooltip = "page.settings" })
-  settings:SetPoint("RIGHT", close, "LEFT", -4, 0)
   settings:SetScript("OnClick", function()
     ns.Router:navigate("settings")
   end)
+  parts.gear = settings
 
   -- Quick language toggle next to the gear icon: shows which language is
   -- currently active (the "auto" setting in Settings still resolves to one
@@ -474,23 +509,24 @@ local function buildTitleBar()
       refreshLangToggle()
     end
   end)
-  langToggle:SetPoint("RIGHT", settings, "LEFT", -10, 0)
+  parts.lang, parts.langDE, parts.langEN = langToggle, langDE, langEN
 
   local help = W.Action(bar, { icon = "help", size = 26, tooltip = "page.help" })
-  help:SetPoint("RIGHT", langToggle, "LEFT", -4, 0)
   help:SetScript("OnClick", function()
     ns.Router:navigate("help")
   end)
   ns.Anchors["FG.Help"] = help
+  parts.help = help
   local dock = W.Action(bar, { icon = "open", size = 26, tooltip = "dock.toggle" })
-  dock:SetPoint("RIGHT", help, "LEFT", -4, 0)
   dock:SetScript("OnClick", function()
     ns.Dock.Toggle()
   end)
+  parts.dock = dock
 
   search = W.EditBox(bar, {
     placeholder = "search.placeholder",
     clear = true,
+    height = SEARCH_HEIGHT,
     onEnter = function(text)
       text = U.trim(text):gsub("/", " ")
       if text ~= "" then
@@ -498,8 +534,7 @@ local function buildTitleBar()
       end
     end,
   })
-  search:SetPoint("RIGHT", dock, "LEFT", -12, 0)
-  search:SetWidth(220)
+  parts.search = search
   ns.Anchors["FG.Search"] = search
   Main.search = search
   return bar
@@ -514,12 +549,10 @@ local function buildHeader(parent)
   local h = CreateFrame("Frame", nil, parent)
   h:SetHeight(Theme.size.contentHeader + 8)
   h.back = W.Action(h, { icon = "chevron-left", size = 24, tooltip = "nav.back" })
-  h.back:SetPoint("LEFT", 12, -6)
   h.back:SetScript("OnClick", function()
     ns.Router:goBack()
   end)
   h.fwd = W.Action(h, { icon = "chevron-right", size = 24, tooltip = "nav.forward" })
-  h.fwd:SetPoint("LEFT", h.back, "RIGHT", 2, 0)
   h.fwd:SetScript("OnClick", function()
     ns.Router:goForward()
   end)
@@ -553,11 +586,8 @@ local function buildHeader(parent)
       ns.CommandHelp.OpenForPage((ns.RouterClass.parse(ns.Router.current)))
     end,
   })
-  h.commands:SetPoint("RIGHT", -12, -6)
   ns.Anchors["FG.Header.Commands"] = h.commands
-  h.tour:SetPoint("RIGHT", h.commands, "LEFT", -HEADER_BUTTON_GAP, 0)
   h.title = W.Text(h, { role = "h2", family = "heading", color = "text" })
-  h.title:SetPoint("LEFT", h.fwd, "RIGHT", 12, -2)
 
   -- The labels of both buttons stay while the title keeps its room, else only the icons remain.
   local function fitButtons()
@@ -571,25 +601,271 @@ local function buildHeader(parent)
     h.commands:SetWidth(h.commands:Fit(cap))
     h.tour:SetWidth(h.tour:Fit(cap))
   end
+  -- Arrows and title in the row under the title bar (the metal band in the skin "forever"), the links at its
+  -- right edge. Both styles use this row as it is.
+  local function placeRow()
+    h.back:SetSize(24, 24)
+    put(h.back, "LEFT", 12, -6)
+    h.fwd:SetSize(24, 24)
+    put(h.fwd, "LEFT", h.back, "RIGHT", 2, 0)
+    h.commands:SetHeight(HEADER_BUTTON_HEIGHT)
+    put(h.commands, "RIGHT", -12, -6)
+    h.commands:Show()
+    h.tour:SetHeight(HEADER_BUTTON_HEIGHT)
+    put(h.tour, "RIGHT", h.commands, "LEFT", -HEADER_BUTTON_GAP, 0)
+    h.tour:SetShown(h.tourId ~= nil)
+    put(h.title, "LEFT", h.fwd, "RIGHT", 12, -2)
+    h.title:SetPoint("RIGHT", h.tourId and h.tour or h.commands, "LEFT", -8, 0)
+  end
+  function h.place()
+    placeRow()
+    placeCrumbs()
+    fitButtons()
+  end
   function h:SetTour(tour)
     h.tourId = tour and tour.id or nil
-    h.tour:SetShown(tour ~= nil)
-    h.title:ClearAllPoints()
-    h.title:SetPoint("LEFT", h.fwd, "RIGHT", 12, -2)
-    h.title:SetPoint("RIGHT", tour and h.tour or h.commands, "LEFT", -8, 0)
-    fitButtons()
+    h.place()
   end
   h:SetTour(nil)
   h:SetScript("OnSizeChanged", fitButtons)
   ns.Bind(h, fitButtons)
-  local line = h:CreateTexture(nil, "BORDER")
-  line:SetPoint("BOTTOMLEFT", 12, 0)
-  line:SetPoint("BOTTOMRIGHT", -12, 0)
-  line:SetHeight(1)
-  ns.Bind(line, function(t)
+  h.line = h:CreateTexture(nil, "BORDER")
+  h.line:SetPoint("BOTTOMLEFT", 12, 0)
+  h.line:SetPoint("BOTTOMRIGHT", -12, 0)
+  h.line:SetHeight(1)
+  ns.Bind(h.line, function(t)
     t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
   end)
   return h
+end
+
+-- Title bar: responsive in both styles ------------------------------------------------------------------------------
+
+-- The title bar holds the logo and the name on the left, the link field in the middle, the search and the symbols
+-- on the right. In the skin "forever" it sits in the metal band above the window (UI/WindowShell.lua) and replaces
+-- the dark bar; the page header (arrows, title, tour and commands) is not part of it, it stays in the content
+-- area under the bar like in the flat look. Nothing is built twice, layoutBar only anchors the controls again, for
+-- the style in force and for the width of the window.
+
+-- Gaps between symbols and between groups.
+local BAR_GAP, BAR_GROUP = 4, 10
+-- Sizes per style: the flat title bar keeps its larger symbols, the band takes smaller ones with room above and below
+-- (pad = bar edge to logo, edge = bar edge to the close button).
+local BAR_FLAT = { pad = 10, edge = 8, gear = 24, help = 26, dock = 26, web = 24, search = 26 }
+local BAR_BAND = { pad = 6, edge = 4, gear = 20, help = 20, dock = 20, web = 20, search = 24 }
+-- The link text of each middle field is at least this wide, the search box shrinks in two steps.
+local LINK_MIN = 160
+local SEARCH_NARROW, SEARCH_LEAST = 140, 120
+
+-- What gives way when the width is short, first to last: the search box, both link texts (their symbols take their
+-- place), the channel symbol, the text of the name, the compact window, help, then the search and the website symbol
+-- (only below Layout.MIN_W).
+local BAR_STEPS = {
+  function(s)
+    s.search = SEARCH_NARROW
+  end,
+  function(s)
+    s.search = SEARCH_LEAST
+  end,
+  function(s)
+    s.link, s.web, s.chan = false, true, true
+  end,
+  function(s)
+    s.chan = false
+  end,
+  function(s)
+    s.text = false
+  end,
+  function(s)
+    s.dock = false
+  end,
+  function(s)
+    s.help = false
+  end,
+  function(s)
+    s.search = 0
+  end,
+  function(s)
+    s.web = false
+  end,
+}
+
+-- The band of the metal frame, current at any point of a refresh: the order of the refresh callbacks of the
+-- shell and of this window is not defined, so the frame is asked to match the skin first (as the shell does).
+local function bandRect()
+  local shell = frame and ns.WindowShell.Of(frame)
+  if not shell then
+    return nil
+  end
+  ns.Skins.Apply(shell.edge, "nine")
+  return ns.Skins.BandRect(shell.edge)
+end
+
+-- Tab order: the controls of the title bar are taken out of the list of the keyboard focus and put back as one
+-- block where they were, in screen order (left to right) while the bar sits in the band. The rest of the list keeps
+-- its order, and the way back puts every control to the place it had, so the flat look keeps its old order.
+local function orderFocus(on)
+  local items, flat, slots = ns.Focus.items, parts.focusFlat, parts.focusSlots
+  if not (flat and slots) then
+    return
+  end
+  local mine = {}
+  for _, f in ipairs(flat) do
+    mine[f] = true
+  end
+  local rest = {}
+  for _, f in ipairs(items) do
+    if not mine[f] then
+      rest[#rest + 1] = f
+    end
+  end
+  if #rest + #flat ~= #items then
+    return
+  end
+  if on then
+    for k, f in ipairs(parts.focusBand) do
+      table.insert(rest, math.min(slots[1] + k - 1, #rest + 1), f)
+    end
+  else
+    for k, f in ipairs(flat) do
+      table.insert(rest, math.min(slots[k], #rest + 1), f)
+    end
+  end
+  for i = 1, math.max(#items, #rest) do
+    items[i] = rest[i]
+  end
+end
+
+-- Sidebar and content. Flat: under the title bar. Forever: directly under the band, the dark bar is gone.
+-- The content always hangs on the page header.
+local function placeContent(rect)
+  if rect then
+    put(sidebar, "TOPLEFT", frame, "TOPLEFT", 0, math.min(0, rect.bottom))
+  else
+    put(sidebar, "TOPLEFT", parts.bar, "BOTTOMLEFT")
+  end
+  sidebar:SetPoint("BOTTOMLEFT", footer, "TOPLEFT")
+  put(contentHost, "TOPLEFT", header, "BOTTOMLEFT")
+  contentHost:SetPoint("BOTTOMRIGHT")
+end
+
+-- Lays out the title bar for the style and the width of the window: measures every part, lets parts give way in the
+-- order of BAR_STEPS until the rest fits, then anchors everything (right edge leftwards, left edge rightwards, the
+-- link field in the middle of the bar as far as the neighbours leave room).
+layoutBar = function()
+  local p = parts
+  if not (frame and p.search) then
+    return
+  end
+  local m = band.on and BAR_BAND or BAR_FLAT
+  local metrics = ns.Skins.list.forever.metrics.bar
+  local avail = frame:GetWidth() - (band.on and 2 * metrics.margin or 0)
+  if not avail or avail <= 0 then
+    return
+  end
+  local logoText = ns.WindowShell.Of(frame).titleText
+  -- No control is taller than the bar minus the gap above and below it (everything is centered on the bar).
+  local height = band.on and band.rect and band.rect.height or p.bar:GetHeight() or 0
+  local cap = math.max(16, height - 2 * metrics.gap)
+  local function square(f, natural)
+    local side = math.min(natural, cap)
+    f:SetSize(side, side)
+    return side
+  end
+  for _, field in ipairs({ p.website, p.channel }) do
+    field:SetWidth(math.max(LINK_MIN, math.ceil(field.label:GetStringWidth()) + 24))
+  end
+  local size = {
+    logo = square(p.logo, LOGO_SIZE),
+    gear = square(p.gear, m.gear),
+    help = square(p.help, m.help),
+    dock = square(p.dock, m.dock),
+    web = square(p.websiteIcon, m.web),
+    chan = square(p.channelIcon, m.web),
+    lang = p.lang:GetWidth(),
+    close = p.close:GetWidth(),
+    link = p.website:GetWidth(),
+    channel = p.channel:GetWidth(),
+  }
+  local textW = math.ceil(logoText:GetStringWidth())
+
+  local state = { search = SEARCH_WIDTH, text = true, link = true, web = false, chan = false, dock = true, help = true }
+  local function leftW(s)
+    return m.pad + size.logo + (s.text and 8 + textW or 0)
+  end
+  local function rightW(s)
+    local w = m.edge + size.close + BAR_GAP + size.gear + BAR_GROUP + size.lang
+    w = w + (s.help and BAR_GAP + size.help or 0) + (s.dock and BAR_GAP + size.dock or 0)
+    w = w + (s.web and BAR_GAP + size.web or 0) + (s.chan and BAR_GAP + size.chan or 0)
+    return w + (s.search > 0 and BAR_GROUP + s.search or 0)
+  end
+  local function need(s)
+    return leftW(s) + (s.link and BAR_GROUP + size.link + BAR_GAP + size.channel or 0) + BAR_GROUP + rightW(s)
+  end
+  local tier = 0
+  while need(state) > avail and BAR_STEPS[tier + 1] do
+    tier = tier + 1
+    BAR_STEPS[tier](state)
+  end
+  band.tier, band.state = tier, state
+
+  -- Right edge, leftwards.
+  local prev
+  local function right(f, gap, on)
+    f:SetShown(on)
+    if on then
+      put(f, "RIGHT", prev or p.bar, prev and "LEFT" or "RIGHT", -gap, 0)
+      prev = f
+    end
+  end
+  right(p.close, m.edge, true)
+  right(p.gear, BAR_GAP, true)
+  right(p.lang, BAR_GROUP, true)
+  right(p.help, BAR_GAP, state.help)
+  right(p.dock, BAR_GAP, state.dock)
+  right(p.channelIcon, BAR_GAP, state.chan)
+  right(p.websiteIcon, BAR_GAP, state.web)
+  p.search:SetSize(math.max(state.search, 1), math.min(m.search, cap))
+  right(p.search, BAR_GROUP, state.search > 0)
+
+  -- Left edge, rightwards: everything is placed by its offset from the bar.
+  put(p.logo, "LEFT", p.bar, "LEFT", m.pad, 0)
+  logoText:SetShown(state.text)
+  if state.text then
+    put(logoText, "LEFT", p.bar, "LEFT", m.pad + size.logo + 8, 0)
+  end
+
+  -- The link fields (website, then channel): centered as a pair on the bar, pushed aside only as far as the
+  -- neighbours need.
+  p.website:SetShown(state.link)
+  p.channel:SetShown(state.link)
+  if state.link then
+    local pair = size.link + BAR_GAP + size.channel
+    local lo = leftW(state) + BAR_GROUP
+    local hi = avail - rightW(state) - BAR_GROUP - pair
+    put(p.website, "LEFT", p.bar, "LEFT", math.max(lo, math.min(hi, (avail - pair) / 2)), 0)
+    put(p.channel, "LEFT", p.website, "RIGHT", BAR_GAP, 0)
+  end
+end
+
+-- Puts the title bar and the content where the style in force wants them. Runs on every ns.RefreshUI.
+applyHeaderMode = function()
+  if not (frame and header and content) then
+    return
+  end
+  local rect = bandRect()
+  if rect then
+    band.rect = rect
+    if not band.on then
+      band.on = true
+      orderFocus(true)
+    end
+  elseif band.on then
+    band.on, band.rect = false, nil
+    orderFocus(false)
+  end
+  placeContent(rect)
+  layoutBar()
 end
 
 local function charLine()
@@ -753,24 +1029,23 @@ local function create()
     shadow = true,
     shadowScale = 0.6,
     fade = "main",
+    band = true,
+    bandSize = "main",
   })
   frame:Hide()
 
-  local title = buildTitleBar()
+  buildTitleBar()
   footer = buildFooter()
   sidebar = ns.Sidebar.Create(frame)
-  sidebar:SetPoint("TOPLEFT", title, "BOTTOMLEFT")
-  sidebar:SetPoint("BOTTOMLEFT", footer, "TOPLEFT")
 
-  local content = CreateFrame("Frame", nil, frame)
+  content = CreateFrame("Frame", nil, frame)
   content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT")
   content:SetPoint("BOTTOMRIGHT", footer, "TOPRIGHT")
   header = buildHeader(content)
   header:SetPoint("TOPLEFT")
   header:SetPoint("TOPRIGHT")
   contentHost = CreateFrame("Frame", nil, content)
-  contentHost:SetPoint("TOPLEFT", header, "BOTTOMLEFT")
-  contentHost:SetPoint("BOTTOMRIGHT")
+  placeContent()
   ns.Anchors["FG.Content"] = contentHost
   ns.Anchors["FG.Main"] = frame
 
@@ -803,11 +1078,58 @@ local function create()
   setupKeyboard()
   restoreGeometry()
   applyAlpha()
+  parts.focusFlat = {
+    parts.website,
+    parts.websiteIcon,
+    parts.channel,
+    parts.channelIcon,
+    parts.close,
+    parts.gear,
+    parts.langDE,
+    parts.langEN,
+    parts.help,
+    parts.dock,
+    parts.search,
+  }
+  parts.focusSlots = {}
+  for k, f in ipairs(parts.focusFlat) do
+    for i, item in ipairs(ns.Focus.items) do
+      if item == f then
+        parts.focusSlots[k] = i
+      end
+    end
+  end
+  -- Screen order of the title bar, left to right.
+  parts.focusBand = {
+    parts.website,
+    parts.channel,
+    parts.search,
+    parts.websiteIcon,
+    parts.channelIcon,
+    parts.dock,
+    parts.help,
+    parts.langDE,
+    parts.langEN,
+    parts.gear,
+    parts.close,
+  }
+  ns.Bind(header, applyHeaderMode)
+  ns.On("FG_UI_REFRESHED", layoutBar)
+  frame:HookScript("OnSizeChanged", layoutBar)
   ns.Router.onChange = onRoute
   Main.frame = frame
 end
 
 -- Public -----------------------------------------------------------------------
+
+-- The link field in the middle of the title bar: the text and the address its copy dialog shows.
+function Main.SetBarLink(text, address)
+  parts.link.text, parts.link.address = text, address
+  if parts.website then
+    parts.website.label:SetText(text)
+    layoutBar()
+  end
+end
 
 function Main.Show(path)
   if not frame then

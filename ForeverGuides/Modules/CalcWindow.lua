@@ -463,7 +463,7 @@ end)
 
 ns.RegisterPage({
   id = "calc",
-  order = 97,
+  order = 650,
   group = "tools",
   title = "page.calc",
   icon = ns.ICONS.calc,

@@ -278,7 +278,7 @@ end)
 
 ns.RegisterPage({
   id = "macros",
-  order = 90,
+  order = 610,
   group = "tools",
   title = "page.macros",
   icon = ns.ICONS.macros,

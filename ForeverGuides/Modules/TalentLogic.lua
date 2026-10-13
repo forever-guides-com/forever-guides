@@ -578,3 +578,114 @@ function TL.NodeEntries(specs, ranks)
   end
   return entries
 end
+
+-- Apply plan ------------------------------------------------------------------------
+
+-- Buys ranks of `want` on top of `have` in tree order (rows ascending) while TL.CanAdd allows it
+-- within `budget` points in total, repeated until a pass buys nothing. Every step passed the rules
+-- with the ranks before it, so the list is a valid purchase order. Existing ranks are never
+-- lowered. Returns the resulting ranks and the steps { id, node, entry, rank = rank after it }.
+local function simulate(specs, want, have, budget)
+  local ranks, steps = {}, {}
+  for id, rank in pairs(have) do
+    ranks[id] = rank
+  end
+  local progress = true
+  while progress do
+    progress = false
+    for _, spec in ipairs(specs) do
+      for _, talent in ipairs(spec.talents) do
+        while
+          talent.node
+          and rankOf(ranks, talent.id) < rankOf(want, talent.id)
+          and TL.CanAdd(specs, spec, talent, ranks, budget)
+        do
+          ranks[talent.id] = rankOf(ranks, talent.id) + 1
+          steps[#steps + 1] = { id = talent.id, node = talent.node, entry = talent.entry, rank = ranks[talent.id] }
+          progress = true
+        end
+      end
+    end
+  end
+  return ranks, steps
+end
+
+-- What applying a build to the character can do without taking points back: the game only
+-- refunds spent points at the class trainer for gold, so points can be added, never moved.
+-- specs = the class trees, want = ranks of the build, have = ranks the character holds (see
+-- TL.RanksFromNodes), free = unspent points (number, nil counts as 0).
+-- Returns a plan:
+--   items    one per talent with points in want or have, tree order. Fields: id, talent, spec
+--            (tree index), want, have, status, now (ranks buyable now), later (ranks buyable once
+--            level, points or other talents allow it), blocked (ranks that can never be bought),
+--            extra (points above the build, conflict only), reason.
+--   status   "done" (have = want), "learn" (now > 0), "later" (later > 0), "blocked" (blocked > 0)
+--            or "conflict" (have > want: the character holds points the build does not want,
+--            they stay).
+--   reason   later: "points" (budget), "row" or "req" (other talents first); blocked: "cap" (the
+--            51 point cap leaves no room because points sit elsewhere) or "node" (no game node);
+--            conflict: "over" (rank above the build) or "other" (talent not in the build).
+--   learn, later, blocked, conflict, done: the items with that count above 0 (an item that is
+--            partly bought now and partly later is in learn and later).
+--   steps    the purchases in a valid order, one rank each: { id, node, entry, rank }.
+--   summary  { free, now, later, blocked, conflict, total (points the build still lacks) }.
+function TL.Plan(specs, want, have, free)
+  free = math.max(0, math.floor(tonumber(free) or 0))
+  local budget = math.min(TL.MAX_POINTS, TL.Total(specs, have) + free)
+  local after, steps = simulate(specs, want, have, budget)
+  local ever = simulate(specs, want, have, TL.MAX_POINTS)
+  local plan = {
+    items = {},
+    learn = {},
+    later = {},
+    blocked = {},
+    conflict = {},
+    done = {},
+    steps = steps,
+    summary = { free = free, now = #steps, later = 0, blocked = 0, conflict = 0, total = 0 },
+  }
+  local sum = plan.summary
+  for specIndex, spec in ipairs(specs) do
+    for _, talent in ipairs(spec.talents) do
+      local w, h = rankOf(want, talent.id), rankOf(have, talent.id)
+      if w > 0 or h > 0 then
+        local item =
+          { id = talent.id, talent = talent, spec = specIndex, want = w, have = h, now = 0, later = 0, blocked = 0 }
+        plan.items[#plan.items + 1] = item
+        if h > w then
+          item.status, item.extra = "conflict", h - w
+          item.reason = w == 0 and "other" or "over"
+          sum.conflict = sum.conflict + item.extra
+          plan.conflict[#plan.conflict + 1] = item
+        elseif h == w then
+          item.status = "done"
+          plan.done[#plan.done + 1] = item
+        else
+          item.now = rankOf(after, talent.id) - h
+          item.later = rankOf(ever, talent.id) - h - item.now
+          item.blocked = w - h - item.now - item.later
+          sum.total = sum.total + w - h
+          if item.later > 0 then
+            local ok, why = TL.CanAdd(specs, spec, talent, after, math.huge)
+            item.reason = ok and "points" or why
+          end
+          if item.later == 0 and item.blocked > 0 then
+            item.reason = talent.node and "cap" or "node"
+          end
+          item.status = item.now > 0 and "learn" or item.later > 0 and "later" or "blocked"
+          sum.later, sum.blocked = sum.later + item.later, sum.blocked + item.blocked
+          if item.now > 0 then
+            plan.learn[#plan.learn + 1] = item
+          end
+          if item.later > 0 then
+            plan.later[#plan.later + 1] = item
+          end
+          if item.blocked > 0 then
+            plan.blocked[#plan.blocked + 1] = item
+          end
+        end
+      end
+    end
+  end
+  return plan
+end

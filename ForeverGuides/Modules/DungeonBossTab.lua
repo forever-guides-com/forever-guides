@@ -46,6 +46,9 @@ local function makeRow(parent, owner)
   row.mark = ns.IconDraw.new(row, DBT.MARK)
   row.name = W.Text(row, { role = "text", color = "text", wrap = true })
   row.state = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
+  -- Portrait and name open the 3D model of a boss that has one.
+  row.modelPic = ns.BossModelWindow.Hotspot(row, row.portrait)
+  row.modelName = ns.BossModelWindow.Hotspot(row, row.name)
   row.line = row:CreateTexture(nil, "ARTWORK")
   row.line:SetPoint("BOTTOMLEFT")
   row.line:SetPoint("BOTTOMRIGHT")
@@ -53,8 +56,12 @@ local function makeRow(parent, owner)
   ns.Bind(row, function()
     row.line:SetColorTexture(1, 1, 1, ns.Theme.lineAlpha())
   end)
-  -- The row is a stop of the keyboard walk and brings itself into view.
-  ns.Focus.register(row, nil)
+  -- The row is a stop of the keyboard walk and brings itself into view; Enter opens the model of a boss that has one.
+  ns.Focus.register(row, function(self)
+    if self.modelName:IsShown() then
+      ns.BossModelWindow.Open(self.modelName.inst, self.modelName.boss)
+    end
+  end)
   function row:fgScrollIntoView()
     owner:ScrollTo(self)
   end
@@ -148,6 +155,11 @@ function DBT.Create(parent)
       row.name:SetText(text)
       row.hasPicture = fids[i] ~= nil
       row.portrait:SetTexture(fids[i])
+      row.modelName:SetBoss(inst, boss)
+      row.modelPic:SetBoss(inst, boss)
+      if not row.hasPicture then
+        row.modelPic:Hide()
+      end
       row.status = state.available and (BP.Status(inst.id, i) or "open") or nil
       if row.status then
         local look = LOOK[row.status]

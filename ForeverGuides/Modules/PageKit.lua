@@ -263,6 +263,8 @@ K.scaledHeight = scaledHeight
 -- An action may also carry boxed (surface and edge, reads as a button), selected (a toggle that
 -- is on), tooltipText (second tooltip line) and dim (dimmed and inert, the tooltip says
 -- why; it stays focusable so the keyboard user can read the reason).
+-- badge: { text, color = Theme token } a small framed label at the top right instead of `right`
+-- (text and frame carry the same token, the text names the state so color is never the only cue).
 -- onReorder(item, anchor, after) / canReorder(): drag and drop, see W.ScrollList.
 function K.NewList(parent, opts)
   return W.ScrollList(parent, {
@@ -280,6 +282,18 @@ function K.NewList(parent, opts)
       row.bg:SetAllPoints()
       row.right = W.Text(row, { role = "small", color = "textMuted", justify = "RIGHT" })
       row.right:SetPoint("TOPRIGHT", -8, -6)
+      row.badge = CreateFrame("Frame", nil, row)
+      row.badge:SetPoint("TOPRIGHT", -8, -5)
+      row.badge.tint = row.badge:CreateTexture(nil, "BACKGROUND")
+      row.badge.tint:SetAllPoints()
+      row.badge.ring = W.Border(row.badge, "accent2", 0.9, 1)
+      row.badge.text = W.Text(row.badge, { role = "small", color = "accent2", justify = "CENTER" })
+      row.badge.text:SetPoint("CENTER")
+      ns.Bind(row.badge, function(b)
+        local r, g, bl = Theme.rgb(b.color or "accent2")
+        b.tint:SetColorTexture(r, g, bl, 0.16)
+      end)
+      row.badge:Hide()
       row.icon = row:CreateTexture(nil, "ARTWORK")
       row.icon:SetSize(20, 20)
       row.icon:SetPoint("TOPLEFT", 8, -8)
@@ -391,7 +405,21 @@ function K.NewList(parent, opts)
       end
       row.title:ClearAllPoints()
       row.title:SetPoint("TOPLEFT", (t.iconPaint or t.icon) and 36 or 8, -5)
-      row.title:SetPoint("RIGHT", row.right, "LEFT", -8, 0)
+      local badge = t.badge
+      if badge then
+        local b = row.badge
+        b.color = badge.color or "accent2"
+        b.ring.set(b.color, 0.9)
+        W.SetColor(b.text, b.color)
+        b.text:SetText(badge.text or "")
+        b:SetSize(math.ceil(b.text:GetStringWidth()) + 12, math.ceil(b.text:GetStringHeight()) + 4)
+        local r, g, bl = Theme.rgb(b.color)
+        b.tint:SetColorTexture(r, g, bl, 0.16)
+        b:Show()
+      else
+        row.badge:Hide()
+      end
+      row.title:SetPoint("RIGHT", badge and row.badge or row.right, "LEFT", -8, 0)
       local actions = t.actions or {}
       local shown, reserve = 0, 4
       for i, b in ipairs(row.actions) do
@@ -589,8 +617,11 @@ function K.ClassColorHex(class)
   return toHex(K.ContrastColor(r, g, b, "surface", 3))
 end
 
-local function playerGender()
-  local sex = UnitSex and UnitSex("player")
+-- `sex` as UnitSex returns it (2 male, 3 female); without it the logged-in character's.
+local function genderOf(sex)
+  if sex == nil then
+    sex = UnitSex and UnitSex("player")
+  end
   return sex == 3 and "female" or "male"
 end
 
@@ -648,11 +679,12 @@ end
 
 -- Order of resolution: client atlas (only when the client has it), the race
 -- sheet (only when the client can tell the file exists), the shipped icon for
--- races without a client icon, the letter badge.
-function K.RaceIconSpec(slug, side, name)
+-- races without a client icon, the letter badge. `sex` (optional, UnitSex values) is the
+-- gender of the icon; lists of other characters pass the stored one.
+function K.RaceIconSpec(slug, side, name, sex)
   local info = K.RACE_ICONS[slug]
   if info and info.atlas then
-    local gender = playerGender()
+    local gender = genderOf(sex)
     local atlas = "raceicon-" .. info.atlas .. "-" .. gender
     if atlasKnown(atlas) then
       return { kind = "atlas", atlas = atlas }

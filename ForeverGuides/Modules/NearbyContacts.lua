@@ -217,7 +217,7 @@ function N.OnUnit(unit, kind)
   end
 end
 
--- The handler of the three events, also the entry for a probe's feed.
+-- The handler of the three events, also the entry for the feed of an extension.
 function N.Dispatch(event, unit)
   if event == "NAME_PLATE_UNIT_ADDED" then
     N.OnUnit(unit, "plate")
@@ -228,7 +228,7 @@ function N.Dispatch(event, unit)
   end
 end
 
--- Counters for the probe and the tests: admitted and dropped events, strangers and contacts seen.
+-- Counters for extensions and the tests: admitted and dropped events, strangers and contacts seen.
 function N.Stats()
   local s = gate.stats
   return {

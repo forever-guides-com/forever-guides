@@ -1546,7 +1546,7 @@ end
 
 ns.RegisterPage({
   id = "map",
-  order = 20,
+  order = 110,
   group = "world",
   title = "page.map",
   icon = ns.ICONS.map,

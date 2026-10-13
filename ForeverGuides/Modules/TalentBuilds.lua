@@ -415,6 +415,17 @@ function TB.Entries(class, spec)
   return out
 end
 
+-- Every build of a class: the lists of all trees one after the other (TB.Entries per tree).
+function TB.AllEntries(class)
+  local out = {}
+  for spec = 1, TB.SPECS do
+    for _, entry in ipairs(TB.Entries(class, spec)) do
+      out[#out + 1] = entry
+    end
+  end
+  return out
+end
+
 -- Checks every own build against the current talent data. Returns how many do not fit and whether
 -- the data version changed since the last run; a change with invalid builds is announced once.
 function TB.Revalidate(announce)

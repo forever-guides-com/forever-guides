@@ -404,17 +404,19 @@ local function buildList(pane, view)
       onClick = WLUI.ConfirmClear,
     },
   }
-  -- The map test exists only when an extension registers it.
-  local mapTest = ns.DevTools.byId.mapprobe
-  if mapTest then
+  -- Buttons an extension registers for this list (slot "waypoints"), none without an extension.
+  for _, tool in ipairs(ns.DevTools.Slot("waypoints")) do
+    local b = tool.button
     buttons[#buttons + 1] = {
-      id = "probe",
-      label = "act.probe",
-      icon = "search",
-      variant = "ghost",
-      tooltip = "wp.probe",
-      tooltipText = "wp.probeTip",
-      onClick = mapTest.run,
+      id = b.id or tool.id,
+      label = b.label,
+      icon = b.icon,
+      variant = b.variant,
+      tooltip = b.tooltip,
+      tooltipText = b.tooltipText,
+      onClick = function()
+        tool.run()
+      end,
     }
   end
   view.buttons = FL.ButtonRow(pane, buttons)
@@ -770,7 +772,7 @@ end)
 
 ns.RegisterPage({
   id = "waypoints",
-  order = 21,
+  order = 120,
   group = "world",
   title = "page.waypoints",
   icon = ns.ICONS.waypoints,

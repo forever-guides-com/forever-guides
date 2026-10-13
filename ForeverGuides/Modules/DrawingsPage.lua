@@ -796,7 +796,7 @@ end
 
 ns.RegisterPage({
   id = "drawings",
-  order = 96,
+  order = 630,
   group = "tools",
   title = "page.drawings",
   icon = ns.ICONS.drawings,

@@ -3,9 +3,11 @@
 -- enchant and sockets per slot, a list of the same slots and the totals of the gear stats
 -- (Modules/GearStatsLogic.lua). Blizzard hands
 -- out no stats for other players, so every number is computed from the worn items. Next to the
--- inspect window a short view shows the main facts (item level, enchants, sockets, talents, guild
--- and the main totals); it is ours (a child of InspectFrame, anchored to it) and
--- never written while in combat. The data is read once per refresh for both.
+-- inspect window a short view shows the main facts (item level, enchants, sockets, talents, guild)
+-- and the totals by group, scrolled with the mouse wheel or its scrollbar when they do not fit; it is
+-- painted like the stat pane of the character window (gold banners, tinted rows). It is ours (a child
+-- of InspectFrame, anchored to it) and never written while in combat. While it is shown the side
+-- tabs of the window sit to its right (InspectLink.Shift). The data is read once per refresh for both.
 local _, ns = ...
 local W, L, Theme, K, Store = ns.W, ns.L, ns.Theme, ns.PageKit, ns.Store
 local I = ns.ItemInfo
@@ -13,6 +15,7 @@ local G = ns.GearStatsLogic
 local V = ns.InspectOverlay
 local E = ns.ItemEnchantOverlay
 local O = ns.ItemLevelOverlay
+local H = ns.HostSkin
 
 local P = {}
 ns.InspectPage = P
@@ -140,6 +143,9 @@ ns.AddLocale(
     ["gs.group.regen"] = "Regeneration",
     ["gs.group.resist"] = "Resistances",
     ["gs.group.other"] = "Other (not recognized)",
+    ["gs.panel.offense"] = "Offense",
+    ["gs.panel.range"] = "%d-%d/%d",
+    ["gs.panel.wheel"] = "Mouse wheel: scroll",
     ["gs.noStats"] = "No stats found",
     ["gs.ench.yes"] = "Ench.",
     ["gs.ench.no"] = "No ench.",
@@ -181,6 +187,9 @@ ns.AddLocale(
     ["gs.group.regen"] = "Regeneration",
     ["gs.group.resist"] = "Resistenzen",
     ["gs.group.other"] = "Sonstiges (nicht erkannt)",
+    ["gs.panel.offense"] = "Offensiv",
+    ["gs.panel.range"] = "%d-%d/%d",
+    ["gs.panel.wheel"] = "Mausrad: scrollen",
     ["gs.noStats"] = "Keine Werte gefunden",
     ["gs.ench.yes"] = "Verz.",
     ["gs.ench.no"] = "Verz. fehlt",
@@ -206,9 +215,25 @@ ns.AddLocale(
 local TWO_COLUMNS = 560 -- page width from which slots and totals sit side by side
 local COLUMN_GAP, ROW_GAP, LEAD_WIDTH = 16, 6, 84
 local ROW_HEIGHT, HEAD_HEIGHT = 18, 24
-local PANEL_WIDTH, PANEL_PAD, PANEL_GAP, QUICK_ROW = 190, 8, 8, 16
-local MORE_WIDTH, MORE_HEIGHT = 70, 22
-local PANEL_TOP, WINDOW_HEIGHT = 40, 424 -- drop below the window's upper edge; height when unknown
+local PANEL_WIDTH, PANEL_PAD, PANEL_GAP, QUICK_ROW = 230, 8, 8, 16
+local MORE_WIDTH, MORE_HEIGHT, SCROLL_ROWS = 70, 22, 3
+local TEXT_INSET, BANNER_MARGIN, BANNER_EXTRA = 4, 2, 8 -- text inside a row; banner inset in its slot; slot height beyond a text line
+local BAR_WIDTH, BAR_GAP = 8, 4 -- scrollbar and the space between it and the rows
+-- Colors of the pane, from the stat pane of the character window: ground, tinted rows, banner, track.
+local GROUND = { 0.125, 0.082, 0.047, 1 }
+local STRIPE_BLIZZARD, STRIPE_DARK = { 0.21, 0.155, 0.105, 0.9 }, 0.06
+local BANNER_FILL, BANNER_EDGE = { 0.24, 0.16, 0.1, 1 }, { 0.62, 0.46, 0.22, 1 }
+local BAR_TRACK = { 0, 0, 0, 0.35 }
+-- Metal rim of the character window, drawn in rings: { inset, thickness, color }, outermost first.
+local RIM = {
+  { 0, 1, { 0.06, 0.04, 0.02, 1 } },
+  { 1, 2, { 0.52, 0.38, 0.19, 1 } },
+  { 3, 1, { 0.2, 0.14, 0.07, 1 } },
+}
+local ALPHA_WINDOW = "InspectFrame" -- name the window opacity (FrameTweaksAlpha) knows the window by
+-- Textures of the window's own art (ButtonFrameTemplate): shown while Blizzard's look is there.
+local HOST_PROBES = { "Bg", "TopTileStreaks" }
+local WINDOW_HEIGHT = 424 -- height of the window when it cannot be read
 local VALUE_SHARE, LABEL_GAP = 0.6, 6 -- most of a row the value may take; space between the two
 
 -- Paper doll: the groups of the character window (PaperDollItemSlotButton Left, Right and Bottom
@@ -1001,9 +1026,17 @@ end
 
 -- Short view at the inspect window ---------------------------------------------------------
 
--- Anchored to the window itself at the upper right, outside. The side tab (InspectLink) hangs at
--- the lower right, so the rows are capped to the room between the two instead of being anchored to
--- the tab.
+-- Anchored to the window itself on its right, outside: top and bottom edge flush with the window, so
+-- the view is one surface as high as the window. The side tabs (InspectLink) sit behind it (Shift).
+-- The title banner is at the top, the button and the counter at the bottom, the rows between.
+--
+-- The look is that of the stat pane of the character window: a gold framed banner over every
+-- group, rows with an alternating tint, gold labels, white values (green for what the gear adds)
+-- on a dark brown ground. The pane's templates are not used: they belong to Blizzard's update code
+-- of the character window and skin add-ons rework anonymous frames below a Blizzard frame, so the
+-- pieces are drawn here (textures of one named frame). Where another add-on took the Blizzard look
+-- off the window (HostSkin) the ground is our own opaque dark surface and the tint follows the
+-- theme; banners and gold labels stay.
 local function windowHeight()
   local f = frame()
   local ok, height = pcall(f.GetHeight, f)
@@ -1014,15 +1047,193 @@ local function rowHeight()
   return Theme.lineHeight(QUICK_ROW, "micro")
 end
 
--- How many rows fit between the top of the short view and the side tab at the current font size.
-local function capacity()
-  local row = rowHeight()
-  local free = windowHeight() - PANEL_TOP - (ns.InspectLink.REACH + PANEL_GAP)
-  local fixed = 2 * PANEL_PAD + row + 4 + PANEL_GAP + MORE_HEIGHT
-  return math.max(1, math.floor((free - fixed) / row))
+-- Pixels for the rows between the title banner and the button row at the window's height.
+local function rowSpace(titleSlot)
+  return windowHeight() - (2 * PANEL_PAD + titleSlot + PANEL_GAP + MORE_HEIGHT)
 end
 
--- Built on first use and never in combat.
+-- How many entries from `first` on fit into `space` pixels (always at least one) and what they take.
+local function fitRows(heights, first, space)
+  local used, count = 0, 0
+  for index = first, #heights do
+    if count > 0 and used + heights[index] > space then
+      break
+    end
+    used, count = used + heights[index], count + 1
+  end
+  return count, used
+end
+
+-- Number of entries above the last page, the one that ends with the list.
+local function lastOffset(heights, space)
+  local used, count = 0, 0
+  for index = #heights, 1, -1 do
+    if count > 0 and used + heights[index] > space then
+      break
+    end
+    used, count = used + heights[index], count + 1
+  end
+  return #heights - count
+end
+
+local function color(name)
+  local r, g, b = Theme.rgb(name)
+  return { r, g, b }
+end
+
+-- Colors of the two looks; values: neutral, good (what the gear adds, a done enchant), bad.
+local function palette(dark)
+  if dark then
+    return {
+      stripe = { 1, 1, 1, STRIPE_DARK },
+      label = color("accent2"),
+      title = color("text"),
+      neutral = color("text"),
+      good = color("success"),
+      bad = color("danger"),
+    }
+  end
+  return {
+    stripe = STRIPE_BLIZZARD,
+    label = { 1, 0.82, 0 }, -- NORMAL_FONT_COLOR
+    title = { 1, 1, 1 },
+    neutral = { 1, 1, 1 },
+    good = { 0.1, 1, 0.1 },
+    bad = { 1, 0.25, 0.25 },
+  }
+end
+
+local VALUE_KIND = { success = "good", bonus = "good", danger = "bad" }
+
+-- A gold framed banner out of five textures of the view: fill and the four edges.
+local function newBanner(holder)
+  local banner = { fill = holder:CreateTexture(nil, "BACKGROUND"), edges = {} }
+  banner.fill:SetDrawLayer("BACKGROUND", 2)
+  banner.fill:SetColorTexture(unpack(BANNER_FILL))
+  for index = 1, 4 do
+    local edge = holder:CreateTexture(nil, "BORDER")
+    edge:SetColorTexture(unpack(BANNER_EDGE))
+    banner.edges[index] = edge
+  end
+  return banner
+end
+
+local function placeBanner(banner, holder, x, y, width, height)
+  local function put(tex, px, py, w, h)
+    tex:ClearAllPoints()
+    tex:SetPoint("TOPLEFT", holder, "TOPLEFT", px, py)
+    tex:SetSize(w, h)
+  end
+  put(banner.fill, x, y, width, height)
+  put(banner.edges[1], x, y, width, 1)
+  put(banner.edges[2], x, y - height + 1, width, 1)
+  put(banner.edges[3], x, y, 1, height)
+  put(banner.edges[4], x + width - 1, y, 1, height)
+end
+
+local function showBanner(banner, on)
+  banner.fill:SetShown(on)
+  for _, edge in ipairs(banner.edges) do
+    edge:SetShown(on)
+  end
+end
+
+-- Whether the window shows no Blizzard art of its own any more (a skin add-on drew over it). While
+-- the probe textures are unknown the add-on list decides, so the plain game never gets the dark look.
+local function darkLook(f)
+  local look, detected = H.Resolve(f, HOST_PROBES, "inspect")
+  if detected == "unknown" and H.Mode() == "auto" then
+    return #H.ForeignSkins() > 0
+  end
+  return look == "dark"
+end
+
+-- The metal rim of the character window out of rings of four textures each, inside the holder's edge.
+local function newRim(holder)
+  local rim = { edges = {} }
+  for _, ring in ipairs(RIM) do
+    local inset, thick, tint = ring[1], ring[2], ring[3]
+    local function edge(p1, p2, x1, y1, x2, y2, horizontal)
+      local t = holder:CreateTexture(nil, "BORDER")
+      t:SetPoint(p1, holder, p1, x1, y1)
+      t:SetPoint(p2, holder, p2, x2, y2)
+      if horizontal then
+        t:SetHeight(thick)
+      else
+        t:SetWidth(thick)
+      end
+      t:SetColorTexture(unpack(tint))
+      rim.edges[#rim.edges + 1] = t
+    end
+    edge("TOPLEFT", "TOPRIGHT", inset, -inset, -inset, -inset, true)
+    edge("BOTTOMLEFT", "BOTTOMRIGHT", inset, inset, -inset, inset, true)
+    edge("TOPLEFT", "BOTTOMLEFT", inset, -inset, inset, inset, false)
+    edge("TOPRIGHT", "BOTTOMRIGHT", -inset, -inset, -inset, inset, false)
+  end
+  function rim.show(on)
+    for _, t in ipairs(rim.edges) do
+      t:SetShown(on)
+    end
+  end
+  return rim
+end
+
+-- The textures and the frame that make up the background of the view: ground, rim, the surface of a
+-- foreign look, banners and tinted rows. The window opacity (FrameTweaksAlpha) fades exactly these;
+-- text, icons and the scrollbar are not in the list.
+local function backgroundParts()
+  local out = {}
+  local rec = panel
+  if not rec then
+    return out
+  end
+  local function banner(b)
+    out[#out + 1] = b.fill
+    for _, edge in ipairs(b.edges) do
+      out[#out + 1] = edge
+    end
+  end
+  out[#out + 1] = rec.fill
+  for _, edge in ipairs(rec.border.edges) do
+    out[#out + 1] = edge
+  end
+  if rec.surface then
+    out[#out + 1] = rec.surface.frame
+  end
+  banner(rec.banner)
+  for _, row in ipairs(rec.rows) do
+    out[#out + 1] = row.stripe
+    banner(row.banner)
+  end
+  return out
+end
+
+-- Puts the background at the opacity of the window again; after new parts or another look.
+local function applyOpacity()
+  local alpha = ns.FrameTweaksAlpha
+  if alpha and type(alpha.Apply) == "function" then
+    alpha.Apply(ALPHA_WINDOW)
+  end
+end
+
+-- Ground of the view: our brown fill and rim, or the opaque dark surface of HostSkin.
+local function applyLook(rec)
+  local dark = darkLook(frame())
+  local changed = rec.dark ~= dark
+  rec.dark = dark
+  rec.fill:SetShown(not dark)
+  rec.border.show(not dark)
+  if dark then
+    rec.surface = H.Surface(rec.holder, { dark = true, level = -1, label = "InspectSurface" })
+    rec.surface.SetShown(true)
+  elseif rec.surface then
+    rec.surface.SetShown(false)
+  end
+  return changed
+end
+
+-- Built on first use and never in combat. The holder is a named frame: skin add-ons fade anonymous
+-- frames below a Blizzard frame together with its art and leave a named one with everything below it.
 local function ensurePanel()
   if panel then
     return panel
@@ -1031,15 +1242,46 @@ local function ensurePanel()
   if not f or O.InCombat() then
     return nil
   end
-  local ok, holder = pcall(CreateFrame, "Frame", nil, f)
+  local ok, holder = pcall(H.NamedFrame, f, "InspectPanel")
   if not (ok and holder) then
     return nil
   end
-  W.FadeWithWindow(W.Fill(holder, "surface", 1))
-  W.Border(holder, "white")
-  local rec = { holder = holder, rows = {} }
-  rec.title = W.Text(holder, { key = "gs.quick.title", role = "micro", color = "accent2" })
-  rec.title:SetPoint("TOPLEFT", PANEL_PAD, -PANEL_PAD)
+  local rec = { holder = holder, rows = {}, offset = 0, maxOffset = 0 }
+  rec.fill = holder:CreateTexture(nil, "BACKGROUND")
+  rec.fill:SetAllPoints()
+  rec.fill:SetColorTexture(unpack(GROUND))
+  rec.border = newRim(holder)
+  rec.banner = newBanner(holder)
+  rec.title = W.Text(holder, { key = "gs.quick.title", role = "micro", color = "text", justify = "CENTER" })
+  rec.title:SetJustifyV("MIDDLE")
+  rec.range = W.Text(holder, { role = "micro", color = "textMuted", justify = "RIGHT" })
+  rec.range:SetJustifyV("MIDDLE")
+  -- The title says what the numbers are; the tooltip adds the scroll hint while rows are cut off.
+  rec.titleHit = CreateFrame("Frame", nil, holder)
+  rec.titleHit:EnableMouse(true)
+  rec.titleHit:SetScript("OnEnter", function(self)
+    local text = L["gs.note.gear"]
+    if rec.scrolls then
+      text = text .. "\n" .. L["gs.panel.wheel"]
+    end
+    ns.ShowTooltip(self, L["gs.quick.title"], text)
+  end)
+  rec.titleHit:SetScript("OnLeave", ns.HideTooltip)
+  holder:EnableMouseWheel(true)
+  holder:SetScript("OnMouseWheel", function(_, delta)
+    P.Scroll(delta)
+  end)
+  -- Scrollbar of the pane: a track with the thumb of W.Scrollbar, dragged or clicked to a position.
+  rec.barHost = CreateFrame("Frame", nil, holder)
+  rec.barHost:SetWidth(BAR_WIDTH)
+  rec.barTrack = rec.barHost:CreateTexture(nil, "BACKGROUND")
+  rec.barTrack:SetAllPoints()
+  rec.barTrack:SetColorTexture(unpack(BAR_TRACK))
+  rec.bar = W.Scrollbar(rec.barHost, function(fraction)
+    rec.offset = math.floor(fraction * rec.maxOffset + 0.5)
+    P.PaintPanel()
+  end)
+  rec.barHost:Hide()
   rec.more = W.Button(holder, {
     key = "gs.more",
     width = MORE_WIDTH,
@@ -1050,10 +1292,26 @@ local function ensurePanel()
       ns.Main.Show(ns.InspectLink.Target())
     end,
   })
+  -- Both right corners of the window: the height is the window's, whatever its size or scale.
+  rec.range:SetPoint("BOTTOMRIGHT", holder, "BOTTOMRIGHT", -PANEL_PAD, PANEL_PAD)
+  rec.range:SetHeight(MORE_HEIGHT)
+  rec.more:SetPoint("BOTTOMLEFT", holder, "BOTTOMLEFT", PANEL_PAD, PANEL_PAD)
   holder:SetWidth(PANEL_WIDTH)
-  holder:SetPoint("TOPLEFT", f, "TOPRIGHT", ns.InspectLink.TAB_INSET, -PANEL_TOP)
+  holder:SetPoint("TOPLEFT", f, "TOPRIGHT", ns.InspectLink.TAB_INSET, 0)
+  holder:SetPoint("BOTTOMLEFT", f, "BOTTOMRIGHT", ns.InspectLink.TAB_INSET, 0)
   holder:Hide()
   panel = rec
+  -- The window opacity of the Blizzard windows fades the background parts as well.
+  local alpha = ns.FrameTweaksAlpha
+  if alpha and type(alpha.AddParts) == "function" then
+    alpha.AddParts(ALPHA_WINDOW, backgroundParts)
+  end
+  -- A skin may take the window's art away a moment after it showed: look again then.
+  H.Watch(f, function()
+    if panel and panel.holder:IsShown() then
+      P.PaintPanel()
+    end
+  end)
   return rec
 end
 
@@ -1061,10 +1319,16 @@ local function quickRow(rec, index)
   local row = rec.rows[index]
   if not row then
     row = {
+      stripe = rec.holder:CreateTexture(nil, "BACKGROUND"),
+      banner = newBanner(rec.holder),
       label = W.Text(rec.holder, { role = "micro", color = "textSecondary" }),
       value = W.Text(rec.holder, { role = "micro", color = "text", justify = "RIGHT" }),
       hit = CreateFrame("Frame", nil, rec.holder),
     }
+    row.stripe:SetDrawLayer("BACKGROUND", 1)
+    rec.partsChanged = true
+    row.label:SetJustifyV("MIDDLE")
+    row.value:SetJustifyV("MIDDLE")
     -- Hover only, and only on a row whose text had to be cut: it carries the full text.
     row.hit:EnableMouse(true)
     row.hit:Hide()
@@ -1077,8 +1341,20 @@ local function quickRow(rec, index)
   return row
 end
 
+-- Groups of the short view: heading and the GearStatsLogic groups listed under it. Rows without a
+-- value are not there, so a group the gear has nothing for has no heading either.
+local PANEL_GROUPS = {
+  { "gs.panel.offense", { "attack", "spell" } },
+  { "gs.group.defense", { "defense" } },
+  { "gs.group.primary", { "primary", "stamina" } },
+  { "gs.group.resist", { "resist" } },
+  { "gs.group.regen", { "regen" } },
+}
+
 -- Rows of the short view, most important first: item level, enchants, empty sockets, talents,
--- guild, then the stats of the gear. { label, value, color (theme name) }.
+-- guild, then the stats of the gear by group. { label, value, kind, heading = banner, band = tinted
+-- row }. kind: "success" and "danger" for a state, "bonus" for what the gear adds, nil is neutral.
+-- The tint alternates from the first row after a banner (the title banner counts as one).
 local function quickEntries(result)
   local facts, unit = result.facts, result.unit
   local entries = {
@@ -1100,37 +1376,94 @@ local function quickEntries(result)
   if unit.guild then
     entries[#entries + 1] = { L["gs.quick.guild"], unit.guild }
   end
-  local stats = G.Quick(result)
-  for _, row in ipairs(stats) do
-    entries[#entries + 1] = { statLabel(row.id), valueText(row) }
+  local rowsOf = {}
+  for _, group in ipairs(result.groups) do
+    rowsOf[group.id] = group.rows
   end
-  if #stats == 0 then
+  local listed = false
+  for _, spec in ipairs(PANEL_GROUPS) do
+    local rows = {}
+    for _, id in ipairs(spec[2]) do
+      for _, row in ipairs(rowsOf[id] or {}) do
+        rows[#rows + 1] = row
+      end
+    end
+    if #rows > 0 then
+      listed = true
+      entries[#entries + 1] = { L[spec[1]], "", heading = true }
+      for _, row in ipairs(rows) do
+        entries[#entries + 1] = { statLabel(row.id), valueText(row), "bonus" }
+      end
+    end
+  end
+  if not listed then
     entries[#entries + 1] = { L["gs.noStats"], "" }
+  end
+  local count = 0
+  for _, entry in ipairs(entries) do
+    if entry.heading then
+      count = 0
+    else
+      count = count + 1
+      entry.band = count % 2 == 1
+    end
   end
   return entries
 end
 
--- Writes one row between the left and the right edge of the inner width. The value keeps its own
--- width up to VALUE_SHARE of the row, the label takes the rest; whichever is cut ends in "..." and
--- the row gets the hover tooltip with the full text.
-local function paintRow(rec, row, entry, y, inner, height)
+-- Writes one row between the left and the right edge of the pane. The value, right aligned, keeps
+-- its own width up to VALUE_SHARE of the row, the label takes all the rest; whichever is cut ends in
+-- "..." and the row gets the hover tooltip with the full text. A heading is a banner with the text
+-- in its middle. A text is measured at its natural width (SetWidth(0)): the client measures a
+-- FontString with a width set from before against that width, so a stale one would cut a text that fits.
+-- y: top of the entry's slot (negative), slot: its height, height: one line of text.
+local function paintRow(rec, row, entry, look, y, slot, height, width)
   local label, value = row.label, row.value
+  local x, inner = PANEL_PAD, width - 2 * TEXT_INSET
   label.fgFull, value.fgFull = entry[1], entry[2]
-  W.SetColor(value, entry[3] or "text")
-  value:ClearAllPoints()
-  value:SetPoint("TOPRIGHT", rec.holder, "TOPRIGHT", -PANEL_PAD, y)
-  value:SetHeight(height)
-  local shownValue = E.Fit(value, entry[2], inner * VALUE_SHARE)
-  local valueWidth = entry[2] == "" and 0 or value:GetStringWidth()
-  value:SetWidth(math.max(1, valueWidth))
+  row.hit:ClearAllPoints()
   label:ClearAllPoints()
-  label:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", PANEL_PAD, y)
+  value:ClearAllPoints()
+  if entry.heading then
+    local banner = slot - 2 * BANNER_MARGIN
+    row.stripe:Hide()
+    placeBanner(row.banner, rec.holder, x, y - BANNER_MARGIN, width, banner)
+    showBanner(row.banner, true)
+    label:SetJustifyH("CENTER")
+    label:SetTextColor(unpack(look.title))
+    label:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", x + TEXT_INSET, y - BANNER_MARGIN)
+    label:SetWidth(0)
+    local cut = E.Fit(label, entry[1], inner)
+    label:SetSize(inner, banner)
+    row.hit:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", x, y - BANNER_MARGIN)
+    row.hit:SetSize(width, banner)
+    row.hit:SetShown(cut ~= entry[1])
+    label:Show()
+    value:Hide()
+    return
+  end
+  showBanner(row.banner, false)
+  row.stripe:ClearAllPoints()
+  row.stripe:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", x, y)
+  row.stripe:SetSize(width, slot)
+  row.stripe:SetColorTexture(unpack(look.stripe))
+  row.stripe:SetShown(entry.band == true)
+  label:SetJustifyH("LEFT")
+  label:SetTextColor(unpack(look.label))
+  value:SetTextColor(unpack(look[VALUE_KIND[entry[3]] or "neutral"]))
+  value:SetPoint("TOPRIGHT", rec.holder, "TOPLEFT", x + width - TEXT_INSET, y)
+  value:SetHeight(height)
+  value:SetWidth(0)
+  local shownValue = E.Fit(value, entry[2], inner * VALUE_SHARE)
+  local valueWidth = entry[2] == "" and 0 or math.ceil(value:GetStringWidth()) + 1
+  value:SetWidth(math.max(1, valueWidth))
+  label:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", x + TEXT_INSET, y)
   label:SetHeight(height)
+  label:SetWidth(0)
   local labelRoom = inner - valueWidth - (valueWidth > 0 and LABEL_GAP or 0)
   local shownLabel = E.Fit(label, entry[1], labelRoom)
-  label:SetWidth(math.max(1, label:GetStringWidth()))
-  row.hit:ClearAllPoints()
-  row.hit:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", PANEL_PAD, y)
+  label:SetWidth(math.max(1, labelRoom))
+  row.hit:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", x + TEXT_INSET, y)
   row.hit:SetSize(inner, height)
   row.hit:SetShown(shownLabel ~= entry[1] or shownValue ~= entry[2])
   label:Show()
@@ -1142,32 +1475,86 @@ function P.PaintPanel()
   if not result then
     if panel then
       panel.holder:Hide()
+      panel.offset = 0
     end
+    ns.InspectLink.Shift(nil)
     return
   end
   local rec = ensurePanel()
   if not rec then
     return
   end
+  local lookChanged = applyLook(rec)
+  local look = palette(rec.dark)
   local height = rowHeight()
-  local inner = PANEL_WIDTH - 2 * PANEL_PAD
+  local bannerSlot = height + BANNER_EXTRA
   local entries = quickEntries(result)
-  local count = math.min(#entries, capacity())
-  rec.title:SetHeight(height)
+  local heights, total = {}, 0
+  for index, entry in ipairs(entries) do
+    heights[index] = entry.heading and bannerSlot or height
+    total = total + heights[index]
+  end
+  local space = rowSpace(bannerSlot)
+  rec.scrolls = fitRows(heights, 1, space) < #entries
+  rec.maxOffset = rec.scrolls and lastOffset(heights, space) or 0
+  local top = math.max(0, math.min(rec.offset, rec.maxOffset))
+  rec.offset = top
+  local count, used = fitRows(heights, top + 1, space)
+  local width = PANEL_WIDTH - 2 * PANEL_PAD - (rec.scrolls and BAR_WIDTH + BAR_GAP or 0)
+  -- Title banner, then the rows.
+  local banner = bannerSlot - 2 * BANNER_MARGIN
+  placeBanner(rec.banner, rec.holder, PANEL_PAD, -(PANEL_PAD + BANNER_MARGIN), width, banner)
+  rec.title:ClearAllPoints()
+  rec.title:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", PANEL_PAD + TEXT_INSET, -(PANEL_PAD + BANNER_MARGIN))
+  rec.title:SetSize(width - 2 * TEXT_INSET, banner)
+  rec.title:SetTextColor(unpack(look.title))
+  rec.titleHit:ClearAllPoints()
+  rec.titleHit:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", PANEL_PAD, -(PANEL_PAD + BANNER_MARGIN))
+  rec.titleHit:SetSize(width, banner)
+  local y = -(PANEL_PAD + bannerSlot)
   for index = 1, count do
-    paintRow(rec, quickRow(rec, index), entries[index], -(PANEL_PAD + height * index + 4), inner, height)
+    local slot = heights[top + index]
+    paintRow(rec, quickRow(rec, index), entries[top + index], look, y, slot, height, width)
+    y = y - slot
   end
   for index = count + 1, #rec.rows do
     local row = rec.rows[index]
     row.label:Hide()
     row.value:Hide()
     row.hit:Hide()
+    row.stripe:Hide()
+    showBanner(row.banner, false)
   end
-  local bottom = PANEL_PAD + 4 + height * (count + 1) -- title row plus the rows
-  rec.more:ClearAllPoints()
-  rec.more:SetPoint("TOPLEFT", rec.holder, "TOPLEFT", PANEL_PAD, -(bottom + PANEL_GAP))
-  rec.holder:SetHeight(bottom + PANEL_GAP + MORE_HEIGHT + PANEL_PAD)
+  rec.barHost:SetShown(rec.scrolls)
+  if rec.scrolls then
+    rec.barHost:ClearAllPoints()
+    rec.barHost:SetPoint(
+      "TOPLEFT",
+      rec.holder,
+      "TOPLEFT",
+      PANEL_WIDTH - PANEL_PAD - BAR_WIDTH,
+      -(PANEL_PAD + bannerSlot)
+    )
+    rec.barHost:SetSize(BAR_WIDTH, math.max(space, used))
+    rec.bar:Update(used / total, rec.maxOffset > 0 and top / rec.maxOffset or 0)
+    W.SetText(rec.range, nil, string.format(L["gs.panel.range"], top + 1, top + count, #entries))
+  end
+  rec.range:SetShown(rec.scrolls)
   rec.holder:Show()
+  ns.InspectLink.Shift(PANEL_WIDTH)
+  if lookChanged or rec.partsChanged then
+    rec.partsChanged = false
+    applyOpacity()
+  end
+end
+
+-- Mouse wheel over the short view: three rows per notch, up for a positive delta.
+function P.Scroll(delta)
+  if not (panel and panel.scrolls and type(delta) == "number") then
+    return
+  end
+  panel.offset = math.max(0, panel.offset - (delta > 0 and SCROLL_ROWS or -SCROLL_ROWS))
+  P.PaintPanel()
 end
 
 -- Refresh ------------------------------------------------------------------------------------
@@ -1230,7 +1617,7 @@ end)
 
 ns.RegisterPage({
   id = "inspect",
-  order = 70,
+  order = 220,
   group = "character",
   title = "page.inspect",
   icon = ns.ICONS.inspect,

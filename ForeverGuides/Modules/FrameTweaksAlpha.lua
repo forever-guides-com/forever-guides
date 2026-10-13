@@ -12,6 +12,9 @@
 -- change on a child frame scans again after a short delay and sets the value once more. The scan runs
 -- when the window attaches, shows, a value is set and on such a change, never per frame.
 -- In combat a window the tweaks must not touch waits for PLAYER_REGEN_ENABLED.
+-- Our own frames on a window (the scan never enters them) hand in their background parts with
+-- AddParts(name, fn): fn returns the textures and frames that fade with the window's opacity in the
+-- background mode (the whole window mode fades them with the window).
 local _, ns = ...
 local FL = ns.FrameTweaksLogic
 
@@ -28,6 +31,7 @@ local original = setmetatable({}, weak) -- part -> alpha the client gave it
 local applied = {} -- name -> set of parts that differ from the client's alpha
 local pending = {} -- name -> true while a change waits for the end of combat
 local scheduled = {} -- name -> true while a delayed scan is queued
+local extra = {} -- name -> function returning the parts our own frames add to the window's background
 local hookedFrames = setmetatable({}, weak) -- child frame -> true once its hooks are in
 local panelHooked = false
 
@@ -376,13 +380,28 @@ function A.ModeAvailable(name)
   return windows[name] ~= nil and enabled() and ns.FrameTweaks.FeatureOn(name, "alpha")
 end
 
+-- Parts our own frames add to the window's background (AddParts), nothing when none or on a failure.
+local function extraParts(name)
+  local fn = extra[name]
+  if not fn then
+    return {}
+  end
+  local ok, list = pcall(fn)
+  return ok and type(list) == "table" and list or {}
+end
+
+function A.AddParts(name, fn)
+  extra[name] = type(fn) == "function" and fn or nil
+  guard(A.Apply, name)
+end
+
 -- Does the window have something to fade? Whole window mode always has.
 function A.Available(name)
   if not (windows[name] and ns.FrameTweaks.FeatureOn(name, "alpha")) then
     return false
   end
   local list = found[name]
-  return A.Mode(name) == "window" or (list ~= nil and #list > 0)
+  return A.Mode(name) == "window" or (list ~= nil and (#list > 0 or #extraParts(name) > 0))
 end
 
 -- Saved opacity in percent.
@@ -436,7 +455,13 @@ function A.Apply(name)
   local mode = A.Mode(name)
   local targets = {}
   if value < FL.ALPHA_MAX then
-    targets = mode == "window" and { frame } or list
+    targets = { frame }
+    if mode ~= "window" then
+      targets = { unpack(list) }
+      for _, part in ipairs(extraParts(name)) do
+        targets[#targets + 1] = part
+      end
+    end
   end
   local want = setmetatable({}, weak)
   for _, part in ipairs(targets) do

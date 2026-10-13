@@ -5,8 +5,10 @@
 --
 -- ns.db.roster["Name-Realm"] = {
 --   name (first name), surname (nil without one), realm, class (token), race (token), raceSlug (Data.Races slug),
---   faction ("A"|"H"), sex (2 male, 3 female), level, money (copper),
---   zone, subzone, guild, ilvl (average item level), played (seconds, total), levelPlayed (seconds on
+--   faction ("A"|"H"), sex (2 male, 3 female), level, money (copper; nil = never read, not 0),
+--   zone, subzone, guild, ilvl (average item level; nil = never read),
+--   at = { money, ilvl, zone, guild, level } (server time of the reading of each field),
+--   schema (2), played (seconds, total), levelPlayed (seconds on
 --   the current level), playedAt (server time of that reading),
 --   professions = { { name, skill, max, id, kind } } (ProfessionLogic, written by Professions.lua),
 --   professionsAt (server time of that reading), seen (time()), build, addon,
@@ -24,10 +26,11 @@ ns.CharRoster = Roster
 
 Roster.CAP = 60
 local UPDATE_DELAY = 1
+local ITEM_READ_GAP = 1
 local MAX_PROFESSIONS = 8
 
--- UnitRace's token to the race slug of Data.Races. The Skyborne tokens are not
--- known, they are matched by name below.
+-- UnitRace's token to the race slug of Data.Races. Skyborne is one token for both
+-- races, the faction tells them apart (SKYBORNE_SLUG).
 local RACE_SLUG = {
   Human = "human",
   Dwarf = "dwarf",
@@ -38,6 +41,24 @@ local RACE_SLUG = {
   Tauren = "tauren",
   Troll = "troll",
 }
+local SKYBORNE_SLUG = { A = "high-order-skyborne", H = "windshaper-skyborne" }
+
+local function raceSlug(token, name, faction)
+  if RACE_SLUG[token] then
+    return RACE_SLUG[token]
+  end
+  local flat = type(token) == "string" and token:lower() or nil
+  if flat == "skyborne" and SKYBORNE_SLUG[faction] then
+    return SKYBORNE_SLUG[faction]
+  end
+  for _, r in ipairs((ns.Data and ns.Data.Races) or {}) do
+    local slugFlat = r.slug:gsub("%-", "")
+    if (flat and flat == slugFlat) or (name and (name == r.n.en or name == r.n.de)) then
+      return r.slug
+    end
+  end
+end
+Roster.RaceSlug = raceSlug
 
 -- Validation -------------------------------------------------------------------
 
@@ -119,8 +140,24 @@ local function cleanTodos(raw)
   return { values = values }
 end
 
+-- Fields with a reading time in `at` (server time of the reading that stored the value).
+local AT_FIELDS = { "money", "ilvl", "zone", "guild", "level" }
+
+local function cleanAt(raw)
+  local out = {}
+  if type(raw) == "table" then
+    for _, field in ipairs(AT_FIELDS) do
+      out[field] = number(raw[field], 1, 1e11)
+    end
+  end
+  return out
+end
+
 -- A clean copy of a stored entry, nil when it cannot be a character (no name or
--- realm). Damaged single fields are dropped, the rest stays usable.
+-- realm). Damaged single fields are dropped, the rest stays usable. Entries of the
+-- first versions stored a failed reading as 0 gold or item level 0 without a reading
+-- time: that 0 means "never read" and becomes nil. The race slug is derived from race
+-- and faction when it is missing.
 function Roster.Clean(raw)
   if type(raw) ~= "table" then
     return nil
@@ -133,22 +170,40 @@ function Roster.Clean(raw)
   local class = text(raw.class, 20)
   local level = number(raw.level, 1, 200)
   local money = number(raw.money, 0, 1e13)
+  local ilvl = number(raw.ilvl, 0, 2000)
+  local at = cleanAt(raw.at)
+  if money == 0 and not at.money then
+    money = nil
+  end
+  if ilvl == 0 and not at.ilvl then
+    ilvl = nil
+  end
+  local race = text(raw.race, 30)
+  local faction = (raw.faction == "A" or raw.faction == "H") and raw.faction or nil
+  local zone = text(raw.zone)
+  -- A reading time without its value says nothing.
+  at.money = money and at.money or nil
+  at.ilvl = ilvl and at.ilvl or nil
+  at.zone = zone and at.zone or nil
+  at.level = level and at.level or nil
   return {
+    schema = 2,
     name = name,
     surname = surname,
     display = joinName(name, surname) or name,
     realm = realm,
     class = class and class:match("^%u[%u_]*$") and class or nil,
-    race = text(raw.race, 30),
-    raceSlug = text(raw.raceSlug, 40),
-    faction = (raw.faction == "A" or raw.faction == "H") and raw.faction or nil,
+    race = race,
+    raceSlug = text(raw.raceSlug, 40) or raceSlug(race, nil, faction),
+    faction = faction,
     sex = (raw.sex == 2 or raw.sex == 3) and raw.sex or nil,
     level = level and math.floor(level) or nil,
     money = money and math.floor(money) or nil,
-    zone = text(raw.zone),
+    zone = zone,
     subzone = text(raw.subzone),
     guild = text(raw.guild),
-    ilvl = number(raw.ilvl, 0, 2000),
+    ilvl = ilvl,
+    at = at,
     played = number(raw.played, 0, 1e9),
     levelPlayed = number(raw.levelPlayed, 0, 1e9),
     playedAt = number(raw.playedAt, 0, 1e11),
@@ -237,8 +292,8 @@ local function nameId(e)
   return PN and PN.Key(e.display) or e.display:lower()
 end
 
--- Copies what `into` lacks from `from`. A stored 0 for money or item level is a
--- stale capture and gives way to a real value.
+-- Copies what `into` lacks from `from`, with the reading time of the field. A stored 0
+-- for money or item level is a stale capture and gives way to a real value.
 local function fillGaps(into, from)
   for k, v in pairs(from) do
     if k == "professions" then
@@ -263,9 +318,18 @@ local function fillGaps(into, from)
           into.todos.values[id] = value
         end
       end
-    elseif k ~= "seen" and k ~= "key" and k ~= "professionsAt" and k ~= "levelPlayed" and k ~= "playedAt" then
+    elseif
+      k ~= "seen"
+      and k ~= "key"
+      and k ~= "professionsAt"
+      and k ~= "levelPlayed"
+      and k ~= "playedAt"
+      and k ~= "at"
+      and k ~= "schema"
+    then
       if into[k] == nil or ((k == "money" or k == "ilvl") and into[k] == 0 and type(v) == "number" and v > 0) then
         into[k] = v
+        into.at[k] = from.at[k]
       end
     end
   end
@@ -367,19 +431,6 @@ function Roster.CurrentKey()
   return Roster.KeyFor(name, surname, realmName())
 end
 
-local function raceSlug(token, name)
-  if RACE_SLUG[token] then
-    return RACE_SLUG[token]
-  end
-  local flat = type(token) == "string" and token:lower() or nil
-  for _, r in ipairs((ns.Data and ns.Data.Races) or {}) do
-    local slugFlat = r.slug:gsub("%-", "")
-    if (flat and flat == slugFlat) or (name and (name == r.n.en or name == r.n.de)) then
-      return r.slug
-    end
-  end
-end
-
 local function raceFaction(slug)
   for _, r in ipairs((ns.Data and ns.Data.Races) or {}) do
     if r.slug == slug then
@@ -388,10 +439,73 @@ local function raceFaction(slug)
   end
 end
 
--- Writes the current character's entry. Returns the key, nil when nothing was
--- written (setting off, no SavedVariables, character not known yet). The played
--- time, PvP, reputation and statistics are not read here (RosterStats.lua).
-function Roster.Capture()
+-- Last readings of the logged-in character, kept in memory. The events feed it (Refresh), Capture
+-- and Flush write it to the entry. { [field] = { v = value, at = server time of the reading } } for
+-- the fields of AT_FIELDS (guild: v = false when the character has none), subzone is a plain string.
+local cache = {}
+
+-- A number replaces an earlier one only when it is above 0, or when there is none yet or the earlier
+-- one is 0 itself. The client answers 0 for gold and item level while it is not ready (login, logout,
+-- item data still loading), which must not wipe a good value.
+local function usable(new, old)
+  return type(new) == "number" and new == new and (new > 0 or old == nil or old == 0)
+end
+
+local function firstPositive(a, b)
+  if type(a) == "number" and a > 0 then
+    return a
+  elseif type(b) == "number" and b > 0 then
+    return b
+  end
+  return type(a) == "number" and a or b
+end
+
+local function remember(field, value, at)
+  local old = cache[field]
+  if usable(value, old and old.v) then
+    cache[field] = { v = value, at = at }
+  end
+end
+
+local function readMoney(at)
+  remember("money", try(GetMoney), at)
+end
+
+local function readItemLevel(at)
+  local average, equipped = try(GetAverageItemLevel)
+  remember("ilvl", firstPositive(equipped, average), at)
+end
+
+local function readGuild(at)
+  if try(IsInGuild) == false then
+    cache.guild = { v = false, at = at }
+    return
+  end
+  local guild = text(try(GetGuildInfo, "player"))
+  if guild then
+    cache.guild = { v = guild, at = at }
+  end
+end
+
+-- Reads the volatile fields into the cache. Called by the events and before every Capture, never at
+-- logout: the client no longer answers reliably then, the last good readings are in the cache.
+function Roster.Refresh()
+  local at = Roster.Now()
+  readMoney(at)
+  readItemLevel(at)
+  remember("level", try(UnitLevel, "player"), at)
+  local zone = text(try(GetZoneText))
+  if zone then
+    cache.zone = { v = zone, at = at }
+  end
+  cache.subzone = text(try(GetSubZoneText))
+  readGuild(at)
+end
+
+-- Writes the current character's entry from the cache. Returns the key, nil when nothing was
+-- written (setting off, no SavedVariables, character not known yet). The played time, PvP,
+-- reputation and statistics are not read here (RosterStats.lua).
+local function write()
   if not Roster.Enabled() then
     return nil
   end
@@ -404,18 +518,25 @@ function Roster.Capture()
   local name, surname = playerName()
   local _, class = try(UnitClass, "player")
   local raceName, raceToken = try(UnitRace, "player")
-  local slug = raceSlug(raceToken, raceName) or old.raceSlug
-  local faction = try(UnitFactionGroup, "player")
-  faction = faction == "Alliance" and "A" or faction == "Horde" and "H" or raceFaction(slug) or old.faction
-  local guild = old.guild
-  if try(IsInGuild) == false then
-    guild = nil
-  else
-    local guildName = try(GetGuildInfo, "player")
-    guild = text(guildName) or guild
-  end
-  local average, equipped = try(GetAverageItemLevel)
+  local factionGroup = try(UnitFactionGroup, "player")
+  local factionLetter = factionGroup == "Alliance" and "A" or factionGroup == "Horde" and "H" or nil
+  local slug = raceSlug(raceToken, raceName, factionLetter or old.faction) or old.raceSlug
+  local faction = factionLetter or raceFaction(slug) or old.faction
+  local sex = try(UnitSex, "player")
   local version, buildNo = try(GetBuildInfo)
+  local at = {}
+  for _, field in ipairs(AT_FIELDS) do
+    at[field] = old.at and old.at[field]
+  end
+  -- The cached reading when it is usable, else the stored value with its reading time.
+  local function adopt(field)
+    local c = cache[field]
+    if c and (type(c.v) ~= "number" or usable(c.v, old[field])) then
+      at[field] = c.at
+      return c.v
+    end
+    return old[field]
+  end
   local entry = {
     name = name,
     surname = surname,
@@ -424,13 +545,14 @@ function Roster.Capture()
     race = text(raceToken) or old.race,
     raceSlug = slug,
     faction = faction,
-    sex = try(UnitSex, "player") or old.sex,
-    level = try(UnitLevel, "player") or old.level,
-    money = try(GetMoney) or old.money,
-    zone = text(try(GetZoneText)) or old.zone,
-    subzone = text(try(GetSubZoneText)),
-    guild = guild,
-    ilvl = equipped or average or old.ilvl,
+    sex = (sex == 2 or sex == 3) and sex or old.sex,
+    level = adopt("level"),
+    money = adopt("money"),
+    zone = adopt("zone"),
+    subzone = cache.subzone,
+    guild = adopt("guild"),
+    ilvl = adopt("ilvl"),
+    at = at,
     played = old.played,
     levelPlayed = old.levelPlayed,
     playedAt = old.playedAt,
@@ -455,6 +577,20 @@ function Roster.Capture()
   prune(t, key)
   ns.Emit("FG_ROSTER_CHANGED")
   return key
+end
+
+-- Reads the game into the cache, then writes the entry.
+function Roster.Capture()
+  if not Roster.Enabled() then
+    return nil
+  end
+  Roster.Refresh()
+  return write()
+end
+
+-- Writes the entry from the cache alone, no new reading. For logout.
+function Roster.Flush()
+  return write()
 end
 
 -- Stores the professions (ProfessionLogic shape) with the time of the reading in the existing
@@ -506,7 +642,8 @@ function Roster.SetStats(key, part, at)
       wrote = true
     end
   end
-  put("pvp", Logic.CleanPvp(part.pvp), Logic.CleanPvp(raw.pvp))
+  local oldPvp = Logic.CleanPvp(raw.pvp)
+  put("pvp", Logic.MergePvp(oldPvp, Logic.CleanPvp(part.pvp)), oldPvp)
   local oldRep, oldStats = Logic.CleanRep(raw.rep), Logic.CleanStats(raw.stats)
   local function filled(list)
     return type(list) == "table" and list[1] ~= nil
@@ -779,6 +916,18 @@ function Roster.DaysSince(seen, now)
   return math.max(0, math.floor(((now or U.now()) - seen) / 86400))
 end
 
+-- Server time of the oldest reading among the fields with a reading time, nil without one.
+function Roster.AsOf(e)
+  local oldest
+  for _, field in ipairs(AT_FIELDS) do
+    local at = e.at and e.at[field]
+    if at and (not oldest or at < oldest) then
+      oldest = at
+    end
+  end
+  return oldest
+end
+
 -- Updates ------------------------------------------------------------------------
 
 local function schedule()
@@ -788,18 +937,50 @@ local function schedule()
 end
 Roster.Schedule = schedule
 
+-- These events only schedule the capture, which reads the cache and writes the entry.
 for _, event in ipairs({
   "PLAYER_LOGIN",
   "PLAYER_ENTERING_WORLD",
   "PLAYER_LEVEL_UP",
-  "PLAYER_MONEY",
   "ZONE_CHANGED_NEW_AREA",
   "PLAYER_EQUIPMENT_CHANGED",
 }) do
   ns.On(event, schedule)
 end
 
--- The last write happens right away, a timer would not run any more.
+-- Gold, item level and guild take their reading into the cache at once, so the logout finds the
+-- last one. The entry is written by the capture or at logout (the game saves the file then).
+ns.On("PLAYER_MONEY", function()
+  readMoney(Roster.Now())
+  schedule()
+end)
+
+ns.On("PLAYER_AVG_ITEM_LEVEL_UPDATE", function()
+  readItemLevel(Roster.Now())
+end)
+
+ns.On("PLAYER_GUILD_UPDATE", function()
+  readGuild(Roster.Now())
+end)
+
+-- Item data arrives in bursts and finishes the item level: read it while there is no usable one
+-- yet, at most once per ITEM_READ_GAP seconds. Afterwards the item level events keep it current.
+local lastItemRead
+ns.On("GET_ITEM_INFO_RECEIVED", function()
+  local known = cache.ilvl
+  if known and known.v > 0 then
+    return
+  end
+  local now = try(GetTime)
+  if now and lastItemRead and now - lastItemRead < ITEM_READ_GAP then
+    return
+  end
+  lastItemRead = now
+  readItemLevel(Roster.Now())
+end)
+
+-- The last write happens right away from the cache, a timer would not run any more and the client
+-- no longer answers reliably.
 ns.On("PLAYER_LOGOUT", function()
-  Roster.Capture()
+  Roster.Flush()
 end)

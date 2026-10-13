@@ -547,7 +547,7 @@ end)
 
 ns.RegisterPage({
   id = "search",
-  order = 15,
+  order = 20,
   group = "main",
   title = "page.search",
   icon = ns.ICONS.search,

@@ -544,23 +544,25 @@ local function build(container)
 
   local infoSec = newSection("info")
   local infoText = part(infoSec, W.Text(rc, { role = "ui", color = "text", wrap = true }), { gap = 10 })
-  part(
-    infoSec,
-    FL.ButtonRow(rc, {
-      {
-        id = "export",
-        label = "act.export",
-        icon = "export",
-        tooltip = "instexport.open",
-        onClick = function()
-          if state.inst then
-            ns.InstanceExport.Run({ instance = state.inst })
-          end
-        end,
-      },
-    }),
-    { gap = 14 }
-  )
+  -- Buttons an extension registers for the open instance (slot "instances"), none without an extension.
+  local infoButtons = {}
+  for _, tool in ipairs(ns.DevTools.Slot("instances")) do
+    local b = tool.button
+    infoButtons[#infoButtons + 1] = {
+      id = b.id or tool.id,
+      label = b.label,
+      icon = b.icon,
+      tooltip = b.tooltip,
+      onClick = function()
+        if state.inst then
+          tool.run(state.inst)
+        end
+      end,
+    }
+  end
+  if #infoButtons > 0 then
+    part(infoSec, FL.ButtonRow(rc, infoButtons), { gap = 14 })
+  end
 
   -- Shows what the layout mode asks for: every section when stacked, the chosen tab beside the list.
   local function showSections(mode)
@@ -744,7 +746,7 @@ end
 
 ns.RegisterPage({
   id = "instances",
-  order = 70,
+  order = 130,
   group = "world",
   title = "page.instances",
   icon = ns.ICONS.instances,

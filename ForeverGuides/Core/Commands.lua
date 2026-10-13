@@ -67,7 +67,7 @@ add({
   id = "diag",
   area = "general",
   public = false,
-  names = { "diag", "probe" },
+  names = { "diag" },
   usage = "/fg diag",
   page = "help",
   control = "help.diagButton",
@@ -228,16 +228,6 @@ add({
   exec = "loot",
 })
 add({
-  id = "instexport",
-  area = "instances",
-  public = false,
-  names = { "instexport", "instanzexport", "instanzdatenexport" },
-  usage = "/fg instexport [name]",
-  page = "help",
-  control = "instexport.open",
-  exec = "instexport",
-})
-add({
   id = "automation",
   area = "tools",
   example = { en = "/fg automation", de = "/fg automatik" },
@@ -251,7 +241,8 @@ add({
 add({
   id = "autoquest",
   area = "tools",
-  public = false,
+  example = { en = "/fg autoquest list", de = "/fg autoquest list" },
+  public = true,
   names = { "autoquest", "autoquests" },
   usage = "/fg autoquest ignore <questID> | ignore npc <npcID> | list",
   page = "settings",
@@ -483,6 +474,17 @@ add({
   exec = "profession",
 })
 add({
+  id = "proftrainers",
+  area = "professions",
+  example = { en = "/fg proftrainers alchemy", de = "/fg berufslehrer alchemie" },
+  public = true,
+  names = { "berufslehrer", "proftrainers", "professiontrainers" },
+  usage = "/fg proftrainers [profession]",
+  page = "proftrainers",
+  control = "page.proftrainers",
+  exec = "proftrainers",
+})
+add({
   id = "guild",
   area = "guild",
   example = { en = "/fg guild", de = "/fg gilde" },
@@ -589,6 +591,7 @@ C.PAGE_AREA = {
   instances = "instances",
   professions = "professions",
   professionroute = "professions",
+  proftrainers = "professions",
   chars = "character",
   character = "character",
   inspect = "character",
@@ -693,11 +696,6 @@ desc(
   "Beute-Seite: Boss-Drops mit Droprate. reset löscht nach Rückfrage."
 )
 desc(
-  "instexport",
-  "Export instance data (floors, areas, pins, loot, boss ids) for the website, optional instance name or id.",
-  "Instanzdaten (Ebenen, Bereiche, Pins, Beute, Boss-IDs) für die Website exportieren, optional Instanzname oder ID."
-)
-desc(
   "fenster",
   "Game windows: list moved ones, reset positions.",
   "Spielfenster: verschobene zeigen, Positionen zurücksetzen."
@@ -768,6 +766,11 @@ desc("marker", "Open the map in marker mode.", "Öffnet die Karte im Marker-Modu
 desc("access", "Access requirements, optional instance.", "Zugangsbedingungen, optional Instanz.")
 desc("lockouts", "Raid lockouts of all characters.", "Raid-Sperren aller Charaktere.")
 desc("profession", "Open the profession route.", "Öffnet die Berufsroute.")
+desc(
+  "proftrainers",
+  "Profession trainers page with positions, optional profession.",
+  "Berufslehrer mit Standorten, optional Beruf."
+)
 desc("guild", "Open Guild & Contacts.", "Öffnet Gilde & Kontakte.")
 desc("social", "Contacts: players you have met.", "Kontakte: Spieler, die du getroffen hast.")
 desc("macros", "Open the macro editor.", "Öffnet den Makro-Editor.")
@@ -794,8 +797,6 @@ EN["cmdhelp.area"] = "%s, click to type:"
 DE["cmdhelp.area"] = "%s, Klick tippt ein:"
 EN["cmdhelp.unknownArea"] = 'No area "%s". Areas:'
 DE["cmdhelp.unknownArea"] = 'Kein Bereich "%s". Bereiche:'
-EN["cmdhelp.dev"] = "Hidden commands, type /fg dev <name>:"
-DE["cmdhelp.dev"] = "Versteckte Befehle, /fg dev <Name> tippen:"
 EN["cmdhelp.more"] = "More:"
 DE["cmdhelp.more"] = "Weitere:"
 EN["cmdhelp.copyHint"] = "Commands of this area, one per line."

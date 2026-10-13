@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.3
+
+### Added
+
+- Profession trainers page with locations, map and waypoint buttons, and a confidence note per trainer.
+- The profession trainers page shows 251 trainers, nearly all with coordinates, and trainers you visit in the game are recorded and added.
+- Pet trainers (hunter) are marked on the class trainers page and listed separately.
+- Inspect: a stats panel in the style of the character window, with grouped values.
+- Inspect: slot texts look like the character window, and the side tabs move beside the panel.
+- Inspect: the panel background follows the window opacity setting.
+- Skillings: tree cards with icons replace the dropdown, and an all builds view shows every build.
+- Skillings: a badge marks the builds shipped with the add-on, and a new build button creates your own.
+- Window style "WoW Forever": the title bar of every window sits in the metal band.
+- The top bar of the main window adapts to the window width and shows copyable links for the website and the author's channel, in both window styles.
+- Other UI add-ons: the spellbook learn list stays readable, and its tab sits with the other spellbook tabs.
+- New settings "Behavior with other UI add-ons" and "Avoid double display" control how our panels and slot texts appear.
+
+### Changed
+
+- The side menu has new groups: Learn (class and trainer pages), Professions and Inventory (loot, durability, items and BiS).
+- Inspect sits directly below Characters in the menu.
+- Character and export now sits in the Addon group next to the settings.
+- Applying a skilling never removes talent points. A preview shows which points can be bought now, which later and which do not fit, and only the points you can buy are set.
+- Character list: the current character reads "(current)", and values that were never read show "-" with the age of the last saved value.
+
+### Fixed
+
+- Gold, item level and other values of your characters were overwritten with 0 at logout.
+- The Skyborne icon in the character list.
+- The map button on the profession route page never appeared.
+- Inspect: value labels were cut off too early.
+
 ## 0.1.2
 
 ### Added

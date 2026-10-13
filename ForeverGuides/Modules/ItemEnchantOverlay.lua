@@ -3,12 +3,17 @@
 -- green (or a red note when a slot that takes an enchant has none) and up to three small gem
 -- icons, on the side of the slot that faces the model. Slots of the left column write to their
 -- right, slots of the right column to their left, the weapon slots below the model write above
--- the slot. In the inspect window every slot shows the short marker only ("+" green, "!" red) with
--- the full text as hover tooltip, so nothing runs over the model or into the next slot. Only a
+-- the slot. The inspect window is laid out the same way: the text is cut with "..." to the room
+-- between the slot and the middle of the model and falls back to the short marker ("+" green, "!"
+-- red, full text as hover tooltip) where that room is too small. Only a
 -- post-hook on PaperDollItemSlotButton_Update, an OnShow hook on CharacterFrame and game events;
--- the regions (one FontString, three textures, one hover-only frame) live in button.fgEnch, nothing of Blizzard's is written. A button repaints only when its item, its
--- layout or a setting changed. A button that needs its regions while in combat is queued and
--- finished at PLAYER_REGEN_ENABLED.
+-- the regions (one FontString, three textures, one hover-only frame) live in button.fgEnch on the
+-- named child frame of the slot (ItemLevelOverlay.SlotFrame), nothing of Blizzard's is written. A
+-- button repaints only when its item, its layout or a setting changed. A button that needs its
+-- regions while in combat is queued and finished at PLAYER_REGEN_ENABLED.
+-- While another add-on draws enchant text next to the slots (settings.slotOverlays, see
+-- ItemLevelOverlay.Policy) the enchant text stays away and what that add-on does not draw moves into
+-- the slot: the gems in a row along the lower edge, the red marker of a missing enchant above them.
 local _, ns = ...
 local I = ns.ItemInfo
 local O = ns.ItemLevelOverlay
@@ -31,6 +36,7 @@ local MIN_TEXT_ROOM = 60 -- less room than this: a short marker instead of the t
 local SLOT_PITCH = 46 -- the weapon slots sit side by side, so they get no more than this
 local SLOT_SIZE = 40
 local GEM_SIZE, GEM_STEP, MAX_GEMS = 14, 15, 3
+local INSET, INSET_GEM = 2, 10 -- inside the slot: margin and gem size
 local GAP = 8
 local HIT_SIZE = 18 -- hover area of a marker, the character itself is only a few pixels wide
 local FALLBACK_ICON = 134400
@@ -173,7 +179,11 @@ local function build(button)
   if O.InCombat() then
     return nil
   end
-  local okFs, fs = pcall(button.CreateFontString, button, nil, "OVERLAY")
+  local frame = O.SlotFrame(button)
+  if not frame then
+    return nil
+  end
+  local okFs, fs = pcall(frame.CreateFontString, frame, nil, "OVERLAY")
   if not (okFs and fs) then
     return nil
   end
@@ -183,14 +193,14 @@ local function build(button)
   fs:SetWordWrap(false)
   local rec = { fs = fs, gems = {}, tipColor = GREEN }
   for i = 1, MAX_GEMS do
-    local okTex, tex = pcall(button.CreateTexture, button, nil, "OVERLAY")
+    local okTex, tex = pcall(frame.CreateTexture, frame, nil, "OVERLAY")
     if okTex and tex then
       tex:SetSize(GEM_SIZE, GEM_SIZE)
       tex:Hide()
       rec.gems[i] = tex
     end
   end
-  local okHit, hit = pcall(CreateFrame, "Frame", nil, button)
+  local okHit, hit = pcall(CreateFrame, "Frame", nil, frame)
   if okHit and hit then
     hit:SetAllPoints(fs)
     hit:EnableMouse(true)
@@ -229,14 +239,26 @@ local function hide(button)
   end
 end
 
--- Anchors the line and the gem row for the side of the slot.
-local function place(rec, button, side)
-  if rec.side == side then
+-- Anchors the line and the gem row for the side of the slot. Side "inset": inside the slot, the gems
+-- on its lower edge and the marker above them (or on the edge when there are no gems).
+local function place(rec, button, side, gemRow)
+  local key = side .. (gemRow and "+" or "")
+  if rec.side == key then
     return
   end
-  rec.side = side
+  rec.side = key
   local fs = rec.fs
   fs:ClearAllPoints()
+  if side == "inset" then
+    fs:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT", INSET, INSET + (gemRow and INSET_GEM + 1 or 0))
+    fs:SetJustifyH("LEFT")
+    for i, tex in ipairs(rec.gems) do
+      tex:ClearAllPoints()
+      tex:SetSize(INSET_GEM, INSET_GEM)
+      tex:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT", INSET + (i - 1) * (INSET_GEM + 1), INSET)
+    end
+    return
+  end
   if side == "left" then
     fs:SetPoint("LEFT", button, "RIGHT", GAP, 6)
     fs:SetJustifyH("LEFT")
@@ -249,6 +271,7 @@ local function place(rec, button, side)
   end
   for i, tex in ipairs(rec.gems) do
     tex:ClearAllPoints()
+    tex:SetSize(GEM_SIZE, GEM_SIZE)
     if side == "left" then
       tex:SetPoint("LEFT", button, "RIGHT", GAP + (i - 1) * GEM_STEP, -8)
     elseif side == "right" then
@@ -287,7 +310,7 @@ local function paint(button, rec, what, side, room)
     hide(button)
     return
   end
-  place(rec, button, side)
+  place(rec, button, side, #what.gems + what.empty > 0)
   paintGems(rec, what.gems, what.empty)
   local shown
   if what.text then
@@ -303,7 +326,7 @@ local function paint(button, rec, what, side, room)
     rec.fs:Show()
     if rec.hit then
       rec.hit:ClearAllPoints()
-      if textMode(room) then
+      if textMode(room) or side == "inset" then
         rec.hit:SetAllPoints(rec.fs)
       else
         rec.hit:SetPoint("CENTER", rec.fs, "CENTER")
@@ -342,19 +365,25 @@ function E.Update(button, unit)
   unit = unit or units[button]
   units[button] = unit
   known[button] = true
-  if E.Option("enchantOverlay") == false or (unit and E.Option("enchantInspect") == false) then
+  local policy = O.Policy(unit and "inspect" or "character")
+  if
+    E.Option("enchantOverlay") == false
+    or (unit and E.Option("enchantInspect") == false)
+    or not (policy.text or policy.extras)
+  then
     return clear(button, generation .. "|off")
   end
   local link = I.inventoryLink(id, unit)
   if link == nil then
     return clear(button, generation .. "|empty")
   end
-  local side, room = layout(button, id, unit ~= nil)
-  if unit then
-    -- Another player's window is crowded: only the marker at the slot, the text is in its tooltip.
-    room = 0
+  local side, room
+  if policy.inset then
+    side, room = "inset", 0
+  else
+    side, room = layout(button, id, unit ~= nil)
   end
-  local key = table.concat({ generation, tostring(link), side, textMode(room) and "t" or "m" }, "|")
+  local key = table.concat({ generation, tostring(link), side, textMode(room) and "t" or "m", policy.sig }, "|")
   if painted[button] == key then
     return
   end
@@ -362,10 +391,11 @@ function E.Update(button, unit)
   local info = I.enchantInfo(id, link, unit)
   local enchanted = info ~= nil and (info.id ~= nil or info.text ~= nil)
   local missing = not enchanted
+    and policy.extras
     and E.Option("enchantMissing") ~= false
     and I.enchantable(id, link, I.flaggedSlots(E.Option("enchantSlots"))) == true
   local gems, empty = {}, 0
-  if E.Option("enchantGems") ~= false then
+  if policy.extras and E.Option("enchantGems") ~= false then
     gems = I.gems(id, link, unit)
     local sockets = I.numSockets(link)
     if sockets then
@@ -374,8 +404,11 @@ function E.Update(button, unit)
   end
   local what = { gems = gems, empty = empty }
   if enchanted then
-    what.text = I.enchantName(info.text) or ns.L["ench.enchanted"]
-    what.color, what.marker = GREEN, MARKER_OK
+    -- The skin names the enchant itself: nothing of ours for an enchanted slot.
+    if policy.text then
+      what.text = I.enchantName(info.text) or ns.L["ench.enchanted"]
+      what.color, what.marker = GREEN, MARKER_OK
+    end
   elseif missing then
     what.text = ns.L["ench.none"]
     what.color, what.marker = RED, MARKER_MISSING
@@ -396,7 +429,7 @@ function E.Update(button, unit)
   end
   paint(button, rec, what, side, room)
   -- An enchant id without a readable tooltip line is looked at again on the next update.
-  if enchanted and info.text == nil then
+  if enchanted and policy.text and info.text == nil then
     painted[button] = nil
   else
     painted[button] = key
@@ -473,6 +506,9 @@ function E.Install()
     frameHooked = pcall(frame.HookScript, frame, "OnShow", function()
       ns.Safe("itemenchant", E.Scan)
     end)
+    if frameHooked then
+      O.WatchSheet("character", frame)
+    end
   end
   return hooked
 end
@@ -499,6 +535,9 @@ ns.On("UNIT_INVENTORY_CHANGED", function(_, unit)
   end
 end)
 ns.On("PLAYER_REGEN_ENABLED", E.Flush)
+ns.On("FG_SLOT_POLICY", function()
+  E.Refresh()
+end)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and path:find("^settings%.enchant") then
     E.Refresh()

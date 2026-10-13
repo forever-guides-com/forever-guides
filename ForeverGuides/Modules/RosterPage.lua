@@ -1338,7 +1338,7 @@ end
 
 ns.RegisterPage({
   id = "chars",
-  order = 25,
+  order = 210,
   group = "character",
   title = "page.chars",
   icon = ns.ICONS.chars,

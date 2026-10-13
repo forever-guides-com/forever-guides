@@ -396,6 +396,8 @@ function V.Refresh()
     return
   end
   V.stats.refreshes = V.stats.refreshes + 1
+  -- Which slot texts the skin draws is read before every paint: it builds them after the window shows.
+  O.Reassess("inspect")
   local unit = V.Unit()
   for _, slot in ipairs(I.SLOTS) do
     local button = slot.overlay ~= false and rawget(_G, "Inspect" .. slot.name) or nil
@@ -427,6 +429,7 @@ function V.Install()
     end)
   end)
   if hooked then
+    O.WatchSheet("inspect", f)
     V.Request()
   end
   return hooked == true
@@ -446,6 +449,7 @@ end)
 ns.On("INSPECT_TALENT_READY", V.Request) -- the talent row of the short view; clients without it never fire it
 ns.On("GET_ITEM_INFO_RECEIVED", V.Request)
 ns.On("PLAYER_REGEN_ENABLED", V.Request)
+ns.On("FG_SLOT_POLICY", V.Request)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and (path:find("^settings%.itemLevel") or path:find("^settings%.enchant")) then
     V.Request()

@@ -22,7 +22,7 @@ ns.AddLocale("enUS", {
   ["roster.col.seen"] = "Last seen",
   ["roster.col.zone"] = "Zone",
   ["roster.col.guild"] = "Guild",
-  ["roster.you"] = "(you)",
+  ["roster.you"] = "(current)",
   ["roster.today"] = "today",
   ["roster.yesterday"] = "yesterday",
   ["roster.days"] = "%d days ago",
@@ -42,6 +42,7 @@ ns.AddLocale("enUS", {
   ["roster.played.unknown"] = "not recorded yet",
   ["roster.tip.professions"] = "Professions: %s",
   ["roster.tip.seen"] = "Last seen: %s",
+  ["roster.tip.asOf"] = "Gold, item level and place read: %s",
   ["roster.tip.build"] = "Game %s, addon %s",
 })
 
@@ -65,7 +66,7 @@ ns.AddLocale("deDE", {
   ["roster.col.seen"] = "Zuletzt",
   ["roster.col.zone"] = "Zone",
   ["roster.col.guild"] = "Gilde",
-  ["roster.you"] = "(du)",
+  ["roster.you"] = "(aktuell)",
   ["roster.today"] = "heute",
   ["roster.yesterday"] = "gestern",
   ["roster.days"] = "vor %d Tagen",
@@ -85,6 +86,7 @@ ns.AddLocale("deDE", {
   ["roster.played.unknown"] = "noch nicht erfasst",
   ["roster.tip.professions"] = "Berufe: %s",
   ["roster.tip.seen"] = "Zuletzt gesehen: %s",
+  ["roster.tip.asOf"] = "Gold, Gegenstandsstufe und Ort: Stand %s",
   ["roster.tip.build"] = "Spiel %s, Addon %s",
 })
 
@@ -129,7 +131,7 @@ local function iconSpec(kind, e)
       name = ns.T(r.n)
     end
   end
-  return K.RaceIconSpec(e.raceSlug or e.race or "?", e.faction, name or e.race)
+  return K.RaceIconSpec(e.raceSlug or e.race or "?", e.faction, name or e.race, e.sex)
 end
 
 local function newIcon(parent, size)
@@ -173,9 +175,9 @@ local function paintIcon(f, spec)
   f.tex:Show()
 end
 
--- "3 days ago" style text, the exact date is in the tooltip.
-local function seenText(e)
-  local days = ns.CharRoster.DaysSince(e.seen)
+-- "3 days ago" style text, the exact date is in the tooltip. `at` is a server time.
+local function agoText(e, at)
+  local days = ns.CharRoster.DaysSince(at)
   if e.current or not days or days == 0 then
     return L["roster.today"]
   elseif days == 1 then
@@ -186,6 +188,10 @@ local function seenText(e)
     return string.format(L["roster.weeks"], math.floor(days / 7))
   end
   return string.format(L["roster.months"], math.floor(days / 30))
+end
+
+local function seenText(e)
+  return agoText(e, e.seen)
 end
 
 local function nameText(e)
@@ -233,13 +239,18 @@ local function tooltipText(e, live, now)
   if #e.professions > 0 then
     local parts = {}
     for _, p in ipairs(e.professions) do
-      parts[#parts + 1] = string.format("%s %d/%d", p.name, p.rank, p.max)
+      parts[#parts + 1] = string.format("%s %d/%d", p.name, p.skill, p.max)
     end
     lines[#lines + 1] = string.format(L["roster.tip.professions"], table.concat(parts, ", "))
   end
   local okDate, when = pcall(date, L["roster.dateFormat"], e.seen)
   if okDate and e.seen > 0 then
     lines[#lines + 1] = string.format(L["roster.tip.seen"], when)
+  end
+  -- What was read at the last login of a character that is not the current one.
+  local asOf = not e.current and ns.CharRoster.AsOf(e)
+  if asOf then
+    lines[#lines + 1] = string.format(L["roster.tip.asOf"], agoText(e, asOf))
   end
   if e.build or e.addon then
     lines[#lines + 1] = string.format(L["roster.tip.build"], e.build or "?", e.addon or "?")
@@ -347,7 +358,7 @@ local function makeRow(parent, onForget, getLayout, pins)
     if e then
       local gold = row.cells.gold
       local coins = ns.CostLogic.Format(e.money)
-      gold:SetText(coins or "0")
+      gold:SetText(coins or (e.money == nil and "-" or "0"))
       if coins and gold:GetStringWidth() > lay.w.gold then
         gold:SetText(ns.CostLogic.Format(e.money, { plain = true }))
       end
@@ -362,7 +373,7 @@ local function paintRow(row, e, live, now)
   row.entry, row.live, row.now = e, live, now
   local c = row.cells
   c.name:SetText(nameText(e))
-  c.level:SetText(tostring(e.level or "?"))
+  c.level:SetText(e.level and tostring(e.level) or "-")
   c.played:SetText(
     live and live.played and ns.RosterStatsLogic.Duration(live.played) or Theme.hexText("textMuted", "-")
   )

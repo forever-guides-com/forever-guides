@@ -39,6 +39,7 @@ ns.AddLocale("enUS", {
   ["talents.editor.importOver"] = "%d points, only %d valid (%d would drop): nothing imported",
   ["talents.editor.imported"] = "Build imported: %d points",
   ["talents.editor.importedClass"] = "Build imported: %d points, class %s",
+  ["talents.editor.blank"] = "New empty build (%s). Spend your points, then save it in the Builds window.",
   ["talents.editor.hotfixDropped"] = "Talent replaced by a hotfix, points removed: %s",
   ["talents.editor.hotfixFollow"] = "(%d dependent points removed too)",
   ["talents.editor.export"] = "Export",
@@ -95,6 +96,7 @@ ns.AddLocale("deDE", {
   ["talents.editor.importOver"] = "%d Punkte, nur %d regelkonform (%d fielen weg): nichts importiert",
   ["talents.editor.imported"] = "Build importiert: %d Punkte",
   ["talents.editor.importedClass"] = "Build importiert: %d Punkte, Klasse %s",
+  ["talents.editor.blank"] = "Neue leere Skillung (%s). Vergib deine Punkte und speichere sie dann im Fenster Skillungen.",
   ["talents.editor.hotfixDropped"] = "Talent durch Hotfix ersetzt, Punkte entfernt: %s",
   ["talents.editor.hotfixFollow"] = "(%d abhängige Punkte ebenfalls entfernt)",
   ["talents.editor.export"] = "Exportieren",
@@ -194,10 +196,14 @@ function TE.CanApply(class)
   return class ~= nil and class == K.PlayerClass() and TL.Specs(class) ~= nil
 end
 
--- Confirms, then commits node entries to the character. The entries are fixed when the dialog
--- opens, even if the editor changes meanwhile.
+-- Shows what the build would change (the preview window), then adds the buyable points to the
+-- character. The entries are fixed when the window opens, even if the editor changes meanwhile.
 local function confirmApply(entries)
-  ns.Dialogs.Confirm("talents.editor.applyTitle", "talents.editor.applyConfirm", function()
+  local plan, key = ns.TalentApply.preview(entries)
+  if not plan then
+    return ns.Notify(TE.Message(key), "error")
+  end
+  ns.TalentDialogs.ApplyPreview(plan, function()
     local ok, result, a, b = ns.TalentApply.applyAndCommit(entries)
     if ok then
       ns.Notify(TE.Message("talents.apply." .. result, a, b), result == "staged" and "warning" or "success")
@@ -236,6 +242,19 @@ function TE.ExportCurrent()
   end
 end
 
+-- Opens the Talents page and gives the editor the job; a page that is not built yet takes it
+-- when it is.
+local function handOver(job)
+  pending = job
+  if ns.Main then
+    ns.Safe("talent-load-open", ns.Main.Show, "talents")
+  end
+  if active and pending == job then
+    pending = nil
+    active.load(job)
+  end
+end
+
 -- Loads a build code into the editor (it opens the Talents page first). The
 -- build is checked like an import: damaged or rule-breaking input changes
 -- nothing and returns false plus the number of problems. A build already in the
@@ -246,16 +265,19 @@ function TE.Load(class, code, level)
     return false, total
   end
   TE.NotifyDropped(replaced, lost)
-  local job = { class = class, ranks = ranks, level = tonumber(level) and TL.ClampLevel(level) or nil }
-  pending = job
-  if ns.Main then
-    ns.Safe("talent-load-open", ns.Main.Show, "talents")
-  end
-  if active and pending == job then
-    pending = nil
-    active.load(job)
-  end
+  handOver({ class = class, ranks = ranks, level = tonumber(level) and TL.ClampLevel(level) or nil })
   return true, 0
+end
+
+-- Opens the editor with an empty build of `class` (no code to parse, so TE.Load cannot do it). The
+-- editor asks before it replaces points, like for a loaded build. Returns false without data for
+-- the class.
+function TE.NewBlank(class)
+  if not TL.Specs(class) then
+    return false
+  end
+  handOver({ class = class, ranks = {}, blank = true })
+  return true
 end
 
 -- Layout ------------------------------------------------------------------------
@@ -371,6 +393,9 @@ function TE.Build(view)
       state.level = math.max(job.level, TL.LevelForPoints(total))
     end
     paint(building)
+    if job.blank then
+      return ns.Notify(string.format(L["talents.editor.blank"], R.className(job.class)), "success")
+    end
     ns.Notify(
       switched and string.format(L["talents.editor.importedClass"], total, R.className(job.class))
         or string.format(L["talents.editor.imported"], total),

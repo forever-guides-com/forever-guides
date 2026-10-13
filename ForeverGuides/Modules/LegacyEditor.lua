@@ -898,7 +898,7 @@ end
 
 ns.RegisterPage({
   id = "legacy",
-  order = 35,
+  order = 240,
   group = "character",
   title = "page.legacy",
   icon = ns.ICONS.legacy,

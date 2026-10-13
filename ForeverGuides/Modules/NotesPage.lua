@@ -1517,7 +1517,7 @@ end
 
 ns.RegisterPage({
   id = "notes",
-  order = 95,
+  order = 620,
   group = "tools",
   title = "page.notes",
   icon = ns.ICONS.notes,

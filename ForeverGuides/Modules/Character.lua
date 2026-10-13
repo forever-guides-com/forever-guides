@@ -369,8 +369,8 @@ end
 
 ns.RegisterPage({
   id = "character",
-  order = 100,
-  group = "tools",
+  order = 705,
+  group = "system",
   title = "page.character",
   icon = ns.ICONS.character,
   aliases = { "charakter", "character", "export" },

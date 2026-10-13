@@ -1,4 +1,4 @@
--- Chat help per area: /fg help, /fg help <area>, /fg help dev. Commands are clickable links
+-- Chat help per area: /fg help, /fg help <area>. Commands are clickable links
 -- that only type the command into the chat box, a click never runs anything.
 -- Must load before ErrorCatcher in the toc: test doubles keep only the last SetItemRef hook.
 local _, ns = ...
@@ -125,34 +125,26 @@ function H.OpenForPage(pageId)
   ns.Dialogs.Copy("area." .. area.id, H.CopyText(area), "cmdhelp.copyHint")
 end
 
--- Hidden commands, several links per line to stay within MAX_LINES.
-function H.DevLines()
-  local lines = { L["cmdhelp.dev"] }
-  local items = {}
-  for _, a in ipairs(C.AREAS) do
-    for _, c in ipairs(C.inArea(a.id, false)) do
-      items[#items + 1] = c
-    end
-  end
-  local perLine = math.max(PER_LINE, math.ceil(#items / (H.MAX_LINES - 1)))
-  for i = 1, #items, perLine do
+-- A title and the commands of a list of entries as links, several per line to stay within MAX_LINES (for
+-- the list of an add-on, such as its hidden commands).
+function H.ListLines(title, entries)
+  local lines = { title }
+  local perLine = math.max(PER_LINE, math.ceil(#entries / (H.MAX_LINES - 1)))
+  for i = 1, #entries, perLine do
     local row = {}
-    for j = i, math.min(i + perLine - 1, #items) do
-      row[#row + 1] = link("c", items[j].id, items[j].names[1])
+    for j = i, math.min(i + perLine - 1, #entries) do
+      row[#row + 1] = link("c", entries[j].id, entries[j].names[1])
     end
     lines[#lines + 1] = table.concat(row, " ")
   end
   return lines
 end
 
--- arg: "" for the area list, "dev" for the hidden commands, else an area name.
+-- arg: "" for the area list, else an area name.
 function H.Lines(arg)
   arg = U.trim(arg or "")
   if arg == "" then
     return H.AreaListLines()
-  end
-  if S.fold(arg) == "dev" then
-    return H.DevLines()
   end
   local area = H.ResolveArea(arg)
   if area then
@@ -178,7 +170,7 @@ function H.FillText(kind, id)
   if not entry then
     return nil
   end
-  return C.example(entry) or ("/fg dev " .. entry.names[1])
+  return C.example(entry) or ("/fg " .. entry.names[1])
 end
 
 function H.OnLink(target)

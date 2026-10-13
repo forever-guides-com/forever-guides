@@ -987,6 +987,10 @@ S.RegisterSource("trainer", function(add)
   for _, t in ipairs((ns.Data or {}).Trainers and ns.Data.Trainers.trainers or {}) do
     add(t.n, ns.RefLogic.className(t.c), "trainers/" .. t.c)
   end
+  -- Pet trainers of the overlay, found by "Begleiter" and "pet" as well.
+  for _, t in ipairs(ns.TrainerRoles and ns.TrainerRoles.Entries() or {}) do
+    add(t.n, ns.RefLogic.className(t.c), "trainers/" .. t.c, { "Begleiter-Lehrer", "Pet trainer" })
+  end
 end)
 
 S.RegisterSource("weaponMaster", function(add)

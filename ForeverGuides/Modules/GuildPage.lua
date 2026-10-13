@@ -9,8 +9,9 @@
 -- changes the guild; the management belongs to the add-on "Forever Guides: GildenManager", which
 -- adds tabs, detail lines and columns through ns.GuildExt (GuildExt.lua) and hides the hint card
 -- (the hint card shows on the tab "Gilde" only).
--- In demo mode (GuildData.IsDemo) the page shows the sample guild of GuildDemo.lua under a banner.
--- That add-on loads on demand: with a guild (or the demo) and the add-on switched on the page loads it
+-- While a stand-in source is set (GuildData.SetSource, an extension showing sample data) the page shows its
+-- data instead of the game's roster; extensions add their own parts through ns.DevTools.Build.
+-- That add-on loads on demand: with a guild (or a source) and the add-on switched on the page loads it
 -- once when it opens, else the hint card offers the button (ns.PackageUI). Tabs, columns and detail
 -- lines that register later are picked up without losing selection, filters or page.
 local _, ns = ...
@@ -31,8 +32,6 @@ local GAP = 8
 local SEARCH_HEIGHT = 26
 local ACTION_WIDTH = 150
 local MAX_ACTIONS = 6
-local STOP_WIDTH = 130
-local DEMO_START_WIDTH = 180
 local WHISPER_ICON, INVITE_ICON, UPDATE_ICON = "pencil", "plus", "refresh" -- icons of ns.UI_ICONS
 local MANAGER_ADDON = "ForeverGuides_GildenManager"
 local MANAGER_STATE = { loaded = "guild.manager.on", disabled = "guild.manager.off", missing = "guild.manager.missing" }
@@ -48,14 +47,6 @@ ns.AddLocale("enUS", {
   ["guild.manager.on"] = "on",
   ["guild.manager.off"] = "off",
   ["guild.manager.missing"] = "missing",
-  ["guild.demo.banner"] = "Sample data, not a real guild",
-  ["guild.demo.start"] = "View sample data",
-  ["guild.demo.end"] = "End demo",
-  ["guild.demo.rights"] = "Demo rights",
-  ["guild.demo.role.leader"] = "Guild master",
-  ["guild.demo.role.officer"] = "Officer",
-  ["guild.demo.role.member"] = "Member",
-  ["guild.demo.seen"] = "Sample list, nothing is stored",
   ["guild.link"] = "Copy link",
   ["guild.link.title"] = "GildenManager",
   ["guild.link.hint"] = "Link to copy",
@@ -149,7 +140,6 @@ ns.AddLocale("enUS", {
   ["guild.whisper.tip"] = "Fills the chat box, nothing is sent.",
   ["guild.invite"] = "Invite",
   ["guild.invite.tip"] = "Invites the player to your group.",
-  ["guild.invite.demo"] = "Sample data, nobody is invited.",
   ["guild.seen.empty"] = "Nobody seen yet.",
   ["guild.seen.local"] = "Stored locally only",
   ["guild.seen.off"] = "Saving is off (settings)",
@@ -194,14 +184,6 @@ ns.AddLocale("deDE", {
   ["guild.manager.on"] = "an",
   ["guild.manager.off"] = "aus",
   ["guild.manager.missing"] = "fehlt",
-  ["guild.demo.banner"] = "Beispieldaten, keine echte Gilde",
-  ["guild.demo.start"] = "Beispieldaten ansehen",
-  ["guild.demo.end"] = "Demo beenden",
-  ["guild.demo.rights"] = "Rechte in der Demo",
-  ["guild.demo.role.leader"] = "Gildenleiter",
-  ["guild.demo.role.officer"] = "Offizier",
-  ["guild.demo.role.member"] = "Mitglied",
-  ["guild.demo.seen"] = "Beispielliste, nichts wird gespeichert",
   ["guild.link"] = "Link kopieren",
   ["guild.link.title"] = "GildenManager",
   ["guild.link.hint"] = "Link zum Kopieren",
@@ -295,7 +277,6 @@ ns.AddLocale("deDE", {
   ["guild.whisper.tip"] = "Füllt die Chatzeile, es wird nichts gesendet.",
   ["guild.invite"] = "Einladen",
   ["guild.invite.tip"] = "Lädt den Spieler in deine Gruppe ein.",
-  ["guild.invite.demo"] = "Beispieldaten, niemand wird eingeladen.",
   ["guild.seen.empty"] = "Noch niemand gesehen.",
   ["guild.seen.local"] = "Nur lokal gespeichert",
   ["guild.seen.off"] = "Speichern ist aus (Einstellungen)",
@@ -398,8 +379,9 @@ local function columns(tab)
 end
 
 local function peerOf(name, guid)
-  if GD.IsDemo() then
-    return GD.DemoPeer(name)
+  local source = GD.Source()
+  if source then
+    return source.peer(name)
   end
   return ns.Peers.Get(name, guid)
 end
@@ -407,7 +389,7 @@ end
 -- "-" while unknown, "reading ..." while GroupInspect or PeerComm still work on a group member.
 local function ilvlText(peer, name)
   local text, group = GL.IlvlText(peer), ns.GroupInspect
-  if text == "-" and not GD.IsDemo() and group and group.Loading(name) then
+  if text == "-" and not GD.Source() and group and group.Loading(name) then
     return L["guild.reading"]
   end
   return text
@@ -415,7 +397,7 @@ end
 
 local function jobsText(peer, name)
   local text, comm = GL.JobsText(peer), ns.PeerComm
-  if text == "-" and not GD.IsDemo() and comm and comm.Waiting(name) then
+  if text == "-" and not GD.Source() and comm and comm.Waiting(name) then
     return L["guild.reading"]
   end
   return text
@@ -435,15 +417,15 @@ local function guildMember(name)
 end
 
 -- The three icon buttons of a contact row (whisper, invite, update, from the right). A button that
--- cannot work is dimmed with the reason as its tooltip text; in the sample data nothing is sent or
+-- cannot work is dimmed with the reason as its tooltip text; with a stand-in source nothing is sent or
 -- asked. refresh redraws the page after a query, so the dimmed state shows at once.
 local function rowActions(e, refresh)
-  local demo = GD.IsDemo()
-  local member = not demo and guildMember(e.name) or nil
+  local source = GD.Source()
+  local member = not source and guildMember(e.name) or nil
   local offline = member ~= nil and not member.online
-  local reason = demo and "demo" or ns.Invites.GroupInviteBlock(e.name, e.guid, offline)
+  local reason = source and "source" or ns.Invites.GroupInviteBlock(e.name, e.guid, offline)
   local whyNot, wait = ns.NearbyWho.Block()
-  whyNot = demo and "demo" or whyNot
+  whyNot = source and "source" or whyNot
   return {
     {
       icon = WHISPER_ICON,
@@ -459,8 +441,7 @@ local function rowActions(e, refresh)
       boxed = true,
       dim = reason ~= nil,
       tooltip = L["guild.invite"],
-      tooltipText = reason and (reason == "demo" and L["guild.invite.demo"] or L["invite.why." .. reason])
-        or L["guild.invite.tip"],
+      tooltipText = reason and (source and L[source.why.invite] or L["invite.why." .. reason]) or L["guild.invite.tip"],
       onClick = function()
         ns.Invites.InviteToGroup(e.name, e.guid, offline)
       end,
@@ -470,7 +451,8 @@ local function rowActions(e, refresh)
       boxed = true,
       dim = whyNot ~= nil,
       tooltip = L["nearby.who.update"],
-      tooltipText = whyNot and ns.NearbyWho.WhyText(whyNot, wait) or L["nearby.who.tip"],
+      tooltipText = whyNot and (source and L[source.why.update] or ns.NearbyWho.WhyText(whyNot, wait))
+        or L["nearby.who.tip"],
       onClick = function()
         ns.NearbyWho.Request(e)
         refresh()
@@ -843,55 +825,8 @@ local function build(container)
   -- Tab bodies of add-ons by id, built once by syncExt().
   local extTabs = {}
 
-  -- Banner of the demo mode: what it is, the rights of the demo character and the way out.
-  local banner = W.Card(view.content, {})
-  banner.text = W.Text(banner, { key = "guild.demo.banner", role = "ui", color = "warning", wrap = true })
-  banner.text:SetPoint("TOPLEFT", PAD, -10)
-  local roleOptions = {}
-  for _, role in ipairs(ns.GuildDemo.ROLES) do
-    roleOptions[#roleOptions + 1] = { value = role, key = "guild.demo.role." .. role }
-  end
-  banner.role = W.Dropdown(banner, {
-    key = "guild.demo.rights",
-    width = DROPDOWN_WIDTH,
-    options = roleOptions,
-    get = function()
-      return GD.DemoRole() or ns.GuildDemo.DEFAULT_ROLE
-    end,
-    set = GD.SetDemoRole,
-  })
-  banner.role.fgId = "guild-demo-role"
-  banner.stop = W.Action(banner, {
-    label = "act.close",
-    icon = "close",
-    tooltip = "guild.demo.end",
-    width = STOP_WIDTH,
-    height = 24,
-    onClick = function()
-      GD.SetDemo(false)
-    end,
-  })
-  banner.stop.fgId = "guild-demo-end"
-  function banner:fgGridLayout(width)
-    self.text:SetWidth(width - PAD * 2)
-    local top = 10 + self.text:GetStringHeight() + GAP
-    self.role:SetWidth(DROPDOWN_WIDTH)
-    self.role:ClearAllPoints()
-    self.role:SetPoint("TOPLEFT", PAD, -top)
-    self.stop:ClearAllPoints()
-    local h
-    if width >= PAD * 2 + DROPDOWN_WIDTH + GAP + STOP_WIDTH then
-      -- Next to the dropdown, level with its box below the label.
-      self.stop:SetPoint("TOPLEFT", PAD + DROPDOWN_WIDTH + GAP, -(top + 18))
-      h = top + 46 + 10
-    else
-      self.stop:SetPoint("TOPLEFT", PAD, -(top + 46 + GAP))
-      h = top + 46 + GAP + 24 + 10
-    end
-    self:SetHeight(h)
-    return h
-  end
-  s:Add(banner, { gap = 12 })
+  -- Parts of an extension at the top of the page (a banner for a stand-in source).
+  local topParts = ns.DevTools.Build("guild-top", view)
 
   -- Hint card: management lives in the add-on GildenManager.
   local manager = W.Card(view.content, {})
@@ -1048,19 +983,8 @@ local function build(container)
 
   -- Guild tab ---------------------------------------------------------------------------------------
   local notice = add("guild", ns.AddParagraph(view, nil, { role = "text", color = "textSecondary", gap = 8 }))
-  -- Only without a guild: shows the sample guild. Placed by refresh(), not part of a group.
-  local demoStart = W.Action(view.content, {
-    label = "act.show",
-    icon = "eye",
-    tooltip = "guild.demo.start",
-    width = DEMO_START_WIDTH,
-    height = 24,
-    onClick = function()
-      GD.SetDemo(true)
-    end,
-  })
-  demoStart.fgId = "guild-demo-start"
-  s:Add(demoStart, { height = 24, width = DEMO_START_WIDTH, gap = 8 })
+  -- Parts of an extension below the notice (the offer to look at sample data), placed by refresh().
+  local noticeParts = ns.DevTools.Build("guild-notice", view)
   local title =
     add("guild", ns.AddParagraph(view, nil, { role = "h3", family = "heading", color = "accent2", gap = 2 }))
   local onlineLine = add("guild", ns.AddParagraph(view, nil, { role = "ui", color = "text", gap = 4 }))
@@ -1413,10 +1337,10 @@ local function build(container)
     showGroup("guild", false)
     hideExtTabs()
     showGroup("social", true)
-    local demo = GD.IsDemo()
-    local list = demo and GD.DemoSeen() or SP.List()
+    local source = GD.Source()
+    local list = source and source.seen() or SP.List()
     socialInfo:SetText(
-      demo and L["guild.demo.seen"]
+      source and L[source.seenNote]
         or L["guild.seen.local"]
           .. (SP.Enabled() and "" or "\n" .. L["guild.seen.off"])
           .. "\n"
@@ -1466,7 +1390,7 @@ local function build(container)
       end
     end
     if picked then
-      local live = not demo and SP.Live(picked.guid, picked.name) or nil
+      local live = not source and SP.Live(picked.guid, picked.name) or nil
       detailSocial.name:SetText(coloredName(picked.name, picked.class))
       detailSocial.body:SetText(table.concat(seenLines(picked, peerOf(picked.name, picked.guid), live), "\n"))
       detailSocial:SetActions({})
@@ -1501,10 +1425,10 @@ local function build(container)
     end
   end
 
-  -- Loads the add-on once per session when there is something to extend (a guild or the demo) and the
+  -- Loads the add-on once per session when there is something to extend (a guild or a source) and the
   -- player switched it on. True when it was loaded: syncExt() has refreshed the page then.
   local function autoLoad()
-    if autoTried or GE.Loaded() or not (GD.IsDemo() or GD.Get().inGuild) then
+    if autoTried or GE.Loaded() or not (GD.Source() or GD.Get().inGuild) then
       return false
     end
     if ns.PackageUI.State(MANAGER_ADDON) ~= "idle" then
@@ -1522,10 +1446,8 @@ local function build(container)
     if autoLoad() then
       return
     end
-    local demo = GD.IsDemo()
-    banner:SetShown(demo)
-    if demo then
-      banner.role.Refresh()
+    for _, part in ipairs(topParts) do
+      part.Refresh()
     end
     local hint = not GE.Loaded() and state.tab == "guild"
     manager:SetShown(hint)
@@ -1547,7 +1469,10 @@ local function build(container)
     else
       refreshSocial()
     end
-    demoStart:SetShown(notice:IsShown() and not GD.Get().inGuild)
+    local offer = notice:IsShown() and not GD.Get().inGuild
+    for _, part in ipairs(noticeParts) do
+      part.Refresh({ offer = offer })
+    end
     detailGuild:SetShown(state.sel ~= nil and state.tab ~= "social")
     detailSocial:SetShown(state.sel ~= nil and state.tab == "social")
     view:Layout()
@@ -1574,7 +1499,7 @@ local function build(container)
       refresh()
     end
   end)
-  ns.On("FG_DEMO_UPDATE", function()
+  ns.On("FG_GUILD_SOURCE", function()
     if container:IsVisible() then
       refresh()
     end
@@ -1622,27 +1547,8 @@ local function addPlates(view)
   ns.AddParagraph(view, "guild.plates.hint", { role = "micro", color = "textMuted", gap = 8 })
 end
 
--- The button that opens the nearby detection probe (also placed by the settings page on its own). It
--- exists only when an extension registers the probe.
-function P.AddProbe(view)
-  local tool = ns.DevTools.byId.nearbyprobe
-  if not tool then
-    return
-  end
-  local probe = W.Action(view.content, {
-    label = "act.test",
-    icon = "search",
-    tooltip = "nearbyprobe.open",
-    width = 180,
-    onClick = tool.run,
-  })
-  probe.fgId = "guild-nearbyprobe"
-  view.stack:Add(probe, { height = 26, width = 180, gap = 6 })
-end
-
--- The settings section: keep the recently seen list, include targets, clear. opts.probe == false
--- leaves the probe button out.
-function P.AddSettings(view, opts)
+-- The settings section: keep the recently seen list, include targets, clear.
+function P.AddSettings(view)
   local s = view.stack
   ns.AddHeading(view, "guild.set.heading")
   for _, item in ipairs({
@@ -1669,9 +1575,6 @@ function P.AddSettings(view, opts)
       addPlates(view)
     end
   end
-  if not (opts and opts.probe == false) then
-    P.AddProbe(view)
-  end
   local clear = W.Action(view.content, {
     label = "act.clear",
     icon = "trash",
@@ -1683,24 +1586,13 @@ function P.AddSettings(view, opts)
   })
   clear.fgId = "guild-clear"
   s:Add(clear, { height = 26, width = 180, gap = 6 })
-  local demo = W.Action(view.content, {
-    label = "act.show",
-    icon = "eye",
-    tooltip = "guild.demo.start",
-    width = 180,
-    onClick = function()
-      GD.SetDemo(true)
-      ns.Main.Show("guild")
-    end,
-  })
-  demo.fgId = "guild-demo-settings"
-  s:Add(demo, { height = 26, width = 180, gap = 6 })
+  ns.DevTools.AddButtons(view, "guild")
   ns.AddParagraph(view, "guild.seen.local", { role = "micro", color = "textMuted" })
 end
 
 ns.RegisterPage({
   id = "guild",
-  order = 30,
+  order = 250,
   group = "character",
   title = "page.guild",
   icon = ns.ICONS.guild,

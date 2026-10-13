@@ -2,7 +2,9 @@
 local _, ns = ...
 local W, Theme, L = ns.W, ns.Theme, ns.L
 
-local GROUPS = { "main", "world", "character", "tools", "system" }
+-- Group ids are stable (saved accordion state, later menu customizing); order and title key
+-- "nav.group.<id>" follow from this list. A group without a listed page gets no header.
+local GROUPS = { "main", "world", "character", "learn", "professions", "inventory", "tools", "system" }
 local HEADER_HEIGHT = 24
 
 ns.AddLocale("enUS", { ["sidebar.groupHint"] = "Click to expand or collapse" })
@@ -61,7 +63,20 @@ function Sidebar.Create(parent)
   f.items = {}
   f.headers = {}
 
+  -- A group without a listed page gets no header and no gap in the icon rail.
+  local listed, active = {}, {}
+  for _, page in ipairs(ns.Router:list()) do
+    if page.sidebar ~= false then
+      listed[page.group] = true
+    end
+  end
   for _, group in ipairs(GROUPS) do
+    if listed[group] then
+      active[#active + 1] = group
+    end
+  end
+
+  for _, group in ipairs(active) do
     local header = CreateFrame("Button", nil, content)
     header:SetHeight(HEADER_HEIGHT)
     header.group = group

@@ -31,8 +31,18 @@ Store.defaults = {
     buttonLabels = true,
     combatHide = false,
     sidebarCollapsed = false,
-    -- Accordion state per sidebar group (UI/Sidebar.lua).
-    sidebarOpen = { main = true, world = false, character = true, tools = true, system = false },
+    -- Accordion state per sidebar group (UI/Sidebar.lua). A group id missing here (older saves)
+    -- counts as open.
+    sidebarOpen = {
+      main = true,
+      world = true,
+      character = true,
+      learn = true,
+      professions = true,
+      inventory = true,
+      tools = true,
+      system = true,
+    },
     minimap = { hide = false, angle = 200 },
     trainersView = "list",
     weaponsView = "list",
@@ -68,6 +78,13 @@ Store.defaults = {
     errorHideBlizzard = true,
     -- Side tab in Blizzard's character window (Modules/BlizzardLinks.lua).
     characterButton = true,
+    -- Panels on Blizzard windows (Modules/HostSkin.lua): "auto" follows the window, "light" or
+    -- "dark" force the look. Store.migrateHostSkin carries over the old spellbookList choice.
+    hostSkin = "auto",
+    -- Item level, enchant and gem overlays on the slots of the character and inspect window
+    -- (Modules/HostSkin.lua, ItemLevelOverlay.lua): "auto" hides what another add-on draws itself,
+    -- "ours" always shows ours, "none" never.
+    slotOverlays = "auto",
     -- Hides Blizzard's talking head window, the voice keeps playing (Modules/TalkingHead.lua).
     hideTalkingHead = false,
     -- Blizzard world map (Modules/WorldMapLinks.lua): button, marker/route bar, own pins, bar state.
@@ -350,9 +367,6 @@ Store.defaults = {
   -- Calculator (Modules/CalcView.lua): history { expr, result }, last input, last result (text),
   -- rules section open, thousands separator. Validated on first read.
   calc = { history = {}, input = "", ans = "", rulesOpen = false, group = false },
-  -- Last instance data export (Modules/InstanceExport.lua): the whole package as JSON text, read from the
-  -- SavedVariables file by the website import.
-  instExport = { at = 0, text = "" },
   -- Measured flight times per route key "fromId>toId": { n, sum, last, min, max } (Modules/FlightLogic.lua).
   flightTimes = {},
   -- Floors and rough area centres the player taught the dungeon map (Modules/DungeonAreaLogic.lua), cleaned on first read.
@@ -520,6 +534,18 @@ function Store.migrateSocialAccept(account)
   s.autoSocialAccept = nil
 end
 
+-- settings.spellbookList (auto, parchment, dark) became settings.hostSkin (auto, light, dark). The old
+-- choice is carried over once; the old key stays as it was. Runs before the defaults are filled in.
+local HOST_SKIN_FROM = { auto = "auto", parchment = "light", dark = "dark" }
+
+function Store.migrateHostSkin(account)
+  local s = account.settings
+  if type(s) ~= "table" or s.hostSkin ~= nil then
+    return
+  end
+  s.hostSkin = HOST_SKIN_FROM[s.spellbookList]
+end
+
 -- settings.fontScales must be a table of numbers: a damaged value is replaced by 1 (the default),
 -- keys of other versions stay. Runs before the defaults are filled in.
 function Store.cleanFontScales(account)
@@ -546,6 +572,7 @@ function Store.init(account, char)
   local _, applied = Store.migrate(account)
   Store.renameMapExplored(account)
   Store.migrateSocialAccept(account)
+  Store.migrateHostSkin(account)
   Store.cleanFontScales(account)
   U.applyDefaults(account, Store.defaults)
   if isNew then

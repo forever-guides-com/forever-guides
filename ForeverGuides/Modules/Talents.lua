@@ -26,7 +26,7 @@ end
 
 ns.RegisterPage({
   id = "talents",
-  order = 30,
+  order = 230,
   group = "character",
   title = "page.talents",
   icon = ns.ICONS.talents,

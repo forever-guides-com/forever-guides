@@ -25,6 +25,21 @@ gm.defaults = {
 -- Usable before SavedVariables are read.
 gm.db = FG.U.applyDefaults({}, gm.defaults)
 
+-- What a companion add-on may use to run this add-on on a copy of its data in memory (see
+-- GuildExt.Share): the defaults, the store and the member rules.
+ext.Share("gildenmanager", {
+  defaults = gm.defaults,
+  Db = function()
+    return gm.db
+  end,
+  SetDb = function(db)
+    gm.db = db
+  end,
+  Members = function()
+    return gm.MembersLogic
+  end,
+})
+
 FG.On("ADDON_LOADED", function(_, name)
   if name ~= ADDON_NAME then
     return
@@ -74,8 +89,6 @@ FG.AddLocale("enUS", {
   ["gm.dry.tip"] = "Actions only show the preview.\nNothing is sent.",
   ["gm.dry.hint"] = "Dry run: nothing is sent",
   ["gm.dry.done"] = "Dry run: %s for %s, nothing sent",
-  ["gm.demo.hint"] = "Demo: nothing is sent",
-  ["gm.demo.done"] = "Demo: %s for %s",
   ["gm.sent.promote"] = "Promotion sent: %s",
   ["gm.sent.demote"] = "Demotion sent: %s",
   ["gm.sent.editNote"] = "Note sent: %s",
@@ -139,8 +152,6 @@ FG.AddLocale("deDE", {
   ["gm.dry.tip"] = "Aktionen zeigen nur die Vorschau.\nNichts wird gesendet.",
   ["gm.dry.hint"] = "Trockenlauf: nichts wird gesendet",
   ["gm.dry.done"] = "Trockenlauf: %s bei %s, nichts gesendet",
-  ["gm.demo.hint"] = "Demo: nichts wird gesendet",
-  ["gm.demo.done"] = "Demo: %s bei %s",
   ["gm.sent.promote"] = "Beförderung gesendet: %s",
   ["gm.sent.demote"] = "Degradierung gesendet: %s",
   ["gm.sent.editNote"] = "Notiz gesendet: %s",

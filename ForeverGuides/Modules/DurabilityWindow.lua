@@ -452,8 +452,8 @@ end)
 
 ns.RegisterPage({
   id = "durability",
-  order = 99,
-  group = "tools",
+  order = 520,
+  group = "inventory",
   title = "page.durability",
   icon = ns.ICONS.durability,
   aliases = { "haltbarkeit", "durability", "reparatur", "repair", "ausruestung", "ausrüstung", "equipment", "armor" },

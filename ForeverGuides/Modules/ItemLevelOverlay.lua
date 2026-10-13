@@ -7,8 +7,12 @@
 -- button.fgIlvl, nothing else of Blizzard's is written. A button repaints only when its item
 -- or a setting changed. A button that needs a new FontString while in combat is queued and
 -- finished at PLAYER_REGEN_ENABLED.
+-- Slots of the character and the inspect window carry everything of ours on one named child frame
+-- (O.SlotFrame), and settings.slotOverlays decides what we draw there while another add-on draws
+-- item level and enchant text itself (O.Policy, HostSkin.SheetOwner).
 local _, ns = ...
 local I = ns.ItemInfo
+local H = ns.HostSkin
 
 local O = {}
 ns.ItemLevelOverlay = O
@@ -150,15 +154,107 @@ end
 -- Shared with ItemEnchantOverlay.
 O.SetFont, O.InCombat = setFont, inCombat
 
+local slotSerial = 0
+
+-- The child frame of a slot button that carries everything we draw on the slot (item level, enchant
+-- text, gems, hover area). It has a global name: skin add-ons fade the anonymous parts of a Blizzard
+-- button and leave named frames of other add-ons alone. Made once per button, not while in combat.
+function O.SlotFrame(button)
+  local frame = button.fgSlot
+  if frame then
+    return frame
+  end
+  if type(button.CreateFontString) ~= "function" or inCombat() then
+    return nil
+  end
+  local name = call(button, "GetName")
+  if type(name) ~= "string" then
+    slotSerial = slotSerial + 1
+    name = "Slot" .. slotSerial
+  end
+  local ok, created = pcall(CreateFrame, "Frame", "ForeverGuidesSlotOverlay_" .. name, button)
+  if not (ok and created) then
+    return nil
+  end
+  created:SetAllPoints(button)
+  button.fgSlot = created
+  return created
+end
+
+-- What we draw on the slots of a window ("character" or "inspect"): level (item level number), text
+-- (enchant text), extras (gems and the missing enchant marker), inset (extras sit inside the slot, because
+-- the skin uses the side of the slot). Chosen by settings.slotOverlays; with auto only while another
+-- add-on draws the slot information, see HostSkin.SheetOwner.
+local policies = {}
+
+local function makePolicy(level, text, extras, inset)
+  local sig = (level and "L" or "l") .. (text and "T" or "t") .. (extras and "X" or "x") .. (inset and "I" or "i")
+  return { level = level, text = text, extras = extras, inset = inset, sig = sig }
+end
+
+local function choose(surface)
+  local mode = H.SlotMode()
+  if mode == "none" then
+    return makePolicy(false, false, false, false)
+  end
+  if mode == "auto" then
+    local owner, draws = H.SheetOwner(surface)
+    if owner then
+      return makePolicy(not draws.level, not draws.text, true, draws.text)
+    end
+  end
+  return makePolicy(true, true, true, false)
+end
+
+function O.Policy(surface)
+  surface = surface == "inspect" and "inspect" or "character"
+  local policy = policies[surface]
+  if not policy then
+    policy = choose(surface)
+    policies[surface] = policy
+  end
+  return policy
+end
+
+-- Reads the setting and the skin again. When the answer changed after something was painted, FG_SLOT_POLICY
+-- repaints every overlay. Returns true then.
+function O.Reassess(surface)
+  surface = surface == "inspect" and "inspect" or "character"
+  local old = policies[surface]
+  policies[surface] = choose(surface)
+  if old and old.sig ~= policies[surface].sig then
+    ns.Emit("FG_SLOT_POLICY", surface)
+    return true
+  end
+  return false
+end
+
+local function reassessAll()
+  for _, surface in ipairs(H.SHEETS) do
+    O.Reassess(surface)
+  end
+end
+
+-- Skins build their slot texts a moment after the window shows: look again at once and a bit later.
+function O.WatchSheet(surface, window)
+  return H.Watch(window, function()
+    O.Reassess(surface)
+  end)
+end
+
 -- The FontString of a button, created on first use. Not while in combat.
-local function region(button)
+local function region(button, kind)
   if button.fgIlvl then
     return button.fgIlvl
   end
   if inCombat() then
     return nil
   end
-  local ok, fs = pcall(button.CreateFontString, button, nil, "OVERLAY")
+  local parent = kind == "bag" and button or O.SlotFrame(button)
+  if not parent then
+    return nil
+  end
+  local ok, fs = pcall(parent.CreateFontString, parent, nil, "OVERLAY")
   if not (ok and fs) then
     return nil
   end
@@ -212,6 +308,9 @@ function O.Update(button, kind, quality, unit)
   end
   known[button] = kind
   local enabled = O.Option("itemLevel") ~= false and O.Option(KIND_OPTION[kind]) ~= false
+  if enabled and kind ~= "bag" then
+    enabled = O.Policy(kind).level
+  end
   if not enabled then
     if painted[button] ~= generation .. "|off" then
       painted[button] = generation .. "|off"
@@ -253,7 +352,7 @@ function O.Update(button, kind, quality, unit)
     pending[button] = kind
     return
   end
-  local fs = region(button)
+  local fs = region(button, kind)
   if not fs then
     return
   end
@@ -359,5 +458,19 @@ ns.On("PLAYER_REGEN_ENABLED", O.Flush)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and path:find("^settings%.itemLevel") then
     O.Refresh()
+  elseif path == "settings.slotOverlays" then
+    reassessAll()
+  end
+end)
+ns.On("FG_SLOT_POLICY", function()
+  O.Refresh()
+end)
+-- A skin switch or any restyle runs ns.RefreshUI: read the skin now and once more after it settled.
+local settle
+ns.On("FG_UI_REFRESHED", function()
+  if settle then
+    settle.Burst()
+  else
+    settle = H.Watch(nil, reassessAll)
   end
 end)

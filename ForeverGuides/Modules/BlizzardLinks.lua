@@ -7,7 +7,9 @@
 -- parented to the sub-view so they show only with it. They never touch the
 -- header strip, which Blizzard rebuilds on every spell update. The "L" tab is a
 -- real tab: it shows ns.SpellbookPanel (the learn list on the book's parchment),
--- Blizzard's own tabs deselect it again. Professions: one side tab in the column
+-- Blizzard's own tabs deselect it again. It sits in the category row of the book
+-- (behind the last tab of CategoryTabSystem, same size and gap, anchored to that
+-- frame); only without that row it stays a side tab. The "T" tab stays at the edge. Professions: one side tab in the column
 -- of the professions window, made from Blizzard's LargeSideTabButtonTemplate when
 -- it exists. Character window: a side tab behind the last of its mode tabs
 -- (CharacterFrame.ModeTabs), the same way; a right click opens a small menu.
@@ -777,6 +779,29 @@ local function findTabs(view, frames, root)
   return last, gap, best, tabs
 end
 
+-- Look of the side tabs of a window we only measure (the inspect window, see InspectLink).
+local FOREIGN_COLUMN = { flow = "column", min = { 30, 30 }, max = { 64, 64 } }
+
+-- The column of tab-sized frames at the right edge of `root`: visible, not ours and not
+-- rejected by exclude(frame). Empty when there is none.
+function B.FindSideTabs(root, exclude)
+  if not isFrame(root) then
+    return {}
+  end
+  local frames = {}
+  for _, frame in ipairs(candidates({ root })) do
+    if not (exclude and exclude(frame)) then
+      frames[#frames + 1] = frame
+    end
+  end
+  local _, _, group = findTabs(FOREIGN_COLUMN, frames, root)
+  local out = {}
+  for _, tab in ipairs(group or {}) do
+    out[#out + 1] = tab.frame
+  end
+  return out
+end
+
 -- Placement -------------------------------------------------------------------
 
 local function fmt(n)
@@ -818,6 +843,9 @@ end
 local function applyLevel(entry, level)
   for _, button in ipairs(entry.buttons) do
     button:SetFrameLevel(level)
+  end
+  if entry.rowTab then
+    entry.rowTab:SetFrameLevel(level)
   end
   if entry.panel then
     entry.panel.SetLevel(level - PANEL_DROP)
@@ -994,9 +1022,90 @@ end
 
 -- Side tabs of the spellbook and talent views ---------------------------------------
 
+-- Look of Blizzard's row of category tabs: tab-sized buttons side by side.
+local ROW_VIEW = { flow = "row", min = { 16, 16 }, max = { 80, 80 } }
+
+local function toggle(frame, on)
+  if on ~= shown(frame) then
+    pcall(on and frame.Show or frame.Hide, frame)
+  end
+end
+
+-- The last visible tab of the spellbook's category row (CategoryTabSystem) with the gap to its
+-- neighbour. Without it: nil and the reason, for the diag report.
+local function findRow(entry)
+  local system = field(entry.parent, "CategoryTabSystem")
+  if not isFrame(system) then
+    return nil, "no CategoryTabSystem"
+  end
+  local tabs = {}
+  for _, child in ipairs(childrenOf(system)) do
+    if isFrame(child) then
+      tabs[#tabs + 1] = child
+    end
+  end
+  local last, gap, group = findTabs(ROW_VIEW, tabs, entry.root)
+  if not last then
+    return nil, nameOf(system) .. " has no visible tab below the window top"
+  end
+  local index = 0
+  for i, tab in ipairs(tabs) do
+    if tab == last.frame then
+      index = i
+    end
+  end
+  return { last = last, gap = gap, system = system },
+    string.format(
+      "%s, %d tabs, last %s #%d %sx%s, gap %s",
+      nameOf(system),
+      #group,
+      nameOf(last.frame),
+      index,
+      fmt(last.w),
+      fmt(last.h),
+      fmt(gap)
+    )
+end
+
+-- The learn list tab sits behind the last tab of the category row, same size and gap, anchored to
+-- that frame. It is a drawn button of its own (the side tab keeps the template look and takes over
+-- again when the row is gone). Returns whether the row tab is in use.
+local function placeRow(entry)
+  local level = entry.level
+  if not level then
+    return false
+  end
+  local row, info = findRow(entry)
+  local tab = entry.rowTab
+  if not row then
+    if tab then
+      toggle(tab, false)
+    end
+    toggle(level.button, true)
+    entry.rowInfo = "tab row: not found (" .. info .. "), side tab at the window edge"
+    return false
+  end
+  if not tab then
+    tab = makeIconButton(entry.parent, level.link, entry.root, level.handler)
+    decorateTab(tab)
+    tab:fgSetSelected(entry.panel and entry.panel.IsShown() or false)
+    entry.rowTab = tab
+  end
+  tab:ClearAllPoints()
+  tab:SetPoint("LEFT", row.last.frame, "RIGHT", row.gap, 0)
+  sizeButton(tab, "icon", row.last.w, row.last.h)
+  toggle(tab, true)
+  toggle(level.button, false)
+  entry.rowInfo = "tab row: " .. info
+  return true
+end
+
 -- The first tab of the stack: at the right window edge, or behind the foreign tab `rel`.
 local function anchorSide(entry, rel)
-  local first = entry.buttons[1]
+  local first = entry.stack[1]
+  if not first then
+    return
+  end
   first:ClearAllPoints()
   if rel then
     first:SetPoint("TOPLEFT", rel, "BOTTOMLEFT", 0, -SIDE_GAP)
@@ -1015,9 +1124,14 @@ local function lowestIndependent(list)
   end
 end
 
+local layoutSide
+
 -- Keeps the stack at the end of the column: it only moves behind the last foreign
 -- side tab when one overlaps it, or when the tab it hangs behind is gone.
 local function reflowSide(entry)
+  if placeRow(entry) ~= (entry.inRow == true) then
+    return layoutSide(entry)
+  end
   local frames = candidates(bases(entry))
   local _, _, group, tabs = findTabs(entry.target.view, frames, entry.root)
   applyLevel(entry, topLevel(frames, entry.parent))
@@ -1028,7 +1142,7 @@ local function reflowSide(entry)
   if entry.anchor and not visible(entry.anchor) then
     anchorSide(entry, nil)
   end
-  local l, r, t, b = rectOf(entry.buttons)
+  local l, r, t, b = rectOf(entry.stack)
   if not l then
     return
   end
@@ -1057,18 +1171,29 @@ local function reflowSide(entry)
   anchorSide(entry, (inColumn and lowestIndependent(group) or hit).frame)
 end
 
--- Stacks the buttons below each other at the right edge of the window. The engine
--- keeps them on the screen when the window sits at the screen edge.
-local function layoutSide(entry)
-  local buttons, modes = entry.buttons, {}
-  for i, button in ipairs(buttons) do
-    if i > 1 then
-      button:ClearAllPoints()
-      button:SetPoint("TOPLEFT", buttons[i - 1], "BOTTOMLEFT", 0, -SIDE_GAP)
+-- Stacks the buttons below each other at the right edge of the window, except the learn list tab
+-- while it sits in the category row. The engine keeps them on the screen when the window sits at
+-- the screen edge.
+function layoutSide(entry)
+  local inRow, stack, modes = placeRow(entry), {}, {}
+  for i, button in ipairs(entry.buttons) do
+    local rowButton = inRow and entry.level.button == button
+    local sized = rowButton and entry.rowTab or button
+    if not rowButton then
+      if #stack > 0 then
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", stack[#stack], "BOTTOMLEFT", 0, -SIDE_GAP)
+      end
+      button:SetClampedToScreen(true)
+      stack[#stack + 1] = button
     end
-    button:SetClampedToScreen(true)
-    modes[i] = LINKS[entry.target.links[i]].tag .. " side " .. fmt(button:GetWidth()) .. "x" .. fmt(button:GetHeight())
+    modes[i] = LINKS[entry.target.links[i]].tag
+      .. (rowButton and " row " or " side ")
+      .. fmt(sized:GetWidth())
+      .. "x"
+      .. fmt(sized:GetHeight())
   end
+  entry.stack, entry.inRow = stack, inRow
   anchorSide(entry, nil)
   entry.gap, entry.mode, entry.offsets, entry.modes = nil, "side", false, modes
   reflowSide(entry)
@@ -1289,6 +1414,9 @@ local function attach(target, parent, root)
       button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     end
     buttons[#buttons + 1] = button
+    if link.panel and target.view.side then
+      entry.level = { button = button, link = link, handler = handler }
+    end
     if link.panel and ns.SpellbookPanel then
       local ok, panel = pcall(ns.SpellbookPanel.Create, parent, {
         onOpen = function()
@@ -1297,6 +1425,9 @@ local function attach(target, parent, root)
         onSelect = function(on)
           if button.fgSetSelected then
             button:fgSetSelected(on)
+          end
+          if entry.rowTab then
+            entry.rowTab:fgSetSelected(on)
           end
         end,
       })
@@ -1552,10 +1683,14 @@ function B.Report()
     ENUMERATE_RUNS
   )
   out[#out + 1] = Scan.PanelLine()
+  if ns.InspectLink and ns.InspectLink.Info then
+    out[#out + 1] = ns.InspectLink.Info()
+  end
   local book = attached.spellbook
   if book then
+    out[#out + 1] = book.rowInfo or "tab row: not checked"
     out[#out + 1] = "spellbook view " .. book.target.parent .. ":"
-    for _, text in ipairs(ns.SpellbookPanel and ns.SpellbookPanel.Dump(book.parent) or {}) do
+    for _, text in ipairs(ns.SpellbookPanel and ns.SpellbookPanel.Structure(book.parent) or {}) do
       out[#out + 1] = text
     end
     out[#out + 1] = book.panel and book.panel.Info() or "panel: not created"

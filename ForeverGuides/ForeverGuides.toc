@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.1.2
+## Version: 0.1.3
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -36,6 +36,7 @@ Core\Notify.lua
 Data\Manifest.lua
 Data\Meta.lua
 Data\Trainers.lua
+Data\TrainerRoles.lua
 Data\Weapons.lua
 Data\TrainerCosts.lua
 Data\WeaponRaces.lua
@@ -55,6 +56,7 @@ Data\MacroSyntax.lua
 Data\Instances.lua
 Data\Access.lua
 Data\DungeonAssets.lua
+Data\BossModels.lua
 Data\BossPins.lua
 Data\Travel.lua
 Data\Abilities_WARRIOR.lua
@@ -112,6 +114,7 @@ Modules\Dashboard.lua
 Modules\Placeholders.lua
 Modules\TravelLogic.lua
 Modules\TravelWalk.lua
+Modules\TrainerRoles.lua
 Modules\RefLogic.lua
 Modules\PinLogic.lua
 Modules\CalcLocale.lua
@@ -232,6 +235,7 @@ Modules\DrawingLink.lua
 Modules\TalentLink.lua
 Modules\ErrorsPage.lua
 Modules\BlizzardScan.lua
+Modules\HostSkin.lua
 Modules\SpellbookPanel.lua
 Modules\BlizzardLinks.lua
 Modules\TalkingHead.lua
@@ -282,7 +286,6 @@ Modules\HideErrors.lua
 Modules\AutomationSettings.lua
 Modules\GuildLogic.lua
 Modules\NearbyLogic.lua
-Modules\GuildDemo.lua
 Modules\GuildData.lua
 Modules\Peers.lua
 Modules\SeenPlayers.lua
@@ -298,7 +301,6 @@ Modules\FrameTweaksBar.lua
 Modules\FrameTweaksHandle.lua
 Modules\FrameTweaksPage.lua
 Modules\AssetFiles.lua
-Modules\InstanceExport.lua
 Modules\WaypointArrow.lua
 Modules\FlightTimer.lua
 Modules\WaypointList.lua
@@ -320,6 +322,8 @@ Modules\ProfessionShopWindow.lua
 Modules\AuctionLink.lua
 Modules\ProfessionTracker.lua
 Modules\ProfessionRoutePage.lua
+Modules\ProfessionTrainersLogic.lua
+Modules\ProfessionTrainersPage.lua
 Modules\RecipeLogic.lua
 Modules\RecipeData.lua
 Modules\RecipeKnown.lua
@@ -332,6 +336,7 @@ Modules\BossProgress.lua
 Modules\BossResetLogic.lua
 Modules\BossReset.lua
 Modules\DungeonBossTab.lua
+Modules\BossModelWindow.lua
 Modules\DungeonWorldMap.lua
 Modules\InstanceResetLogic.lua
 Modules\InstanceReset.lua

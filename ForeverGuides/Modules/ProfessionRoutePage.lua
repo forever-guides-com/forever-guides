@@ -267,7 +267,8 @@ local function newTrainerRow(parent)
     onClick = function()
       local t = row.trainer
       if t then
-        K.ShowOnMap(t.map, t.x, t.y, t.n)
+        local place = ns.ProfessionTrainersLogic.Place(t)
+        K.ShowOnMap(place.map, place.x, place.y, place.label)
       end
     end,
   })
@@ -284,21 +285,8 @@ local function newTrainerRow(parent)
   return row
 end
 
--- Map position of a trainer: fractions of the zone map, percent values are converted.
-local function position(t)
-  if type(t.map) ~= "number" or type(t.x) ~= "number" or type(t.y) ~= "number" then
-    return nil
-  end
-  local x, y = t.x, t.y
-  if x > 1 or y > 1 then
-    x, y = x / 100, y / 100
-  end
-  if x < 0 or y < 0 or x > 1 or y > 1 then
-    return nil
-  end
-  return x, y
-end
-
+-- item.trainer is an entry of ProfessionTrainersLogic.Collect: its position holds fractions of the zone
+-- map, its map is the id of the data or the client map named like the zone (resolved on click).
 local function paintTrainer(row, item)
   if item.head then
     row.text:SetText(item.head)
@@ -308,18 +296,35 @@ local function paintTrainer(row, item)
     return
   end
   local t = item.trainer
-  local parts = { t.n }
-  if t.f == "A" or t.f == "H" then
-    parts[#parts + 1] = L["kit.faction." .. t.f]
+  local PL = ns.ProfessionTrainersLogic
+  local parts = { PL.DisplayName(t) }
+  if t.faction == "A" or t.faction == "H" then
+    parts[#parts + 1] = L["kit.faction." .. t.faction]
   end
-  if t.loc then
-    parts[#parts + 1] = t.loc
+  local place = ns.T(t.place)
+  if place then
+    parts[#parts + 1] = place
   end
   row.text:SetText(table.concat(parts, ", "))
   W.SetColor(row.text, "text")
-  local x, y = position(t)
-  row.trainer = x and { map = t.map, x = x, y = y, n = t.n } or nil
-  row.map:SetShown(x ~= nil)
+  row.trainer = PL.HasPosition(t) and t or nil
+  row.map:SetShown(row.trainer ~= nil)
+end
+
+-- The trainers of every rank of a route: { { head } or { trainer } } rows, the trainers of the rank
+-- sorted by faction, place and name. The trainer data file (when loaded) adds trainers and positions.
+local function trainerRows(slug, data)
+  local PL = ns.ProfessionTrainersLogic
+  local entries =
+    PL.Sort(PL.Collect({ { slug = slug, data = data, name = R.PROFESSIONS[slug] } }, rawget(ns, "ProfessionTrainers")))
+  local list = {}
+  for _, r in ipairs(type(data.ranks) == "table" and data.ranks or {}) do
+    list[#list + 1] = { head = string.format(L["profroute.rankHead"], rankName(r.rank), tonumber(r.max) or 0) }
+    for _, t in ipairs(PL.Filter(entries, { rank = r.rank })) do
+      list[#list + 1] = { trainer = t }
+    end
+  end
+  return list
 end
 
 -- Page ----------------------------------------------------------------------------------------------
@@ -489,14 +494,7 @@ local function build(container)
       hint:SetShown(true)
     end
     steps:Sync(rows, paintStep)
-    local list = {}
-    for _, r in ipairs(type(data.ranks) == "table" and data.ranks or {}) do
-      list[#list + 1] = { head = string.format(L["profroute.rankHead"], rankName(r.rank), tonumber(r.max) or 0) }
-      for _, t in ipairs(r.trainers or {}) do
-        list[#list + 1] = { trainer = t }
-      end
-    end
-    trainers:Sync(list, paintTrainer)
+    trainers:Sync(trainerRows(slug, data), paintTrainer)
     view:Layout()
   end
 
@@ -532,8 +530,8 @@ end
 
 ns.RegisterPage({
   id = "professionroute",
-  order = 81,
-  group = "character",
+  order = 420,
+  group = "professions",
   title = "page.professionroute",
   icon = ns.ICONS.professionroute,
   aliases = { "berufsroute", "skillroute", "professionroute", "professionroutes" },

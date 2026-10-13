@@ -96,8 +96,8 @@ end
 
 ns.RegisterPage({
   id = "levels",
-  order = 52,
-  group = "character",
+  order = 330,
+  group = "learn",
   title = "page.levels",
   icon = ns.ICONS.levels,
   aliases = { "levels", "stufen", "level", "stufe", "lernliste" },

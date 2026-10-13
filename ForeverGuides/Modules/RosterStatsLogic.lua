@@ -256,6 +256,23 @@ function S.CleanPvp(raw)
   return nil
 end
 
+-- The new PvP reading (clean) with the counters the client answered with 0 or not at all filled from
+-- the stored one (clean, may be nil). The kills, the honor level and the highest rank do not drop.
+function S.MergePvp(old, new)
+  if not (old and new) then
+    return new
+  end
+  for _, field in ipairs({ "honor", "level", "kills", "highestRank" }) do
+    if (new[field] == nil or new[field] == 0) and old[field] and old[field] > 0 then
+      new[field] = old[field]
+      if field == "level" then
+        new.rankName = new.rankName or old.rankName
+      end
+    end
+  end
+  return new
+end
+
 -- Statistics ------------------------------------------------------------------------------------
 
 local function statOrder(id)
@@ -304,8 +321,18 @@ function S.FromStatistics(rows)
   return #out > 0 and out or nil
 end
 
+-- Old and new reading in one list. The counts only grow: a 0 in the new reading (the client is not
+-- ready, "--") does not replace a stored count above 0.
 function S.MergeStatistics(old, new)
-  local out = combine({ cleanStatList(old), cleanStatList(new) }, statKey, statLess, S.MAX_STATS)
+  local stored, held, fresh = cleanStatList(old), {}, {}
+  for _, e in ipairs(stored) do
+    held[e.id] = e
+  end
+  for _, e in ipairs(cleanStatList(new)) do
+    local prev = held[e.id]
+    fresh[#fresh + 1] = (e.value == 0 and prev and prev.value > 0) and prev or e
+  end
+  local out = combine({ stored, fresh }, statKey, statLess, S.MAX_STATS)
   return #out > 0 and out or nil
 end
 

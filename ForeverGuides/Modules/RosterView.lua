@@ -51,7 +51,7 @@ ns.AddLocale("enUS", {
   ["chars.fresh.hint"] = "Log in, open bank and professions",
   ["chars.tip.goldAll"] = "All characters: %s",
   ["chars.tip.prof.age"] = "Updated: %s",
-  ["chars.you"] = "(you)",
+  ["chars.you"] = "(current)",
   ["chars.faction.A"] = "Alliance",
   ["chars.faction.H"] = "Horde",
   ["chars.seen.today"] = "today",
@@ -66,6 +66,7 @@ ns.AddLocale("enUS", {
   ["chars.tip.zone"] = "Zone: %s",
   ["chars.tip.gold"] = "Gold: %s",
   ["chars.tip.seen"] = "Last seen: %s",
+  ["chars.tip.asOf"] = "Read: %s",
   ["chars.tip.raid"] = "Raid: %s",
   ["chars.tip.expires"] = "Lock ends in %s",
   ["chars.tip.week"] = "Killed this week (%d/%d)",
@@ -118,7 +119,7 @@ ns.AddLocale("deDE", {
   ["chars.fresh.hint"] = "Einloggen, Bank und Berufe öffnen",
   ["chars.tip.goldAll"] = "Alle Charaktere: %s",
   ["chars.tip.prof.age"] = "Stand: %s",
-  ["chars.you"] = "(du)",
+  ["chars.you"] = "(aktuell)",
   ["chars.faction.A"] = "Allianz",
   ["chars.faction.H"] = "Horde",
   ["chars.seen.today"] = "heute",
@@ -133,6 +134,7 @@ ns.AddLocale("deDE", {
   ["chars.tip.zone"] = "Zone: %s",
   ["chars.tip.gold"] = "Gold: %s",
   ["chars.tip.seen"] = "Zuletzt: %s",
+  ["chars.tip.asOf"] = "Stand: %s",
   ["chars.tip.raid"] = "Raid: %s",
   ["chars.tip.expires"] = "Sperre endet in %s",
   ["chars.tip.week"] = "Diese Woche getötet (%d/%d)",
@@ -268,8 +270,20 @@ function V.Register(def)
   return def
 end
 
+-- "-" for a character whose gold was never read, "0" for a real empty purse.
 local function coins(char, plain)
+  if char.money == nil then
+    return "-"
+  end
   return ns.CostLogic.Format(char.money, plain and { plain = true } or nil) or "0"
+end
+
+-- "Read: 3 d ago" for a stored reading of a character that is not the current one.
+local function asOfLine(char, at)
+  if char.current or not at then
+    return nil
+  end
+  return string.format(L["chars.tip.asOf"], agoText(ns.CharRoster.DaysSince(at)))
 end
 
 local function nameTip(char)
@@ -281,6 +295,7 @@ local function nameTip(char)
       string.format(L["chars.tip.zone"], char.subzone and (char.zone .. ", " .. char.subzone) or char.zone)
   end
   lines[#lines + 1] = string.format(L["chars.tip.gold"], coins(char, true))
+  lines[#lines + 1] = asOfLine(char, ns.CharRoster.AsOf(char))
   local when = dateText(char.seen)
   if when then
     lines[#lines + 1] = string.format(L["chars.tip.seen"], when)
@@ -350,6 +365,10 @@ V.Register({
   end,
   tip = function(char)
     local text = coins(char, true)
+    local asOf = asOfLine(char, char.at and char.at.money)
+    if asOf then
+      text = text .. "\n" .. asOf
+    end
     local count, total = ns.CharRoster.Totals(ns.CharRoster.List())
     if count > 1 then
       text = text .. "\n" .. string.format(L["chars.tip.goldAll"], ns.CostLogic.Format(total, { plain = true }) or "0")
@@ -470,6 +489,24 @@ end
 
 -- The modules the tooltip lists, each with the time of its last reading. skip leaves a line out.
 local FRESH_MODULES = {
+  {
+    label = "chars.row.gold",
+    at = function(char)
+      return char.at and char.at.money
+    end,
+    skip = function(char)
+      return not (char.at and char.at.money)
+    end,
+  },
+  {
+    label = "chars.row.ilvl",
+    at = function(char)
+      return char.at and char.at.ilvl
+    end,
+    skip = function(char)
+      return not (char.at and char.at.ilvl)
+    end,
+  },
   {
     label = "chars.row.professions",
     at = function(char)

@@ -57,27 +57,7 @@ local function setting(key)
   end
 end
 
--- The button that runs the item function test (also placed by the settings page on its own). It
--- exists only when an extension registers the test.
-function S.AddProbe(view)
-  local tool = ns.DevTools.byId.itemprobe
-  if not tool then
-    return
-  end
-  view.stack:Add(
-    W.Action(view.content, {
-      label = "act.test",
-      icon = "search",
-      tooltip = "ilvl.probe",
-      width = 220,
-      onClick = tool.run,
-    }),
-    { height = 26, width = 220 }
-  )
-end
-
--- opts.probe == false leaves the test button out.
-function S.Add(view, opts)
+function S.Add(view)
   local s = view.stack
   ns.AddHeading(view, "ilvl.heading")
   ns.AddParagraph(view, "ilvl.hint", { role = "micro", color = "textMuted" })
@@ -134,8 +114,5 @@ function S.Add(view, opts)
     }),
     { height = 42, width = 320 }
   )
-  if not (opts and opts.probe == false) then
-    S.AddProbe(view)
-  end
   ns.ItemEnchantSettings.Add(view)
 end

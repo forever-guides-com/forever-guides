@@ -368,13 +368,18 @@ function IV.LoadingImage(inst)
 end
 
 -- Boss portrait: { fid, kind } with kind "own" (the boss image), "default" (the generic boss image)
--- or "initial" (no usable file, the caller draws the first letter in a circle).
+-- or "initial" (no usable file, the caller draws the first letter in a circle). Order: the portraits of the
+-- data, the boss model image (Data.BossModels icon), the generic image, the letter.
 function IV.Portrait(inst, boss)
   local D = ns.Data and ns.Data.DungeonAssets
   local list = D and D.portraits and D.portraits[inst.n.en]
   local own = list and boss.n and list[boss.n.en]
   if own and known(own) ~= false then
     return own, "own"
+  end
+  local entry = boss.n and ns.DataApi.BossModel(inst.n.en, boss.n.en)
+  if entry and entry.icon and known(entry.icon) ~= false then
+    return entry.icon, "own"
   end
   if D and D.ejDefault and known(D.ejDefault) ~= false then
     return D.ejDefault, "default"
@@ -572,6 +577,9 @@ local function makeBossRow(parent)
   row.abLabel = W.Text(row, { key = "instances.abilities", role = "micro", color = "textMuted" })
   row.chips = K.ChipRow(row)
   newLine(row)
+  -- Portrait and name open the 3D model of a boss that has one.
+  row.modelPic = ns.BossModelWindow.Hotspot(row, row.portrait)
+  row.modelName = ns.BossModelWindow.Hotspot(row, row.name, true)
 
   function row:fgLayout(width)
     local textX = IV.PORTRAIT + 12
@@ -627,6 +635,8 @@ local function paintBossRow(row, item)
       .. Theme.hexText("textMuted", L[progress == "confirmed" and "bossprogress.defeated" or "bossprogress.likely"])
   end
   row.name:SetText(text)
+  row.modelPic:SetBoss(item.inst, boss)
+  row.modelName:SetBoss(item.inst, boss)
   local fid, kind = IV.Portrait(item.inst, boss)
   row.portraitKind = kind
   row.pic:SetTexture(fid)

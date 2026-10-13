@@ -46,7 +46,7 @@ end
 
 -- Number of ranks as the game reports it, nil when the client has no such function.
 local function rankCount()
-  if GD.IsDemo() then
+  if GD.Source() then
     return #GD.Get().ranks
   end
   local fn = endpoint("GuildControlGetNumRanks") or rawget(_G, "GuildControlGetNumRanks")
@@ -117,8 +117,8 @@ local function argument(call, m)
   end
 end
 
--- Runs a confirmed action. Answers "sent" (the call went out), "dry" (dry run, nothing sent), "demo"
--- (sample guild, only the sample rows changed) or false and a reason code. The roster is read again here: rank and rights may have changed while
+-- Runs a confirmed action. Answers "sent" (the call went out), "dry" (dry run, nothing sent), "source"
+-- (a stand-in source took it, the game was not called) or false and a reason code. The roster is read again here: rank and rights may have changed while
 -- the dialog was open. value: the new text of a note.
 function A.Run(action, member, value)
   local call = CALLS[action]
@@ -141,14 +141,16 @@ function A.Run(action, member, value)
     end
   end
   local old, new = values(action, roster, m, value)
-  if GD.IsDemo() then
-    -- Sample guild: only the sample rows change and the demo log gets the entry, the game is never called.
-    if not GD.DemoApply(action, m.key, value) then
+  local source = GD.Source()
+  if source then
+    -- A stand-in source takes the action on its own rows and the log (a copy in memory) gets the entry,
+    -- the game is never called.
+    if not source.apply(action, m.key, value) then
       return false, "failed"
     end
     AL.Record(gm.db, { action = action, name = m.name, old = old, new = new }, FG.U.now())
-    FG.Notify(string.format(L["gm.demo.done"], L["gm.act." .. action], m.name), "info")
-    return "demo"
+    FG.Notify(string.format(L[source.done], L["gm.act." .. action], m.name), "info")
+    return "source"
   end
   if gm.db.dryRun then
     FG.Notify(string.format(L["gm.dry.done"], L["gm.act." .. action], m.name), "info")
@@ -300,8 +302,9 @@ function A.Open(action, member, ctx)
   W.SetText(d.title, "gm.act." .. action)
   d.who:SetText(m.name)
   d.msg:SetText("")
-  W.SetText(d.dry, GD.IsDemo() and "gm.demo.hint" or "gm.dry.hint")
-  d.dry:SetShown(GD.IsDemo() or gm.db.dryRun == true)
+  local source = GD.Source()
+  W.SetText(d.dry, source and source.hint or "gm.dry.hint")
+  d.dry:SetShown(source ~= nil or gm.db.dryRun == true)
   local isNote, isRemove = NOTES[action] == true, action == "remove"
   d.text:SetShown(isNote)
   d.name:SetShown(isRemove)

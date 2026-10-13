@@ -1105,7 +1105,7 @@ end
 
 ns.RegisterPage({
   id = "windows",
-  order = 220,
+  order = 740,
   group = "system",
   title = "page.windows",
   icon = ns.ICONS.windows,

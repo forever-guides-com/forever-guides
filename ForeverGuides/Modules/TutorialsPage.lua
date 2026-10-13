@@ -91,7 +91,7 @@ end
 
 ns.RegisterPage({
   id = "tutorials",
-  order = 210,
+  order = 720,
   group = "system",
   title = "page.tutorials",
   icon = ns.ICONS.tutorials,

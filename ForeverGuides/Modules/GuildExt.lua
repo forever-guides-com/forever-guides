@@ -166,3 +166,24 @@ end
 function E.Loaded()
   return #registry.tab + #registry.detail + #registry.column > 0
 end
+
+-- An add-on hands a table of its own functions to companions under its id (Share), a companion
+-- asks for it with OnShared(id, fn): fn(handle) runs at once when the handle exists, else when it
+-- arrives. The handle belongs to the add-on, the page does not use it.
+local shared, waiting = {}, {}
+
+function E.Share(id, handle)
+  shared[id] = handle
+  for _, fn in ipairs(waiting[id] or {}) do
+    ns.Safe("guildext:shared " .. id, fn, handle)
+  end
+end
+
+function E.OnShared(id, fn)
+  if shared[id] then
+    ns.Safe("guildext:shared " .. id, fn, shared[id])
+    return
+  end
+  waiting[id] = waiting[id] or {}
+  table.insert(waiting[id], fn)
+end

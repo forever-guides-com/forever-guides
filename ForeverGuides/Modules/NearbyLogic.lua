@@ -41,7 +41,7 @@ end
 
 -- Admission of the events: a tumbling window of one second with an event count and the time spent.
 -- gate:Admit(now) -> true, or false and the reason ("pause", "crowd", "budget"); gate:Charge(ms) books
--- the time the admitted event used. gate.stats counts what happened, for the probe and the tests.
+-- the time the admitted event used. gate.stats counts what happened, for extensions and the tests.
 function NL.NewGate()
   local gate = { stats = { admitted = 0, pause = 0, crowd = 0, budget = 0, crowds = 0 } }
   local windowAt, count, spent, pausedUntil = nil, 0, 0, -math.huge

@@ -92,6 +92,7 @@ ns.ICONS = {
   instances = STOCK .. "INV_Misc_Key_14",
   professions = STOCK .. "Trade_BlackSmithing",
   professionroute = OWN_ICONS .. "professionroute.png",
+  proftrainers = STOCK .. "Trade_Engineering",
   items = STOCK .. "INV_Chest_Plate06",
   macros = STOCK .. "INV_Misc_Note_01",
   character = STOCK .. "INV_Misc_Note_06",

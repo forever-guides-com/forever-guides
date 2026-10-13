@@ -197,8 +197,8 @@ end
 
 ns.RegisterPage({
   id = "classes",
-  order = 40,
-  group = "character",
+  order = 310,
+  group = "learn",
   title = "page.classes",
   icon = ns.ICONS.classes,
   aliases = { "klassen", "rassen", "voelker", "classes", "races" },

@@ -316,7 +316,7 @@ end
 
 ns.RegisterPage({
   id = "errors",
-  order = 230,
+  order = 750,
   group = "system",
   title = "page.errors",
   icon = ns.ICONS.errors,

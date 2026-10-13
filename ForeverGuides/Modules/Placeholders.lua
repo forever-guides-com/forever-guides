@@ -3,7 +3,7 @@
 local _, ns = ...
 
 local STUBS = {
-  { id = "items", order = 85, aliases = { "items", "bis" }, planned = 3 },
+  { id = "items", order = 530, group = "inventory", aliases = { "items", "bis" }, planned = 3 },
 }
 
 for _, stub in ipairs(STUBS) do
@@ -14,7 +14,7 @@ for _, stub in ipairs(STUBS) do
   ns.RegisterPage({
     id = stub.id,
     order = stub.order,
-    group = "character",
+    group = stub.group,
     title = "page." .. stub.id,
     introKey = "stub." .. stub.id .. ".intro",
     icon = ns.ICONS[stub.id],

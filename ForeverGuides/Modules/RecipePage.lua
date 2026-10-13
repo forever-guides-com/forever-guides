@@ -1002,8 +1002,8 @@ end
 
 ns.RegisterPage({
   id = "professions",
-  order = 80,
-  group = "character",
+  order = 410,
+  group = "professions",
   title = "page.professions",
   icon = ns.ICONS.professions,
   aliases = { "berufe", "professions", "rezepte", "recipes" },

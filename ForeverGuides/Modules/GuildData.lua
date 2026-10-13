@@ -3,7 +3,7 @@
 -- lazily when the page needs it. Reads only: nothing here changes the guild. Every game call is
 -- wrapped in pcall, a missing function answers nil.
 local _, ns = ...
-local GL, GDemo = ns.GuildLogic, ns.GuildDemo
+local GL = ns.GuildLogic
 
 local D = {}
 ns.GuildData = D
@@ -13,10 +13,8 @@ D.MAX_MEMBERS = 2000
 local UPDATE_DELAY = 0.5
 
 local state = { dirty = true, asked = -1e9 }
--- Demo mode: the sample guild (GuildDemo.lua) instead of the game's roster. In memory only, never
--- stored and never sent; the game is not asked while it runs.
-local demo
-local demoHooks = {}
+-- A stand-in source (an extension showing sample data) instead of the game's roster: see D.SetSource.
+local source
 
 local function g(name)
   return rawget(_G, name)
@@ -109,8 +107,8 @@ end
 
 -- The cached roster. Read from the game when the events marked it dirty, never in combat.
 function D.Get()
-  if demo then
-    return demo.snap
+  if source then
+    return source.snapshot()
   end
   if state.dirty and not inCombat() then
     read()
@@ -121,7 +119,7 @@ end
 -- Asks the server for the roster. false when not in a guild, in combat or asked less than
 -- D.MIN_ASK seconds ago.
 function D.Request()
-  if demo then
+  if source then
     return false
   end
   local inGuild = call(g("IsInGuild"))
@@ -144,8 +142,8 @@ end
 -- One right as the game answers it (api name such as "CanEditPublicNote"); nil for a function the
 -- client does not have.
 function D.Can(name)
-  if demo then
-    return GDemo.Can(demo, name)
+  if source then
+    return source.can(name)
   end
   local r = call(api(name))
   return r and r[1] == true
@@ -167,70 +165,27 @@ ns.On("GUILD_ROSTER_UPDATE", onUpdate)
 ns.On("PLAYER_GUILD_UPDATE", onUpdate)
 ns.On("GUILD_RANKS_UPDATE", onUpdate)
 
--- Demo mode -----------------------------------------------------------------------------------------
+-- Stand-in source ---------------------------------------------------------------------------------
 
-function D.IsDemo()
-  return demo ~= nil
+-- The source that stands in for the game, nil while the game answers. A source is a table with
+--   snapshot(): the roster (same shape as D.Get), can(name): one right, peer(name): item level and
+--   jobs of a member, seen(): the contact list of the tab "Social", seenNote: locale key of its note,
+--   why: { invite, update } locale keys of the reason a row button is dimmed,
+--   hint, done: locale keys of the lines the GildenManager shows, apply(action, memberKey, value): a
+--   confirmed GildenManager action on the roster of the source (true when something changed).
+-- It stays in memory and the game is not asked while it is set.
+function D.Source()
+  return source
 end
 
--- fn(on) runs when the demo starts or ends, before the page refreshes (add-ons swap their own data).
-function D.OnDemoChange(fn)
-  demoHooks[#demoHooks + 1] = fn
-end
-
-local function demoChanged(hooks)
-  if hooks then
-    for _, fn in ipairs(demoHooks) do
-      ns.Safe("guilddata:demo", fn, demo ~= nil)
-    end
-  end
-  ns.Emit("FG_DEMO_UPDATE")
-end
-
-function D.SetDemo(on)
-  if (on == true) == (demo ~= nil) then
-    return
-  end
-  demo = on == true and GDemo.New(ns.PlayerName.Self(), ns.U.now()) or nil
-  demoChanged(true)
-end
-
--- "leader", "officer" or "member"; nil outside the demo.
-function D.DemoRole()
-  return demo and demo.role or nil
-end
-
-function D.SetDemoRole(role)
-  if demo and GDemo.SetRole(demo, role) then
-    demoChanged()
-  end
-end
-
--- The sample players of the tab "Social" and the item level and professions of a sample player.
-function D.DemoSeen()
-  return demo and demo.seen or {}
-end
-
-function D.DemoPeer(name)
-  return demo and GDemo.Peer(demo, name) or nil
-end
-
--- Main and own notes the sample members carry for the GildenManager.
-function D.DemoExtras()
-  return demo and GDemo.Extras(demo) or {}
-end
-
--- A confirmed GildenManager action on the sample rows. False when nothing changed.
-function D.DemoApply(action, memberKey, value)
-  if demo and GDemo.Apply(demo, action, memberKey, value) then
-    demoChanged()
-    return true
-  end
-  return false
+-- Sets or clears (nil) the source and tells the page; calling it again redraws after a change.
+function D.SetSource(value)
+  source = value
+  ns.Emit("FG_GUILD_SOURCE")
 end
 
 -- Test hook: forget the cache and the request time.
 function D.Reset()
-  demo = nil
+  source = nil
   state.dirty, state.asked, state.snap = true, -1e9, empty()
 end

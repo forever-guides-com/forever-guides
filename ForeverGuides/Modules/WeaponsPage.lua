@@ -594,8 +594,8 @@ end
 
 ns.RegisterPage({
   id = "weapons",
-  order = 60,
-  group = "character",
+  order = 340,
+  group = "learn",
   title = "page.weapons",
   icon = ns.ICONS.weapons,
   aliases = { "waffen", "weapons" },

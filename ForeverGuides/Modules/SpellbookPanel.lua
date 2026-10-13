@@ -1,11 +1,12 @@
--- Panel inside Blizzard's spellbook that shows the learn list on the book's own
--- parchment. It is a transparent child of the spellbook view covering the paged
+-- Panel inside Blizzard's spellbook that shows the learn list on the book's own parchment, or on
+-- an own dark surface when a skin addon hides the parchment (or the setting hostSkin says so, see
+-- Modules/HostSkin.lua). It is a transparent child of the spellbook view covering the paged
 -- spell content; while it is shown that content is faded out with SetAlpha (never
 -- Hide, so Blizzard's own show/hide logic and secure frames stay untouched) and
 -- faded back in when the panel hides. BlizzardLinks owns the tab button and
 -- calls Create once per spellbook view.
 local _, ns = ...
-local W, Theme, K, Scan = ns.W, ns.Theme, ns.PageKit, ns.BlizzardScan
+local W, Theme, K, Scan, HostSkin = ns.W, ns.Theme, ns.PageKit, ns.BlizzardScan, ns.HostSkin
 
 ns.AddLocale("enUS", {
   ["spellbook.open"] = "Open in addon",
@@ -39,13 +40,19 @@ local DIVIDER_H = 11
 local DIVIDER_FALLBACK_H = 2
 local HEADING_FONT = "SystemFont_Huge2" -- font object of Blizzard's page heading
 local HEADING_ROLE = "display" -- fallback: theme display font at 28 px
-local HEADER_H = HEADER_TOP + HEADER_ROW + DIVIDER_GAP + DIVIDER_H + 8 -- the list starts below it
+local HEADER_BELOW = HEADER_ROW + DIVIDER_GAP + DIVIDER_H + 8 -- the list starts this far below the header top
+local HEADER_DARK_TOP = 12 -- on the own dark surface nothing has to line up with Blizzard's heading
+local HEADER_MIN = 8
 local HEADER_TEXT = "parchmentText"
 local LOGO = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
 local LOGO_SIZE = 18
 local MIN_CONTENT = 100
 local CONTENT_FRACTION = 0.5 -- a content frame covers at least this much of the view
-local DUMP_LIMIT = 60
+local LINE_LIMIT = 60
+-- Widgets of the book's top row besides the category tabs; the panel never covers their lower edge.
+local ROW_FIELDS =
+  { "SearchBox", "SettingsDropdown", "FilterDropdown", "HidePassivesCheckbox", "HidePassivesCheckButton" }
+local ROW_GAP = 4
 -- Children of the view that are chrome, never the paged content.
 local CHROME = {
   "tab",
@@ -125,6 +132,31 @@ local function findContent(book, exclude)
   return best, bestKey
 end
 
+-- Lowest edge of the book's top row (shown category tabs, search box, settings dropdown) and the
+-- names it came from. nil without a known rect, then the panel keeps the content's top edge.
+local function rowBottom(book)
+  local lowest, names = nil, {}
+  local function take(frame, label)
+    if Scan.IsFrame(frame) and Scan.Call(frame, "IsShown") ~= false then
+      local bottom = Scan.Number(frame, "GetBottom")
+      if bottom then
+        names[#names + 1] = label
+        lowest = lowest and math.min(lowest, bottom) or bottom
+      end
+    end
+  end
+  local system = Scan.Field(book, "CategoryTabSystem")
+  if Scan.IsFrame(system) then
+    for i, tab in ipairs(Scan.Children(system)) do
+      take(tab, "tab" .. i)
+    end
+  end
+  for _, name in ipairs(ROW_FIELDS) do
+    take(Scan.Field(book, name), name)
+  end
+  return lowest, names
+end
+
 -- These widgets live on a Blizzard frame, so Tab inside our window must not reach them.
 local function leaveFocusRing(root)
   local list = ns.Focus and ns.Focus.items
@@ -144,23 +176,20 @@ end
 
 -- opts: onOpen() opens the addon page, onSelect(shown) mirrors the state on the tab button.
 function S.Create(book, opts)
-  local panel = { mode = "none" }
-  local frame = CreateFrame("Frame", nil, book)
+  local panel = { mode = "none", dark = false }
+  -- Named: skin add-ons fade anonymous frames below a Blizzard frame together with its art.
+  local frame = HostSkin.NamedFrame(book, "SpellbookPanel")
   frame:Hide()
   frame:EnableMouse(true) -- clicks must not fall through to the faded-out book
   panel.frame = frame
 
-  -- Only visible when no content frame was found to fade out.
-  panel.fill = frame:CreateTexture(nil, "BACKGROUND")
-  panel.fill:SetAllPoints()
-  ns.Bind(panel.fill, function(t)
-    t:SetColorTexture(Theme.color("parchment"))
-  end)
-  panel.fill:Hide()
+  -- Own opaque surface: always on the dark look, else only when no content frame was found to
+  -- fade out or the page is not drawn although the parchment look is forced.
+  panel.surface = HostSkin.Surface(frame, { label = "SpellbookSurface" })
+  panel.fill = panel.surface.fill
+  panel.surface.SetShown(false)
 
   local header = CreateFrame("Frame", nil, frame)
-  header:SetPoint("TOPLEFT", CONTENT_LEFT, -HEADER_TOP)
-  header:SetPoint("TOPRIGHT", -CONTENT_RIGHT, -HEADER_TOP)
   header:SetHeight(HEADER_ROW)
   panel.header = header
 
@@ -181,10 +210,10 @@ function S.Create(book, opts)
   divider:SetPoint("TOPLEFT", header, "BOTTOMLEFT", DIVIDER_SHIFT, -DIVIDER_GAP)
   divider:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, -DIVIDER_GAP)
   panel.divider = divider
-  ns.Bind(divider, function(t)
+  local function paintDivider(t)
     local getInfo = C_Texture and C_Texture.GetAtlasInfo
     local ok, known = false, nil
-    if getInfo then
+    if getInfo and not panel.dark then
       ok, known = pcall(getInfo, DIVIDER_ATLAS)
     end
     if ok and known then
@@ -192,11 +221,12 @@ function S.Create(book, opts)
       t:SetHeight(DIVIDER_H)
       panel.dividerKind = "atlas"
     else
-      t:SetColorTexture(Theme.color("parchmentAccent", 0.6))
+      t:SetColorTexture(Theme.color(panel.dark and "accentDim" or "parchmentAccent", 0.6))
       t:SetHeight(DIVIDER_FALLBACK_H)
       panel.dividerKind = "line"
     end
-  end)
+  end
+  ns.Bind(divider, paintDivider)
   panel.openButton = W.Button(header, {
     key = "spellbook.open",
     variant = "gold",
@@ -225,8 +255,17 @@ function S.Create(book, opts)
   label:SetPoint("RIGHT", -8, 0)
 
   panel.body = CreateFrame("Frame", nil, frame)
-  panel.body:SetPoint("TOPLEFT", CONTENT_LEFT, -HEADER_H)
-  panel.body:SetPoint("BOTTOMRIGHT", -CONTENT_RIGHT, 0)
+  -- Header row and list hang `offset` below the panel top.
+  local function setHeaderTop(offset)
+    header:ClearAllPoints()
+    header:SetPoint("TOPLEFT", CONTENT_LEFT, -offset)
+    header:SetPoint("TOPRIGHT", -CONTENT_RIGHT, -offset)
+    panel.body:ClearAllPoints()
+    panel.body:SetPoint("TOPLEFT", CONTENT_LEFT, -(offset + HEADER_BELOW))
+    panel.body:SetPoint("BOTTOMRIGHT", -CONTENT_RIGHT, 0)
+    panel.headerTop = offset
+  end
+  setHeaderTop(HEADER_TOP)
   local view = ns.NewPageView(panel.body)
   panel.list = ns.LevelView.Create(view, {
     anchor = "FG.Spellbook",
@@ -244,9 +283,20 @@ function S.Create(book, opts)
     end
   end
 
-  -- Anchors the panel to the paged content (or the estimated page) and fades the content out.
+  -- Anchors the panel to the paged content (or the estimated page), fades the content out and
+  -- picks the look. The page is read with the content restored: a skin may hang the page
+  -- textures below it, and our own fade must not read as a hidden parchment. The top edge lies
+  -- below the top row (tabs, search, dropdown) whatever the skin did to it: on the parchment it
+  -- only moves down out of an overlap, on the own dark surface it also closes the gap to the row.
   local function place()
     restore()
+    local look, detected = HostSkin.Resolve(book, HostSkin.Probes.spellbook, "spellbook")
+    local dark, visible = look == "dark", detected == "light"
+    panel.dark = dark
+    panel.list.SetPalette(dark and "dark" or "parchment")
+    W.SetColor(panel.title, dark and "text" or HEADER_TEXT)
+    panel.surface.SetPalette(dark)
+    paintDivider(divider)
     local content, key = findContent(book, frame)
     if
       content
@@ -258,21 +308,40 @@ function S.Create(book, opts)
       content, key = nil, nil
     end
     panel.contentKey = key
+    local rowEdge, rowNames = rowBottom(book)
+    local limit = rowEdge and rowEdge - ROW_GAP
+    panel.rowEdge, panel.rowNames = rowEdge, rowNames
+    -- How far below its natural top (content top, estimated page) the panel starts; negative: above.
+    local function dropFrom(top)
+      local drop = limit and top and top - limit or 0
+      return dark and drop or math.max(0, drop)
+    end
     frame:ClearAllPoints()
     if content then
-      frame:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
+      panel.drop = dropFrom(Scan.Number(content, "GetTop"))
+      frame:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -panel.drop)
       frame:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", 0, 0)
       panel.mode = "content"
       if pcall(content.SetAlpha, content, 0) then
         panel.faded = content
       end
     else
-      frame:SetPoint("TOPLEFT", book, "TOPLEFT", INSET.left, -INSET.top)
+      local bookTop = Scan.Number(book, "GetTop")
+      panel.drop = math.max(dropFrom(bookTop and bookTop - INSET.top), -INSET.top)
+      frame:SetPoint("TOPLEFT", book, "TOPLEFT", INSET.left, -(INSET.top + panel.drop))
       frame:SetPoint("BOTTOMRIGHT", book, "BOTTOMRIGHT", -INSET.right, INSET.bottom)
       panel.mode = "insets"
     end
-    panel.fill:SetShown(content == nil)
+    setHeaderTop(dark and HEADER_DARK_TOP or math.max(HEADER_MIN, HEADER_TOP - panel.drop))
+    panel.surface.SetShown(dark or content == nil or not visible)
   end
+
+  -- ns.RefreshUI (setting changed, skin switched) re-reads the page while the panel is open.
+  ns.Bind(frame, function()
+    if frame:IsShown() then
+      place()
+    end
+  end)
 
   frame:HookScript("OnShow", function()
     if opts.onSelect then
@@ -286,9 +355,17 @@ function S.Create(book, opts)
     end
   end)
 
+  -- A skin may fade the book's art a moment after it showed: look again a frame and half a second later.
+  local watch = HostSkin.Watch(book, function()
+    if frame:IsShown() then
+      place()
+    end
+  end)
+
   function panel.Show()
     place()
     frame:Show()
+    watch.Burst(true)
     ns.Safe("spellbook-panel", panel.list.Refresh)
     leaveFocusRing(frame)
   end
@@ -317,7 +394,7 @@ function S.Create(book, opts)
   function panel.Info()
     local content = panel.faded
     return string.format(
-      "panel: mode %s, content %s %sx%s, rect left %s bottom %s size %sx%s",
+      "panel: mode %s, content %s %sx%s, rect left %s bottom %s size %sx%s, look %s, row bottom %s (%s), moved %s, header %s",
       panel.mode,
       panel.contentKey or "none",
       content and fmt(Scan.Number(content, "GetWidth")) or "-",
@@ -325,7 +402,12 @@ function S.Create(book, opts)
       fmt(Scan.Number(frame, "GetLeft")),
       fmt(Scan.Number(frame, "GetBottom")),
       fmt(Scan.Number(frame, "GetWidth")),
-      fmt(Scan.Number(frame, "GetHeight"))
+      fmt(Scan.Number(frame, "GetHeight")),
+      panel.dark and "dark" or "parchment",
+      fmt(panel.rowEdge),
+      table.concat(panel.rowNames or {}, " "),
+      fmt(panel.drop),
+      fmt(panel.headerTop)
     )
   end
 
@@ -351,13 +433,13 @@ local function describe(frame, key, depth)
 end
 
 -- Two levels of the spellbook view (child frames and frame fields with their
--- keys, object types, sizes, shown state) for /fg diag, at most DUMP_LIMIT lines.
-function S.Dump(book)
+-- keys, object types, sizes, shown state) for /fg diag, at most LINE_LIMIT lines.
+function S.Structure(book)
   local lines = {}
   local function add(text)
-    if #lines < DUMP_LIMIT then
+    if #lines < LINE_LIMIT then
       lines[#lines + 1] = text
-    elseif #lines == DUMP_LIMIT then
+    elseif #lines == LINE_LIMIT then
       lines[#lines + 1] = "  ... truncated"
     end
   end

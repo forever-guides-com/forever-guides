@@ -573,7 +573,7 @@ end
 
 ns.RegisterPage({
   id = "shots",
-  order = 96,
+  order = 640,
   group = "tools",
   title = "page.shots",
   icon = ns.ICONS.shots,

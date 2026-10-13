@@ -37,8 +37,22 @@ local EVENTS = { "SPELLS_CHANGED", "PLAYER_LEVEL_UP", "LEARNED_SPELL_IN_TAB" }
 
 -- Theme tokens per palette. "parchment" is for lists that sit directly on WoW's
 -- own spellbook page: dark brown text and no dark card fill, the page shows through.
+-- "dark" is the same compact list on an opaque dark surface (a skin addon hides the page):
+-- the light tokens of the default palette, cards a step lighter than the surface under them.
+-- Palettes of one view must agree on `compact` (layout of the filter row).
 local PALETTES = {
   default = {
+    fill = "surface",
+    text = "text",
+    secondary = "textSecondary",
+    muted = "textMuted",
+    accent = "accent2",
+    success = "success",
+    chips = { name = "text", meta = "textMuted", hover = { 1, 1, 1, 0.08 } },
+  },
+  dark = {
+    compact = true,
+    fill = "surface2",
     text = "text",
     secondary = "textSecondary",
     muted = "textMuted",
@@ -47,6 +61,7 @@ local PALETTES = {
     chips = { name = "text", meta = "textMuted", hover = { 1, 1, 1, 0.08 } },
   },
   parchment = {
+    compact = true,
     text = "parchmentText",
     secondary = "parchmentTextSecondary",
     muted = "parchmentTextSecondary",
@@ -204,12 +219,10 @@ local function makeRow(parent, pal)
   local card = CreateFrame("Frame", nil, row)
   card:SetPoint("TOPLEFT")
   card:SetPoint("BOTTOMRIGHT", 0, ROW_GAP)
-  if pal.border then
-    W.Border(card, pal.border, pal.borderAlpha)
-  else
-    W.Fill(card, "surface", 1)
-    W.Border(card, "white")
+  if pal.fill then
+    W.Fill(card, pal.fill, 1)
   end
+  W.Border(card, pal.border or "white", pal.borderAlpha)
   row.card = card
   row.title = W.Text(card, { role = "h3", family = "heading", color = pal.accent })
   row.sum = W.Text(card, { role = "micro", color = pal.secondary, justify = "RIGHT" })
@@ -338,10 +351,13 @@ end
 -- Adds the filters, the summary line and the list to view's stack and returns
 -- { Refresh, SetShown }. o: getClass() -> class token, anchor (tour anchor
 -- prefix, "<anchor>.Filters" and "<anchor>.List"), palette ("parchment" for
--- lists on WoW's spellbook page: dark text, compact filter row, no hint line).
+-- lists on WoW's spellbook page: dark text, compact filter row, no hint line; "dark" for the
+-- same list on a dark surface). handle.SetPalette(name) switches between palettes of the same
+-- layout (parchment and dark) at runtime and repaints the list.
 function V.Create(view, o)
-  local pal = PALETTES[o.palette or "default"] or PALETTES.default
-  local compact = pal ~= PALETTES.default
+  local palName = PALETTES[o.palette] and o.palette or "default"
+  local pal = PALETTES[palName]
+  local compact = pal.compact == true
   local s = view.stack
   local state = { search = "", from = 1 }
   local items = {}
@@ -359,9 +375,16 @@ function V.Create(view, o)
     return track(item)
   end
 
+  -- Texts that follow the palette: { font string, palette field }.
+  local tinted = {}
+  local function tint(fs, field)
+    tinted[#tinted + 1] = { fs, field }
+    return fs
+  end
+
   local filters = CreateFrame("Frame", nil, view.content)
   K.Anchor(o.anchor .. ".Filters", filters)
-  local searchLabel = W.Text(filters, { key = "levels.search", role = "ui", color = pal.text })
+  local searchLabel = tint(W.Text(filters, { key = "levels.search", role = "ui", color = pal.text }), "text")
   searchLabel:SetPoint("TOPLEFT")
   local box = W.EditBox(filters, {
     clear = true,
@@ -383,7 +406,7 @@ function V.Create(view, o)
   fromBox.edit:SetMaxLetters(2)
   fromBox:SetPoint("TOPLEFT", box, "TOPRIGHT", 24, 0)
   fromBox:SetWidth(56)
-  local fromLabel = W.Text(filters, { key = "levels.fromMe", role = "ui", color = pal.text })
+  local fromLabel = tint(W.Text(filters, { key = "levels.fromMe", role = "ui", color = pal.text }), "text")
   fromLabel:SetPoint("BOTTOMLEFT", fromBox, "TOPLEFT", 0, 4)
   if not compact then
     local mine = W.Button(filters, {
@@ -401,7 +424,7 @@ function V.Create(view, o)
       end,
     })
     mine:SetPoint("LEFT", fromBox, "RIGHT", 8, 0)
-    local fromHint = W.Text(filters, { key = "levels.fromHint", role = "micro", color = pal.muted })
+    local fromHint = tint(W.Text(filters, { key = "levels.fromHint", role = "micro", color = pal.muted }), "muted")
     fromHint:SetPoint("TOPLEFT", fromBox, "BOTTOMLEFT", 0, -4)
   end
   local reset = W.Action(filters, {
@@ -426,26 +449,52 @@ function V.Create(view, o)
     add(filters, { height = K.scaledHeight(16) + 82 })
   end
 
-  local count = track(ns.AddParagraph(view, nil, { role = "ui", color = pal.secondary }))
+  local count = tint(track(ns.AddParagraph(view, nil, { role = "ui", color = pal.secondary })), "secondary")
   if not compact then
-    track(ns.AddParagraph(view, "levels.hint", { role = "micro", color = pal.muted }))
+    tint(track(ns.AddParagraph(view, "levels.hint", { role = "micro", color = pal.muted })), "muted")
   end
-  track(ns.AddParagraph(view, "cost.legend", { role = "micro", color = pal.muted }))
-  local rowList = K.RowPool(view.content, function(parent)
-    return makeRow(parent, pal)
-  end)
+  tint(track(ns.AddParagraph(view, "cost.legend", { role = "micro", color = pal.muted })), "muted")
+
+  -- One row pool per palette (rows and chips bake their colors in), made on first use. The stack
+  -- holds the host, which lays out the pool of the current palette.
+  local host = CreateFrame("Frame", nil, view.content)
+  local pools = {}
+  local function poolFor(p)
+    if not pools[p] then
+      pools[p] = K.RowPool(host, function(parent)
+        return makeRow(parent, p)
+      end)
+    end
+    return pools[p]
+  end
+  local function showActivePool()
+    local active = poolFor(pal)
+    for _, list in pairs(pools) do
+      list:SetShown(list == active)
+    end
+  end
+  function host:fgGridLayout(width)
+    local list = poolFor(pal)
+    list:ClearAllPoints()
+    list:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+    list:SetWidth(width)
+    local h = list:fgGridLayout(width)
+    host:SetHeight(h)
+    return h
+  end
   local function paint(row, entry)
     paintRow(row, entry, pal)
   end
-  K.Anchor(o.anchor .. ".List", rowList)
-  add(rowList, { gap = 4 })
-  local note = track(ns.AddParagraph(view, nil, { role = "ui", color = pal.secondary }))
+  K.Anchor(o.anchor .. ".List", host)
+  add(host, { gap = 4 })
+  showActivePool()
+  local note = tint(track(ns.AddParagraph(view, nil, { role = "ui", color = pal.secondary })), "secondary")
 
   function refresh()
     if not K.HasData("Abilities") then
       note:SetText(L["kit.noData"])
       count:SetText("")
-      rowList:Sync({}, paint)
+      poolFor(pal):Sync({}, paint)
       view:Layout()
       return
     end
@@ -488,7 +537,7 @@ function V.Create(view, o)
         end
       end
     end
-    rowList:Sync(rows, paint)
+    poolFor(pal):Sync(rows, paint)
     handle.rows = rows
     local lines = {}
     if res.plain then
@@ -510,6 +559,19 @@ function V.Create(view, o)
   end
 
   handle.Refresh = refresh
+  handle.palette = palName
+  function handle.SetPalette(name)
+    local target = PALETTES[name]
+    if not target or target == pal or (target.compact == true) ~= compact then
+      return
+    end
+    pal, handle.palette = target, name
+    for _, entry in ipairs(tinted) do
+      W.SetColor(entry[1], pal[entry[2]])
+    end
+    showActivePool()
+    ns.Safe("level-view", refresh)
+  end
   handle.state = state
   function handle:SetShown(shown)
     for _, item in ipairs(items) do

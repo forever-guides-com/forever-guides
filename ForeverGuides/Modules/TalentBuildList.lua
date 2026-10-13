@@ -5,7 +5,7 @@
 -- duplicate, delete, or keep a copy of a shipped build as an own one). Rules and storage live in
 -- Modules/TalentBuilds.lua; the editor's build comes from TalentEditor.Current().
 local _, ns = ...
-local W, L, U, K, TL, TB = ns.W, ns.L, ns.U, ns.PageKit, ns.TalentLogic, ns.TalentBuilds
+local W, L, U, K, TL, TB, R = ns.W, ns.L, ns.U, ns.PageKit, ns.TalentLogic, ns.TalentBuilds, ns.RefLogic
 
 local BL = {}
 ns.TalentBuildList = BL
@@ -15,9 +15,9 @@ ns.TalentBuildList = BL
 BL.MAX_ROWS = 5
 BL.ROWS_MIN, BL.ROWS_MAX = 3, 14
 local ROW_HEIGHT = 54
-local TREE_WIDTH = 260
--- Window height taken by everything but the list (title, class and tree choice, buttons, hints).
-local LIST_OVERHEAD = 330
+-- Window height at 100 percent font size taken by everything but the list (title, class choice, tree
+-- cards, buttons, hints), measured with a build selected (selection line and management buttons).
+local LIST_OVERHEAD = 352
 BL.WINDOW_W, BL.WINDOW_H = 580, 640
 BL.MIN_W, BL.MIN_H = 440, 420
 BL.MAX_W, BL.MAX_H = 1000, 1000
@@ -25,12 +25,20 @@ BL.MAX_W, BL.MAX_H = 1000, 1000
 local ICON_PLAN = "Interface\\Icons\\INV_Scroll_03"
 local ICON_APPLY = "Interface\\Buttons\\UI-CheckBox-Check"
 local ICON_SHARE = "Interface\\Icons\\INV_Letter_15"
+local ICON_DIR = "Interface\\Icons\\"
+-- Badge of a row: shipped builds (standard and website) in the accent color, own builds in blue.
+-- The badge always carries a word, the color only backs it.
+local BADGE_COLOR = { shipped = "accent2", own = "info" }
 
 ns.AddLocale("enUS", {
   ["talents.builds.title"] = "Builds",
   ["talents.builds.grip"] = "Drag to resize",
   ["talents.builds.openTip"] = "Recommended and own builds: plan, apply, save, import and export",
   ["talents.builds.tree"] = "Talent tree",
+  ["talents.builds.treeShow"] = "Show only the builds of this tree",
+  ["talents.builds.treeClear"] = "Click again to show the builds of all trees",
+  ["talents.builds.new"] = "New build",
+  ["talents.builds.newTip"] = "Opens the editor with an empty build of this class. Spend the points there, then save it here.",
   ["talents.builds.save"] = "Save current build",
   ["talents.builds.saveTip"] = "Keeps what is in the editor as your own build",
   ["talents.builds.import"] = "Import a build",
@@ -40,12 +48,12 @@ ns.AddLocale("enUS", {
   ["talents.builds.overwriteClass"] = "The editor shows another class. Plan this build first or choose its class in the editor.",
   ["talents.builds.empty.class"] = "No recommendations for this class yet.",
   ["talents.builds.empty.tree"] = "No builds for this tree yet. Save the current build or import one.",
+  ["talents.builds.empty.all"] = "No builds for this class yet. Save the current build or import one.",
   ["talents.builds.outdated"] = "The website builds were made for other talent data and stay hidden until the add-on is updated.",
   ["talents.builds.pick"] = "Click a build to manage it.",
   ["talents.builds.selected"] = "Selected: %s",
-  ["talents.builds.source.standard"] = "Standard",
-  ["talents.builds.source.website"] = "Website",
-  ["talents.builds.source.own"] = "Own",
+  ["talents.builds.badge.shipped"] = "Included",
+  ["talents.builds.badge.own"] = "Own",
   ["talents.builds.level"] = "Level %d",
   ["talents.builds.score"] = "Score %d",
   ["talents.builds.author"] = "by %s",
@@ -73,6 +81,10 @@ ns.AddLocale("deDE", {
   ["talents.builds.grip"] = "Zum Ändern der Größe ziehen",
   ["talents.builds.openTip"] = "Empfohlene und eigene Skillungen: planen, anwenden, speichern, importieren und exportieren",
   ["talents.builds.tree"] = "Talentbaum",
+  ["talents.builds.treeShow"] = "Nur die Skillungen dieses Baums zeigen",
+  ["talents.builds.treeClear"] = "Erneut klicken, um die Skillungen aller Bäume zu zeigen",
+  ["talents.builds.new"] = "Neue Skillung anlegen",
+  ["talents.builds.newTip"] = "Öffnet den Editor mit einer leeren Skillung dieser Klasse. Vergib dort die Punkte und speichere sie dann hier.",
   ["talents.builds.save"] = "Aktuellen Stand speichern",
   ["talents.builds.saveTip"] = "Speichert den Stand des Editors als eigene Skillung",
   ["talents.builds.import"] = "Skillung importieren",
@@ -82,12 +94,12 @@ ns.AddLocale("deDE", {
   ["talents.builds.overwriteClass"] = "Der Editor zeigt eine andere Klasse. Plane diese Skillung zuerst oder wähle ihre Klasse im Editor.",
   ["talents.builds.empty.class"] = "Noch keine Empfehlungen für diese Klasse.",
   ["talents.builds.empty.tree"] = "Für diesen Baum gibt es noch keine Skillung. Speichere den aktuellen Stand oder importiere eine.",
+  ["talents.builds.empty.all"] = "Für diese Klasse gibt es noch keine Skillung. Speichere den aktuellen Stand oder importiere eine.",
   ["talents.builds.outdated"] = "Die Skillungen der Website wurden für andere Talentdaten gemacht und bleiben ausgeblendet, bis das Addon aktualisiert ist.",
   ["talents.builds.pick"] = "Klicke eine Skillung an, um sie zu verwalten.",
   ["talents.builds.selected"] = "Ausgewählt: %s",
-  ["talents.builds.source.standard"] = "Standard",
-  ["talents.builds.source.website"] = "Website",
-  ["talents.builds.source.own"] = "Eigene",
+  ["talents.builds.badge.shipped"] = "Mitgeliefert",
+  ["talents.builds.badge.own"] = "Eigene",
   ["talents.builds.level"] = "Stufe %d",
   ["talents.builds.score"] = "Bewertung %d",
   ["talents.builds.author"] = "von %s",
@@ -110,12 +122,22 @@ ns.AddLocale("deDE", {
   ["talents.builds.deleted"] = "Skillung gelöscht.",
 })
 
+-- Full name of a talent tree.
+local function treeName(class, spec)
+  local list = TL.Specs(class)
+  return list and list[spec] and ns.T(list[spec].n) or ""
+end
+
 -- Second line of a row: split, level, score and author, or the reason an own build is unusable.
-local function subLine(entry)
+-- withTree names the talent tree first (the list of all trees of a class).
+local function subLine(entry, withTree)
   if not entry.valid then
     return L["talents.builds.invalid"]
   end
   local parts = { entry.points, string.format(L["talents.builds.level"], entry.level) }
+  if withTree then
+    table.insert(parts, 1, treeName(entry.class, entry.spec))
+  end
   if entry.score then
     parts[#parts + 1] = string.format(L["talents.builds.score"], math.floor(entry.score))
   end
@@ -142,7 +164,8 @@ end
 
 -- How many list rows a window of this height shows.
 function BL.RowsFor(height)
-  return U.clamp(math.floor((height - LIST_OVERHEAD) / K.scaledHeight(ROW_HEIGHT)), BL.ROWS_MIN, BL.ROWS_MAX)
+  local room = height - K.scaledHeight(LIST_OVERHEAD)
+  return U.clamp(math.floor(room / K.scaledHeight(ROW_HEIGHT)), BL.ROWS_MIN, BL.ROWS_MAX)
 end
 
 -- Fills `view` (a page view: stack, content, Layout) with the controls and the list. close() hides
@@ -151,12 +174,23 @@ end
 function BL.Build(view, close, host)
   local TE, FL = ns.TalentEditor, ns.FlowLayout
   local stack = view.stack
-  local state = { class = editorClass(), spec = 1, selected = nil, entries = {} }
+  -- spec: the chosen talent tree, nil shows the builds of all three trees.
+  local state = { class = editorClass(), spec = nil, selected = nil, entries = {} }
   local refresh
 
+  -- Selects a build of the list; a chosen tree follows it so the build stays visible.
   local function choose(entry)
-    state.class, state.spec, state.selected = entry.class, entry.spec, entry.key
+    state.class, state.selected = entry.class, entry.key
+    state.spec = state.spec and entry.spec or nil
     refresh()
+  end
+
+  local function newBuild()
+    if TE.NewBlank(state.class) then
+      close()
+    else
+      ns.Notify(L["kit.noData"], "warning")
+    end
   end
 
   local function saveCurrent()
@@ -241,30 +275,76 @@ function BL.Build(view, close, host)
     end,
     set = function(class)
       if class ~= state.class then
-        state.class, state.spec, state.selected = class, 1, nil
+        state.class, state.spec, state.selected = class, nil, nil
         refresh()
       end
     end,
   })
   stack:Add(classButtons, { gap = 12 })
 
-  local options = {}
-  local tree = W.Dropdown(view.content, {
-    key = "talents.builds.tree",
-    options = options,
-    width = TREE_WIDTH,
-    get = function()
-      return state.spec
-    end,
-    set = function(value)
-      state.spec, state.selected = value, nil
-      refresh()
-    end,
-  })
-  FL.FitDropdown(tree)
-  stack:Add(tree, { height = 46, width = TREE_WIDTH, gap = 8 })
+  -- The three trees of the class as cards. The choice buttons keep their text, so every class has
+  -- its own group (built in the order of the keyboard focus); the one of the chosen class is shown.
+  local treeBox = CreateFrame("Frame", nil, view.content)
+  local treeGroups, treeGroupList = {}, {}
+  local function pickTree(spec)
+    state.spec = state.spec ~= spec and spec or nil
+    state.selected = nil
+    refresh()
+  end
+  for _, class in ipairs(R.CLASSES) do
+    local specs = TL.Specs(class)
+    if specs then
+      local items = {}
+      for i, spec in ipairs(specs) do
+        items[i] = {
+          value = i,
+          label = ns.T(spec.n),
+          ring = "accent2",
+          icon = { kind = "texture", texture = ICON_DIR .. (spec.i or "INV_Misc_QuestionMark") },
+        }
+      end
+      local group = K.ChoiceGroup(treeBox, {
+        items = items,
+        labelKey = "talents.builds.tree",
+        get = function()
+          return state.spec
+        end,
+        click = pickTree,
+      })
+      group:Hide()
+      for _, btn in ipairs(group.buttons) do
+        local function tip()
+          ns.ShowTooltip(
+            btn,
+            btn.fgTreeName,
+            L[btn.selected and "talents.builds.treeClear" or "talents.builds.treeShow"]
+          )
+        end
+        btn.fgName = function()
+          return btn.fgTreeName
+        end
+        btn:HookScript("OnEnter", tip)
+        btn:HookScript("OnLeave", ns.HideTooltip)
+        btn.fgOnFocus, btn.fgOnBlur = tip, ns.HideTooltip
+      end
+      treeGroups[class] = group
+      treeGroupList[#treeGroupList + 1] = group
+    end
+  end
+  function treeBox:fgGridLayout(width)
+    return K.StackLayout(treeBox, treeGroupList, width, 0)
+  end
+  stack:Add(treeBox, { gap = 8 })
 
   local toolbar = FL.ButtonRow(view.content, {
+    {
+      id = "new",
+      label = "talents.builds.new",
+      icon = "plus",
+      tooltip = "talents.builds.new",
+      tooltipText = "talents.builds.newTip",
+      onClick = newBuild,
+    },
     {
       id = "save",
       label = "act.save",
@@ -302,10 +382,11 @@ function BL.Build(view, close, host)
     rowHeight = ROW_HEIGHT,
     bind = function(entry)
       local canApply = entry.valid and TE.CanApply(entry.class)
+      local kind = entry.own and "own" or "shipped"
       return {
         title = entry.name,
-        sub = subLine(entry),
-        right = L["talents.builds.source." .. entry.source],
+        sub = subLine(entry, state.spec == nil),
+        badge = { text = L["talents.builds.badge." .. kind], color = BADGE_COLOR[kind] },
         selected = entry.key == state.selected,
         wrapSub = true,
         actions = {
@@ -406,17 +487,25 @@ function BL.Build(view, close, host)
   -- skipLayout: the caller lays the window out.
   function refresh(skipLayout)
     local specs = TL.Specs(state.class) or {}
-    for i = #options, 1, -1 do
-      options[i] = nil
+    if state.spec and not specs[state.spec] then
+      state.spec = nil
     end
-    for i, spec in ipairs(specs) do
-      options[i] = { value = i, text = ns.T(spec.n) }
-    end
-    state.spec = U.clamp(state.spec, 1, math.max(1, #specs))
     classButtons.Refresh()
-    tree.Refresh()
+    for class, group in pairs(treeGroups) do
+      group:SetShown(class == state.class)
+    end
+    local group = treeGroups[state.class]
+    treeBox:SetShown(group ~= nil)
+    if group then
+      -- The names follow the language, which can change while the window stays built.
+      for i, btn in ipairs(group.buttons) do
+        btn.fgTreeName = ns.T(specs[i].n)
+        btn.label:SetText(btn.fgTreeName)
+      end
+      group.Refresh()
+    end
 
-    local entries = TB.Entries(state.class, state.spec)
+    local entries = state.spec and TB.Entries(state.class, state.spec) or TB.AllEntries(state.class)
     state.entries, state.index = entries, nil
     for i, entry in ipairs(entries) do
       if entry.key == state.selected then
@@ -435,7 +524,7 @@ function BL.Build(view, close, host)
       notes[#notes + 1] = L["talents.builds.empty.class"]
     end
     if #entries == 0 then
-      notes[#notes + 1] = L["talents.builds.empty.tree"]
+      notes[#notes + 1] = L[state.spec and "talents.builds.empty.tree" or "talents.builds.empty.all"]
     end
     W.SetText(status, nil, table.concat(notes, "\n"))
     status:SetShown(#notes > 0)
@@ -461,11 +550,7 @@ function BL.Build(view, close, host)
 
   -- Each opening starts on the class the editor shows.
   local function show()
-    local class = editorClass()
-    if class ~= state.class then
-      state.class, state.spec = class, 1
-    end
-    state.selected = nil
+    state.class, state.spec, state.selected = editorClass(), nil, nil
     refresh()
   end
 

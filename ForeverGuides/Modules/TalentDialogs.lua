@@ -13,6 +13,15 @@ ns.AddLocale("enUS", {
   ["talents.editor.exportShare"] = "Share in chat",
   ["talents.builds.nameHint"] = "Name of the build",
   ["talents.builds.nameSave"] = "Save",
+  ["talents.apply.intro"] = "Points you already spent stay as they are. The game only refunds them at the class trainer for gold, so this build is added to your talents and never set over them.",
+  ["talents.apply.now"] = "Can be set now: %d points",
+  ["talents.apply.later"] = "Later (after level or other talents): %d points",
+  ["talents.apply.blocked"] = "Not possible: %d points",
+  ["talents.apply.conflict"] = "Does not fit (already spent differently, can only be reset at the class trainer for gold): %d points",
+  ["talents.apply.more"] = "and %d more",
+  ["talents.apply.nothing"] = "None of the missing points can be bought right now. Nothing would change.",
+  ["talents.apply.go"] = "Set purchasable talents",
+  ["talents.apply.allSet"] = "All points of this build are already set.",
 })
 
 ns.AddLocale("deDE", {
@@ -22,6 +31,15 @@ ns.AddLocale("deDE", {
   ["talents.editor.exportShare"] = "Im Chat teilen",
   ["talents.builds.nameHint"] = "Name der Skillung",
   ["talents.builds.nameSave"] = "Speichern",
+  ["talents.apply.intro"] = "Bereits vergebene Punkte bleiben, wie sie sind. Das Spiel erstattet sie nur beim Klassenlehrer gegen Gold, deshalb wird diese Skillung zu deinen Talenten hinzugefügt und nie darüber gelegt.",
+  ["talents.apply.now"] = "Jetzt kaufbar: %d Punkte",
+  ["talents.apply.later"] = "Später (nach Stufe oder anderen Talenten): %d Punkte",
+  ["talents.apply.blocked"] = "Nicht möglich: %d Punkte",
+  ["talents.apply.conflict"] = "Passt nicht (bereits anders verteilt, nur beim Lehrer gegen Gold zurücksetzbar): %d Punkte",
+  ["talents.apply.more"] = "und %d weitere",
+  ["talents.apply.nothing"] = "Von den fehlenden Punkten ist gerade keiner kaufbar. Es würde sich nichts ändern.",
+  ["talents.apply.go"] = "Kaufbare Talente setzen",
+  ["talents.apply.allSet"] = "Alle Punkte dieser Skillung sind schon gesetzt.",
 })
 
 local SIDE = 16
@@ -249,5 +267,123 @@ function TD.Name(titleKey, suggestion, submit)
   W.SetText(d.error, nil, "")
   d:Show()
   focusLater(d.field, true)
+  return d
+end
+
+-- Preview of an apply -----------------------------------------------------------
+
+local PREVIEW_NAMES = 6
+
+-- One block per kind of a TL.Plan: the summary field with the points, the item field that counts
+-- per talent, the head text and its color.
+local PREVIEW_KINDS = {
+  { kind = "learn", sum = "now", field = "now", head = "talents.apply.now", color = "success" },
+  { kind = "later", sum = "later", field = "later", head = "talents.apply.later", color = "textSecondary" },
+  { kind = "blocked", sum = "blocked", field = "blocked", head = "talents.apply.blocked", color = "warning" },
+  { kind = "conflict", sum = "conflict", field = "extra", head = "talents.apply.conflict", color = "warning" },
+}
+
+-- "Name (points), ...", cut after PREVIEW_NAMES talents.
+local function nameList(items, field)
+  local parts = {}
+  for i, item in ipairs(items) do
+    if i > PREVIEW_NAMES then
+      parts[#parts + 1] = string.format(L["talents.apply.more"], #items - PREVIEW_NAMES)
+      break
+    end
+    parts[i] = string.format("%s (%d)", ns.T(item.talent.n), item[field])
+  end
+  return table.concat(parts, ", ")
+end
+
+-- The text blocks of a plan: { kind, color, text } for every kind that has points, in the order
+-- now, later, not possible, does not fit.
+function TD.PreviewSections(plan)
+  local out = {}
+  for _, k in ipairs(PREVIEW_KINDS) do
+    local points = plan.summary[k.sum]
+    if points > 0 then
+      out[#out + 1] = {
+        kind = k.kind,
+        color = k.color,
+        text = string.format(L[k.head], points) .. "\n" .. nameList(plan[k.kind], k.field),
+      }
+    end
+  end
+  return out
+end
+
+local applyDialog
+
+-- Shows what applying a build would do (plan = TL.Plan result) and calls onApply() when the player
+-- confirms. Without buyable points only the explanation shows and the button stays off.
+function TD.ApplyPreview(plan, onApply)
+  local d = applyDialog
+  if not d then
+    d = ns.Dialogs.Create("ForeverGuidesTalentApply", 540, 400)
+    applyDialog = d
+    W.SetText(d.title, "talents.editor.applyTitle")
+    d.intro = W.Text(d, { key = "talents.apply.intro", role = "ui", color = "textSecondary", wrap = true })
+    d.intro:SetPoint("TOPLEFT", SIDE, -48)
+    d.intro:SetPoint("RIGHT", -SIDE, 0)
+    d.blocks = {}
+    for i, k in ipairs(PREVIEW_KINDS) do
+      d.blocks[i] = W.Text(d, { role = "ui", color = k.color, wrap = true, text = "" })
+    end
+    d.nothing = W.Text(d, { key = "talents.apply.nothing", role = "ui", color = "text", wrap = true })
+    d.go = W.Action(d, {
+      label = "talents.apply.go",
+      icon = "check",
+      tooltip = "talents.apply.go",
+      variant = "primary",
+      width = 210,
+      height = 28,
+      onClick = function()
+        d:Hide()
+        d.onApply()
+      end,
+    })
+    d.go:SetPoint("BOTTOMRIGHT", -SIDE, 14)
+    d.cancel = W.Action(d, {
+      label = "act.cancel",
+      icon = "close",
+      tooltip = "common.cancel",
+      width = 110,
+      height = 28,
+      onClick = function()
+        d:Hide()
+      end,
+    })
+    d.cancel:SetPoint("RIGHT", d.go, "LEFT", -8, 0)
+  end
+  d.onApply = onApply
+  local shown = {}
+  for _, section in ipairs(TD.PreviewSections(plan)) do
+    shown[section.kind] = section.text
+  end
+  local anchor = d.intro
+  for i, k in ipairs(PREVIEW_KINDS) do
+    local block = d.blocks[i]
+    block:SetShown(shown[k.kind] ~= nil)
+    if shown[k.kind] then
+      W.SetText(block, nil, shown[k.kind])
+      block:ClearAllPoints()
+      block:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -12)
+      block:SetPoint("RIGHT", -SIDE, 0)
+      anchor = block
+    end
+  end
+  local buyable = plan.summary.now > 0
+  d.nothing:ClearAllPoints()
+  d.nothing:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -12)
+  d.nothing:SetPoint("RIGHT", -SIDE, 0)
+  W.SetText(d.nothing, plan.summary.total == 0 and "talents.apply.allSet" or "talents.apply.nothing")
+  d.nothing:SetShown(not buyable)
+  if buyable then
+    d.go:Enable()
+  else
+    d.go:Disable()
+  end
+  d:Show()
   return d
 end

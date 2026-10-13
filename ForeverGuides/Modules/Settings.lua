@@ -20,6 +20,16 @@ end
 ns.AddLocale("enUS", {
   ["settings.buttonLabels"] = "Show text on icon buttons",
   ["settings.buttonLabelsHint"] = "Buttons show a short word next to their icon. Off: icons only, the tooltip names the action. Narrow places hide the text by themselves.",
+  ["settings.hostSkin"] = "Behavior with other UI add-ons",
+  ["settings.hostSkin.auto"] = "Automatic (follows the window)",
+  ["settings.hostSkin.light"] = "Light (Blizzard's own look)",
+  ["settings.hostSkin.dark"] = "Dark (own dark surface)",
+  ["settings.hostSkinHint"] = "Forever Guides adds panels to Blizzard windows, for example the learn list in the spellbook. Automatic reads whether the window is drawn light or a UI add-on has made it dark, and picks matching colors. If a panel is hard to read, choose Light or Dark.",
+  ["settings.slotOverlays"] = "Avoid double display",
+  ["settings.slotOverlays.auto"] = "Automatic",
+  ["settings.slotOverlays.ours"] = "Always show ours",
+  ["settings.slotOverlays.none"] = "Hide ours",
+  ["settings.slotOverlaysHint"] = "Some UI add-ons draw item level or enchants next to the slots of the character and inspect window themselves. Automatic hides our texts that show the same and keeps the gems and the warning for a missing enchant. Hide ours removes all of our slot texts.",
   ["settings.keys"] = "Key bindings",
   ["settings.keysHint"] = "Not preset. Set your keys under AddOns > Forever Guides. Current keys:",
   ["settings.keysOpen"] = "Open key bindings",
@@ -70,6 +80,16 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["settings.buttonLabels"] = "Beschriftung an Symbolknöpfen anzeigen",
   ["settings.buttonLabelsHint"] = "Knöpfe zeigen ein kurzes Wort neben ihrem Symbol. Aus: nur Symbole, der Tooltip nennt die Aktion. Schmale Stellen blenden den Text selbst aus.",
+  ["settings.hostSkin"] = "Verhalten mit anderen UI-Addons",
+  ["settings.hostSkin.auto"] = "Automatisch (folgt dem Fenster)",
+  ["settings.hostSkin.light"] = "Hell (Original-Look von Blizzard)",
+  ["settings.hostSkin.dark"] = "Dunkel (eigene dunkle Fläche)",
+  ["settings.hostSkinHint"] = "Forever Guides ergänzt Blizzard-Fenster um eigene Bereiche, zum Beispiel die Lernliste im Zauberbuch. Automatisch erkennt, ob das Fenster hell dargestellt wird oder ein UI-Addon es dunkel gemacht hat, und wählt passende Farben. Ist ein Bereich schwer lesbar, wähle Hell oder Dunkel.",
+  ["settings.slotOverlays"] = "Doppelte Anzeige vermeiden",
+  ["settings.slotOverlays.auto"] = "Automatisch",
+  ["settings.slotOverlays.ours"] = "Immer unsere zeigen",
+  ["settings.slotOverlays.none"] = "Unsere ausblenden",
+  ["settings.slotOverlaysHint"] = "Manche UI-Addons zeichnen Itemlevel oder Verzauberungen selbst neben die Slots im Charakter- und Betrachten-Fenster. Automatisch blendet dann unsere Texte aus, die dasselbe zeigen, und behält Sockel sowie die Warnung bei fehlender Verzauberung. Unsere ausblenden entfernt alle unsere Slot-Texte.",
   ["settings.keys"] = "Tastenbelegung",
   ["settings.keysHint"] = "Nicht vorbelegt. Eigene Tasten unter AddOns > Forever Guides. Aktuelle Tasten:",
   ["settings.keysOpen"] = "Tastenbelegung öffnen",
@@ -494,6 +514,44 @@ local function windowSection(view)
   toggle(view, "hideTalkingHead", "settings.hideTalkingHead", function()
     ns.TalkingHead.Apply()
   end, "settings.hideTalkingHeadHint")
+  local hostSkin = W.Dropdown(view.content, {
+    key = "settings.hostSkin",
+    width = 280,
+    options = {
+      { value = "auto", key = "settings.hostSkin.auto" },
+      { value = "light", key = "settings.hostSkin.light" },
+      { value = "dark", key = "settings.hostSkin.dark" },
+    },
+    get = function()
+      return ns.db.settings.hostSkin
+    end,
+    set = function(v)
+      Store.set("settings.hostSkin", v)
+      ns.RefreshUI()
+    end,
+  })
+  hostSkin.fgId = "host-skin"
+  view.stack:Add(hostSkin, { height = 46, width = 280 })
+  ns.AddParagraph(view, "settings.hostSkinHint", { role = "micro", color = "textMuted" })
+  local slotOverlays = W.Dropdown(view.content, {
+    key = "settings.slotOverlays",
+    width = 280,
+    options = {
+      { value = "auto", key = "settings.slotOverlays.auto" },
+      { value = "ours", key = "settings.slotOverlays.ours" },
+      { value = "none", key = "settings.slotOverlays.none" },
+    },
+    get = function()
+      return ns.db.settings.slotOverlays
+    end,
+    set = function(v)
+      Store.set("settings.slotOverlays", v)
+      ns.RefreshUI()
+    end,
+  })
+  slotOverlays.fgId = "slot-overlays"
+  view.stack:Add(slotOverlays, { height = 46, width = 280 })
+  ns.AddParagraph(view, "settings.slotOverlaysHint", { role = "micro", color = "textMuted" })
 end
 
 local function styleSection(view)
@@ -558,13 +616,10 @@ local function advancedSection(view)
   end)
 end
 
--- The probe buttons of the item level and guild sections sit here. Only when an extension registers
--- probes, which also brings the texts of this section (see the loop in build).
-local function probesSection(view)
-  ns.AddHeading(view, "settings.probes")
-  ns.AddParagraph(view, "settings.probesHint", { role = "micro", color = "textMuted" })
-  ns.ItemLevelSettings.AddProbe(view)
-  ns.GuildPage.AddProbe(view)
+-- The buttons an extension registers for the settings (slot "settings") under the head it sets.
+-- Built only when there is a button, see the loop in build.
+local function extensionSection(view)
+  ns.DevTools.AddButtons(view, "settings")
 end
 
 -- The sections of each tab in page order, one card each.
@@ -600,7 +655,7 @@ local SECTIONS = {
   },
   items = {
     function(view)
-      ns.ItemLevelSettings.Add(view, { probe = false })
+      ns.ItemLevelSettings.Add(view)
     end,
     function(view)
       ns.InspectPage.AddSettings(view)
@@ -635,7 +690,7 @@ local SECTIONS = {
       ns.AutomationSettings.AddInvites(view)
     end,
     function(view)
-      ns.GuildPage.AddSettings(view, { probe = false })
+      ns.GuildPage.AddSettings(view)
     end,
   },
   advanced = {
@@ -643,7 +698,7 @@ local SECTIONS = {
     function(view)
       ns.ErrorCatcher.AddSettings(view)
     end,
-    probesSection,
+    extensionSection,
   },
 }
 
@@ -724,7 +779,7 @@ local function build(container)
     view.area:Hide()
     local grid = ns.SettingsGrid.New(view)
     for _, section in ipairs(SECTIONS[id]) do
-      if section ~= probesSection or #ns.DevTools.list > 0 then
+      if section ~= extensionSection or #ns.DevTools.Slot("settings") > 0 then
         section(grid:Card())
       end
     end
@@ -783,7 +838,7 @@ end
 
 ns.RegisterPage({
   id = "settings",
-  order = 200,
+  order = 710,
   group = "system",
   title = "page.settings",
   icon = ns.ICONS.settings,

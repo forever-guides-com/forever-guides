@@ -45,9 +45,18 @@ function R.zoneName(i)
   return z and ns.T(z) or nil
 end
 
--- Class trainers for a class token and faction ("A"/"H"/nil = all), sorted by kind, zone, name.
--- Trainers the player recorded in game (ns.TrainerLog) are merged in, flagged own = true.
--- A data trainer wins over a recorded one with the same NPC id.
+-- "pet" for a pet trainer (teaches the hunter's pet only), else "class".
+local function roleOf(t)
+  local roles = ns.TrainerRoles
+  return roles and roles.Of(t) or "class"
+end
+R.roleOf = roleOf
+
+-- Class trainers for a class token and faction ("A"/"H"/nil = all), sorted by role (pet trainers
+-- last), kind, zone, name. Trainers the player recorded in game (ns.TrainerLog) are merged in,
+-- flagged own = true. A data trainer wins over a recorded one with the same NPC id. The pet
+-- trainers of the overlay (ns.TrainerRoles, no coordinates) join unless a recorded pet trainer of
+-- the same name already has a position.
 function R.Trainers(class, faction)
   local out, known = {}, {}
   for _, t in ipairs((data().Trainers and data().Trainers.trainers) or {}) do
@@ -63,12 +72,30 @@ function R.Trainers(class, faction)
   if log and log.Entries then
     okLog, own = pcall(log.Entries, class, faction)
   end
+  local ownPets = {}
   for _, t in ipairs(okLog and type(own) == "table" and own or {}) do
     if not known[t.npc] then
       out[#out + 1] = t
+      if roleOf(t) == "pet" and t.n and t.n.en then
+        ownPets[t.n.en:lower()] = true
+      end
     end
   end
+  if ns.TrainerRoles then
+    for _, t in ipairs(ns.TrainerRoles.Entries(class, faction)) do
+      if not ownPets[t.n.en:lower()] then
+        out[#out + 1] = t
+      end
+    end
+  end
+  local rank = {}
+  for _, t in ipairs(out) do
+    rank[t] = roleOf(t) == "pet" and 1 or 0
+  end
   table.sort(out, function(a, b)
+    if rank[a] ~= rank[b] then
+      return rank[a] < rank[b]
+    end
     local ka, kb = KIND_ORDER[a.k] or 9, KIND_ORDER[b.k] or 9
     if ka ~= kb then
       return ka < kb
@@ -112,13 +139,20 @@ local function raceNames(class, side)
 end
 
 -- Trainer groups for the page: one per faction ("A"/"H") or both when faction
--- is nil. { faction, trainers, empty, gaps, races }. gaps are the class
--- specific data gaps of that faction, races is only filled for empty groups.
+-- is nil. { faction, trainers, pets, empty, gaps, races }. trainers lists the
+-- class trainers first, then the pet trainers, which pets repeats on its own.
+-- gaps are the class specific data gaps of that faction, races is only filled
+-- for empty groups.
 function R.TrainerGroups(class, faction)
   local out = {}
   for _, side in ipairs(faction and { faction } or { "A", "H" }) do
-    local g = { faction = side, trainers = R.Trainers(class, side), gaps = {}, races = {} }
+    local g = { faction = side, trainers = R.Trainers(class, side), pets = {}, gaps = {}, races = {} }
     g.empty = #g.trainers == 0
+    for _, t in ipairs(g.trainers) do
+      if roleOf(t) == "pet" then
+        g.pets[#g.pets + 1] = t
+      end
+    end
     for _, gap in ipairs(R.TrainerGaps(class, side)) do
       if gap.c == class then
         g.gaps[#g.gaps + 1] = gap
