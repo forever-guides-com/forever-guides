@@ -30,7 +30,14 @@ Store.defaults = {
     -- Short text next to the icon of action buttons (W.Action label); off = icons only.
     buttonLabels = true,
     combatHide = false,
+    -- Reminder bar after a price scan and at calm moments while data is unsaved (Modules/SaveState.lua).
+    saveHint = true,
     sidebarCollapsed = false,
+    -- Account default of the optional sub-addons by manifest id (Core/SubAddons.lua); a character
+    -- overrides it in ForeverGuidesCharDB.subaddons. The key must exist so the controls can bind.
+    subaddons = { guildmanager = false },
+    -- settings.nav (navigation layout for all characters, Modules/NavLayoutLogic.lua) has no default on
+    -- purpose: an absent key is the default menu.
     -- Accordion state per sidebar group (UI/Sidebar.lua). A group id missing here (older saves)
     -- counts as open.
     sidebarOpen = {
@@ -164,18 +171,23 @@ Store.defaults = {
     lootOutside = false,
     lootMinQuality = 2,
     -- Inventory of all characters in item tooltips (Modules/Inventory.lua, InventoryTooltip.lua): on, record the bank,
-    -- record the mailbox, own faction only, current character first, class colors.
+    -- record the mailbox, count the guild bank (record it while its window is open, show it as a row),
+    -- own faction only, current character first, class colors.
     inventoryTooltip = true,
     inventoryBank = true,
     inventoryMail = true,
+    inventoryGuildBank = true,
     inventoryFaction = false,
     inventoryCurrentFirst = true,
     inventoryColors = true,
+    -- Auction house prices (Modules/PriceDb.lua): record them, age in days after which a price counts as old.
+    priceDb = { enabled = true, maxAgeDays = 14 },
     -- Sell helper at the merchant (Modules/SellHelper.lua): gray items, white, green, blue and epic gear
     -- below an item level (0 = rule off) or every item of a quality (switches, off), bind filter (all,
     -- unbound, bound), keep consumables, crafting reagents and upgrades, protected item ids (comma
-    -- list), game's own junk sale for the gray rule, sell on opening the merchant (off), take over the
-    -- game's "sell all junk" button of the merchant window (on).
+    -- list; the profession tools are appended once, sellProtectSeeded), game's own junk sale for the
+    -- gray rule, sell on opening the merchant (off), take over the game's "sell all junk" button of the
+    -- merchant window (on).
     sellGray = true,
     sellWhiteBelow = 0,
     sellWhiteAll = false,
@@ -190,6 +202,7 @@ Store.defaults = {
     sellKeepReagents = true,
     sellKeepUpgrades = true,
     sellProtect = "",
+    sellProtectSeeded = false,
     sellNative = true,
     sellAuto = false,
     sellBlizzButton = true,
@@ -203,7 +216,7 @@ Store.defaults = {
     -- on. autoKey (shift, alt, ctrl) holds them back, autoChat prints what they do. Per helper: delays,
     -- who counts as trusted, quest kinds and exception lists (comma lists of quest ids and NPC ids).
     autoKey = "shift",
-    autoChat = true,
+    autoChat = false,
     autoRepair = false,
     autoRepairGuild = false,
     autoSummon = false,
@@ -387,6 +400,8 @@ Store.defaults = {
   peers = {},
   -- Item counts per character key (Modules/InventoryLogic.lua), local only.
   inventory = {},
+  -- Auction house prices per house (Modules/PriceDb.lua, PriceDbLogic.lua), local only.
+  prices = { v = 1, lastRequest = 0, houses = {} },
   -- Last weekly reset the client reported (server time epoch, 0 unknown), see Modules/RaidWeek.lua.
   weekReset = 0,
   imports = {},
@@ -399,6 +414,10 @@ Store.charDefaults = {
   lastRoute = "dashboard",
   -- Legacy plan of this character: ranks by perk key (Modules/LegacyPlan.lua).
   legacy = { v = 1, ranks = {} },
+  -- Per character override of the sub-addon switches: [id] = true or false, nil follows the account.
+  subaddons = {},
+  -- nav (navigation layout of this character) is absent until the user edits the menu for this
+  -- character only; an empty table would count as an override that wins over the account layout.
 }
 
 -- Migrations[n] upgrades a db from schema n-1 to n.
@@ -564,6 +583,20 @@ function Store.cleanFontScales(account)
   end
 end
 
+-- The profession tools join the sell protect list once, for new and existing installations. The
+-- player's own entries stay; a tool removed later does not come back.
+function Store.seedSellProtect(account)
+  local tools = ns.Data and ns.Data.ProfessionTools
+  if not (ns.SellLogic and tools and type(account.settings) == "table") then
+    return
+  end
+  local ids = {}
+  for i, tool in ipairs(tools) do
+    ids[i] = tool.id
+  end
+  ns.SellLogic.SeedProtect(account.settings, ids)
+end
+
 function Store.init(account, char)
   account = type(account) == "table" and account or {}
   char = type(char) == "table" and char or {}
@@ -575,6 +608,7 @@ function Store.init(account, char)
   Store.migrateHostSkin(account)
   Store.cleanFontScales(account)
   U.applyDefaults(account, Store.defaults)
+  Store.seedSellProtect(account)
   if isNew then
     account.setup.fresh = true
   end
@@ -621,4 +655,26 @@ function Store.set(path, value)
   if ns.Emit then
     ns.Emit("FG_SETTING_CHANGED", path, value)
   end
+end
+
+-- Writes into the character store (ForeverGuidesCharDB). A value of nil removes the key. Same event as
+-- Store.set, with the scope "char" as third argument: the path is relative to ns.charDB there, so a
+-- listener that cares about account settings checks the scope (or its "settings." prefix) first.
+function Store.setChar(path, value)
+  local parts = U.split(path, ".")
+  if #parts == 0 or type(ns.charDB) ~= "table" then
+    return false
+  end
+  local node = ns.charDB
+  for i = 1, #parts - 1 do
+    if type(node[parts[i]]) ~= "table" then
+      node[parts[i]] = {}
+    end
+    node = node[parts[i]]
+  end
+  node[parts[#parts]] = value
+  if ns.Emit then
+    ns.Emit("FG_SETTING_CHANGED", path, value, "char")
+  end
+  return true
 end

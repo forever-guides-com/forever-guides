@@ -524,12 +524,6 @@ for i, name in ipairs(STRATA) do
   STRATA_RANK[name] = i
 end
 
--- The strata above the window's (the bar must not sit under it); tooltips stay above the bar.
-function FT.BarStrata(windowStrata)
-  local rank = STRATA_RANK[windowStrata] or STRATA_RANK.MEDIUM
-  return STRATA[math.min(rank + 1, STRATA_RANK.FULLSCREEN_DIALOG)]
-end
-
 -- Below the window (offset in screen units from the window's bottom edge) or, when the screen
 -- ends there, inside the bottom of the screen. bottom: window's bottom edge, screen units.
 -- inside: the player wants it inside the window's bottom edge.

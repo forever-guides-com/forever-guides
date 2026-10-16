@@ -17,6 +17,7 @@ ns.On("ADDON_LOADED", function(_, name)
   ns.db, ns.charDB = db, charDB
   ns.Errors.attach(ns.db.errors)
   ns.SetLocale(ns.db.settings.locale)
+  ns.SubAddons.LoadAll()
 end)
 
 ns.On("PLAYER_LOGIN", function()

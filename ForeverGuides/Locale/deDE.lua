@@ -20,6 +20,7 @@ ns.AddLocale("deDE", {
   ["nav.group.main"] = "ÜBERSICHT",
   ["nav.group.world"] = "WELT",
   ["nav.group.character"] = "CHARAKTER",
+  ["nav.group.social"] = "GILDE UND KONTAKTE",
   ["nav.group.learn"] = "LERNEN",
   ["nav.group.professions"] = "BERUFE",
   ["nav.group.inventory"] = "INVENTAR",

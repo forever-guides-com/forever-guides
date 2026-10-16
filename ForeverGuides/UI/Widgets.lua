@@ -119,7 +119,8 @@ end
 -- never draw a tooltip of their own.
 -- spec: title (white), text (wrapped), hint (wrapped, muted), lines (list of "text",
 --   { text, color = theme name } or { left, right, color, rightColor }), anchor (default
---   ANCHOR_RIGHT), link (item/spell/... hyperlink) or spell (id) as the head of the tooltip.
+--   ANCHOR_RIGHT), link (item/spell/... hyperlink) or spell (id) as the head of the tooltip
+--   (a link to an item also gets the owned-by-character block at the end, Modules/InventoryTooltip.lua).
 --   A line { separator = true } is a thin rule across the full width of the tooltip.
 local Tooltip = {}
 W.Tooltip = Tooltip
@@ -210,6 +211,14 @@ local function head(tip, spec)
   return filled or spec.title ~= nil
 end
 
+-- The item link of a tooltip spec; nil for spells and other links.
+local function specItem(spec)
+  local link = spec.link
+  if type(link) == "string" and link:find("item:", 1, true) then
+    return link
+  end
+end
+
 function Tooltip.Show(owner, spec)
   local tip = rawget(_G, "GameTooltip")
   if not (tip and owner) then
@@ -217,7 +226,15 @@ function Tooltip.Show(owner, spec)
   end
   tip:SetOwner(owner, spec.anchor or "ANCHOR_RIGHT")
   clearSeparators(tip)
+  -- The inventory block comes last (before the hint), so the client's hooks wait until it is added.
+  local item, inventory = specItem(spec), ns.InventoryTooltip
+  if inventory then
+    inventory.Hold(tip, item ~= nil)
+  end
   if not head(tip, spec) then
+    if inventory then
+      inventory.Hold(tip, false)
+    end
     tip:Hide()
     return false
   end
@@ -237,6 +254,9 @@ function Tooltip.Show(owner, spec)
       local r, g, b = rgb(line.color or "text")
       tip:AddLine(line.left or line.text, r, g, b, true)
     end
+  end
+  if inventory and item then
+    ns.Safe("inventory-tooltip", inventory.AddForItem, tip, item)
   end
   if spec.hint and spec.hint ~= "" then
     local r, g, b = Theme.color("textMuted")
@@ -591,6 +611,24 @@ local VARIANTS = {
     border = "accentDim",
     borderAlpha = 0.8,
     borderHover = "accent2",
+  },
+  -- The footer Save button: a filled accent button at rest, a warning fill while data is unsaved
+  -- (UI/SaveUI.lua). Text on both fills passes AA in every theme (tests/test_savestate.lua).
+  save = {
+    bg = "action",
+    bgHover = "actionHi",
+    text = "text",
+    textHover = "bg",
+    border = "actionHi",
+    borderAlpha = 0.6,
+  },
+  saveDirty = {
+    bg = "warning",
+    bgHover = "accent",
+    text = "bg",
+    textHover = "bg",
+    border = "text",
+    borderAlpha = 0.9,
   },
   -- An icon button with surface and edge like a secondary button ("boxed").
   boxed = {
@@ -1612,7 +1650,7 @@ end
 
 -- Edit box ----------------------------------------------------------------
 
--- opts: placeholder (locale key), onEnter(text), onChange(text), clear (bool)
+-- opts: placeholder (locale key), onEnter(text), onChange(text), clear (bool), inset (text margin, 8)
 function W.EditBox(parent, opts)
   opts = opts or {}
   local f = CreateFrame("Frame", nil, parent)
@@ -1620,15 +1658,16 @@ function W.EditBox(parent, opts)
   W.Fill(f, "bg", 0.9)
   local border = W.Border(f, "white", 0.25)
   local eb = CreateFrame("EditBox", nil, f)
-  eb:SetPoint("TOPLEFT", 8, 0)
-  eb:SetPoint("BOTTOMRIGHT", opts.clear and -24 or -8, 0)
+  local inset = opts.inset or 8
+  eb:SetPoint("TOPLEFT", inset, 0)
+  eb:SetPoint("BOTTOMRIGHT", opts.clear and -24 or -inset, 0)
   eb:SetAutoFocus(false)
   ns.Bind(eb, function()
     Theme.applyFont(eb, "ui", "body")
     eb:SetTextColor(Theme.color("text"))
   end)
   local ph = W.Text(f, { key = opts.placeholder, role = "ui", color = "textMuted" })
-  ph:SetPoint("LEFT", 8, 0)
+  ph:SetPoint("LEFT", inset, 0)
   local clearBtn
   if opts.clear then
     clearBtn = W.Action(f, { icon = "close", size = 18, tooltip = "common.clear" })
@@ -1678,6 +1717,7 @@ function W.EditBox(parent, opts)
     eb:SetFocus()
   end)
   f.edit = eb
+  f.clearButton = clearBtn
   update()
   return f
 end

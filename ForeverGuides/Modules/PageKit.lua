@@ -1117,7 +1117,8 @@ end
 -- not resolved in the same frame) and returns its own height.
 -- :Sync(list, paint) reuses one row per list index and calls paint(row, item).
 -- Rows hang off the pool's own frame, so hiding the pool hides them too.
--- fgGridLayout(width) stacks the active rows and returns the total height.
+-- fgGridLayout(width) stacks the active rows and returns the total height. A row may carry fgGap, empty
+-- space above it (not part of the row frame, a rule may be drawn in it) that counts in the total height.
 function K.RowPool(parent, makeRow)
   local pool, active = {}, {}
   local list = CreateFrame("Frame", nil, parent)
@@ -1142,6 +1143,7 @@ function K.RowPool(parent, makeRow)
   function list:fgGridLayout(width)
     local y = 0
     for _, row in ipairs(active) do
+      y = y + (row.fgGap or 0)
       row:ClearAllPoints()
       row:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -y)
       row:SetWidth(width)

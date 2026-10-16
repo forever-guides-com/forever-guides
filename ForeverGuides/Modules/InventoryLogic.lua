@@ -10,6 +10,12 @@
 -- The account bank belongs to no character: its area accountBank lives in one snapshot under
 -- Logic.ACCOUNT_KEY (by = key of the character that captured it) and the tooltip shows it as
 -- its own row.
+-- The guild bank belongs to no character either: one snapshot per guild under
+-- Logic.GuildKey(guild name, realm), shared by every member, tab by tab:
+--   { t = server time of the last write, name = guild name, by = key of the capturing character,
+--     tabs = { [tab] = { t = server time of that tab's capture, items = { [itemId] = count } } } }
+-- A tab keeps its last capture until its own data arrives again. The budget is its own (see
+-- Logic.MAX_GUILD_ENTRIES), no character area is involved.
 local _, ns = ...
 
 local Logic = {}
@@ -20,6 +26,7 @@ ns.AddLocale("enUS", {
   ["inv.part.bags"] = "Bags",
   ["inv.part.bank"] = "Bank",
   ["inv.part.accountBank"] = "Account bank",
+  ["inv.part.guildBank"] = "Guild bank (%s)",
   ["inv.part.equip"] = "Equipped",
   ["inv.part.mail"] = "Mail",
   ["inv.total"] = "Total: %d",
@@ -30,6 +37,7 @@ ns.AddLocale("deDE", {
   ["inv.part.bags"] = "Taschen",
   ["inv.part.bank"] = "Bank",
   ["inv.part.accountBank"] = "Kontobank",
+  ["inv.part.guildBank"] = "Gildenbank (%s)",
   ["inv.part.equip"] = "Ausrüstung",
   ["inv.part.mail"] = "Post",
   ["inv.total"] = "Gesamt: %d",
@@ -43,6 +51,13 @@ Logic.ACCOUNT_AREA = "accountBank"
 Logic.ACCOUNT_KEY = "@account"
 -- Table entries per character over all areas (the SavedVariables size stays small).
 Logic.MAX_ENTRIES = 800
+-- Guild bank snapshots: key prefix (not a roster key, like ACCOUNT_KEY), the table entries over all
+-- tabs and the tab numbers the client has (MAX_GUILDBANK_TABS). Eight tabs of 98 slots hold at most
+-- 784 distinct stacks, so the cap only ever trims damaged data; the smallest stacks go first.
+Logic.GUILD_PREFIX = "@guild:"
+Logic.MAX_GUILD_ENTRIES = 800
+Logic.MAX_GUILD_TABS = 8
+Logic.MAX_GUILD_NAME = 60
 Logic.MAX_COUNT = 1e6
 Logic.MAX_ITEM_ID = 1e8
 Logic.MAX_LINES = 8
@@ -155,6 +170,114 @@ function Logic.SetArea(snap, area, tally, now)
   return snap
 end
 
+-- Guild bank ---------------------------------------------------------------------------------
+
+-- Key of a guild snapshot; nil without a usable name or realm. The realm loses spaces and hyphens
+-- like in a roster key, so both realm spellings of the client give the same key.
+function Logic.GuildKey(name, realm)
+  if type(name) ~= "string" or name == "" or #name > Logic.MAX_GUILD_NAME or type(realm) ~= "string" then
+    return nil
+  end
+  realm = realm:gsub(" ", ""):gsub("%-", "")
+  if realm == "" then
+    return nil
+  end
+  return Logic.GUILD_PREFIX .. name .. "-" .. realm
+end
+
+function Logic.IsGuildKey(key)
+  return type(key) == "string" and key:sub(1, #Logic.GUILD_PREFIX) == Logic.GUILD_PREFIX
+end
+
+-- A whole tab number the client has, else nil.
+local function tabNumber(v)
+  v = number(v, 1, Logic.MAX_GUILD_TABS)
+  return v and v == math.floor(v) and v or nil
+end
+
+-- Table entries over all tabs of a guild snapshot.
+function Logic.GuildEntries(snap)
+  local n = 0
+  for _, tab in pairs(type(snap) == "table" and type(snap.tabs) == "table" and snap.tabs or {}) do
+    n = n + (type(tab) == "table" and size(tab.items) or 0)
+  end
+  return n
+end
+
+-- Smallest stacks first over all tabs, ties by the higher item id, then the higher tab.
+local function trimGuild(snap)
+  local list = {}
+  for tab, entry in pairs(snap.tabs) do
+    for id, n in pairs(entry.items) do
+      list[#list + 1] = { tab = tab, id = id, n = n }
+    end
+  end
+  local over = #list - Logic.MAX_GUILD_ENTRIES
+  if over <= 0 then
+    return
+  end
+  table.sort(list, function(a, b)
+    if a.n ~= b.n then
+      return a.n < b.n
+    end
+    if a.id ~= b.id then
+      return a.id > b.id
+    end
+    return a.tab > b.tab
+  end)
+  for i = 1, over do
+    snap.tabs[list[i].tab].items[list[i].id] = nil
+  end
+end
+
+-- A clean copy of a stored guild snapshot (damaged tabs and entries dropped, budget applied).
+function Logic.CleanGuild(raw)
+  raw = type(raw) == "table" and raw or {}
+  local snap = { t = number(raw.t, 0, 1e11) or 0, tabs = {} }
+  if type(raw.name) == "string" and #raw.name <= Logic.MAX_GUILD_NAME then
+    snap.name = raw.name
+  end
+  if type(raw.by) == "string" and #raw.by <= 120 then
+    snap.by = raw.by
+  end
+  for tab, entry in pairs(type(raw.tabs) == "table" and raw.tabs or {}) do
+    tab = tabNumber(tab)
+    if tab and type(entry) == "table" then
+      snap.tabs[tab] = { t = number(entry.t, 0, 1e11) or snap.t, items = Logic.Merge({}, entry.items) }
+    end
+  end
+  trimGuild(snap)
+  return snap
+end
+
+-- Replaces one tab with a fresh tally at time `now`; the other tabs stay as they were. An empty
+-- tally is a reading too (the tab was emptied).
+function Logic.SetGuildTab(snap, tab, tally, now)
+  tab = tabNumber(tab)
+  if not tab then
+    return snap
+  end
+  snap.tabs = type(snap.tabs) == "table" and snap.tabs or {}
+  snap.tabs[tab] = { t = now, items = Logic.Merge({}, tally) }
+  snap.t = now
+  trimGuild(snap)
+  return snap
+end
+
+-- Count of one item over all tabs and the time of the oldest tab that holds it (nil without it).
+function Logic.GuildCount(snap, itemId)
+  local sum, oldest = 0, nil
+  for _, tab in pairs(type(snap) == "table" and type(snap.tabs) == "table" and snap.tabs or {}) do
+    local n = type(tab) == "table" and type(tab.items) == "table" and tab.items[itemId]
+    if type(n) == "number" and n > 0 then
+      sum = sum + n
+      local t = number(tab.t, 0, 1e11) or 0
+      oldest = oldest and math.min(oldest, t) or t
+    end
+  end
+  return sum, oldest
+end
+
 -- Counts of one item per area and their sum.
 function Logic.Counts(snap, itemId)
   local parts, sum = {}, 0
@@ -192,11 +315,34 @@ local function accountRow(snap, itemId, now)
   }
 end
 
+-- The guild bank of the current guild as one row of its own; nil when it holds none of the item.
+-- guild: { key, name }. The row is old when the oldest tab that holds the item is.
+local function guildRow(inv, guild, itemId, now)
+  if type(guild) ~= "table" or type(guild.key) ~= "string" or type(inv[guild.key]) ~= "table" then
+    return nil
+  end
+  local n, t = Logic.GuildCount(inv[guild.key], itemId)
+  if n <= 0 then
+    return nil
+  end
+  return {
+    key = guild.key,
+    name = ns.L["inv.part.guildBank"]:format(tostring(guild.name)),
+    shared = true,
+    current = false,
+    sum = n,
+    parts = {},
+    t = t,
+    old = now ~= nil and now - t >= Logic.STALE_DAYS * 86400,
+  }
+end
+
 -- Rows -------------------------------------------------------------------------------------
 
 -- One row per character that owns the item. chars: { key, display, class, faction, current,
 -- hidden }, inv: key -> snapshot. opts: faction (show only this one), currentFirst (else by
--- name), now (server time, for the age).
+-- name), now (server time, for the age), guild ({ key, name } of the current character's guild: its
+-- bank is one more row).
 function Logic.Rows(chars, inv, itemId, opts)
   opts = opts or {}
   local rows = {}
@@ -237,13 +383,14 @@ function Logic.Rows(chars, inv, itemId, opts)
     return a.key < b.key
   end)
   rows[#rows + 1] = accountRow(inv[Logic.ACCOUNT_KEY], itemId, opts.now)
+  rows[#rows + 1] = guildRow(inv, opts.guild, itemId, opts.now)
   return rows
 end
 
--- What the tooltip shows: nil when nothing is worth a line (no owner, or only the character
--- that looks at the item). Else { rows (at most `max`), more (rows left out), total, multi }.
+-- What the tooltip shows: nil when nobody owns the item, else { rows (at most `max`), more (rows
+-- left out), total, multi }. The current character counts like any other, wherever the item is.
 function Logic.Model(rows, max)
-  if #rows == 0 or (#rows == 1 and rows[1].current) then
+  if #rows == 0 then
     return nil
   end
   max = max or Logic.MAX_LINES
@@ -287,7 +434,7 @@ end
 -- "<name>: <sum> (Bags 5, Bank 20, ...)" with the non-empty parts only.
 function Logic.RowText(row, colors)
   local L = ns.L
-  if row.account then
+  if row.account or row.shared then
     return string.format("%s: %d", row.name, row.sum)
   end
   local parts = {}

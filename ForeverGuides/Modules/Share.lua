@@ -32,7 +32,9 @@ ns.AddLocale("enUS", {
   ["share.ch.guild"] = "Guild",
   ["share.ch.whisper"] = "Whisper",
   ["share.whisperFirst"] = "First name",
-  ["share.whisperSurname"] = "Surname (optional)",
+  ["share.whisperSurname"] = "Surname",
+  ["share.whisperNeedName"] = "Please enter first and last name, for example Isanja Wosande.",
+  ["share.whisperBadName"] = "First and last name need at least 2 letters each and no further parts, for example Isanja Wosande.",
   ["share.whisperNotFound"] = "Player not found: %s. Check first and last name and online status.",
   ["share.preview"] = "Preview (exactly what is sent)",
   ["share.input"] = "Text (is split into chat messages)",
@@ -60,7 +62,9 @@ ns.AddLocale("deDE", {
   ["share.ch.guild"] = "Gilde",
   ["share.ch.whisper"] = "Flüstern",
   ["share.whisperFirst"] = "Vorname",
-  ["share.whisperSurname"] = "Nachname (optional)",
+  ["share.whisperSurname"] = "Nachname",
+  ["share.whisperNeedName"] = "Bitte Vor- und Nachnamen eingeben, zum Beispiel Isanja Wosande.",
+  ["share.whisperBadName"] = "Vor- und Nachname brauchen je mindestens 2 Buchstaben und keine weiteren Teile, zum Beispiel Isanja Wosande.",
   ["share.whisperNotFound"] = "Spieler nicht gefunden: %s. Prüfe Vor- und Nachname und Online-Status.",
   ["share.preview"] = "Vorschau (genau das wird gesendet)",
   ["share.input"] = "Text (wird in Chat-Nachrichten aufgeteilt)",
@@ -303,6 +307,10 @@ local function fillWhisper(d)
     local saved = ns.db and ns.db.settings.shareWhisper
     if type(saved) == "table" then
       first, surname = PN.Clean(saved.first), PN.Clean(saved.surname)
+      -- An entry without a surname (older versions) cannot be reached and is dropped.
+      if not PN.CheckWhisper(PN.Join(first, surname)) then
+        first = nil
+      end
     end
   end
   if first and first ~= "" then
@@ -392,8 +400,20 @@ local function refresh(d)
     line = line .. ". " .. d.link.sizeLine
   end
   W.SetText(d.count, nil, line)
+  -- A rejected whisper name stays visible (text, red color and field border) until it is valid.
+  local nameError
+  if d.channel == "WHISPER" and d.nameCheck then
+    local ok, why = PN.CheckWhisper(whisperTarget(d))
+    nameError = not ok and why or nil
+  end
+  W.SetColor(d.warn, nameError and not d.status and "danger" or "warning")
+  for _, field in ipairs({ d.first, d.surname }) do
+    field.errorBorder.show(nameError ~= nil)
+  end
   if d.status then
     W.SetText(d.warn, nil, d.status)
+  elseif nameError then
+    W.SetText(d.warn, nameError == "missing" and "share.whisperNeedName" or "share.whisperBadName")
   elseif d.link and d.link.errText then
     W.SetText(d.warn, nil, d.link.errText)
   elseif d.link and d.link.err then
@@ -464,12 +484,34 @@ local function send(d)
     end
     return
   end
-  if #d.msgs == 0 or (d.channel == "WHISPER" and firstName(d) == "") then
+  if #d.msgs == 0 then
     return
   end
   local chatType, target = route(d)
+  -- Nothing leaves without "<first> <surname>", the name is never completed or guessed.
+  if chatType == "WHISPER" and not PN.CheckWhisper(target) then
+    d.nameCheck, d.status = true, nil
+    refresh(d)
+    return
+  end
+  d.nameCheck = false
   d.job = { msgs = d.msgs, i = 1, chatType = chatType, target = target, gated = clickGated(chatType) }
   step(d, d.job)
+end
+
+-- Tab moves between the name fields and the text box, Shift+Tab goes back.
+local function tabFrom(d, field)
+  local ring = { d.first.edit, d.surname.edit }
+  if d.editable then
+    ring[3] = d.input.edit
+  end
+  local back = IsShiftKeyDown and IsShiftKeyDown()
+  for i, edit in ipairs(ring) do
+    if edit == field then
+      ring[(i - 1 + (back and -1 or 1)) % #ring + 1]:SetFocus()
+      return
+    end
+  end
 end
 
 local function build()
@@ -494,7 +536,7 @@ local function build()
       return d.channel
     end,
     set = function(v)
-      d.channel, d.status = v, nil
+      d.channel, d.status, d.nameCheck = v, nil, false
       if v == "WHISPER" then
         fillWhisper(d)
       end
@@ -510,14 +552,23 @@ local function build()
 
   -- Two fields side by side in their own row, each one half of the dialog width.
   local function nameBox(key)
-    return W.EditBox(d, {
+    local box = W.EditBox(d, {
       placeholder = key,
       height = 24,
       onChange = function()
         d.autoFilled, d.status = false, nil
         refresh(d)
       end,
+      onEnter = function()
+        send(d)
+      end,
     })
+    box.errorBorder = W.Border(box, "danger", 1, 2)
+    box.errorBorder.show(false)
+    box.edit:SetScript("OnTabPressed", function(field)
+      tabFrom(d, field)
+    end)
+    return box
   end
   d.first = nameBox("share.whisperFirst")
   d.first:SetPoint("TOPLEFT", 16, -136)
@@ -582,7 +633,7 @@ local function show(title, text, link)
   d.link = link
   W.SetText(d.note, link and (link.hint or "share.noteLink") or "share.note")
   fillOptions(d.options)
-  d.channel, d.status = defaultChannel(d.options), nil
+  d.channel, d.status, d.nameCheck = defaultChannel(d.options), nil, false
   fillWhisper(d)
   d.dropdown.Refresh()
   d.input:SetShown(d.editable)
@@ -672,5 +723,14 @@ function Share.OpenDrawing(id)
   if why == "tooLarge" then
     built.errText = string.format(L["drawlink.err.tooLarge"], DL.Kilobytes(bytes))
   end
+  return show("", "", built)
+end
+
+-- A ready link message of any kind registered with NoteLink.RegisterKind: `built` is what
+-- NoteLink.BuildFor returned, or { err = reason }. hint and errPrefix are locale keys for the line
+-- under the preview and the prefix of the error text.
+function Share.OpenLink(built, hint, errPrefix)
+  built = built or {}
+  built.hint, built.errPrefix = hint, errPrefix
   return show("", "", built)
 end

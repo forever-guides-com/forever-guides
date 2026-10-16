@@ -13,9 +13,11 @@ ns.AddLocale("enUS", {
   ["inv.set.enable"] = "Inventory in tooltip",
   ["inv.set.bank"] = "Record bank",
   ["inv.set.mail"] = "Record mail",
+  ["inv.set.guildBank"] = "Count the guild bank",
   ["inv.set.faction"] = "Own faction only",
   ["inv.set.currentFirst"] = "Current character first",
   ["inv.set.colors"] = "Class colors",
+  ["inv.set.priceTooltip"] = "Show auction house price in tooltips",
   ["inv.set.rescan"] = "Record this character again",
   ["inv.set.clear"] = "Delete inventory",
   ["inv.set.clearTitle"] = "Delete inventory",
@@ -29,9 +31,11 @@ ns.AddLocale("deDE", {
   ["inv.set.enable"] = "Bestand im Tooltip",
   ["inv.set.bank"] = "Bank erfassen",
   ["inv.set.mail"] = "Post erfassen",
+  ["inv.set.guildBank"] = "Gildenbank mitzählen",
   ["inv.set.faction"] = "Nur eigene Fraktion",
   ["inv.set.currentFirst"] = "Aktuellen Charakter zuerst",
   ["inv.set.colors"] = "Klassenfarben",
+  ["inv.set.priceTooltip"] = "Auktionshaus-Preis in Tooltips anzeigen",
   ["inv.set.rescan"] = "Diesen Charakter neu erfassen",
   ["inv.set.clear"] = "Bestand löschen",
   ["inv.set.clearTitle"] = "Bestand löschen",
@@ -44,6 +48,7 @@ local TOGGLES = {
   { "inventoryTooltip", "inv.set.enable" },
   { "inventoryBank", "inv.set.bank" },
   { "inventoryMail", "inv.set.mail" },
+  { "inventoryGuildBank", "inv.set.guildBank" },
   { "inventoryFaction", "inv.set.faction" },
   { "inventoryCurrentFirst", "inv.set.currentFirst" },
   { "inventoryColors", "inv.set.colors" },
@@ -67,6 +72,17 @@ function S.Add(view)
     toggle.fgId = "inventory-" .. key
     s:Add(toggle, { height = 24, gap = 6 })
   end
+  local price = W.Toggle(view.content, {
+    key = "inv.set.priceTooltip",
+    get = function()
+      return Store.get("settings.priceDb.tooltip") ~= false
+    end,
+    set = function(v)
+      Store.set("settings.priceDb.tooltip", v)
+    end,
+  })
+  price.fgId = "inventory-priceTooltip"
+  s:Add(price, { height = 24, gap = 6 })
   s:Add(
     W.Action(view.content, {
       label = "act.refresh",

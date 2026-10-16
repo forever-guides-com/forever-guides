@@ -138,8 +138,8 @@ function MRL.TabLabel(routes, i)
   return string.format(L["map.route.tab.alt"], i, delta)
 end
 
--- The extra facts of a step (requirement, source, cost, note); colored for the list, plain for
--- the copied text.
+-- The extra facts of a step (requirement, source, cost, note); colored with coin icons for the list,
+-- plain with coin letters for the copied text.
 local function extras(step, colored)
   local function tint(token, text)
     return colored and Theme.hexText(token, text) or text
@@ -152,7 +152,7 @@ local function extras(step, colored)
     out[#out + 1] = tint("textMuted", L["map.cf." .. step.cf])
   end
   if step.cost and step.cost > 0 then
-    out[#out + 1] = string.format(L["map.route.cost"], ns.RefLogic.Money(step.cost))
+    out[#out + 1] = string.format(L["map.route.cost"], ns.CostLogic.Format(step.cost, { plain = not colored }) or "0")
   end
   if step.rn then
     out[#out + 1] = ns.T(step.rn) or step.rn

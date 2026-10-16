@@ -67,20 +67,20 @@ function Dialogs.Copy(titleKey, text, hintKey, actions)
     copy = base("ForeverGuidesCopyDialog", 560, 360)
     copy.hint = W.Text(copy, { role = "ui", color = "textSecondary", wrap = true })
     copy.hint:SetPoint("TOPLEFT", 16, -44)
-    copy.hint:SetPoint("RIGHT", -16, 0)
-    -- Native ScrollFrame + EditBox, modeled directly on EllesmereUI's own
-    -- working export/copy popup (confirmed rendering text correctly on
-    -- this same Forever client). Our own W.ScrollArea abstraction failed
-    -- to show text here across several attempts despite the content
-    -- being genuinely present the whole time (confirmed via
-    -- Ctrl+A/Ctrl+C), so this bypasses it entirely rather than patching
-    -- it again.
+    copy.hint:SetPoint("TOPRIGHT", -16, -44)
+    -- Plain ScrollFrame + EditBox: W.ScrollArea did not render the text here although it was present
+    -- (Ctrl+A/Ctrl+C copied it), so the dialog bypasses it.
     local area = CreateFrame("ScrollFrame", nil, copy)
     area:SetFrameLevel(copy:GetFrameLevel() + 1)
     area:SetPoint("TOPLEFT", 16, -84)
     area:SetPoint("BOTTOMRIGHT", -16, 52)
     area:EnableMouseWheel(true)
-    W.Fill(area, "surface", 1)
+    -- The surface belongs to the window, not to the scroll frame: a scroll child can end up behind the
+    -- textures of its own scroll frame (after a raise) and the text would be covered by an opaque fill.
+    local field = W.Fill(copy, "surface", 1, "BORDER")
+    field:ClearAllPoints()
+    field:SetPoint("TOPLEFT", area, "TOPLEFT")
+    field:SetPoint("BOTTOMRIGHT", area, "BOTTOMRIGHT")
 
     local content = CreateFrame("Frame", nil, area)
     content:SetWidth(area:GetWidth() > 0 and area:GetWidth() or 528)

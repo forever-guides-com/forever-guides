@@ -162,7 +162,7 @@ function IV.QuestLines(q, byId)
     rewards[#rewards + 1] = string.format(L["instances.quest.xp"], q.xp)
   end
   if q.mo and q.mo > 0 then
-    rewards[#rewards + 1] = R.Money(q.mo)
+    rewards[#rewards + 1] = ns.CostLogic.Format(q.mo) or "0"
   end
   for _, r in ipairs(q.rw or {}) do
     local name = r.n or ("#" .. tostring(r.id))

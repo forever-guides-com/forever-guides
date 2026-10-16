@@ -192,6 +192,60 @@ function PN.ForWhisper(first, surname, realm)
   return full
 end
 
+-- Letters per part of a name that can be whispered.
+PN.MIN_LETTERS = 2
+
+-- Characters (not bytes) of a string of letters.
+local function charCount(s)
+  return select(2, s:gsub("[^\128-\191]", ""))
+end
+
+-- A name part: letters with an apostrophe or hyphen only between letters.
+local function plausiblePart(part)
+  if part:find("^[%-']") or part:find("[%-']$") or part:find("[%-'][%-']") then
+    return false
+  end
+  local letters = part:gsub("[%-']", "")
+  return letters:find("^[%a\128-\255]+$") ~= nil and charCount(letters) >= PN.MIN_LETTERS
+end
+
+-- Whether `full` can be the target of a whisper: exactly "<first> <surname>", each
+-- part with at least two letters, the surname with an optional "-<realm>" behind it.
+-- Returns true, or false and why: "missing" (one part only), "extra" (more than two
+-- parts) or "invalid" (too short or a character that is no letter). Nothing is
+-- completed or guessed here.
+function PN.CheckWhisper(full)
+  full = PN.Clean(full)
+  local sep, realmSep = separators()
+  local parts = {}
+  local from = 1
+  while true do
+    local at = full:find(sep, from, true)
+    parts[#parts + 1] = full:sub(from, (at or #full + 1) - 1)
+    if not at then
+      break
+    end
+    from = at + #sep
+  end
+  if full == "" or #parts < 2 then
+    return false, "missing"
+  elseif #parts > 2 then
+    return false, "extra"
+  end
+  local surname, realm = parts[2], nil
+  local at = surname:find(realmSep, 1, true)
+  if at then
+    surname, realm = surname:sub(1, at - 1), parts[2]:sub(at + #realmSep)
+  end
+  if realm and not realm:find("^[%w\128-\255'%-]+$") then
+    return false, "invalid"
+  end
+  if not (plausiblePart(parts[1]) and plausiblePart(surname)) then
+    return false, "invalid"
+  end
+  return true
+end
+
 -- Link payload field: spaces, colons, pipes and percent signs become %XX, so a
 -- name with a surname cannot break the colon separated link parsing.
 function PN.Encode(name)

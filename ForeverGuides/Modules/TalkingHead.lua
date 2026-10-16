@@ -1,4 +1,5 @@
--- Hides Blizzard's talking head window (settings.hideTalkingHead, off by default). Only the window
+-- Hides Blizzard's talking head window (settings.hideTalkingHead, off by default; the toggle shows it the other way
+-- round: on means the window is shown). Only the window
 -- goes away: Close would also end the voice line, Hide keeps the dialogue audio running.
 local _, ns = ...
 
@@ -6,12 +7,12 @@ local TH = {}
 ns.TalkingHead = TH
 
 ns.AddLocale("enUS", {
-  ["settings.hideTalkingHead"] = "Hide Talking Head",
-  ["settings.hideTalkingHeadHint"] = "Hides the window only.\nVoice keeps playing.",
+  ["settings.hideTalkingHead"] = "Show Talking Head",
+  ["settings.hideTalkingHeadHint"] = "Off hides the window only.\nVoice keeps playing.",
 })
 ns.AddLocale("deDE", {
-  ["settings.hideTalkingHead"] = "Talking Head ausblenden",
-  ["settings.hideTalkingHeadHint"] = "Blendet nur das Fenster aus.\nDie Sprache läuft weiter.",
+  ["settings.hideTalkingHead"] = "Talking Head anzeigen",
+  ["settings.hideTalkingHeadHint"] = "Aus blendet nur das Fenster aus.\nDie Sprache läuft weiter.",
 })
 
 local hookedFrame

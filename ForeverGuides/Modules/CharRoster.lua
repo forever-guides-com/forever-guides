@@ -481,7 +481,8 @@ local function readGuild(at)
     cache.guild = { v = false, at = at }
     return
   end
-  local guild = text(try(GetGuildInfo, "player"))
+  -- GetGuildInfo also returns the rank name; only the guild name is wanted, text() takes a length second.
+  local guild = text((try(GetGuildInfo, "player")))
   if guild then
     cache.guild = { v = guild, at = at }
   end

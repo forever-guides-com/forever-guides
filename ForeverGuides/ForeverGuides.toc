@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.1.3
+## Version: 0.1.4
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -26,6 +26,7 @@ Core\Store.lua
 Core\Keys.lua
 Core\Capabilities.lua
 Core\Loader.lua
+Core\SubAddons.lua
 Core\DataApi.lua
 Core\Router.lua
 Core\Commands.lua
@@ -59,6 +60,7 @@ Data\DungeonAssets.lua
 Data\BossModels.lua
 Data\BossPins.lua
 Data\Travel.lua
+Data\FlightLengths.lua
 Data\Abilities_WARRIOR.lua
 Data\Abilities_PALADIN.lua
 Data\Abilities_HUNTER.lua
@@ -79,6 +81,7 @@ Data\Spells_WARLOCK.lua
 Data\Spells_DRUID.lua
 Data\Spells_GENERAL.lua
 Data\Tutorials.lua
+Data\ProfessionTools.lua
 
 UI\Theme.lua
 UI\Skins.lua
@@ -92,8 +95,11 @@ UI\Desktop.lua
 UI\DesktopRibbon.lua
 UI\Toast.lua
 UI\Page.lua
+Modules\NavLayoutLogic.lua
 UI\Sidebar.lua
+UI\SidebarEdit.lua
 UI\FooterControls.lua
+UI\SaveUI.lua
 UI\MainFrame.lua
 UI\Minimap.lua
 UI\Dock.lua
@@ -127,6 +133,7 @@ Modules\LevelLogic.lua
 Modules\CostLogic.lua
 Modules\CostCapture.lua
 Modules\PageKit.lua
+UI\ManageWindow.lua
 Modules\LevelView.lua
 Modules\MapPoly.lua
 Modules\MapRevealLogic.lua
@@ -223,6 +230,10 @@ Modules\PackageUI.lua
 Modules\SettingsGrid.lua
 Modules\Settings.lua
 Modules\KeysSettings.lua
+Modules\AddonSettings.lua
+Modules\NavSettings.lua
+Modules\SaveStateLogic.lua
+Modules\SaveState.lua
 Modules\TutorialsPage.lua
 Modules\Help.lua
 Modules\SetupWizardLogic.lua
@@ -265,10 +276,13 @@ Modules\Inventory.lua
 Modules\InventoryTooltip.lua
 Modules\InventoryDiag.lua
 Modules\InventorySettings.lua
+Modules\PriceDbLogic.lua
+Modules\PriceDb.lua
 Modules\AccessView.lua
 Modules\SellLogic.lua
 Modules\SellHelper.lua
 Modules\SellPreview.lua
+Modules\SellProtect.lua
 Modules\SellSettings.lua
 Modules\InviteLogic.lua
 Modules\Invites.lua
@@ -285,6 +299,7 @@ Modules\AutoRelease.lua
 Modules\HideErrors.lua
 Modules\AutomationSettings.lua
 Modules\GuildLogic.lua
+Modules\ContactsLogic.lua
 Modules\NearbyLogic.lua
 Modules\GuildData.lua
 Modules\Peers.lua
@@ -293,7 +308,11 @@ Modules\GroupInspect.lua
 Modules\NearbyContacts.lua
 Modules\NearbyWho.lua
 Modules\GuildExt.lua
+Modules\GuildKit.lua
+Modules\GuildManagerButton.lua
+Modules\ContactsView.lua
 Modules\GuildPage.lua
+Modules\ContactsPage.lua
 Modules\FrameTweaksLogic.lua
 Modules\FrameTweaks.lua
 Modules\FrameTweaksAlpha.lua
@@ -315,10 +334,15 @@ Modules\DurabilityView.lua
 Modules\DurabilityWindow.lua
 Modules\DurabilitySettings.lua
 Modules\ProfessionRouteLogic.lua
+Modules\ProfessionListLogic.lua
 Modules\PeerComm.lua
 Modules\ProfessionData.lua
+Modules\PriceSourceAddon.lua
 Modules\ProfessionShop.lua
+Modules\ProfessionList.lua
 Modules\ProfessionShopWindow.lua
+Modules\ProfessionListLink.lua
+Modules\AuctionSettings.lua
 Modules\AuctionLink.lua
 Modules\ProfessionTracker.lua
 Modules\ProfessionRoutePage.lua

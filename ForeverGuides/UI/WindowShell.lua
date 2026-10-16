@@ -19,7 +19,8 @@
 --   shell.edge        the overlay frame of the edge, shell.divider the line under the strip
 --   shell.band        the metal band the strip sits in (Skins.BandRect), nil while it sits in the window
 --   shell.bandFill    texture of the window frame behind the band (color metrics.bar.backdrop), built when the
---                     band is first used, shown only while shell.band is set; below the metal and the strip
+--                     band is first used, shown only while shell.band is set; below the metal and the strip. It
+--                     reaches metrics.bar.bleed under the metal (sides and top), so no clear sliver of the art shows
 --   Shell.Style(frame, style, parts)   WindowStyle.Apply reports the window's style: a background
 --                            color of its own is kept, the opacity reaches the stone of the skin
 --   Shell.IsTitleBar(frame)  true for the title strip of a shell (its "x" button is dressed)
@@ -287,9 +288,12 @@ local function restyleBandFill(shell, band)
   end
   if shell.fillKey ~= shell.barKey then
     shell.fillKey = shell.barKey
+    -- Both sides hang on the same reference (the window), so the pixel rounding of one side never opens a gap
+    -- the other does not have. The bleed lies under the metal, which is opaque there.
+    local bleed = Skins.list.forever.metrics.bar.bleed
     fill:ClearAllPoints()
-    fill:SetPoint("TOPLEFT", shell.frame, "TOPLEFT", 0, band.top)
-    fill:SetPoint("BOTTOMRIGHT", shell.frame, "TOPRIGHT", 0, band.bottom)
+    fill:SetPoint("TOPLEFT", shell.frame, "TOPLEFT", -bleed.side, band.top + bleed.top)
+    fill:SetPoint("BOTTOMRIGHT", shell.frame, "TOPRIGHT", bleed.side, band.bottom)
   end
   fill:Show()
   paintBandFill(shell)

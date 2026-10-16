@@ -53,6 +53,25 @@ function ns.DiagReport()
   for name, p in pairs(ns.Packages) do
     line(out, "package %s: %s", name, p.status)
   end
+  if ns.SubAddons then
+    local update = rawget(_G, "UpdateAddOnMemoryUsage")
+    if type(update) == "function" then
+      pcall(update)
+    end
+    for _, e in ipairs(ns.SubAddons.List()) do
+      local kb = ns.SubAddons.Memory(e.id)
+      line(
+        out,
+        "subaddon %s: %s source=%s%s list=%s loaded=%s",
+        e.id,
+        ns.SubAddons.State(e.id),
+        ns.SubAddons.Source(e.id),
+        kb and string.format(" memory=%.0f KB", kb) or "",
+        ns.SubAddons.ListState(e.id) or "unknown",
+        ns.SubAddons.IsLoaded(e.id) and "yes" or "no"
+      )
+    end
+  end
   line(
     out,
     "savedVariables=%s sessions=%s schema=%s migrations=%s",
@@ -141,6 +160,10 @@ function ns.DiagReport()
     line(out, "log warn: %s", ns.Errors.clip(warnings[i], 160))
   end
   out[#out + 1] = ns.Notify.Report()
+  if ns.PriceDb then
+    local okPrices, text = pcall(ns.PriceDb.DiagLine)
+    out[#out + 1] = okPrices and text or "prices: ?"
+  end
   if ns.GatherSparkles then
     local okSparkles, lines = pcall(ns.GatherSparkles.DiagLines)
     out[#out + 1] = okSparkles and table.concat(lines, "\n") or "sparkles: ?"

@@ -1,7 +1,8 @@
 -- Inventory of the current character: bags and worn items always, the bank and the mailbox
 -- while they are open. Stored per character in ns.db.inventory (account-wide SavedVariables,
--- never sent anywhere), counted by item id. Every game call goes through pcall and a missing
--- API leaves its area untouched. The tooltip side is Modules/InventoryTooltip.lua.
+-- never sent anywhere), counted by item id. The guild bank is stored per guild (one snapshot for
+-- all its members, tab by tab) while its window is open. Every game call goes through pcall and a
+-- missing API leaves its area untouched. The tooltip side is Modules/InventoryTooltip.lua.
 local _, ns = ...
 local Logic = ns.InventoryLogic
 local Roster = ns.CharRoster
@@ -19,10 +20,24 @@ local LEGACY_BANK = { -1, 5, 6, 7, 8, 9, 10, 11 }
 local LAST_EQUIP_SLOT = 23
 local MAX_MAILS = 100
 local MAX_ATTACHMENTS = 32
+-- Slots per guild bank tab when the client names no MAX_GUILDBANK_SLOTS_PER_TAB; the hard bound.
+local DEFAULT_GUILD_SLOTS = 98
+local MAX_GUILD_SLOTS = 200
 
 -- bags and bank wait for the next flush, a tooltip flushes first (see Fresh).
-local state = { dirty = true, bankDirty = false, mailDirty = false, bankOpen = false, mailOpen = false }
+local state = {
+  dirty = true,
+  bankDirty = false,
+  mailDirty = false,
+  bankOpen = false,
+  mailOpen = false,
+  guildOpen = false,
+  -- Tabs whose data arrived and wait for the next flush: { [tab] = true }.
+  guildTabs = {},
+}
 Inv.state = state
+-- Counts every change of the stored snapshots; the tooltip cache is valid for one value.
+Inv.version = 0
 
 -- Option(key): the stored setting, else the default (on unless the default says otherwise).
 function Inv.Option(key)
@@ -215,6 +230,7 @@ local function write(areas, key)
     Logic.SetArea(snap, area, tally, now)
   end
   ns.db.inventory[key] = snap
+  Inv.version = Inv.version + 1
   return true
 end
 
@@ -263,6 +279,173 @@ function Inv.CaptureMail()
   return tally ~= nil and write({ mail = tally })
 end
 
+-- Guild bank --------------------------------------------------------------------------------
+
+-- A guild bank function of the client: the legacy global, else the same name in C_GuildBank.
+local function guildFn(name)
+  local f = globalFn(name)
+  if f then
+    return f
+  end
+  local c = rawget(_G, "C_GuildBank")
+  return type(c) == "table" and type(c[name]) == "function" and c[name] or nil
+end
+
+local function inCombat()
+  local fn = globalFn("InCombatLockdown")
+  if not fn then
+    return false
+  end
+  local ok, combat = pcall(fn)
+  return not ok or combat == true
+end
+
+-- Key and name of the guild of the current character; nil when it has none, the client does not
+-- say, or the value is secret. The realm is the one GetGuildInfo names for a guild of another
+-- realm, else the own one.
+function Inv.GuildKey()
+  local info = globalFn("GetGuildInfo")
+  if not info then
+    return nil
+  end
+  local ok, name, _, _, realm = pcall(info, "player")
+  if not (ok and type(name) == "string" and I.accessible(name)) then
+    return nil
+  end
+  if not (type(realm) == "string" and realm ~= "" and I.accessible(realm)) then
+    realm = nil
+    for _, fn in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
+      local get = globalFn(fn)
+      local read, value = pcall(get or function() end)
+      if read and type(value) == "string" and value ~= "" and I.accessible(value) then
+        realm = value
+        break
+      end
+    end
+  end
+  local key = Logic.GuildKey(name, realm)
+  return key, key and name or nil
+end
+
+-- A whole tab number inside what the client has, else nil.
+local function guildTab(v)
+  if not I.readable(v) or v ~= math.floor(v) or v < 1 or v > Logic.MAX_GUILD_TABS then
+    return nil
+  end
+  local count = guildFn("GetNumGuildBankTabs")
+  local ok, tabs = pcall(count or function() end)
+  if ok and I.readable(tabs) and v > tabs then
+    return nil
+  end
+  return v
+end
+
+-- The tab the guild bank window shows: the data that arrives belongs to it.
+local function currentGuildTab()
+  local current = guildFn("GetCurrentGuildBankTab")
+  local ok, tab = pcall(current or function() end)
+  return ok and guildTab(tab) or nil
+end
+
+-- False when the character may not see the tab (an unreadable answer counts as viewable).
+local function guildTabViewable(tab)
+  local info = guildFn("GetGuildBankTabInfo")
+  if not info then
+    return true
+  end
+  local ok, viewable = pcall(function()
+    local _, _, value = info(tab)
+    if I.accessible(value) then
+      return value
+    end
+  end)
+  return not ok or viewable ~= false
+end
+
+-- The stacks of one guild bank tab as { [itemId] = count }. nil when the tab cannot be read
+-- completely: a failed call or a secret value would replace a good count with half a one.
+local function scanGuildTab(tab)
+  local getLink, getInfo = guildFn("GetGuildBankItemLink"), guildFn("GetGuildBankItemInfo")
+  if not (getLink and getInfo) then
+    return nil
+  end
+  local slots = rawget(_G, "MAX_GUILDBANK_SLOTS_PER_TAB")
+  slots = I.readable(slots) and slots >= 1 and math.min(slots, MAX_GUILD_SLOTS) or DEFAULT_GUILD_SLOTS
+  local tally = {}
+  for slot = 1, slots do
+    local ok, complete = pcall(function()
+      local link = getLink(tab, slot)
+      if link == nil then
+        return true
+      end
+      if not I.accessible(link) then
+        return false
+      end
+      local id = Logic.ItemId(link)
+      if not id then
+        return true
+      end
+      local _, count = getInfo(tab, slot)
+      if not I.readable(count) then
+        return false
+      end
+      Logic.Add(tally, id, count)
+      return true
+    end)
+    if not (ok and complete) then
+      return nil
+    end
+  end
+  return tally
+end
+
+local function writeGuild(key, name, tab, tally)
+  if type(ns.db) ~= "table" then
+    return false
+  end
+  if type(ns.db.inventory) ~= "table" then
+    ns.db.inventory = {}
+  end
+  local snap = Logic.CleanGuild(ns.db.inventory[key])
+  snap.name, snap.by = name, Roster.CurrentKey()
+  Logic.SetGuildTab(snap, tab, tally, Roster.Now())
+  ns.db.inventory[key] = snap
+  Inv.version = Inv.version + 1
+  return true
+end
+
+-- Reads one tab (default: the shown one) into the snapshot of the guild, the other tabs stay as
+-- they were. The client has data for a tab only after it was queried, and an unqueried tab reads as
+-- empty: keepEmpty is true when the data has just arrived (an empty tab is real then), false at
+-- the opening of the window (an empty reading is ignored). Returns true when something was written.
+function Inv.CaptureGuildTab(tab, keepEmpty)
+  if not (Inv.Enabled() and Inv.Option("inventoryGuildBank") ~= false and state.guildOpen) or inCombat() then
+    return false
+  end
+  local key, name = Inv.GuildKey()
+  if tab then
+    tab = guildTab(tab)
+  else
+    tab = currentGuildTab()
+  end
+  if not (key and tab and guildTabViewable(tab)) then
+    return false
+  end
+  local tally = scanGuildTab(tab)
+  if not tally or (not keepEmpty and next(tally) == nil) then
+    return false
+  end
+  return writeGuild(key, name, tab, tally)
+end
+
+local function flushGuild()
+  local tabs = state.guildTabs
+  state.guildTabs = {}
+  for tab in pairs(tabs) do
+    Inv.CaptureGuildTab(tab, true)
+  end
+end
+
 -- Captures what changed since the last time.
 function Inv.Flush()
   if state.dirty then
@@ -299,6 +482,7 @@ function Inv.Rescan()
   Inv.CaptureBags()
   Inv.CaptureBank()
   Inv.CaptureMail()
+  Inv.CaptureGuildTab()
 end
 
 -- Deletes the snapshots of all characters, then reads the current bags again.
@@ -306,7 +490,9 @@ function Inv.Clear()
   if type(ns.db) == "table" then
     ns.db.inventory = {}
   end
+  Inv.version = Inv.version + 1
   state.dirty = true
+  state.guildTabs = {}
   Inv.CaptureBags()
 end
 
@@ -341,6 +527,34 @@ local function closeMail()
   state.mailOpen, state.mailDirty = false, false
 end
 
+local function openGuildBank()
+  if state.guildOpen then
+    return
+  end
+  state.guildOpen = true
+  Inv.CaptureGuildTab()
+end
+
+local function closeGuildBank()
+  state.guildOpen, state.guildTabs = false, {}
+end
+
+-- The data of a tab arrived (also after every move of an item): the tab is the shown one, read
+-- after the next flush so a burst of events reads once.
+local function guildSlotsChanged()
+  if not state.guildOpen then
+    return
+  end
+  local tab = currentGuildTab()
+  if tab then
+    state.guildTabs[tab] = true
+    ns.Debounce("inventoryGuildBank", DELAY, flushGuild)
+  end
+end
+
+ns.On("GUILDBANKFRAME_OPENED", openGuildBank)
+ns.On("GUILDBANKFRAME_CLOSED", closeGuildBank)
+ns.On("GUILDBANKBAGSLOTS_CHANGED", guildSlotsChanged)
 ns.On("BANKFRAME_OPENED", openBank)
 ns.On("BANKFRAME_CLOSED", closeBank)
 ns.On("MAIL_SHOW", openMail)
@@ -369,6 +583,9 @@ local function onInteraction(opening)
     end
     if kind == interactionId("MailInfo") then
       return (opening and openMail or closeMail)()
+    end
+    if kind == interactionId("GuildBanker") then
+      return (opening and openGuildBank or closeGuildBank)()
     end
   end
 end

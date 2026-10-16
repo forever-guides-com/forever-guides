@@ -1,5 +1,5 @@
 -- Settings page in tabs: general, appearance, map, items, loot and inventory, selling, automation,
--- guild and contacts, advanced. Every tab is a grid of cards (Modules/SettingsGrid.lua), one card per
+-- guild and contacts, add-ons, advanced. Every tab is a grid of cards (Modules/SettingsGrid.lua), one card per
 -- section. The sections of other modules are added through ns.SettingsPage.
 local _, ns = ...
 local W, Store, WS, Theme = ns.W, ns.Store, ns.WindowStyle, ns.Theme
@@ -59,11 +59,8 @@ ns.AddLocale("enUS", {
   ["settings.roster"] = "Character list",
   ["settings.rosterSave"] = "Save character list",
   ["settings.rosterHint"] = "Saves name, race, class, level, gold, zone, guild, item level and professions of each character you log in with.\nStays in your SavedVariables on this computer, never sent anywhere.\nShown on the start page.\nSwitching off stops saving. Stored entries stay until you remove them on the start page.",
-  ["settings.packages"] = "Add-on packages",
-  ["settings.packagesHint"] = "Switch on here, off in the add-on list in game.",
   ["settings.pkg.professions"] = "Profession data",
   ["settings.pkg.recipes"] = "Recipes",
-  ["settings.pkg.guild"] = "Guild manager",
   ["settings.pkg.loaded"] = "On",
   ["settings.pkg.disabled"] = "Off",
   ["settings.pkg.missing"] = "Missing",
@@ -119,11 +116,8 @@ ns.AddLocale("deDE", {
   ["settings.roster"] = "Charakterliste",
   ["settings.rosterSave"] = "Charakterliste speichern",
   ["settings.rosterHint"] = "Speichert Name, Volk, Klasse, Stufe, Gold, Zone, Gilde, Gegenstandsstufe und Berufe jedes angemeldeten Charakters.\nBleibt in deinen SavedVariables auf diesem Rechner, wird nirgendwohin gesendet.\nAnzeige auf der Startseite.\nAusschalten stoppt das Speichern. Gespeicherte Einträge bleiben, bis du sie auf der Startseite entfernst.",
-  ["settings.packages"] = "Zusatzpakete",
-  ["settings.packagesHint"] = "Hier einschalten, in der Addon-Liste im Spiel ausschalten.",
   ["settings.pkg.professions"] = "Berufsdaten",
   ["settings.pkg.recipes"] = "Rezepte",
-  ["settings.pkg.guild"] = "GildenManager",
   ["settings.pkg.loaded"] = "An",
   ["settings.pkg.disabled"] = "Aus",
   ["settings.pkg.missing"] = "Fehlt",
@@ -284,36 +278,11 @@ local function feedbackSection(view)
   ns.AddParagraph(view, "settings.toastPositionHint", { role = "micro", color = "textMuted" })
 end
 
--- Optional add-ons next to this one: one line each with their state and the button that switches
--- them on and loads them (ns.PackageUI).
-local PACKAGES = {
-  { name = "ForeverGuides_Professions", key = "settings.pkg.professions" },
-  { name = "ForeverGuides_Recipes", key = "settings.pkg.recipes" },
-  { name = "ForeverGuides_GildenManager", key = "settings.pkg.guild" },
-}
-
-local function packagesSection(view)
-  ns.AddHeading(view, "settings.packages")
-  for _, pkg in ipairs(PACKAGES) do
-    local row = ns.PackageUI.Banner(view.content, pkg.name, {
-      labelKey = pkg.key,
-      showLoaded = true,
-      onResize = function()
-        view:Layout()
-      end,
-    })
-    row.fgId = "settings-pkg-" .. pkg.name
-    -- The state may have changed in the add-on list: Show() calls row:Refresh() whenever the page opens.
-    view.stack:Add(row, { gap = 8 })
-  end
-  ns.AddParagraph(view, "settings.packagesHint", { role = "micro", color = "textMuted" })
-end
-
 -- The tabs of the page. A section is added to a tab with a function build(view); the built-in
 -- sections below call the Add functions of their modules, other modules append theirs with
 -- ns.SettingsPage.Add(build, tab).
 local PAD = 16
-local TAB_LIST = { "general", "window", "map", "items", "bags", "sell", "automation", "social", "advanced" }
+local TAB_LIST = { "general", "window", "map", "items", "bags", "sell", "automation", "social", "addons", "advanced" }
 local TABS = {}
 for _, id in ipairs(TAB_LIST) do
   TABS[id] = true
@@ -332,13 +301,24 @@ function SP.Add(build, tab)
   table.insert(extra[tab], build)
 end
 
-local function toggle(view, key, labelKey, after, tooltipText)
+-- invert: the toggle shows the opposite of the stored value (on = feature shown, stored as hidden = false).
+local function toggle(view, key, labelKey, after, tooltipText, invert)
   local get, set = setting(key)
   view.stack:Add(
     W.Toggle(view.content, {
       key = labelKey,
-      get = get,
+      get = function()
+        local v = get() and true or false
+        if invert then
+          v = not v
+        end
+        return v
+      end,
       set = function(v)
+        v = v and true or false
+        if invert then
+          v = not v
+        end
         set(v)
         if after then
           after(v)
@@ -513,7 +493,7 @@ local function windowSection(view)
   end)
   toggle(view, "hideTalkingHead", "settings.hideTalkingHead", function()
     ns.TalkingHead.Apply()
-  end, "settings.hideTalkingHeadHint")
+  end, "settings.hideTalkingHeadHint", true)
   local hostSkin = W.Dropdown(view.content, {
     key = "settings.hostSkin",
     width = 280,
@@ -633,7 +613,6 @@ local SECTIONS = {
     function(view)
       ns.KeysSettings.Add(view)
     end,
-    packagesSection,
   },
   window = {
     windowSection,
@@ -691,6 +670,14 @@ local SECTIONS = {
     end,
     function(view)
       ns.GuildPage.AddSettings(view)
+    end,
+    function(view)
+      ns.ContactsPage.AddSettings(view)
+    end,
+  },
+  addons = {
+    function(view)
+      ns.AddonSettings.AddSettings(view)
     end,
   },
   advanced = {

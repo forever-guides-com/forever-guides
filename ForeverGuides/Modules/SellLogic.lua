@@ -150,22 +150,53 @@ function Logic.ItemId(link)
   return type(link) == "string" and tonumber(link:match("item:(%d+)")) or nil
 end
 
+-- A whole number the list can hold.
+function Logic.ValidId(id)
+  return number(id) and id == math.floor(id) and id >= 1 and id <= Logic.MAX_ITEM_ID
+end
+
+-- The stored text with the valid ids that are not on the list yet appended, as far as MAX_PROTECT
+-- allows.
+function Logic.AddIds(text, ids)
+  local list, seen = Logic.ParseIds(text), {}
+  for _, id in ipairs(list) do
+    seen[id] = true
+  end
+  for _, id in ipairs(ids) do
+    if Logic.ValidId(id) and not seen[id] and #list < Logic.MAX_PROTECT then
+      seen[id] = true
+      list[#list + 1] = id
+    end
+  end
+  return Logic.JoinIds(list)
+end
+
 -- The stored text with one more id, unchanged when it is no id or already in the list.
 function Logic.AddId(text, link)
   local id = Logic.ItemId(link)
-  local list = Logic.ParseIds(text)
-  if not id then
-    return Logic.JoinIds(list)
-  end
-  for _, known in ipairs(list) do
-    if known == id then
-      return Logic.JoinIds(list)
+  return Logic.AddIds(text, id and { id } or {})
+end
+
+-- The stored text without one id.
+function Logic.RemoveId(text, id)
+  local list = {}
+  for _, known in ipairs(Logic.ParseIds(text)) do
+    if known ~= id then
+      list[#list + 1] = known
     end
   end
-  if #list < Logic.MAX_PROTECT then
-    list[#list + 1] = id
-  end
   return Logic.JoinIds(list)
+end
+
+-- One-time seeding of the protect list: appends the ids to the stored list and marks the seeding as
+-- done, so an id the player removes later stays removed. True when the settings changed.
+function Logic.SeedProtect(settings, ids)
+  if type(settings) ~= "table" or settings.sellProtectSeeded == true then
+    return false
+  end
+  settings.sellProtect = Logic.AddIds(settings.sellProtect, ids)
+  settings.sellProtectSeeded = true
+  return true
 end
 
 -- The rules of the settings table. Safety switches read as on when the value is missing.
@@ -368,7 +399,8 @@ function Logic.NativeFits(items, list, rules)
   return true
 end
 
--- Coin text for a copper amount, "0" for nothing.
+-- Coin text for a copper amount, "0" for nothing: icons for the window, the tooltip and the own chat
+-- frame, plain = true for text that is copied or sent on.
 function Logic.Money(copper, plain)
   return ns.CostLogic.Format(copper, { plain = plain }) or "0"
 end

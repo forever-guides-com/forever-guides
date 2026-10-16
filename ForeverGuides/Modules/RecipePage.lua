@@ -5,9 +5,9 @@
 -- W.ScrollList, so 600 recipes only build the visible rows.
 -- Data: Modules/RecipeData.lua, logic: RecipeLogic.lua, known recipes: RecipeKnown.lua.
 local _, ns = ...
-local W, L, Theme, K = ns.W, ns.L, ns.Theme, ns.PageKit
+local W, L, Theme, K, U = ns.W, ns.L, ns.Theme, ns.PageKit, ns.U
 local R, Data, Known = ns.RecipeLogic, ns.RecipeAccess, ns.RecipeKnown
-local Route, Shop = ns.ProfessionRouteLogic, ns.ProfessionShop
+local Route, Shop, PL = ns.ProfessionRouteLogic, ns.ProfessionShop, ns.ProfessionListLogic
 
 local P = {}
 ns.RecipePage = P
@@ -21,6 +21,8 @@ local SPLIT_GAP = 14
 local MIN_ROWS = 8
 local ICON = 18
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
+local ADD_H, ADD_QTY_W = 24, 60
+local FIN_QTY_W, NAME_MIN = 44, 140 -- amount field of the "add finished item" button, narrowest name
 
 ns.AddLocale("enUS", {
   ["recipes.intro"] = "Recipe database per profession",
@@ -67,6 +69,14 @@ ns.AddLocale("enUS", {
   ["recipes.changedNote"] = "Changed against Classic",
   ["recipes.removedNote"] = "Removed in Forever",
   ["recipes.linkHint"] = "Shift+click: link to chat",
+  ["recipes.addToList"] = "Add to shopping list",
+  ["recipes.addTip"] = "Raises the amount when the item is already on the list.",
+  ["recipes.addHint"] = "Click an item to add it to the shopping list.",
+  ["recipes.addQty"] = "Amount",
+  ["recipes.addInvalid"] = "Enter a whole amount from 1 to 9999.",
+  ["recipes.addFinished"] = "Add finished",
+  ["recipes.addFinishedTitle"] = "Add finished item to shopping list",
+  ["recipes.addFinishedTip"] = "Adds the item this recipe makes as a position to buy at the auction house. Switch it to Craft in the list to see its materials.",
 })
 ns.AddLocale("deDE", {
   ["recipes.intro"] = "Rezeptdatenbank je Beruf",
@@ -113,6 +123,14 @@ ns.AddLocale("deDE", {
   ["recipes.changedNote"] = "Geändert gegenüber Classic",
   ["recipes.removedNote"] = "In Forever entfernt",
   ["recipes.linkHint"] = "Umschalt+Klick: Link in den Chat",
+  ["recipes.addToList"] = "Zur Einkaufsliste hinzufügen",
+  ["recipes.addTip"] = "Erhöht die Menge, wenn das Item schon auf der Liste steht.",
+  ["recipes.addHint"] = "Klicke ein Item an, um es zur Einkaufsliste hinzuzufügen.",
+  ["recipes.addQty"] = "Menge",
+  ["recipes.addInvalid"] = "Gib eine ganze Menge von 1 bis 9999 ein.",
+  ["recipes.addFinished"] = "Fertig hinzufügen",
+  ["recipes.addFinishedTitle"] = "Fertiges Item zur Einkaufsliste hinzufügen",
+  ["recipes.addFinishedTip"] = "Fügt das Item, das dieses Rezept herstellt, als Position zum Kauf im Auktionshaus hinzu. In der Liste auf Herst. umstellen, um die Materialien zu sehen.",
 })
 
 -- Game helpers ---------------------------------------------------------------------------------------
@@ -258,11 +276,17 @@ local function newItemLine(parent)
     end
   end)
   b:SetScript("OnLeave", ns.HideTooltip)
+  b.sel = b:CreateTexture(nil, "BACKGROUND")
+  b.sel:SetAllPoints()
+  b.sel:SetColorTexture(1, 1, 1, 0.08)
+  b.sel:Hide()
   b:SetScript(
     "OnClick",
     ns.Wrap("recipes-item-line", function(self)
       if shiftDown() and self.id then
         insertChatLink(self.link or string.format("|Hitem:%d|h[%s]|h", self.id, self.label or tostring(self.id)))
+      elseif self.id then
+        parent:Select(self.id)
       end
     end)
   )
@@ -271,6 +295,35 @@ local function newItemLine(parent)
 end
 
 -- Detail ------------------------------------------------------------------------------------------------
+
+-- The amount field of an add bar; Enter adds.
+local function newAmountField(parent, width, onEnter)
+  local box = W.EditBox(parent, { height = ADD_H, onEnter = onEnter })
+  box:SetWidth(width)
+  box.edit:SetText("1")
+  box.edit:SetScript("OnEnter", function(self)
+    ns.ShowTooltip(self, L["recipes.addQty"])
+  end)
+  box.edit:SetScript("OnLeave", ns.HideTooltip)
+  return box
+end
+
+-- The amount in a field (empty means 1), nil with a notification for anything but a whole number 1..MAX.
+local function amountOf(box)
+  local text = U.trim(box.edit:GetText() or "")
+  local n = text == "" and 1 or tonumber(text)
+  local qty = PL.Qty(n)
+  if not qty or qty ~= n then
+    ns.Notify(L["recipes.addInvalid"], "warning")
+    return nil
+  end
+  return qty
+end
+
+-- The list entry of the item a recipe makes.
+local function madeEntry(r)
+  return { id = r.i, de = type(r.n) == "table" and r.n[1] or nil, en = type(r.n) == "table" and r.n[2] or nil }
+end
 
 local function newDetail(parent)
   local d = CreateFrame("Frame", nil, parent)
@@ -291,6 +344,8 @@ local function newDetail(parent)
     ns.Wrap("recipes-name", function()
       if shiftDown() and d.recipe then
         insertChatLink(chatLink(d.recipe, R.Name(d.recipe, lang())))
+      elseif d.recipe and d.recipe.i then
+        d:Select(d.recipe.i)
       end
     end)
   )
@@ -304,6 +359,108 @@ local function newDetail(parent)
   d.reagentHead = W.Text(d, { key = "recipes.reagents", role = "h3", family = "heading", color = "accent2" })
   d.hint = W.Text(d, { key = "recipes.linkHint", role = "micro", color = "textMuted", wrap = true })
   d.lines = {}
+  -- The item picked by a click (a reagent, a recipe item or the item the recipe makes) and the bar that
+  -- adds it to the shopping list.
+  d.addHint = W.Text(d, { key = "recipes.addHint", role = "micro", color = "textMuted", wrap = true })
+  d.add = CreateFrame("Frame", nil, d)
+  d.add.qty = newAmountField(d.add, ADD_QTY_W, function()
+    d:AddTarget()
+  end)
+  d.add.qty:SetPoint("TOPRIGHT", 0, 0)
+  d.add.name = W.Text(d.add, { role = "ui" })
+  d.add.name:SetPoint("LEFT", d.add, "TOPLEFT", 0, -ADD_H / 2)
+  d.add.name:SetPoint("RIGHT", d.add.qty, "LEFT", -8, 0)
+  d.add.button = W.Action(d.add, {
+    key = "recipes.addToList",
+    icon = "plus",
+    variant = "primary",
+    tooltip = "recipes.addToList",
+    tooltipText = "recipes.addTip",
+    height = 28,
+    width = 200,
+    onClick = function()
+      d:AddTarget()
+    end,
+  })
+  d.add.button:SetPoint("TOPLEFT", 0, -(ADD_H + 6))
+  d.add:SetHeight(ADD_H + 6 + 28)
+  d.add:Hide()
+  d.addHint:Hide()
+  -- Next to the name of the item the recipe makes: buy it finished instead of crafting it.
+  d.finished = CreateFrame("Frame", nil, d)
+  d.finished.qty = newAmountField(d.finished, FIN_QTY_W, function()
+    d:AddFinished()
+  end)
+  d.finished.qty:SetPoint("TOPLEFT", 0, 0)
+  d.finished.button = W.Action(d.finished, {
+    label = "recipes.addFinished",
+    icon = "plus",
+    tooltip = "recipes.addFinishedTitle",
+    tooltipText = "recipes.addFinishedTip",
+    height = ADD_H,
+    onClick = function()
+      d:AddFinished()
+    end,
+  })
+  d.finished.button:SetPoint("TOPLEFT", d.finished.qty, "TOPRIGHT", 6, 0)
+  d.finished:SetHeight(ADD_H)
+  d.finished:Hide()
+  function d:Select(id)
+    self.target = id
+    self:ShowTarget()
+    if self.relayout then
+      self.relayout()
+    end
+  end
+  -- Marks the picked line, fills the bar. The entry of the target comes from the line that carries
+  -- it (reagents have data names) or from the recipe itself (the item it makes).
+  function d:ShowTarget()
+    local entry
+    for i = 1, #self.lines do
+      local b = self.lines[i]
+      local on = b:IsShown() and b.id == self.target
+      b.sel:SetShown(on)
+      entry = on and b.entry or entry
+    end
+    local r = self.recipe
+    if not entry and r and r.i and r.i == self.target then
+      entry = madeEntry(r)
+    end
+    self.entry = entry
+    if entry then
+      entry.slug = self.slug
+      local label = clientItemName(entry.id)
+        or ns.T({ de = entry.de, en = entry.en })
+        or string.format(L["recipes.item"], entry.id)
+      W.SetText(self.add.name, nil, ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(entry.id)))
+    end
+    self.add:SetShown(entry ~= nil and r ~= nil)
+    self.addHint:SetShown(entry == nil and r ~= nil and #self.layout.reagents + #self.layout.patterns > 0)
+  end
+  -- The amount of the field (empty means 1) goes onto the list, anything but a whole number 1..MAX is
+  -- refused.
+  function d:AddTarget()
+    if not self.entry then
+      return
+    end
+    local qty = amountOf(self.add.qty)
+    if qty and ns.ProfessionList.AddFromPage(self.entry, qty) then
+      self.add.qty.edit:SetText("1")
+    end
+  end
+  -- The item the recipe makes goes onto the list as a position to buy at the auction house.
+  function d:AddFinished()
+    local r = self.recipe
+    local qty = r and r.i and amountOf(self.finished.qty)
+    if not qty then
+      return
+    end
+    local entry = madeEntry(r)
+    entry.slug = self.slug
+    if ns.ProfessionList.AddFromPage(entry, qty, true) then
+      self.finished.qty.edit:SetText("1")
+    end
+  end
   return d
 end
 
@@ -325,12 +482,21 @@ local function paintDetail(d, r, ctx)
   for _, w in ipairs(widgets) do
     w:SetShown(r ~= nil)
   end
-  d.layout = { used = 0 }
+  -- Only a recipe that makes an item can be bought finished (spell-only recipes make none).
+  d.finished:SetShown(r ~= nil and r.i ~= nil)
+  d.layout = { used = 0, reagents = {}, patterns = {} }
   if not r then
     for _, b in ipairs(d.lines) do
       b:Hide()
     end
+    d.add:Hide()
+    d.addHint:Hide()
     return
+  end
+  d.slug = ctx.slug
+  -- A new recipe starts with the item it makes picked, a repaint of the same recipe keeps the pick.
+  if d.targetFor ~= r.s then
+    d.targetFor, d.target = r.s, r.i
   end
   local name = R.Name(r, lang())
   d.icon:SetTexture(recipeIcon(r))
@@ -342,7 +508,6 @@ local function paintDetail(d, r, ctx)
   -- Source: trainer with rank, recipe items (names from the client), or unknown.
   local kind = R.SourceKind(r)
   local sourceText = L["recipes.srcUnknown"]
-  d.layout.patterns = {}
   if kind == "t" then
     local rank = r.rank and L["profroute.rank." .. r.rank]
     sourceText = rank and rank ~= "profroute.rank." .. r.rank and string.format(L["recipes.srcTrainerRank"], rank)
@@ -354,7 +519,7 @@ local function paintDetail(d, r, ctx)
         used = used + 1
         local b = line(d, used)
         local label = clientItemName(id) or string.format(L["recipes.item"], id)
-        b.id, b.label, b.link = id, label, nil
+        b.id, b.label, b.link, b.entry = id, label, nil, { id = id }
         b.icon:SetTexture(itemIcon(id) or FALLBACK_ICON)
         b.name:SetText(ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(id)))
         b.right:SetText("")
@@ -381,7 +546,6 @@ local function paintDetail(d, r, ctx)
   -- Reagents with the stock of this character.
   local reagents, crafts = R.Reagents(r.mats, ctx.stock)
   d.crafts:SetText(crafts and crafts > 0 and string.format(L["recipes.crafts"], crafts) or "")
-  d.layout.reagents = {}
   local items = type(ctx.data.items) == "table" and ctx.data.items or {}
   for _, m in ipairs(reagents) do
     used = used + 1
@@ -389,6 +553,7 @@ local function paintDetail(d, r, ctx)
     local info = items[m.id] or {}
     local label = ns.T({ de = info.de, en = info.en }) or clientItemName(m.id) or string.format(L["recipes.item"], m.id)
     b.id, b.label, b.link = m.id, label, nil
+    b.entry = { id = m.id, de = info.de, en = info.en, icon = info.ico }
     b.icon:SetTexture(iconPath(info.ico) or itemIcon(m.id) or FALLBACK_ICON)
     b.name:SetText(ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(m.id)))
     b.right:SetText(string.format(L["recipes.reagentCount"], m.need, m.have))
@@ -400,6 +565,7 @@ local function paintDetail(d, r, ctx)
     d.lines[i]:Hide()
   end
   d.layout.used = used
+  d:ShowTarget()
 end
 
 -- Places the detail widgets from the top and returns the height; the wrapped texts get their width
@@ -421,16 +587,34 @@ local function layoutDetail(d, width)
     fs:SetShown(h > 0)
     y = y + (h > 0 and h + (gap or 6) or 0)
   end
+  -- The "add finished item" controls sit right of the name when the name keeps its minimum width, else
+  -- on a row of their own below it.
+  local fin, beside = d.finished, false
+  if fin:IsShown() then
+    local room = width - 40 - NAME_MIN - 8 - FIN_QTY_W - 6
+    local button = fin.button
+    beside = room >= button.fgSide
+    button:SetWidth(button:Fit(beside and room or width - FIN_QTY_W - 6))
+    fin:SetSize(FIN_QTY_W + 6 + button:GetWidth(), ADD_H)
+    fin:ClearAllPoints()
+  end
+  local nameW = width - 40 - (beside and fin:GetWidth() + 8 or 0)
   d.icon:ClearAllPoints()
   d.icon:SetPoint("TOPLEFT", 0, 0)
   d.name:ClearAllPoints()
   d.name:SetPoint("TOPLEFT", 40, 0)
-  d.name:SetWidth(math.max(40, width - 40))
+  d.name:SetWidth(math.max(40, nameW))
   local nameH = math.max(d.name:GetStringHeight(), 32)
   d.nameButton:ClearAllPoints()
   d.nameButton:SetPoint("TOPLEFT", 0, 0)
-  d.nameButton:SetSize(width, nameH)
+  d.nameButton:SetSize(40 + math.max(40, nameW), nameH)
   y = nameH + 8
+  if beside then
+    fin:SetPoint("TOPRIGHT", 0, -math.floor((nameH - ADD_H) / 2))
+  elseif fin:IsShown() then
+    fin:SetPoint("TOPLEFT", 0, -y + 4)
+    y = y + ADD_H + 4
+  end
   text(d.bands, 4)
   text(d.bandNow, 8)
   text(d.source, 4)
@@ -456,6 +640,15 @@ local function layoutDetail(d, width)
       y = y + rowH
     end
     y = y + 8
+  end
+  if d.add:IsShown() then
+    d.add:ClearAllPoints()
+    d.add:SetPoint("TOPLEFT", 0, -y)
+    d.add:SetSize(width, d.add:GetHeight())
+    d.add.button:SetWidth(width)
+    y = y + d.add:GetHeight() + 8
+  elseif d.addHint:IsShown() then
+    text(d.addHint, 6)
   end
   d.hint:ClearAllPoints()
   d.hint:SetPoint("TOPLEFT", 0, -y)
@@ -827,6 +1020,9 @@ local function build(container)
     end,
   })
   local detail = newDetail(split)
+  detail.relayout = function()
+    view:Layout()
+  end
   paintDetail(detail, nil, ctx)
 
   local function listHeight()
@@ -912,7 +1108,11 @@ local function build(container)
     summary:SetText(string.format(L["recipes.count"], #filtered, #ctx.list))
     local current = ctx.byId[state.selected]
     strip:Paint(current and current.sk or nil, ctx.max, ctx.skill)
-    paintDetail(detail, current, { data = ctx.data, skill = ctx.skill, stock = current and stock() or {} })
+    paintDetail(
+      detail,
+      current,
+      { data = ctx.data, skill = ctx.skill, stock = current and stock() or {}, slug = ctx.slug }
+    )
     view:Layout()
   end
 

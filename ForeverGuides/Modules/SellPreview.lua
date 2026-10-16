@@ -29,6 +29,8 @@ ns.AddLocale("deDE", {
 
 local ROW = 26
 local WIDTH, HEIGHT = 560, 440
+-- Width of the price column at the least; it grows with the coin icons of the widest price.
+local PRICE_W = 130
 
 local dialog
 -- Rows that are switched off, by bag:slot.
@@ -64,7 +66,7 @@ local function makeRow(parent)
   row.reason:SetWidth(90)
   row.price = W.Text(row, { role = "ui", justify = "RIGHT" })
   row.price:SetPoint("RIGHT", -10, 0)
-  row.price:SetWidth(130)
+  row.price:SetWidth(PRICE_W)
   -- The check box covers the whole row, so a click anywhere on it switches the row.
   row.check = W.Checkbox(row, {
     text = "",
@@ -132,13 +134,28 @@ local function build()
   dialog.cancel:SetPoint("RIGHT", dialog.sell, "LEFT", -8, 0)
 end
 
+-- The window grows by what the widest price needs beyond the price column, so no amount is cut.
+local function fitPrices(list)
+  local size, wide = ns.Theme.fontSize("ui"), PRICE_W
+  for _, entry in ipairs(list) do
+    wide = math.max(wide, ns.CostLogic.Width(size, entry.price) + 2)
+  end
+  dialog:SetWidth(WIDTH + wide - PRICE_W)
+  for _, row in ipairs(dialog.rows) do
+    row.price:SetWidth(wide)
+  end
+  dialog.priceW = wide
+end
+
 local function fill(result)
   P.off = {}
   dialog.entries = result.list
+  fitPrices(result.list)
   for i, entry in ipairs(result.list) do
     local row = dialog.rows[i]
     if not row then
       row = makeRow(dialog.area.content)
+      row.price:SetWidth(dialog.priceW)
       dialog.rows[i] = row
     end
     row.entry = entry

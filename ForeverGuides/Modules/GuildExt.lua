@@ -20,7 +20,7 @@ ns.GuildExt = E
 
 local DEFAULT_ORDER = 100
 local MAX_ID = 32
-local RESERVED_TABS = { guild = true, social = true }
+local RESERVED_TABS = { guild = true }
 
 local registry = { tab = {}, detail = {}, column = {} }
 local sequence = 0

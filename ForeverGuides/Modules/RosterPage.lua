@@ -55,6 +55,8 @@ local BAR_H_WRAPPED = 78
 local SORT_W = 170
 local PANEL_W = 250
 local PANEL_ROW = 24
+-- Row panel: title line, All/None line, list, Done line.
+local PANEL_HEAD, PANEL_FOOT = 62, 36
 local BTN_GAP = 6
 local CTRL = 18
 local CTRL_ROOM = 3 * CTRL + 10
@@ -999,7 +1001,7 @@ local function build(container)
   function fitPanels()
     if panel then
       local avail = container:GetHeight() - bar:GetHeight() - 6
-      panel:SetHeight(math.max(80, math.min(40 + #boxes * PANEL_ROW + 8, avail)))
+      panel:SetHeight(math.max(120, math.min(PANEL_HEAD + #boxes * PANEL_ROW + 8 + PANEL_FOOT, avail)))
     end
     for _, p in ipairs({ hiddenPanel, todoPanel }) do
       if p then
@@ -1066,6 +1068,18 @@ local function build(container)
     W.Fill(panel, "surface", 1)
     W.Border(panel, "accentDim", 1)
     local half = (PANEL_W - 18) / 2
+    panel.title = W.Text(panel, { key = "chars.rows", role = "ui", color = "accent2" })
+    panel.title:SetPoint("TOPLEFT", panel, "TOPLEFT", 8, -8)
+    panel.close = W.Action(panel, {
+      icon = "close",
+      size = W.CLOSE_SIZE,
+      tooltip = "common.close",
+      onClick = function()
+        panel:Hide()
+      end,
+    })
+    panel.close:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -4, -4)
+    panel.title:SetPoint("RIGHT", panel.close, "LEFT", -4, 0)
     local on = W.Action(panel, {
       label = "act.all",
       icon = "check",
@@ -1076,7 +1090,7 @@ local function build(container)
         setAll(true)
       end,
     })
-    on:SetPoint("TOPLEFT", panel, "TOPLEFT", 6, -6)
+    on:SetPoint("TOPLEFT", panel, "TOPLEFT", 6, -32)
     local off = W.Action(panel, {
       label = "act.none",
       icon = "close",
@@ -1087,11 +1101,22 @@ local function build(container)
         setAll(false)
       end,
     })
-    off:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -6)
-    panel.fgFirst = on
+    off:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -6, -32)
+    -- Done only closes, the choice is saved with every click.
+    panel.done = W.Action(panel, {
+      label = "act.done",
+      icon = "check",
+      height = 24,
+      onClick = function()
+        panel:Hide()
+      end,
+    })
+    panel.done:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 6, 6)
+    panel.done:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -6, 6)
+    panel.fgFirst = panel.close
     panel.scroll = W.ScrollArea(panel)
-    panel.scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, -36)
-    panel.scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, 4)
+    panel.scroll:SetPoint("TOPLEFT", panel, "TOPLEFT", 4, -PANEL_HEAD)
+    panel.scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -4, PANEL_FOOT)
     panel:Hide()
     Panels.Register(panel)
   end

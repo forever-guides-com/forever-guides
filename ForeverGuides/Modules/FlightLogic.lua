@@ -1,7 +1,8 @@
 -- Flight times without WoW API: name matching of flight masters (game name to ns.Data.Travel
--- node), duration of a hop from the travel data or from times measured in game
--- (ns.db.flightTimes), and the sum over the hops of a route. Missing hops are never guessed, the
--- result then says "at least". The game side lives in Modules/FlightRoute.lua.
+-- node), duration of a hop from the travel data, from the length of its direction
+-- (ns.Data.FlightLengths) or from times measured in game (ns.db.flightTimes), and the sum over the
+-- hops of a route. Missing hops are never guessed, the result then says "at least". The game side
+-- lives in Modules/FlightRoute.lua.
 local _, ns = ...
 local L = ns.L
 
@@ -25,6 +26,14 @@ FL.MAX_SECONDS = 1200
 FL.MAX_ENTRIES = 400
 -- Measured means of fewer flights than this still count as approximate.
 FL.MIN_SAMPLES = 3
+-- Yards per second of a flight when no measured flight tells better, and the range a learned speed stays in.
+FL.DEFAULT_SPEED = 30.4
+FL.MIN_SPEED = 25
+FL.MAX_SPEED = 36
+-- A stored duration belongs to a direction when it is at most this far (relative to the duration) from
+-- length / speed of that direction. The two directions of a pair count as the same way up to MIRROR_GAP.
+FL.FIT_TOLERANCE = 0.12
+FL.MIRROR_GAP = 0.10
 
 local ARTICLES = { "the", "der", "die", "das" }
 -- Game names (normalized) that the travel data spells differently: the client shows the zone for
@@ -83,12 +92,41 @@ local function addLink(links, from, to, link)
   end
 end
 
+local function isFlight(l)
+  return l.m == "flight" and l.from and l.to and l.d
+end
+
+-- Both directions unless the link says bi = false; an explicit link wins over a mirrored one.
+-- accept(link) narrows the links to one faction.
+local function fillLinks(data, accept)
+  local links, mirrored = {}, {}
+  for _, l in ipairs(data.links or {}) do
+    if isFlight(l) and accept(l) then
+      addLink(links, l.from, l.to, l)
+    end
+  end
+  for _, l in ipairs(data.links or {}) do
+    if isFlight(l) and l.bi ~= false and accept(l) then
+      local key = l.to .. ">" .. l.from
+      if not links[key] then
+        links[key] = l
+        mirrored[key] = true
+      end
+    end
+  end
+  return links, mirrored
+end
+
+local function acceptAll()
+  return true
+end
+
 local function index(data)
   local idx = cache[data]
   if idx then
     return idx
   end
-  idx = { byId = {}, byName = {}, links = {}, out = {}, zoneKeys = {}, flightIds = {} }
+  idx = { byId = {}, byName = {}, out = {}, zoneKeys = {}, flightIds = {}, byFaction = {} }
   for _, z in ipairs(data.zones or {}) do
     local keys = { [FL.normalize((z.s:gsub("-", " ")))] = true }
     for _, name in pairs(z.n or {}) do
@@ -96,20 +134,13 @@ local function index(data)
     end
     idx.zoneKeys[z.s] = keys
   end
-  -- Both directions unless the link says bi = false; an explicit link wins over a mirrored one.
+  idx.links, idx.mirrored = fillLinks(data, acceptAll)
   for _, l in ipairs(data.links or {}) do
-    if l.m == "flight" and l.from and l.to and l.d then
+    if isFlight(l) then
       idx.flightIds[l.from], idx.flightIds[l.to] = true, true
       idx.out[l.from] = true
-      addLink(idx.links, l.from, l.to, l)
-    end
-  end
-  for _, l in ipairs(data.links or {}) do
-    if l.m == "flight" and l.from and l.to and l.d and l.bi ~= false then
-      local key = l.to .. ">" .. l.from
-      idx.out[l.to] = true
-      if not idx.links[key] then
-        idx.links[key] = l
+      if l.bi ~= false then
+        idx.out[l.to] = true
       end
     end
   end
@@ -254,25 +285,149 @@ function FL.record(routeKey, seconds)
   return true
 end
 
+-- Lengths ---------------------------------------------------------------------------------------
+
+local function lengthData()
+  local lengths = ns.Data and ns.Data.FlightLengths
+  return type(lengths) == "table" and type(lengths.len) == "table" and lengths or nil
+end
+
+-- Length in yards of the flight path from node id to node id, or nil. The two directions of a pair
+-- are different paths with different lengths.
+function FL.lengthOf(from, to)
+  local lengths = lengthData()
+  local yards = lengths and from and to and lengths.len[from .. ">" .. to]
+  return type(yards) == "number" and yards > 0 and yards or nil
+end
+
+-- Yards per second the stored durations were taken at.
+local function dataSpeed()
+  local lengths = lengthData()
+  return lengths and type(lengths.speed) == "number" and lengths.speed > 0 and lengths.speed or FL.DEFAULT_SPEED
+end
+
+-- Speed of the measured flights: the median of length / mean seconds over routes with a known length
+-- and enough samples, kept inside MIN_SPEED..MAX_SPEED. Without such a route the default.
+function FL.speed(times)
+  times = times or timesTable(false)
+  local speeds = {}
+  for key in pairs(type(times) == "table" and times or {}) do
+    local yards = type(key) == "string" and FL.lengthOf(key:match("^([^>]+)>([^>]+)$"))
+    local mean, n = FL.learned(key, times)
+    if yards and mean and mean > 0 and n >= FL.MIN_SAMPLES then
+      speeds[#speeds + 1] = yards / mean
+    end
+  end
+  if #speeds == 0 then
+    return FL.DEFAULT_SPEED
+  end
+  table.sort(speeds)
+  local mid = math.floor((#speeds + 1) / 2)
+  local median = #speeds % 2 == 1 and speeds[mid] or (speeds[mid] + speeds[mid + 1]) / 2
+  return math.min(FL.MAX_SPEED, math.max(FL.MIN_SPEED, median))
+end
+
+-- Which way a stored duration belongs to: "own" (fits the length of its own direction, or no length is
+-- known), "other" (fits only the length of the opposite direction) or "none" (fits neither, a possible
+-- difference of the Forever client that is kept as it is).
+local function belongsTo(seconds, ownYards, otherYards)
+  local speed = dataSpeed()
+  if not ownYards or math.abs(seconds - ownYards / speed) / seconds <= FL.FIT_TOLERANCE then
+    return "own"
+  end
+  if otherYards and math.abs(seconds - otherYards / speed) / seconds <= FL.FIT_TOLERANCE then
+    return "other"
+  end
+  return "none"
+end
+
 -- Durations -------------------------------------------------------------------------------------
 
--- One hop from node id to node id: { seconds, source, n } or nil. Order of trust: official data,
--- measured mean, classic or reported data, estimate.
-function FL.hop(from, to, data, times)
-  if not (from and to) then
+-- Links of one faction ("A" or "H") that win over the other faction's link of the same pair.
+local function factionSet(idx, data, faction)
+  if faction ~= "A" and faction ~= "H" then
     return nil
   end
-  local link = index(data or travelData() or { nodes = {}, links = {} }).links[from .. ">" .. to]
-  if link and link.cf == "official" then
-    return { seconds = link.d, source = "official" }
+  local set = idx.byFaction[faction]
+  if not set then
+    set = {}
+    set.links, set.mirrored = fillLinks(data, function(l)
+      return l.f == "B" or l.f == faction
+    end)
+    idx.byFaction[faction] = set
   end
-  local mean, n = FL.learned(from .. ">" .. to, times)
-  if mean then
-    return { seconds = mean, source = "learned", n = n }
+  return set
+end
+
+-- The stored link of a pair and whether it is the mirrored way back: the faction's own link first.
+local function storedLink(ctx, key)
+  local set = ctx.set
+  if set and set.links[key] then
+    return set.links[key], set.mirrored[key]
+  end
+  return ctx.idx.links[key], ctx.idx.mirrored[key]
+end
+
+-- The flight speed is read from the measured flights once per hopper.
+local function estimate(ctx, yards)
+  ctx.speed = ctx.speed or FL.speed(ctx.times)
+  return { seconds = math.floor(yards / ctx.speed + 0.5), source = "estimate" }
+end
+
+-- The stored link for a hop that decides the duration, or the estimate from the path length.
+local function direction(ctx, from, to, link, mirrored)
+  local yards, back = FL.lengthOf(from, to), FL.lengthOf(to, from)
+  if link and not mirrored then
+    if belongsTo(link.d, yards, back) == "other" then
+      return estimate(ctx, yards)
+    end
+    return { seconds = link.d, source = link.cf or "estimate" }
+  end
+  if link and yards and back then
+    -- Mirrored: the stored link is the way back, its duration is ours when it fits our length.
+    local gap = math.abs(yards - back) / math.max(yards, back)
+    if belongsTo(link.d, back, yards) ~= "other" and gap > FL.MIRROR_GAP then
+      return estimate(ctx, yards)
+    end
   end
   if link then
     return { seconds = link.d, source = link.cf or "estimate" }
   end
+  if yards then
+    return estimate(ctx, yards)
+  end
+end
+
+-- Returns a function (from, to) -> { seconds, source, n } or nil for many hops over the same data:
+-- the index and the measured speed are looked up once. Order of trust: official data, measured mean
+-- of this direction, the stored link when its duration fits this direction (classic or reported
+-- data), the length of this direction divided by the flight speed (estimate). Without a length the
+-- stored link counts as it is, without a link and a length the hop is unknown. faction ("A" or "H",
+-- optional) picks the link of that faction where both factions have one for the same pair.
+function FL.hopper(data, times, faction)
+  data = data or travelData() or { nodes = {}, links = {} }
+  local idx = index(data)
+  local ctx = { idx = idx, times = times, set = factionSet(idx, data, faction) }
+  return function(from, to)
+    if not (from and to) then
+      return nil
+    end
+    local key = from .. ">" .. to
+    local link, mirrored = storedLink(ctx, key)
+    if link and link.cf == "official" then
+      return { seconds = link.d, source = "official" }
+    end
+    local mean, n = FL.learned(key, times)
+    if mean then
+      return { seconds = mean, source = "learned", n = n }
+    end
+    return direction(ctx, from, to, link, mirrored)
+  end
+end
+
+-- One hop from node id to node id: see FL.hopper.
+function FL.hop(from, to, data, times, faction)
+  return FL.hopper(data, times, faction)(from, to)
 end
 
 -- Key of a whole route "id>id>id" over start, stops and destination, nil when a node is unknown.
@@ -296,10 +451,11 @@ end
 -- measured parts. parts has one entry per hop (source "unknown" without seconds). A route of
 -- several hops that was flown and measured as a whole (FlightTimerLogic) uses that mean instead
 -- (measured = true).
-function FL.estimateRoute(hops, data, times)
+function FL.estimateRoute(hops, data, times, faction)
   local total, unknown, approx, parts = 0, 0, false, {}
+  local hop = FL.hopper(data, times, faction)
   for _, h in ipairs(hops or {}) do
-    local r = FL.hop(h.from, h.to, data, times)
+    local r = hop(h.from, h.to)
     if r then
       total = total + r.seconds
       approx = approx or APPROX_SOURCE[r.source] == true or (r.source == "learned" and r.n < FL.MIN_SAMPLES)

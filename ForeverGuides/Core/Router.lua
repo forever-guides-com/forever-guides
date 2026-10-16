@@ -13,7 +13,8 @@ function Router.new(onChange)
   return setmetatable({ pages = {}, order = {}, back = {}, fwd = {}, current = nil, onChange = onChange }, Router)
 end
 
--- page = { id, group, icon, title (locale key), aliases = {..}, build(parent), show(page, params), placeholder }
+-- page = { id, group, icon, title (locale key), aliases = {..}, build(parent), show(page, params), placeholder,
+-- redirect(params) -> other page id for a deep link that moved }
 function Router:register(page)
   assert(type(page.id) == "string", "page id required")
   if not self.pages[page.id] then
@@ -87,9 +88,15 @@ end
 
 -- Returns false for unknown pages; the current page stays.
 function Router:navigate(path)
-  local id = Router.parse(path)
+  local id, params = Router.parse(path)
   if not id or not self.pages[id] then
     return false
+  end
+  -- A page may send an old deep link to its new home before the history sees it.
+  local redirect = self.pages[id].redirect
+  local target = redirect and redirect(params)
+  if target and self.pages[target] then
+    path = target
   end
   if path == self.current then
     self:_set(path)

@@ -20,6 +20,7 @@ ns.AddLocale("enUS", {
   ["nav.group.main"] = "OVERVIEW",
   ["nav.group.world"] = "WORLD",
   ["nav.group.character"] = "CHARACTER",
+  ["nav.group.social"] = "GUILD AND CONTACTS",
   ["nav.group.learn"] = "LEARN",
   ["nav.group.professions"] = "PROFESSIONS",
   ["nav.group.inventory"] = "INVENTORY",

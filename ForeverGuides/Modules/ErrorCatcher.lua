@@ -108,7 +108,7 @@ function EC.Capture(kind, msg, stack, addon, source)
   end
   stack = Logic.CleanStack(stack)
   addon = addon or Logic.AddonOf(msg, stack)
-  if addon ~= Logic.OWN and not flag("errorForeign") then
+  if not Logic.IsOwn(addon) and not flag("errorForeign") then
     return nil
   end
   return (ns.Errors.add({ msg = msg, kind = kind, addon = addon, stack = stack, ctx = addon }))
@@ -203,12 +203,53 @@ function EC.OnBugGrabbed(...)
   end
 end
 
+local RESTRICTIONS = { "Combat", "Encounter", "ChallengeMode", "PvPMatch", "Map", "Chat" }
+
+local function gameFlag(name)
+  local fn = rawget(_G, name)
+  if type(fn) ~= "function" then
+    return false
+  end
+  local ok, value = pcall(fn)
+  return ok and value == true
+end
+
+-- The game state a blocked call happened in.
+local function gameState()
+  local state = { combat = gameFlag("InCombatLockdown"), group = gameFlag("IsInGroup"), restricted = {} }
+  local inInstance = rawget(_G, "IsInInstance")
+  if type(inInstance) == "function" then
+    local ok, value = pcall(inInstance)
+    state.instance = ok and value == true
+  end
+  for _, name in ipairs(RESTRICTIONS) do
+    if ns.AddonRestricted(name) then
+      state.restricted[#state.restricted + 1] = name
+    end
+  end
+  return state
+end
+
+-- State line and the short Lua stack of the moment. The client raises the blocked-action event inside the
+-- blocked call and does not always name the function, so the stack is the only trace of the code path.
+function EC.ActionStack()
+  local raw = ""
+  if type(debugstack) == "function" then
+    local ok, text = pcall(debugstack, 1, 20, 0)
+    raw = ok and text or ""
+  end
+  local stack = Logic.ActionStack(raw)
+  local head = Logic.StateLine(gameState())
+  return stack ~= "" and head .. "\n" .. stack or head
+end
+
 local function onAction(kind, text)
   return function(_, addon, func)
     if addon == nil or addon == "" then
       addon = "?"
     end
-    pcall(EC.Capture, kind, text .. tostring(func), "", tostring(addon), "event")
+    local okStack, stack = pcall(EC.ActionStack)
+    pcall(EC.Capture, kind, text .. tostring(func), okStack and stack or "", tostring(addon), "event")
   end
 end
 ns.On("ADDON_ACTION_BLOCKED", onAction("blocked", "Blocked call to protected function "))
@@ -358,7 +399,7 @@ end)
 
 function EC.Report()
   return string.format(
-    "error catcher: on=%s handler=%s bugGrabber=%s floodDropped=%d repeatsDropped=%d",
+    "error catcher: on=%s handler=%s collector=%s floodDropped=%d repeatsDropped=%d",
     tostring(EC.Enabled()),
     tostring(current ~= nil),
     tostring(bugGrabber ~= nil),

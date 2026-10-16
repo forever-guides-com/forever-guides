@@ -31,7 +31,8 @@ function TL.WalkDurations()
   return walkD
 end
 
--- o: { faction = "A"|"H", level, class = "MAGE"|"DRUID"|..., skyborne, modes = { [mode] = true }, mount, today = "YYYY-MM-DD" }
+-- o: { faction = "A"|"H", level, class = "MAGE"|"DRUID"|..., skyborne, modes = { [mode] = true }, mount, today = "YYYY-MM-DD",
+-- flightTimes = measured flight times (default: the saved ones) }
 function TL.NodeVisible(node, o)
   if node.f ~= "B" and node.f ~= o.faction then
     return false
@@ -85,23 +86,39 @@ local function buildEdges(data, o, skip)
     out[e.from] = out[e.from] or {}
     table.insert(out[e.from], e)
   end
+  -- Flights take the time of their direction, the same as the flight times shown in the game.
+  local flightHop
+  local function flightSeconds(from, to)
+    if not (flightHop or ns.FlightLogic) then
+      return nil
+    end
+    flightHop = flightHop or ns.FlightLogic.hopper(data, o.flightTimes, o.faction)
+    return flightHop(from, to)
+  end
   for _, l in ipairs(data.links) do
     if TL.LinkAllowed(l, o) then
       local foot = (l.m == "walk" and o.mount == false) and FOOT_FACTOR or 1
       local world = walkD and l.m == "walk" and l.from and walkD[TL.LinkKey(l)] or nil
-      local sec = math.floor(((world or l.d or 0) + (l.w or 0)) * foot + 0.5)
-      local weight = sec
-      if o.preferFlight and l.m == "walk" then
-        weight = sec + math.max(o.flyMin or TL.FLY_MIN, math.floor(sec * ((o.flyFactor or TL.FLY_FACTOR) - 1) + 0.5))
-      end
       local function mk(from, to)
+        local base, cf = world or l.d or 0, l.cf
+        if l.m == "flight" and l.from then
+          local hop = flightSeconds(from, to)
+          if hop then
+            base, cf = hop.seconds, hop.source
+          end
+        end
+        local sec = math.floor((base + (l.w or 0)) * foot + 0.5)
+        local weight = sec
+        if o.preferFlight and l.m == "walk" then
+          weight = sec + math.max(o.flyMin or TL.FLY_MIN, math.floor(sec * ((o.flyFactor or TL.FLY_FACTOR) - 1) + 0.5))
+        end
         return {
           from = from,
           to = to,
           mode = l.m,
           sec = sec,
           weight = weight,
-          cf = l.cf,
+          cf = cf,
           rq = l.rq,
           rn = l.rn,
           cost = l.cost,

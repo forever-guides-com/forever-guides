@@ -1,5 +1,7 @@
 -- The handle of a Blizzard window (mode "grip" of Modules/FrameTweaksBar.lua, the default): one
--- small square on UIParent that ignores the window's scale and alpha, drawn without client textures.
+-- small square, a child of the window, that ignores the window's scale and alpha, drawn without client
+-- textures. It lives in the strata of its window a few levels above it (Handle.LEVEL), so it stacks with
+-- the window: a window in front of it covers it, it never reaches over a window above its own.
 -- It sits outside the lower right corner of the window where no part of the window hangs
 -- (tabs, button rows), else beside or above it. A click opens a panel next to it with opacity
 -- (- number +, slider), zoom (- number +, slider), "Reset" and a way to the settings page. Pulling
@@ -17,6 +19,7 @@ Handle.TICK = 0.1
 Handle.LEAVE_DELAY = 0.6
 Handle.DRAG_DISTANCE = 4
 Handle.RETRY = 1
+Handle.LEVEL = Bar.LEVEL
 Handle.PAD, Handle.PANEL_WIDTH, Handle.ROW = 10, 260, 18
 
 ns.AddLocale("enUS", {
@@ -306,11 +309,11 @@ end
 
 local function place(h, frame)
   local name = h.fgName
-  local strata = FL.BarStrata(frame:GetFrameStrata())
+  local strata = frame:GetFrameStrata()
   local scale = UIParent:GetEffectiveScale()
   local win, parts, screen, key = Bar.Surround(name, frame)
   h:SetScale(scale)
-  h:SetFrameStrata(strata)
+  Bar.SyncLayer(name, h, frame)
   h:ClearAllPoints()
   if win then
     local at = FL.PlaceHandle(win, parts, Handle.SIZE, screen, Handle.GAP)
@@ -362,11 +365,12 @@ function Handle.Tick(name)
   if
     not state
     or state.key ~= key
-    or state.strata ~= FL.BarStrata(frame:GetFrameStrata())
+    or state.strata ~= frame:GetFrameStrata()
     or state.scale ~= UIParent:GetEffectiveScale()
   then
     place(h, frame)
   end
+  Bar.SyncLayer(name, h, frame)
   h:SetAlpha(Bar.Hot(h, frame, h.fgOpen == true) and 1 or Bar.IdleAlpha())
   -- The bar had no free spot: try again now and then, the window may have changed.
   if h.fgFallback then
@@ -379,7 +383,7 @@ function Handle.Tick(name)
 end
 
 local function build(name, frame)
-  local h = CreateFrame("Button", nil, UIParent)
+  local h = CreateFrame("Button", nil, frame)
   h.fgName = name
   h:SetSize(Handle.SIZE, Handle.SIZE)
   h:SetIgnoreParentScale(true)
@@ -440,6 +444,7 @@ local function build(name, frame)
     end
   end)
   handles[name] = h
+  Bar.HookLayer(name, frame)
   return h
 end
 

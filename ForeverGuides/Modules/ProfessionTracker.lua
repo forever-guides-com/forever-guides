@@ -12,7 +12,7 @@
 -- The position changes only out of combat; PLAYER_REGEN_ENABLED places it afterwards.
 local _, ns = ...
 local W, L, Theme, U, WS = ns.W, ns.L, ns.Theme, ns.U, ns.WindowStyle
-local S, SW = ns.ProfessionShop, ns.ProfessionShopWindow
+local S, SW, R = ns.ProfessionShop, ns.ProfessionShopWindow, ns.ProfessionRouteLogic
 
 local T = {}
 ns.ProfessionTracker = T
@@ -255,7 +255,7 @@ local function newRow(parent)
     "OnClick",
     ns.Wrap("proftracker-tick", function()
       if row.line then
-        S.SetChecked(row.slug, row.line.id, not row.ticked)
+        ns.ProfessionList.SetDone(row.line, not row.ticked)
       end
     end)
   )
@@ -291,7 +291,7 @@ local function entries(plan)
   local open, done, checked = {}, {}, S.Checked(plan.slug)
   for _, group in ipairs(plan.groups or {}) do
     for _, line in ipairs(group.lines) do
-      local ticked = checked[line.id] == true
+      local ticked = R.IsDone(line, checked)
       local list = ticked and done or open
       list[#list + 1] = { line = line, slug = plan.slug, ticked = ticked }
     end

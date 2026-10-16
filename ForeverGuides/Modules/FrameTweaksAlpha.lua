@@ -171,9 +171,10 @@ local function record(c, item, kind, key, region)
   end
 end
 
--- Frames the scan never enters: forbidden, ours, and other windows (they have their own scan).
+-- Frames the scan never enters: forbidden, ours (windows, and the bar and handle that are children of
+-- their window) and other windows (they have their own scan).
 local function foreign(c, child, name)
-  if c.attached[child] or method(child, "IsForbidden") == true then
+  if c.attached[child] or method(child, "IsForbidden") == true or child.fgName ~= nil then
     return true
   end
   return type(name) == "string" and (FL.Excluded(name) or FL.Listed(name))

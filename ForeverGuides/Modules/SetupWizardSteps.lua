@@ -31,6 +31,8 @@ ns.AddLocale("enUS", {
   ["setup.changeWhere"] = "Change later: Settings, tab in brackets.",
   ["setup.step.look"] = "Language and look",
   ["setup.step.look.text"] = "A few quick settings. Changes apply right away.\nSkip any time.",
+  ["setup.step.addons"] = "Optional add-ons",
+  ["setup.step.addons.text"] = "For all characters. Per character: Settings > Addons.",
   ["setup.step.windows"] = "Windows",
   ["setup.step.windows.text"] = "Game windows, addon and messages.",
   ["setup.step.invitations"] = "Invites and data",
@@ -91,8 +93,8 @@ ns.AddLocale("enUS", {
   ["setup.ctl.frameTweaks"] = "Move game windows",
   ["setup.ctl.frameTweaksHint"] = "Drag by the title bar, reset on the page Windows.",
   ["setup.ctl.frameMore"] = "More options",
-  ["setup.ctl.hideTalkingHead"] = "Hide Talking Head",
-  ["setup.ctl.hideTalkingHeadHint"] = "Hides the NPC speech window.",
+  ["setup.ctl.hideTalkingHead"] = "Show Talking Head",
+  ["setup.ctl.hideTalkingHeadHint"] = "Off hides the NPC speech window.",
   ["setup.ctl.arrow"] = "Show arrow",
   ["setup.ctl.arrowTitle"] = "Arrow: show destination",
   ["setup.ctl.arrowBackground"] = "Arrow: background",
@@ -125,6 +127,8 @@ ns.AddLocale("deDE", {
   ["setup.changeWhere"] = "Später ändern: Einstellungen, Reiter in Klammern.",
   ["setup.step.look"] = "Sprache und Aussehen",
   ["setup.step.look.text"] = "Ein paar schnelle Einstellungen. Änderungen wirken sofort.\nJederzeit überspringbar.",
+  ["setup.step.addons"] = "Optionale Addons",
+  ["setup.step.addons.text"] = "Für alle Charaktere. Pro Charakter: Einstellungen > Addons.",
   ["setup.step.windows"] = "Fenster",
   ["setup.step.windows.text"] = "Spielfenster, Addon und Meldungen.",
   ["setup.step.invitations"] = "Einladungen und Daten",
@@ -185,8 +189,8 @@ ns.AddLocale("deDE", {
   ["setup.ctl.frameTweaks"] = "Spielfenster verschiebbar",
   ["setup.ctl.frameTweaksHint"] = "Am Titel ziehen, zurücksetzen auf der Seite Fenster.",
   ["setup.ctl.frameMore"] = "Mehr Optionen",
-  ["setup.ctl.hideTalkingHead"] = "Talking Head ausblenden",
-  ["setup.ctl.hideTalkingHeadHint"] = "Blendet das NPC-Sprechfenster aus.",
+  ["setup.ctl.hideTalkingHead"] = "Talking Head anzeigen",
+  ["setup.ctl.hideTalkingHeadHint"] = "Aus blendet das NPC-Sprechfenster aus.",
   ["setup.ctl.arrow"] = "Pfeil anzeigen",
   ["setup.ctl.arrowTitle"] = "Pfeil: Ziel anzeigen",
   ["setup.ctl.arrowBackground"] = "Pfeil: Hintergrund",
@@ -432,6 +436,19 @@ step("look", 10, {
   },
 }, { layout = { "logo", "title", "text", "links", "controls" } })
 
+-- One switch per optional add-on of the manifest: the wizard sets the default for all characters, the
+-- override of a single character lives in the Settings tab.
+local addonSwitches = {}
+for _, entry in ipairs(ns.SubAddons.List()) do
+  addonSwitches[#addonSwitches + 1] = toggle("settings.subaddons." .. entry.id, entry.titleKey, {
+    hintKey = entry.descKey,
+    apply = function(value)
+      ns.SubAddons.SetEnabled(entry.id, value, "account")
+    end,
+  })
+end
+step("addons", 15, addonSwitches, { tab = "addons", since = "0.1.4" })
+
 -- Appears once the key has a default (the icon button labels are built separately).
 step("controls", 20, {
   toggle("settings.buttonLabels", "setup.ctl.buttonLabels", {
@@ -485,6 +502,7 @@ step("windows", 30, {
   toggle("settings.combatHide", "settings.combatHide"),
   toggle("settings.hideTalkingHead", "setup.ctl.hideTalkingHead", {
     hintKey = "setup.ctl.hideTalkingHeadHint",
+    invert = true,
     apply = applyModule("TalkingHead"),
   }),
   toggle("settings.minimap.hide", "settings.minimap", {

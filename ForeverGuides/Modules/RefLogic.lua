@@ -471,20 +471,3 @@ function R.Quests(inst, faction)
   end)
   return out
 end
-
--- "12 g 3 s 4 k" style money from copper.
-function R.Money(copper)
-  copper = copper or 0
-  local g, s, c = math.floor(copper / 10000), math.floor(copper % 10000 / 100), copper % 100
-  local parts = {}
-  if g > 0 then
-    parts[#parts + 1] = g .. "g"
-  end
-  if s > 0 then
-    parts[#parts + 1] = s .. "s"
-  end
-  if c > 0 or #parts == 0 then
-    parts[#parts + 1] = c .. "c"
-  end
-  return table.concat(parts, " ")
-end

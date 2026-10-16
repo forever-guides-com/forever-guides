@@ -72,6 +72,48 @@ function Logic.CleanStack(stack)
   return table.concat(lines, "\n")
 end
 
+-- The call stack of a blocked-action event is short: the event fires inside the blocked call, so the lines
+-- under our own dispatch name the code that made it.
+Logic.ACTION_LINES = 8
+
+-- Frames of the event dispatch, the protected-call wrappers and this catcher say nothing about the cause.
+local function isNoise(line)
+  return line:find("Core[/\\]Events%.lua") ~= nil
+    or line:find("Core[/\\]Log%.lua") ~= nil
+    or line:find("ErrorCatcher", 1, true) ~= nil
+    or line:find("^%[C%]: .-x?pcall[`']") ~= nil
+end
+
+-- The first ACTION_LINES lines of a raw debugstack that are not dispatch noise, paths shortened.
+function Logic.ActionStack(stack)
+  local lines = {}
+  for line in tostring(stack or ""):gmatch("[^\r\n]+") do
+    if line:find("%S") and not isNoise(line) then
+      lines[#lines + 1] = Logic.ShortPath(line)
+      if #lines >= Logic.ACTION_LINES then
+        break
+      end
+    end
+  end
+  return table.concat(lines, "\n")
+end
+
+-- One line for the top of the stack: what the game state was. s: combat, group, instance (booleans),
+-- restricted (list of active restriction names).
+function Logic.StateLine(s)
+  local function yn(v)
+    return v and "yes" or "no"
+  end
+  local restricted = s.restricted and #s.restricted > 0 and table.concat(s.restricted, ",") or "none"
+  return string.format(
+    "state: combat=%s group=%s instance=%s restricted=%s",
+    yn(s.combat),
+    yn(s.group),
+    yn(s.instance),
+    restricted
+  )
+end
+
 -- Duplicates -----------------------------------------------------------------------------
 
 -- The same message from a different source within the window is one error seen twice
@@ -170,6 +212,12 @@ function Logic.Addon(e)
   return e.addon or Logic.OWN
 end
 
+-- Our own folders: the main add-on and every companion that starts with its name (data add-ons,
+-- GildenManager, sub-addons).
+function Logic.IsOwn(addon)
+  return type(addon) == "string" and addon:sub(1, #Logic.OWN) == Logic.OWN
+end
+
 local function stamp(t, format)
   if not t or t == 0 then
     return "-"
@@ -261,7 +309,7 @@ function Logic.Filter(list, opts)
     local ok = true
     if opts.scope == "session" and e.session ~= opts.session then
       ok = false
-    elseif opts.scope == "own" and Logic.Addon(e) ~= Logic.OWN then
+    elseif opts.scope == "own" and not Logic.IsOwn(Logic.Addon(e)) then
       ok = false
     end
     if ok and opts.addon and opts.addon ~= "" and Logic.Addon(e) ~= opts.addon then

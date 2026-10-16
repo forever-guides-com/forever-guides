@@ -45,7 +45,6 @@ R.DEFAULT_SOURCE = "auction"
 R.DEFAULT_SURCHARGE = 10
 R.MAX_SURCHARGE = 100
 R.MAX_SKILL = 1000
-R.CALLER = "ForeverGuides"
 
 local BY_NAME, BY_ID, GROUP_SET = {}, {}, {}
 for slug, p in pairs(R.PROFESSIONS) do
@@ -377,11 +376,21 @@ function R.Search(name, qty, convert)
   return R.SearchString(name, qty)
 end
 
+-- A route line is done when the tick table has it, an own position of the list carries its own flag, so
+-- does a material row (derived from a crafted item) with the tick of that occurrence.
+local function isDone(line, checked)
+  if line.own or line.derived then
+    return line.done == true
+  end
+  return type(checked) == "table" and checked[line.id] == true
+end
+R.IsDone = isDone
+
 -- The lines that are not ticked off yet.
 function R.Pending(lines, checked)
   local out = {}
   for _, line in ipairs(lines or {}) do
-    if not (type(checked) == "table" and checked[line.id]) then
+    if not isDone(line, checked) then
       out[#out + 1] = line
     end
   end
@@ -392,7 +401,7 @@ end
 function R.Wanted(lines, checked)
   local out = {}
   for _, line in ipairs(lines or {}) do
-    if line.source ~= "vendor" and not (type(checked) == "table" and checked[line.id]) then
+    if line.source ~= "vendor" and not isDone(line, checked) then
       out[#out + 1] = line
     end
   end
@@ -401,6 +410,9 @@ end
 
 -- Name of a shopping list: "Forever Guides <profession> <from>-<to>", no characters the import breaks on.
 function R.ListName(professionName, from, to)
+  if from == nil and to == nil then
+    return cleanName("Forever Guides " .. (professionName or ""))
+  end
   return cleanName(string.format("Forever Guides %s %d-%d", professionName or "", from or 0, to or 0))
 end
 
@@ -418,6 +430,7 @@ function R.ImportText(listName, searches)
   return cleanName(listName) .. "^" .. table.concat(searches or {}, "^")
 end
 
+-- The list text goes to an edit box and into the chat as text, so the coin letters stay.
 local function money(copper)
   return ns.CostLogic.Format(copper, { plain = true })
 end
@@ -433,8 +446,7 @@ function R.ListText(groups, opts)
   for _, g in ipairs(groups or {}) do
     out[#out + 1] = (opts.groupTitle and opts.groupTitle(g.source) or g.source) .. ":"
     for _, line in ipairs(g.lines) do
-      local text =
-        string.format("%s%dx %s", (opts.checked and opts.checked[line.id]) and "[x] " or "", line.qty, line.name)
+      local text = string.format("%s%dx %s", isDone(line, opts.checked) and "[x] " or "", line.qty, line.name)
       local price = line.total and money(line.total)
       out[#out + 1] = price and (text .. " (" .. price .. ")") or text
     end

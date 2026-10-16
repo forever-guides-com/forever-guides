@@ -69,9 +69,15 @@ local function questId()
   return id and id > 0 and id or nil
 end
 
-local function title()
+-- The title is read before the quest is taken or turned in: the window text is gone afterwards. Without it
+-- the quest log knows the title of the id.
+local function title(id)
   local found, text = Guard.Call("GetTitleText")
   text = found and Guard.Safe(text) or nil
+  if type(text) ~= "string" or text == "" then
+    local foundLog, logged = Guard.Call("C_QuestLog.GetTitleForQuestID", id)
+    text = foundLog and Guard.Safe(logged) or nil
+  end
   return type(text) == "string" and text ~= "" and text or "?"
 end
 
@@ -107,8 +113,9 @@ function Q.OnDetail()
   if not QL.KindAllowed(settings(), QL.Kind(daily == true, weekly == true)) or not allowedTry("accept:" .. id) then
     return
   end
+  local name = title(id)
   Guard.Call("AcceptQuest")
-  Guard.Say(ID, string.format(L["auto.quest.accepted"], title()))
+  Guard.Say(ID, string.format(L["auto.quest.accepted"], name))
 end
 
 -- True when the quest asks for gold, a currency, or items the player did not allow.
@@ -159,7 +166,7 @@ function Q.OnComplete()
   if not allowedTry("reward:" .. id) then
     return
   end
-  local name = title()
+  local name = title(id)
   Guard.Call("GetQuestReward", choices == 1 and 1 or 0)
   Guard.Say(ID, string.format(L["auto.quest.done"], name))
 end

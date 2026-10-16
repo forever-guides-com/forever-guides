@@ -23,6 +23,7 @@ ns.AddLocale("enUS", {
   ["inv.diag.hidden"] = ", hidden in the overview",
   ["inv.diag.never"] = "never",
   ["inv.diag.account"] = "Account bank: last capture %s, %d items",
+  ["inv.diag.guild"] = "Guild bank %s: last capture %s, %d items in %d tabs",
   ["inv.diag.errors"] = "Captured errors from the tooltip or capture: %d, last: %s",
   ["inv.diag.noItem"] = "No item: hover an item in your bags and type /fg inventory again, or use /fg inventory <item link or id>.",
   ["inv.diag.item"] = "Item %d:",
@@ -47,6 +48,7 @@ ns.AddLocale("deDE", {
   ["inv.diag.hidden"] = ", in der Übersicht ausgeblendet",
   ["inv.diag.never"] = "nie",
   ["inv.diag.account"] = "Kontobank: letzte Erfassung %s, %d Items",
+  ["inv.diag.guild"] = "Gildenbank %s: letzte Erfassung %s, %d Items in %d Reitern",
   ["inv.diag.errors"] = "Erfasste Fehler aus Tooltip oder Erfassung: %d, zuletzt: %s",
   ["inv.diag.noItem"] = "Kein Item: Mauszeiger in den Taschen auf ein Item halten und /fg inventar erneut tippen, oder /fg inventar <Item-Link oder ID> nutzen.",
   ["inv.diag.item"] = "Item %d:",
@@ -151,6 +153,23 @@ function D.Lines(argument)
   if type(account) == "table" and itemCount(account) > 0 then
     add("inv.diag.account", stamp(account.t), itemCount(account))
   end
+  local guildKeys = {}
+  for key in pairs(inv) do
+    if Logic.IsGuildKey(key) then
+      guildKeys[#guildKeys + 1] = key
+    end
+  end
+  table.sort(guildKeys)
+  for _, key in ipairs(guildKeys) do
+    local snap = inv[key]
+    if type(snap) == "table" and Logic.GuildEntries(snap) > 0 then
+      local tabs = 0
+      for _ in pairs(type(snap.tabs) == "table" and snap.tabs or {}) do
+        tabs = tabs + 1
+      end
+      add("inv.diag.guild", tostring(snap.name or key), stamp(snap.t), Logic.GuildEntries(snap), tabs)
+    end
+  end
 
   local failed, last = 0, nil
   for _, e in ipairs(ns.Errors.list) do
@@ -186,6 +205,14 @@ function D.Lines(argument)
     out[#out + 1] = L["inv.diag.owner"]:format(
       plain(Logic.RowText({ name = L["inv.part.accountBank"], sum = accountCount, parts = {}, account = true }))
     )
+  end
+  local guildKey, guildName = Inv.GuildKey()
+  local guildCount = guildKey and Logic.GuildCount(inv[guildKey], id) or 0
+  if guildCount > 0 then
+    owners = owners + 1
+    local name = L["inv.part.guildBank"]:format(tostring(guildName))
+    out[#out + 1] =
+      L["inv.diag.owner"]:format(plain(Logic.RowText({ name = name, sum = guildCount, parts = {}, shared = true })))
   end
   if owners == 0 then
     add("inv.diag.nobody")

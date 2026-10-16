@@ -1,10 +1,11 @@
 -- Opacity and zoom controls of a Blizzard window handled by Modules/FrameTweaks.lua, in three modes
 -- (settings.frameBarMode): "grip" (default) a small handle that opens a panel, see FrameTweaksHandle.lua;
 -- "bar" the bar built here, background opacity "- 100 % +" with a slider, zoom "- 100 % +" with a
--- slider and the resize grip; "off" nothing (keys and commands only). A bar is an own frame on
--- UIParent that ignores the window's scale and alpha, so it stays readable and equally big whatever
--- the zoom. Windows narrower than 360 px get numbers and buttons only. It is fully visible only
--- while the mouse is over the window or the bar, or a bar control has the focus.
+-- slider and the resize grip; "off" nothing (keys and commands only). A bar is an own frame, a child
+-- of the window in its strata a few levels above it (so a window in front covers it), that ignores the
+-- window's scale and alpha, so it stays readable and equally big whatever the zoom. Windows narrower
+-- than 360 px get numbers and buttons only. It is fully visible only while the mouse is over the
+-- window or the bar, or a bar control has the focus.
 -- Placement: the window's parts that hang out of it (tabs, button rows) are measured once and again
 -- when the window changes its size; the bar goes under the deepest one, else above the window, else
 -- beside it, and never over a part. Without a free spot the handle stands in for the bar.
@@ -341,6 +342,73 @@ function Bar.Surround(name, frame, force)
   return win, parts, { w = w, h = h }, key
 end
 
+-- Layering ----------------------------------------------------------------------------------------
+
+-- Frame levels a bar or handle sits above its window (the level of the drag strip, a child of every
+-- handled window). Both are children of the window in its strata, so a window raised later is above them.
+Bar.LEVEL = FL.HANDLE_LEVEL
+
+-- A protected window may not be touched in combat or while a restriction of the client holds it.
+local function layerAllowed(name, frame)
+  local protected = FL.Protected(name)
+  if not protected then
+    local ok, value = pcall(frame.IsProtected, frame)
+    protected = ok and value == true
+  end
+  if not protected then
+    return true
+  end
+  if type(InCombatLockdown) == "function" and InCombatLockdown() then
+    return false
+  end
+  return ns.ProtectedAllowed(frame)
+end
+
+-- Strata and level of an owner (bar, handle) follow its window: same strata, Bar.LEVEL above its level.
+-- Runs on every change of the window's layer (hooks) and on every tick, as the client raises a window on
+-- a click without a call into Lua.
+function Bar.SyncLayer(name, owner, frame)
+  if not layerAllowed(name, frame) then
+    return
+  end
+  local strata = frame:GetFrameStrata()
+  local level = math.min(frame:GetFrameLevel() + Bar.LEVEL, 9999)
+  local layer = owner.fgLayer
+  if layer and layer.strata == strata and layer.level == level then
+    return
+  end
+  owner.fgLayer = { strata = strata, level = level }
+  owner:SetFrameStrata(strata)
+  owner:SetFrameLevel(level)
+end
+
+local layerHooked = setmetatable({}, { __mode = "k" })
+
+-- Hooks the layer methods of a window once; every change brings its bar and handle along.
+function Bar.HookLayer(name, frame)
+  if layerHooked[frame] or type(hooksecurefunc) ~= "function" then
+    return
+  end
+  layerHooked[frame] = true
+  local function follow()
+    if windows[name] ~= frame then
+      return
+    end
+    local handle = ns.FrameTweaksHandle
+    local owners = { bars[name] or false, handle and handle.Of(name) or false }
+    for _, owner in ipairs(owners) do
+      if owner then
+        guard(Bar.SyncLayer, name, owner, frame)
+      end
+    end
+  end
+  for _, method in ipairs({ "Raise", "Lower", "SetFrameLevel", "SetFrameStrata" }) do
+    if type(frame[method]) == "function" then
+      pcall(hooksecurefunc, frame, method, follow)
+    end
+  end
+end
+
 -- Placement ---------------------------------------------------------------------------------------
 
 -- Does the window leave room for the sliders? Its width in screen units.
@@ -406,7 +474,7 @@ end
 
 -- Puts the bar where no part of the window is in the way. False when no spot is free.
 local function place(bar, frame, force)
-  local strata = FL.BarStrata(frame:GetFrameStrata())
+  local strata = frame:GetFrameStrata()
   local scale = UIParent:GetEffectiveScale()
   local wide = wideFor(frame)
   local inside = insideWanted()
@@ -425,7 +493,7 @@ local function place(bar, frame, force)
   end
   bar.fgState = { key = key, strata = strata, scale = scale, wide = wide, labels = labelsOf(bar), inside = inside }
   bar:SetScale(scale)
-  bar:SetFrameStrata(strata)
+  Bar.SyncLayer(bar.fgName, bar, frame)
   bar:ClearAllPoints()
   bar:SetPoint(p, frame, rp, x, y)
   return true
@@ -799,7 +867,7 @@ function Bar.NewControls(owner, name)
 end
 
 local function build(name, frame)
-  local bar = CreateFrame("Frame", nil, UIParent)
+  local bar = CreateFrame("Frame", nil, frame)
   bar:SetSize(Bar.PAD, Bar.HEIGHT)
   bar:SetIgnoreParentScale(true)
   bar:SetIgnoreParentAlpha(true)
@@ -826,6 +894,7 @@ local function build(name, frame)
     end
   end)
   bars[name] = bar
+  Bar.HookLayer(name, frame)
   return bar
 end
 
@@ -842,7 +911,7 @@ function Bar.Tick(name)
     return
   end
   local state = bar.fgState
-  local strata = FL.BarStrata(frame:GetFrameStrata())
+  local strata = frame:GetFrameStrata()
   local _, _, _, key = Bar.Surround(name, frame)
   if
     not state
@@ -858,6 +927,7 @@ function Bar.Tick(name)
       return
     end
   end
+  Bar.SyncLayer(name, bar, frame)
   bar:SetAlpha(Bar.Hot(bar, frame) and 1 or Bar.IdleAlpha())
   paint(bar)
 end

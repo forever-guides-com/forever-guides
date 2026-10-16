@@ -43,7 +43,7 @@ function FT.expected(total)
   return seconds, total.approx == true
 end
 
--- info: { name, key (route key for the measurement), expected (seconds), approx, preview }.
+-- info: { name, from, key (route key for the measurement), expected (seconds), approx, source, preview }.
 -- A preview loops over its expected time and is never measured.
 function FT.start(s, now, info)
   info = info or {}
@@ -51,12 +51,15 @@ function FT.start(s, now, info)
   s.phase = "flying"
   s.startedAt = now
   s.name = info.name
+  s.from = info.from
+  s.source = info.source
   s.key = info.key
   s.expected = expected and expected > 0 and expected < math.huge and expected or nil
   s.approx = info.approx == true
   s.preview = info.preview == true and s.expected ~= nil
   -- A real flight counts once the game confirms it (UnitOnTaxi).
   s.confirmed = s.preview
+  s.stored = false
 end
 
 function FT.cancel(s)
@@ -117,6 +120,74 @@ function FT.land(s, now)
   end
   s.phase = "idle"
   return "landed", elapsed, recorded
+end
+
+-- A flight survives /reload as a record in the character store. The game clock restarts with the
+-- session, so the start is kept as server time. Wall-clock elapsed time is the true flight time,
+-- which keeps the measurement at the landing correct for a resumed flight.
+FT.RECORD_VERSION = 1
+-- A record older than this share of the expected time (plus FT.STALE_SLACK) belongs to a flight that is over.
+FT.STALE_SHARE = 1.5
+FT.STALE_SLACK = 60
+
+local function finite(v)
+  return type(v) == "number" and v == v and v > -math.huge and v < math.huge
+end
+
+-- The record of the confirmed flight in s, or nil (idle, preview, not confirmed, no server time).
+-- serverNow is GetServerTime, now the game clock of s.startedAt, char "name-realm".
+function FT.record(s, now, serverNow, char)
+  if s.phase ~= "flying" or s.preview or not s.confirmed or not finite(serverNow) or type(char) ~= "string" then
+    return nil
+  end
+  return {
+    v = FT.RECORD_VERSION,
+    char = char,
+    from = s.from,
+    to = s.name,
+    key = s.key,
+    startedAt = serverNow - math.max(0, now - s.startedAt),
+    expected = s.expected,
+    approx = s.approx or nil,
+    source = s.source,
+  }
+end
+
+-- Takes a stored flight up again while the game says the player is still on the taxi. Returns true,
+-- or false and the reason ("none", "version", "char", "time", "future", "stale"); the caller drops
+-- the record then. The flight counts as confirmed and as stored already.
+function FT.resume(s, now, rec, serverNow, char)
+  if type(rec) ~= "table" then
+    return false, "none"
+  elseif rec.v ~= FT.RECORD_VERSION then
+    return false, "version"
+  elseif type(char) ~= "string" or rec.char ~= char then
+    return false, "char"
+  elseif not finite(rec.startedAt) or not finite(serverNow) then
+    return false, "time"
+  end
+  local elapsed = serverNow - rec.startedAt
+  if elapsed < 0 then
+    return false, "future"
+  end
+  local expected = tonumber(rec.expected)
+  expected = expected and expected > 0 and expected < math.huge and expected or nil
+  local limit = expected and (expected * FT.STALE_SHARE + FT.STALE_SLACK) or FL.MAX_SECONDS
+  if elapsed >= limit then
+    return false, "stale"
+  end
+  FT.start(s, now, {
+    name = rec.to,
+    from = rec.from,
+    key = type(rec.key) == "string" and rec.key or nil,
+    expected = expected,
+    approx = rec.approx == true,
+    source = rec.source,
+  })
+  s.startedAt = now - elapsed
+  s.confirmed = true
+  s.stored = true
+  return true
 end
 
 -- Follows the game's taxi flag. Returns nil while nothing ends, else "landed", seconds, recorded or

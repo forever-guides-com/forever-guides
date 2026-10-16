@@ -105,6 +105,15 @@ local function enableFunction()
   return type(fn) == "function" and fn or nil
 end
 
+-- Writes the change of the game's add-on list, which stays pending until it is saved.
+local function saveList()
+  local addons = rawget(_G, "C_AddOns")
+  local fn = type(addons) == "table" and addons.SaveAddOns or rawget(_G, "SaveAddOns")
+  if type(fn) == "function" then
+    pcall(fn)
+  end
+end
+
 -- Switches the add-on on when needed and loads it. Returns true, or false plus the reason:
 -- COMBAT, MISSING, NO_API, ERROR or the answer of the client (NOT_DEMAND_LOADED, DISABLED, ...).
 function U.Enable(name)
@@ -123,9 +132,10 @@ function U.Enable(name)
     if not enable then
       return false, "NO_API"
     end
-    if not pcall(enable, name, UnitName("player")) then
+    if not pcall(enable, name, ns.ListCharacter and ns.ListCharacter() or UnitName("player")) then
       return false, "ERROR"
     end
+    saveList()
   end
   busy = busy + 1
   local ok, loaded, reason = pcall(ns.LoadPackage, name)

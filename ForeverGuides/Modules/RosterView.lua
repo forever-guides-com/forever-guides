@@ -270,7 +270,8 @@ function V.Register(def)
   return def
 end
 
--- "-" for a character whose gold was never read, "0" for a real empty purse.
+-- "-" for a character whose gold was never read, "0" for a real empty purse. plain: the letter form,
+-- the shorter last form of a table cell that is too narrow for the icons.
 local function coins(char, plain)
   if char.money == nil then
     return "-"
@@ -294,7 +295,7 @@ local function nameTip(char)
     lines[#lines + 1] =
       string.format(L["chars.tip.zone"], char.subzone and (char.zone .. ", " .. char.subzone) or char.zone)
   end
-  lines[#lines + 1] = string.format(L["chars.tip.gold"], coins(char, true))
+  lines[#lines + 1] = string.format(L["chars.tip.gold"], coins(char))
   lines[#lines + 1] = asOfLine(char, ns.CharRoster.AsOf(char))
   local when = dateText(char.seen)
   if when then
@@ -364,14 +365,14 @@ V.Register({
     return { text = coins(char), plain = coins(char, true) }
   end,
   tip = function(char)
-    local text = coins(char, true)
+    local text = coins(char)
     local asOf = asOfLine(char, char.at and char.at.money)
     if asOf then
       text = text .. "\n" .. asOf
     end
     local count, total = ns.CharRoster.Totals(ns.CharRoster.List())
     if count > 1 then
-      text = text .. "\n" .. string.format(L["chars.tip.goldAll"], ns.CostLogic.Format(total, { plain = true }) or "0")
+      text = text .. "\n" .. string.format(L["chars.tip.goldAll"], ns.CostLogic.Format(total) or "0")
     end
     return L["chars.row.gold"], text
   end,

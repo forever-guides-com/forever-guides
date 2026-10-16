@@ -64,10 +64,10 @@ local function openFeedback(context)
       end,
     })
     dd:SetPoint("TOPLEFT", 16, -48)
-    dd:SetPoint("RIGHT", -16, 0)
+    dd:SetPoint("TOPRIGHT", -16, -48)
     local text = W.TextArea(feedback, { height = 140 })
     text:SetPoint("TOPLEFT", 16, -104)
-    text:SetPoint("RIGHT", -16, 0)
+    text:SetPoint("TOPRIGHT", -16, -104)
     feedback.text = text
     local create = W.Button(feedback, {
       key = "help.feedbackCreate",

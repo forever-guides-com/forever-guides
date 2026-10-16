@@ -184,7 +184,7 @@ function Main.Relayout()
   if not frame then
     return
   end
-  local lay = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed)
+  local lay = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, sidebar.editing)
   ns.MainLayout = lay
   sidebar:SetWidth(lay.sidebarWidth)
   sidebar:Layout(lay.sidebar == "icons")
@@ -266,12 +266,32 @@ local function getView(page)
   return view
 end
 
+-- Page views that are built again the next time another page was shown (see onPagesChanged).
+local stale = {}
+
+local function dropView(id)
+  local v = views[id]
+  if v then
+    v.container:Hide()
+    views[id] = nil
+    stale[id] = nil
+    if currentView == v then
+      currentView = nil
+    end
+  end
+end
+
 local function onRoute(path, page, params)
   if not frame then
     return
   end
   for _, v in pairs(views) do
     v.container:Hide()
+  end
+  for id in pairs(stale) do
+    if id ~= page.id then
+      dropView(id)
+    end
   end
   local view = getView(page)
   currentView = view
@@ -306,6 +326,28 @@ local function invalidateViews()
 end
 Main.InvalidateViews = invalidateViews
 
+-- A sub-addon switched on or off changes which pages exist: the navigation is built again, the search
+-- index is read again, the start page and the settings follow when they are shown the next time (the
+-- settings page stays while it is open, so the switch under the player's hand keeps its place).
+local function onPagesChanged()
+  ns.SearchLogic.ResetIndex()
+  if not frame then
+    return
+  end
+  sidebar:Rebuild()
+  for _, id in ipairs({ "dashboard", "settings" }) do
+    if views[id] then
+      stale[id] = true
+    end
+  end
+  local id, params = ns.RouterClass.parse(ns.Router.current or "")
+  if id == "dashboard" and views.dashboard then
+    dropView("dashboard")
+    onRoute(ns.Router.current, ns.Router:get(id), params)
+  end
+end
+ns.On("FG_SUBADDON_CHANGED", onPagesChanged)
+
 -- Keyboard -------------------------------------------------------------------
 
 local function handleKey(key)
@@ -325,6 +367,9 @@ local function handleKey(key)
     return true
   elseif (key == "ENTER" or key == "SPACE") and ns.Focus.current then
     return ns.Focus.activate()
+  elseif (key == "UP" or key == "DOWN") and IsShiftKeyDown() and ns.Focus.current and ns.Focus.current.fgReorder then
+    ns.Focus.current:fgReorder(key == "UP" and -1 or 1)
+    return true
   elseif (key == "UP" or key == "DOWN") and ns.Focus.current then
     ns.Focus.move(key == "UP" and -1 or 1)
     return true
@@ -503,13 +548,12 @@ local function buildTitleBar()
     langDERing.show(active == "deDE")
     langENRing.show(active == "enUS")
   end
-  refreshLangToggle()
-  ns.On("FG_SETTING_CHANGED", function(_, path)
-    if path == "settings.locale" then
-      refreshLangToggle()
-    end
-  end)
+  -- The active language is the one source: the setting is stored before ns.SetLocale resolves it, so the ring
+  -- follows FG_LOCALE_CHANGED, and every repaint (style, size, font) reads it again through the bind.
+  ns.Bind(langToggle, refreshLangToggle)
+  ns.On("FG_LOCALE_CHANGED", refreshLangToggle)
   parts.lang, parts.langDE, parts.langEN = langToggle, langDE, langEN
+  parts.langRing = { deDE = langDERing, enUS = langENRing }
 
   local help = W.Action(bar, { icon = "help", size = 26, tooltip = "page.help" })
   help:SetScript("OnClick", function()
@@ -949,8 +993,12 @@ local function buildFooter()
   local version = W.Text(f, { text = "v" .. ns.version, role = "micro", color = "textMuted" })
   version:SetPoint("RIGHT", grip, "LEFT", -8, 0)
 
+  local save = ns.SaveUI.Build(f)
+  save:SetPoint("RIGHT", version, "LEFT", -8, 0)
+  ns.Anchors["FG.Footer.Save"] = save
+
   local controls = ns.FooterControls.Build(f)
-  controls:SetPoint("RIGHT", version, "LEFT", -8, 0)
+  controls:SetPoint("RIGHT", save, "LEFT", -8, 0)
   ns.Anchors["FG.Footer.Controls"] = controls
 
   local errors = W.Button(f, {
@@ -969,10 +1017,22 @@ local function buildFooter()
   -- room that is left. The controls themselves are never cut.
   function fitData()
     local width = f:GetWidth()
-    local right = grip:GetWidth() + 10 + version:GetStringWidth() + 8
+    local base = grip:GetWidth() + 10 + version:GetStringWidth() + 8
     local errorsWidth = errors:IsShown() and errors:GetWidth() + 8 or 0
     local charWidth = char:GetStringWidth()
     local dataWidth = data.text:GetStringWidth() + 4
+    -- The Save caption gives way before the controls lose sliders or captions. level() lays the
+    -- controls out for a button width and says how much of them is left (3 sliders, 2 captions, 1).
+    local function level(saveWidth)
+      local room = width - base - saveWidth - 8 - errorsWidth - 10 - charWidth - 12 - 8
+      controls:Fit(room - dataWidth, room - DATA_MIN)
+      return controls.alphaSlider:IsShown() and 3 or controls.alphaLabel:IsShown() and 2 or 1
+    end
+    local withCaption = level(save.FitCaption(true))
+    if withCaption >= level(save.FitCaption(false)) then
+      save.FitCaption(true)
+    end
+    local right = base + save:GetWidth() + 8
     -- Space for data status, character line and the controls side by side (10, 8 and 12 are gaps).
     local shared = width - right - errorsWidth - 10 - charWidth - 12 - 8
     controls:Fit(shared - dataWidth, shared - DATA_MIN)
@@ -1068,8 +1128,12 @@ local function create()
     ns.Emit("FG_MAIN_SHOWN")
   end)
   -- After the own OnShow/OnHide above, so no SetScript can replace the hooks of the Esc stack.
-  -- Esc leaves a keyboard focus of the window first.
+  -- Esc ends a drag or the navigation edit mode first, then leaves a keyboard focus of the window.
   ns.WindowShell.RegisterEsc(frame, function()
+    if ns.SidebarEdit.Leave() then
+      ns.Focus.clear()
+      return true
+    end
     if ns.Focus.current then
       ns.Focus.clear()
       return true

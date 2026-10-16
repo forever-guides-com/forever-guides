@@ -622,10 +622,10 @@ local function report(job)
   end
   local total = #job.list
   if sold == total then
-    chat(string.format(ns.L["sell.done"], sold, Logic.Money(copper, true)))
+    chat(string.format(ns.L["sell.done"], sold, Logic.Money(copper)))
   else
     local why = ns.L["sell.why." .. (job.stopped or "rest")]
-    chat(string.format(ns.L["sell.stopped"], why, sold, total, Logic.Money(copper, true)))
+    chat(string.format(ns.L["sell.stopped"], why, sold, total, Logic.Money(copper)))
   end
   state.job = nil
   Helper.Refresh()
@@ -716,7 +716,7 @@ end
 
 -- Asks first with the count, the rare ones among them and the proceeds, then sells.
 local function confirmQuick(list, rare, total)
-  local text = string.format(ns.L["sell.quick.confirm"], #list, rare, Logic.Money(total, true))
+  local text = string.format(ns.L["sell.quick.confirm"], #list, rare, Logic.Money(total))
   ns.Dialogs.Confirm("sell.tip.title", "sell.confirmText", function()
     Helper.Sell(list)
   end)

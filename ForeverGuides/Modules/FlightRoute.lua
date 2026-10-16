@@ -33,6 +33,12 @@ local function game(name)
   return _G[name]
 end
 
+-- "A" or "H" for the faction of the player, nil when the game does not say.
+local function factionCode()
+  local faction = try(game("UnitFactionGroup"), "player")
+  return faction == "Alliance" and "A" or faction == "Horde" and "H" or nil
+end
+
 local function inCombat()
   return InCombatLockdown ~= nil and InCombatLockdown() == true
 end
@@ -153,5 +159,5 @@ function FR.Route(slot, nodes)
     }
     pairsForTotal[i] = { from = fromNode, to = toNode }
   end
-  return { hops = hops, total = FL.estimateRoute(pairsForTotal) }
+  return { hops = hops, total = FL.estimateRoute(pairsForTotal, nil, nil, factionCode()) }
 end

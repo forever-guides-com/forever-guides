@@ -502,8 +502,8 @@ add({
   public = true,
   names = { "sozial", "social", "kontakte", "contacts" },
   usage = "/fg social",
-  page = "guild",
-  control = "guild.tab.social",
+  page = "contacts",
+  control = "page.contacts",
   exec = "social",
 })
 add({
@@ -598,6 +598,7 @@ C.PAGE_AREA = {
   loot = "character",
   items = "character",
   guild = "guild",
+  contacts = "guild",
   notes = "tools",
   drawings = "tools",
   calc = "tools",
@@ -771,8 +772,8 @@ desc(
   "Profession trainers page with positions, optional profession.",
   "Berufslehrer mit Standorten, optional Beruf."
 )
-desc("guild", "Open Guild & Contacts.", "Öffnet Gilde & Kontakte.")
-desc("social", "Contacts: players you have met.", "Kontakte: Spieler, die du getroffen hast.")
+desc("guild", "Open the guild page.", "Öffnet die Gildenseite.")
+desc("social", "Open the contacts: players you have met.", "Öffnet die Kontakte: Spieler, die du getroffen hast.")
 desc("macros", "Open the macro editor.", "Öffnet den Makro-Editor.")
 desc("settings", "Open the settings.", "Öffnet die Einstellungen.")
 desc("about", "Version, data status, website, license.", "Version, Datenstand, Website, Lizenz.")

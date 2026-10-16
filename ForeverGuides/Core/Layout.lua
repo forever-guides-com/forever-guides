@@ -16,9 +16,10 @@ local Layout = {
 ns.Layout = Layout
 
 -- contentWidth decides columns; the sidebar collapses when the user asked
--- for it or the window is narrower than the breakpoint.
-function Layout.compute(width, userCollapsed)
-  local collapsed = userCollapsed or width < Layout.COLLAPSE_BELOW
+-- for it or the window is narrower than the breakpoint. forceFull keeps the full sidebar (the
+-- navigation edit mode needs the room for its controls).
+function Layout.compute(width, userCollapsed, forceFull)
+  local collapsed = not forceFull and (userCollapsed or width < Layout.COLLAPSE_BELOW)
   local sidebar = collapsed and Layout.SIDEBAR_ICONS or Layout.SIDEBAR_FULL
   local content = width - sidebar
   return {

@@ -21,6 +21,7 @@ ns.AddLocale("enUS", {
   ["cost.sumUnknown"] = "+ %d without price",
   ["cost.availableTotal"] = "Everything learnable now: %s",
   ["cost.weaponsTotal"] = "All skills with a teacher: %s",
+  ["cost.letter.copper"] = "c",
 })
 
 ns.AddLocale("deDE", {
@@ -34,6 +35,7 @@ ns.AddLocale("deDE", {
   ["cost.sumUnknown"] = "+ %d ohne Preis",
   ["cost.availableTotal"] = "Alles Lernbare jetzt: %s",
   ["cost.weaponsTotal"] = "Alle Fertigkeiten mit Lehrer: %s",
+  ["cost.letter.copper"] = "k",
 })
 
 local function static()
@@ -143,25 +145,48 @@ end
 
 -- Formatting -----------------------------------------------------------------------
 
--- Coin text for a copper amount, nil for 0 or nothing: the amount in front of its
--- own coin icon, gold, silver and copper, parts that are 0 left out. The icons are
--- inline textures at text height (0:0), they take their color from the texture,
--- the digits from the text color of the surface. Built here on purpose instead of
--- GetCoinTextureString, so the look never depends on the client's helper.
--- opts.plain: "1g 20s 5k" for places where escapes do not render (exports, logs).
-local ICON_FORMAT = "|TInterface\\MoneyFrame\\%s:0:0:2:0|t"
+-- The one formatter of every amount of money the add-on shows. Coin text for a copper
+-- amount, nil for 0, a negative amount or nothing: the amount in front of its own coin
+-- icon, gold, silver and copper, parts that are 0 left out, gold without grouping. The
+-- icons are inline textures at text height (0:0), they take their color from the
+-- texture, the digits from the text color of the surface. Built here on purpose
+-- instead of GetCoinTextureString, so the look never depends on the client's helper.
+-- Modes: icons (default) for FontStrings, tooltips and the owner's own chat frame;
+-- opts.plain "1g 20s 5k" where escapes cannot render or the text leaves the client:
+-- edit boxes and copy texts, text sent to other players, narrow cells as the last form
+-- of a fit. The letters are g and s in both languages, copper is "c" in English and "k"
+-- in German (key cost.letter.copper). The icons also give way to the letters while the
+-- client does not know the coin files (a missing file would draw a green square).
+local COIN_DIR = "Interface\\MoneyFrame\\"
+local ICON_FORMAT = "|T" .. COIN_DIR .. "%s:0:0:2:0|t"
 local PARTS = {
   { unit = 10000, mod = nil, letter = "g", icon = "UI-GoldIcon" },
   { unit = 100, mod = 100, letter = "s", icon = "UI-SilverIcon" },
-  { unit = 1, mod = 100, letter = "k", icon = "UI-CopperIcon" },
+  { unit = 1, mod = 100, letter = "k", key = "cost.letter.copper", icon = "UI-CopperIcon" },
 }
 
+-- True while the client knows the three coin files, or cannot be asked (ns.ResolveIcon
+-- is the UI layer, it is not there in a pure logic load).
+local function coinsKnown()
+  local resolve = ns.ResolveIcon
+  if type(resolve) ~= "function" then
+    return true
+  end
+  for _, p in ipairs(PARTS) do
+    local path = COIN_DIR .. p.icon
+    if resolve(path) ~= path then
+      return false
+    end
+  end
+  return true
+end
+
 function CL.Format(copper, opts)
-  if type(copper) ~= "number" or copper < 1 then
+  if type(copper) ~= "number" or copper ~= copper or copper < 1 or copper == math.huge then
     return nil
   end
   copper = math.floor(copper)
-  local plain = opts and opts.plain
+  local plain = (opts and opts.plain) or not coinsKnown()
   local parts = {}
   for _, p in ipairs(PARTS) do
     local n = math.floor(copper / p.unit)
@@ -169,10 +194,23 @@ function CL.Format(copper, opts)
       n = n % p.mod
     end
     if n > 0 then
-      parts[#parts + 1] = plain and (n .. p.letter) or (n .. string.format(ICON_FORMAT, p.icon))
+      parts[#parts + 1] = plain and (n .. (p.key and L[p.key] or p.letter)) or (n .. string.format(ICON_FORMAT, p.icon))
     end
   end
   return table.concat(parts, " ")
+end
+
+-- Pixels the amount needs at a font size (Theme.fontSize(role)), for columns that are
+-- sized before their texts exist. Digits, letters and gaps count 0.6 of the size (the
+-- widest digit with some air), every coin icon 1.2 times the size (its height is the
+-- text height): the client draws up to 20 % wider than the test mock. 0 for no amount.
+function CL.Width(size, copper, opts)
+  local text = CL.Format(copper, opts)
+  if not text then
+    return 0
+  end
+  local bare, coins = text:gsub("|T[^|]*|t", "")
+  return math.ceil(#bare * 0.6 * size) + coins * math.ceil(1.2 * size)
 end
 
 -- A price is uncertain when it is a Classic price or the Forever data and Classic

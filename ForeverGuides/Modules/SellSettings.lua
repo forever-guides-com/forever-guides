@@ -1,6 +1,6 @@
 -- Settings tab "Selling" (Modules/SellHelper.lua), in sections: general, rules by quality, binding,
 -- keep options, protect list. Changes go through Store.set, the helper reads the values on every scan.
--- The protect list takes item ids typed in or a shift-click on an item while its field has the focus.
+-- The protect list has its own window (Modules/SellProtect.lua), the tab shows the count and a button.
 local _, ns = ...
 local W, Store = ns.W, ns.Store
 local Logic = ns.SellLogic
@@ -53,8 +53,9 @@ ns.AddLocale("enUS", {
   ["sell.set.blizzHint"] = 'Takes over "Sell all junk" in the merchant window.\nOur rules decide what is sold.',
   ["sell.set.native"] = "Game junk function",
   ["sell.set.nativeHint"] = "Only when all gray items are sold",
-  ["sell.set.protect"] = "Item IDs, never sold",
-  ["sell.set.protectHint"] = "Shift-click an item while typing\nor enter item IDs",
+  ["sell.set.protectHint"] = "Protected items are never sold.\nThis applies to the preview and to the automatic sale.\nProfession tools are on the list from the start.",
+  ["sell.set.protectCount"] = "Protected items: %d",
+  ["sell.set.protectManage"] = "Manage protect list",
   ["sell.set.auto"] = "Auto-sell at merchant",
   ["sell.set.autoHint"] = "Sells on opening, no preview\nUp to 12 items, protection applies",
 })
@@ -103,14 +104,14 @@ ns.AddLocale("deDE", {
   ["sell.set.blizzHint"] = 'Übernimmt "Alles Plunder verkaufen" im Händlerfenster.\nUnsere Regeln entscheiden, was verkauft wird.',
   ["sell.set.native"] = "Native Plunder-Funktion",
   ["sell.set.nativeHint"] = "Nur wenn alle grauen Items verkauft werden",
-  ["sell.set.protect"] = "Item-IDs, nie verkauft",
-  ["sell.set.protectHint"] = "Item beim Tippen per Shift-Klick einfügen\noder Item-IDs eintragen",
+  ["sell.set.protectHint"] = "Geschützte Items werden nie verkauft.\nDas gilt für die Vorschau und für den automatischen Verkauf.\nBerufswerkzeuge stehen von Anfang an auf der Liste.",
+  ["sell.set.protectCount"] = "Geschützte Items: %d",
+  ["sell.set.protectManage"] = "Schutzliste verwalten",
   ["sell.set.auto"] = "Automatisch verkaufen",
   ["sell.set.autoHint"] = "Verkauft beim Öffnen, ohne Vorschau\nBis 12 Items, Schutz gilt",
 })
 
 local FIELD_WIDTH = 320
-local MAX_NAMES = 8
 local SECTION_GAP = 18
 
 -- Item qualities of the rows (0 gray, 1 white, 2 green, 3 blue, 4 epic): the label gets the color
@@ -155,7 +156,7 @@ local QUALITY_ROWS = {
   },
 }
 
-local protectBox, namesText
+local countText
 
 local function stored(key)
   local value = ns.db.settings[key]
@@ -165,44 +166,9 @@ local function stored(key)
   return value
 end
 
-local function itemName(id)
-  local get = rawget(_G, "C_Item")
-  local f = type(get) == "table" and get.GetItemNameByID or rawget(_G, "GetItemInfo")
-  if type(f) == "function" then
-    local ok, name = pcall(f, id)
-    if ok and type(name) == "string" and name ~= "" then
-      return ns.ItemInfo.ColorName(name, ns.ItemInfo.quality(id))
-    end
-  end
-  return "#" .. id
-end
-
--- Names of the protected items, as far as the game knows them.
-function S.NamesText()
-  local ids, names = Logic.ParseIds(stored("sellProtect")), {}
-  for i = 1, math.min(#ids, MAX_NAMES) do
-    names[i] = itemName(ids[i])
-  end
-  local more = #ids > MAX_NAMES and (" +" .. (#ids - MAX_NAMES)) or ""
-  return table.concat(names, ", ") .. more
-end
-
-local function paintNames()
-  if namesText then
-    W.SetText(namesText, nil, S.NamesText())
-  end
-end
-
--- Adds a shift-clicked item to the protect list. Only while the field has the focus.
+-- Adds a shift-clicked item to the protect list. Only while the field of its window has the focus.
 function S.InsertLink(link)
-  if not (protectBox and protectBox.edit:HasFocus()) then
-    return false
-  end
-  local text = Logic.AddId(protectBox.edit:GetText(), link)
-  protectBox.edit:SetText(text)
-  Store.set("settings.sellProtect", text)
-  paintNames()
-  return true
+  return ns.SellProtect.InsertLink(link)
 end
 
 -- A heading with room above it, except for the first one of the tab.
@@ -385,35 +351,24 @@ local function keepSection(view)
   toggle(view, "sellKeepUpgrades", "sell.set.upgrades", { hint = "sell.set.upgradesHint" })
 end
 
+local function paintCount(fs)
+  fs:SetText(string.format(ns.L["sell.set.protectCount"], ns.SellProtect.Count()))
+end
+
 local function protectSection(view)
-  local s = view.stack
   section(view, "sell.sec.protect")
-  s:Add(W.Text(view.content, { key = "sell.set.protect", role = "ui", color = "textSecondary" }), { gap = 4 })
-  protectBox = W.EditBox(view.content, {
-    onChange = function(text)
-      Store.set("settings.sellProtect", text)
-      paintNames()
-    end,
-    onEnter = function(text)
-      local clean = Logic.JoinIds(Logic.ParseIds(text))
-      Store.set("settings.sellProtect", clean)
-      protectBox.edit:SetText(clean)
-      paintNames()
-    end,
-  })
-  protectBox.edit:SetMaxLetters(Logic.MAX_PROTECT * 10)
-  protectBox.fgId = "sell-protect"
-  function protectBox:Refresh()
-    if not self.edit:HasFocus() then
-      self.edit:SetText(stored("sellProtect") or "")
-    end
-    paintNames()
-  end
-  s:Add(protectBox, { height = 26, width = FIELD_WIDTH, gap = 4 })
-  namesText = W.Text(view.content, { role = "micro", color = "textSecondary", wrap = true })
-  s:Add(namesText, { gap = 4 })
   ns.AddParagraph(view, "sell.set.protectHint", { role = "micro", color = "textMuted" })
-  protectBox:Refresh()
+  countText = ns.AddParagraph(view, nil, { role = "ui", color = "textSecondary", gap = 6, text = " " })
+  countText.fgId = "sell-protectCount"
+  countText.Refresh = paintCount
+  ns.Bind(countText, paintCount)
+  local manage = W.Button(view.content, {
+    key = "sell.set.protectManage",
+    width = 220,
+    onClick = ns.SellProtect.Open,
+  })
+  manage.fgId = "sell-protect"
+  view.stack:Add(manage, { height = 26, width = 220, gap = 6 })
 end
 
 -- The sections in page order. A later section "Always sell (list)" belongs after the quality rules:
@@ -446,3 +401,9 @@ local function hookInsert()
 end
 
 hookInsert()
+
+ns.On("FG_SETTING_CHANGED", function(_, path)
+  if countText and path == "settings.sellProtect" then
+    paintCount(countText)
+  end
+end)

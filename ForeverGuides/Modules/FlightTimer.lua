@@ -3,6 +3,9 @@
 -- of Blizzard's is replaced), its end through UnitOnTaxi. Look and behaviour sit in
 -- settings.flightTimerWindow (title, background, bar, "approx.", lock, font size, scale, bar), the
 -- position in ns.db.frames.flightTimer. A gear shows on hover and opens the settings panel.
+-- A confirmed flight is kept in ns.charDB.activeFlight, so the timer comes back after /reload or a
+-- relog during the flight. SavedVariables are written on reload and logout only: a client crash
+-- loses the record, and the timer then stays away for that flight.
 -- The state machine and the measurement of the route live in Modules/FlightTimerLogic.lua.
 local _, ns = ...
 local W, L, Theme, U, WS = ns.W, ns.L, ns.Theme, ns.U, ns.WindowStyle
@@ -73,6 +76,28 @@ local function onTaxi()
   end
   local ok, value = pcall(fn, "player")
   return ok and value and true or false
+end
+
+local function ask(name, ...)
+  local fn = rawget(_G, name)
+  if type(fn) ~= "function" then
+    return nil
+  end
+  local ok, value = pcall(fn, ...)
+  return ok and value or nil
+end
+
+local function serverNow()
+  return ask("GetServerTime")
+end
+
+-- "name-realm" of the player, nil while the game does not say.
+local function charId()
+  local name = ask("UnitName", "player")
+  local realm = ask("GetNormalizedRealmName") or ask("GetRealmName")
+  if type(name) == "string" and name ~= "" and type(realm) == "string" and realm ~= "" then
+    return name .. "-" .. realm
+  end
 end
 
 -- Settings -----------------------------------------------------------------------------------------
@@ -526,8 +551,16 @@ end
 -- the flight just got confirmed or ended). Returns what FlightTimerLogic.tick returned.
 function FTI.Tick()
   local event, seconds, recorded = FT.tick(state, nowSeconds(), onTaxi())
+  local db = ns.charDB
   if not FT.flying(state) then
     stopTracking()
+    if db then
+      db.activeFlight = nil
+    end
+  elseif db and state.confirmed and not state.stored and not state.preview then
+    -- Once per flight: the record never changes while it runs.
+    state.stored = true
+    db.activeFlight = FT.record(state, nowSeconds(), serverNow(), charId())
   end
   local snap = FT.snapshot(state, nowSeconds())
   local want = snap ~= nil and snap.confirmed and (enabled() or snap.preview) and true or false
@@ -561,10 +594,38 @@ function FTI.OnTake(slot)
     end
     info.key = FL.routeKey(pairsOfNodes)
     info.expected, info.approx = FT.expected(route.total)
+    info.from = route.hops[1].fromName
+    info.source = FL.sourceKind(route.total)
   end
   FT.start(state, nowSeconds(), info)
   startTracking()
   FTI.Refresh()
+end
+
+-- Takes a flight stored before /reload up again while the player is still on the taxi. A record the
+-- flight no longer fits (stale, other character, unknown version) is dropped, and so is any record
+-- once the world is loaded without a taxi (final). Without a usable record nothing is shown: the
+-- remaining time cannot be known.
+function FTI.Restore(final)
+  local db = ns.charDB
+  if not db or FT.flying(state) then
+    return false
+  end
+  local rec = db.activeFlight
+  if rec == nil then
+    return false
+  end
+  if onTaxi() then
+    if FT.resume(state, nowSeconds(), rec, serverNow(), charId()) then
+      startTracking()
+      FTI.Refresh()
+      return true
+    end
+    db.activeFlight = nil
+  elseif final then
+    db.activeFlight = nil
+  end
+  return false
 end
 
 -- Hooks TakeTaxiNode once the game has it (a post-hook: the flight itself is never touched).
@@ -604,6 +665,23 @@ end
 
 ns.On("PLAYER_LOGIN", function()
   FTI.Install()
+  FTI.Restore(false)
+end)
+-- The taxi flag can lag behind the loading screen, so a missing taxi only drops the record after
+-- a short wait; a late flag still resumes the flight.
+local RESTORE_DELAYS = { 1, 4 }
+ns.On("PLAYER_ENTERING_WORLD", function()
+  FTI.Restore(false)
+  local after = rawget(_G, "C_Timer") and C_Timer.After
+  if type(after) ~= "function" then
+    FTI.Restore(true)
+    return
+  end
+  for i, delay in ipairs(RESTORE_DELAYS) do
+    after(delay, function()
+      ns.Safe("flight-timer-restore", FTI.Restore, i == #RESTORE_DELAYS)
+    end)
+  end
 end)
 ns.On("TAXIMAP_OPENED", function()
   FTI.Install()

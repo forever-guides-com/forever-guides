@@ -83,7 +83,18 @@ Skins.list = {
       -- gap = the least space above and below a control in the band.
       -- backdrop = the brightest dark of the band interior (measured in the client, the thin
       -- bright rim of the metal carries no text): the title colors keep 4.5:1 on it (tests/test_skins.lua).
-      bar = { margin = 8, textPad = 10, main = 38, window = 32, gap = 4, backdrop = "#42280d" },
+      -- bleed = how far the band backdrop reaches under the metal past the window (side) and past the upper edge of
+      -- the band (top): the art leaves a clear sliver at the inner edge of the sides and below the top rim, the
+      -- backdrop closes it. Both stay below the thickness of the metal (side pieces 8 px and more, top rim about 9).
+      bar = {
+        margin = 8,
+        textPad = 10,
+        main = 38,
+        window = 32,
+        gap = 4,
+        backdrop = "#42280d",
+        bleed = { side = 3, top = 8 },
+      },
     },
   },
 }

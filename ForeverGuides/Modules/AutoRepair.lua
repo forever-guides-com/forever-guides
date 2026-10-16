@@ -25,7 +25,7 @@ local UNLIMITED = -1
 local state = { open = false, gen = 0 }
 
 local function money(copper)
-  return ns.SellLogic.Money(copper, true)
+  return ns.SellLogic.Money(copper)
 end
 
 local function number(value)

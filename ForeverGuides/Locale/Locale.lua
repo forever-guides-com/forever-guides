@@ -45,6 +45,11 @@ end
 function ns.SetLocale(setting)
   local client = type(GetLocale) == "function" and GetLocale() or "enUS"
   active = ns.ResolveLocale(setting, client)
+  -- Views that mirror the language (the buttons in the title bar) read it from here, not from the setting
+  -- that is written just before this call.
+  if ns.Emit then
+    ns.Emit("FG_LOCALE_CHANGED", active)
+  end
   return active
 end
 

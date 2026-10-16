@@ -2,11 +2,11 @@
 -- players you target, with class, level, place and what a visible unit tells passively. An entry
 -- keeps its first contact (e.first = { t, src, zone }, e.src is the same source) unchanged; e.t and
 -- e.zone are the time and place of the last sighting, which group scans and NearbyContacts refresh.
--- Stored only in ns.db.seenPlayers on this computer, at most GuildLogic.MAX_SEEN entries, never sent
+-- Stored only in ns.db.seenPlayers on this computer, at most ContactsLogic.MAX_SEEN entries, never sent
 -- anywhere and never exported. Off with settings.seenSave. S.Find(guid) is the one table lookup that
 -- tells a contact from a stranger.
 local _, ns = ...
-local GL, PN, L, Guard = ns.GuildLogic, ns.PlayerName, ns.L, ns.AutoGuard
+local CL, PN, L, Guard = ns.ContactsLogic, ns.PlayerName, ns.L, ns.AutoGuard
 
 local S = {}
 ns.SeenPlayers = S
@@ -46,17 +46,17 @@ function S.List()
   end
   local list = ns.db.seenPlayers
   if indexFor ~= list then
-    GL.CleanSeen(list)
-    index, guids, indexFor = GL.SeenIndex(list), GL.SeenGuidIndex(list), list
+    CL.CleanSeen(list)
+    index, guids, indexFor = CL.SeenIndex(list), CL.SeenGuidIndex(list), list
   end
   return list
 end
 
 -- Adds or refreshes a player of the list (name, guid, class, level, zone, race, src ...), see
--- GuildLogic.SeenAdd. Returns the entry.
+-- ContactsLogic.SeenAdd. Returns the entry.
 function S.Add(info, now)
   local list = S.List()
-  return GL.SeenAdd(list, index, info, now or ns.U.now(), guids)
+  return CL.SeenAdd(list, index, info, now or ns.U.now(), guids)
 end
 
 -- The contact with this GUID in one table lookup, nil for a stranger (or an entry stored without a GUID).
@@ -78,7 +78,7 @@ end
 function S.Touch(e, unit)
   local info = S.ReadUnit(unit)
   info.zone = try(g("GetRealZoneText"))
-  GL.SeenUpdate(e, info, ns.U.now())
+  CL.SeenUpdate(e, info, ns.U.now())
   ns.Emit("FG_SEEN_UPDATE")
   return info
 end
@@ -118,7 +118,7 @@ function S.ReadUnit(unit)
   local pvpName = safe(g("UnitPVPName"), unit)
   if type(pvpName) == "string" then
     local first = Guard.Safe(try(g("UnitName"), unit))
-    facts.title = GL.TitleOf(pvpName, PN.Display(unit), first)
+    facts.title = CL.TitleOf(pvpName, PN.Display(unit), first)
   end
   local pvp = safe(g("UnitIsPVP"), unit)
   if type(pvp) == "boolean" then

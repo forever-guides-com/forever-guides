@@ -265,7 +265,7 @@ register("guild", function(rest)
 end)
 register("social", function(rest)
   if not areaHelp(rest, "social") then
-    ns.Main.Show("guild/social")
+    ns.Main.Show("contacts")
   end
 end)
 register("macros", function()

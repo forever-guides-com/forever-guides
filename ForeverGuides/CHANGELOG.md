@@ -4,6 +4,64 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.1.4] - 2026-10-16
+
+### Added
+
+- New "Add-ons" tab in the settings with one card per optional add-on: a default for all characters, an override per character and a status line.
+- New setup step "Optional add-ons" sets the default for all characters.
+- New menu group "Guild and contacts" with the pages Guild and Contacts.
+- Without the GuildManager the guild page shows the normal guild view and a button that switches the GuildManager on.
+- Navigation edit mode: the pencil in the sidebar hides, renames and moves entries and groups, for all characters or only the current one.
+- Selling: the protect list has its own window to add items by name, ID, link or shift-click, with suggestions from your bags and worn items.
+- Profession tools such as pickaxes, hammers, fishing poles and enchanting rods are put on the protect list once, and you can remove them.
+- Shopping list: every position has amount buttons, an amount field, a remove button and a tick. The list is saved per character and holds up to 200 own positions.
+- Shopping list: new buttons "Remove done", "Empty list" (with confirmation) and "Restore" for removed route lines.
+- Professions: a click on an item offers "Add to shopping list" with an amount, and "Add finished" adds the crafted item.
+- Shopping list: share it as a chat link that opens read only, and "Take over into my list" adds it to yours.
+- Shopping list: both windows show the same list with have and need in colors and the views "Combined" and "By reason".
+- Shopping list: in "By reason" every added item has its own group with its materials, groups have separators, and ticking an item ticks its materials.
+- Shopping list: "Combined" lists only what you buy, both windows have a search field and the column headers have tooltips.
+- Shopping list: craftable items can be set to "Craft myself", which lists their materials, or to "Auction house".
+- Shopping list: it opens with the auction house when positions are open, which you can switch off. The auction house list shows icons and quality colors.
+- Shopping list: a fixed "Total" row shows the total cost in both views and both windows and names the items without a price.
+- Auction house: the button opens a window with the tabs Shopping list and Settings. There you start a full price scan with progress and see the date of the last scan.
+- Prices: an own price database per auction house (Horde, Alliance, Neutral) with lowest price, median and highest price, filled by every search and by a full scan.
+- Prices: the shopping list shows price and total, and item tooltips show lowest, median and highest price with their age. A price add-on serves as a fallback.
+- The guild bank counts in the item tooltip, per tab once you opened it, and you can switch it off.
+- Saving: a "Save" button in the footer reloads the interface and writes all data. A hint reminds you after scans and in longer sessions, and you can switch it off.
+- Flight time: after a reload during a flight the timer continues with the remaining time.
+
+### Changed
+
+- The GuildManager is now an optional add-on, off by default, that you switch on and off per character. Characters that already use it keep it.
+- The game's add-on list follows the switch in both directions, and an orange hint appears only when the game refuses the change.
+- Contacts (players you have met) have their own page next to the guild, and the command to open it is /fg social. The switch to store them sits with the guild settings.
+- On the selling tab the protect list shows a short description, its count and the button "Manage protect list" instead of the ID field.
+- Shopping list: "Send" puts the list into the chat as a link, and the new button "Auction list" creates the list for an auction house add-on.
+- Every item tooltip shows what each character owns (bags, bank, mail), now also in the shopping list and in our own windows.
+- Money is shown with gold, silver and copper icons everywhere. Texts you copy keep letters.
+- Chat messages of the automation, for example "Quest accepted", are off by default and can be switched on under Automation.
+- The Talking Head switch reads positive: on shows the window and off hides it.
+- Window tweaks: the bar with the sliders sits inside its window, and a window you click later always lies above it.
+- Entries on the error page for blocked actions without a function name now carry more detail.
+
+### Removed
+
+- The card "Additional packages" in the settings is gone, the data packages load on their own.
+
+### Fixed
+
+- The guild column of the character overview stayed empty for guild members.
+- The chat message of automatic quests names the quest instead of a question mark.
+- Sharing by whisper now needs a first and a last name, and nothing is sent without the last name.
+- The language buttons in the header always show the active language, and the window follows a language change.
+- Window style "WoW Forever": no more gap at the top and right in the title band of windows.
+- Flight times depend on the direction: each direction uses the length of its own route, and route planning uses the same times.
+- The window for choosing the fields of the character overview has a close button.
+- The feedback window shows its text, and the window for the website shows its address.
+- Window tweaks offered the opacity setting for windows that have no artwork of their own.
+
 ## [0.1.3] - 2026-10-13
 
 ### Added
@@ -69,6 +127,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.1.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/forever-guides-com/forever-guides/releases/tag/v0.1.1
