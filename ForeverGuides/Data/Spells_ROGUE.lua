@@ -1,4 +1,5 @@
--- Zauber ROGUE (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of ROGUE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -285,7 +286,7 @@ ns.Data.Spells.ROGUE = {
     i="classicon_rogue",
     id=462708,
     k="talent",
-    n={de="Halsabscheider",en="Cutthroat"},
+    n={de="Halsabschneider",en="Cutthroat"},
   },
   {
     c={"DRUID","HUNTER","MAGE","PRIEST","ROGUE","SHAMAN","WARLOCK","WARRIOR"},
@@ -391,7 +392,7 @@ ns.Data.Spells.ROGUE = {
     n={de="Ablenken",en="Distract"},
   },
   {
-    c={"HUNTER","ROGUE","WARRIOR"},
+    c={"HUNTER","ROGUE","SHAMAN","WARRIOR"},
     fid=132147,
     i="ability_dualwield",
     id=674,
@@ -404,7 +405,7 @@ ns.Data.Spells.ROGUE = {
     i="ability_dualwield",
     id=13715,
     k="talent",
-    n={de="Beidhändigkeits-Spezialisierung",en="Dual Wield Specialization"},
+    n={de="Beidhändigkeitsspezialisierung",en="Dual Wield Specialization"},
   },
   {
     fid=135994,
@@ -928,7 +929,7 @@ ns.Data.Spells.ROGUE = {
     i="ability_poisons",
     id=14113,
     k="talent",
-    n={de="Verbessere Gifte",en="Improved Poisons"},
+    n={de="Verbesserte Gifte",en="Improved Poisons"},
   },
   {
     fid=132310,
@@ -1059,7 +1060,7 @@ ns.Data.Spells.ROGUE = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {

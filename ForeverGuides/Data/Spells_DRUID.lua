@@ -1,4 +1,5 @@
--- Zauber DRUID (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of DRUID: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -116,7 +117,7 @@ ns.Data.Spells.DRUID = {
     i="ability_ghoulfrenzy",
     id=16958,
     k="talent",
-    n={en="Blood Frenzy"},
+    n={de="Blutraserei",en="Blood Frenzy"},
   },
   {
     fid=132114,
@@ -343,6 +344,14 @@ ns.Data.Spells.DRUID = {
     rt={de="Passiv",en="Passive"},
   },
   {
+    fid=132123,
+    i="ability_druid_dreamstate",
+    id=408258,
+    k="talent",
+    l=1,
+    n={de="Traumzustand",en="Dreamstate"},
+  },
+  {
     fid=236151,
     i="ability_druid_eclipse",
     id=408248,
@@ -522,6 +531,14 @@ ns.Data.Spells.DRUID = {
     k="talent",
     l=20,
     n={de="Wilde Attacke",en="Feral Charge"},
+  },
+  {
+    fid=132183,
+    i="ability_hunter_pet_bear",
+    id=16979,
+    k="talent",
+    l=20,
+    n={de="Wilde Attacke (Bär)",en="Feral Charge (Bear)"},
   },
   {
     fid=132154,
@@ -961,7 +978,7 @@ ns.Data.Spells.DRUID = {
     id=1322670,
     k="talent",
     l=1,
-    n={en="Improved Shifting Power"},
+    n={de="Verbesserte Machtverschiebung",en="Improved Shifting Power"},
   },
   {
     fid=136231,
@@ -1084,8 +1101,16 @@ ns.Data.Spells.DRUID = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
+  },
+  {
+    fid=236159,
+    i="ability_druid_kingofthejungle",
+    id=417046,
+    k="talent",
+    l=1,
+    n={de="König des Dschungels",en="King of the Jungle"},
   },
   {
     fid=132131,
@@ -1405,6 +1430,14 @@ ns.Data.Spells.DRUID = {
     rt={de="Gestaltwandel",en="Shapeshift"},
   },
   {
+    fid=132138,
+    i="ability_druid_predatoryinstincts",
+    id=1223242,
+    k="talent",
+    l=1,
+    n={de="Instinkt der Natur",en="Natural Instinct"},
+  },
+  {
     fid=132091,
     i="ability_bullrush",
     id=417051,
@@ -1634,14 +1667,6 @@ ns.Data.Spells.DRUID = {
     sup=9823,
   },
   {
-    fid=132138,
-    i="ability_druid_predatoryinstincts",
-    id=1223242,
-    k="talent",
-    l=1,
-    n={de="Räuberische Instinkte",en="Predatory Instincts"},
-  },
-  {
     fid=132185,
     i="ability_hunter_pet_cat",
     id=16972,
@@ -1654,7 +1679,7 @@ ns.Data.Spells.DRUID = {
     id=407995,
     k="talent",
     l=25,
-    n={en="Primal Bite"},
+    n={de="Urtümlicher Biss",en="Primal Bite"},
     rk=1,
   },
   {
@@ -1664,7 +1689,7 @@ ns.Data.Spells.DRUID = {
     id=1238069,
     k="spell",
     l=36,
-    n={en="Primal Bite"},
+    n={de="Urtümlicher Biss",en="Primal Bite"},
     rk=2,
     sup=407995,
   },
@@ -1675,7 +1700,7 @@ ns.Data.Spells.DRUID = {
     id=1238070,
     k="spell",
     l=48,
-    n={en="Primal Bite"},
+    n={de="Urtümlicher Biss",en="Primal Bite"},
     rk=3,
     sup=1238069,
   },
@@ -1686,7 +1711,7 @@ ns.Data.Spells.DRUID = {
     id=1238073,
     k="spell",
     l=60,
-    n={en="Primal Bite"},
+    n={de="Urtümlicher Biss",en="Primal Bite"},
     rk=4,
     sup=1238070,
   },
@@ -2228,14 +2253,14 @@ ns.Data.Spells.DRUID = {
     id=1322605,
     k="talent",
     l=1,
-    n={en="Shifting Power"},
+    n={de="Machtverschiebung",en="Shifting Power"},
   },
   {
     fid=136231,
     i="spell_shadow_vampiricaura",
     id=5221,
     k="spell",
-    l=22,
+    l=20,
     n={de="Schreddern",en="Shred"},
     rk=1,
   },
@@ -2483,6 +2508,7 @@ ns.Data.Spells.DRUID = {
     i="inv_misc_pelt_bear_03",
     id=16929,
     k="talent",
+    l=1,
     n={de="Dickes Fell",en="Thick Hide"},
   },
   {

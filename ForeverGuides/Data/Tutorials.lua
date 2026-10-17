@@ -4,11 +4,12 @@ local _, ns = ...
 
 ns.Tutorials.register({
   id = "addon-start",
-  version = 1,
+  version = 2,
   title = "tour.addon-start.title",
   steps = {
     { id = "welcome" },
     { id = "sidebar", target = "FG.Sidebar" },
+    { id = "edit", target = "FG.Sidebar.Edit", optional = true },
     { id = "search", target = "FG.Search" },
     { id = "data", target = "FG.Footer.Data", optional = true },
     { id = "help", target = "FG.Help" },

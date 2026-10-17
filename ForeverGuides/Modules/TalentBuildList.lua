@@ -10,14 +10,10 @@ local W, L, U, K, TL, TB, R = ns.W, ns.L, ns.U, ns.PageKit, ns.TalentLogic, ns.T
 local BL = {}
 ns.TalentBuildList = BL
 
--- Visible list rows at the default window height; a taller or shorter window shows more or
--- fewer (BL.RowsFor), the page scrolls when the rest does not fit.
-BL.MAX_ROWS = 5
-BL.ROWS_MIN, BL.ROWS_MAX = 3, 14
+-- The list takes all the height the window has left after the controls above and the texts below it
+-- (measured, see fillList); it never shows fewer rows than ROWS_MIN, the page scrolls then.
+BL.ROWS_MIN = 3
 local ROW_HEIGHT = 54
--- Window height at 100 percent font size taken by everything but the list (title, class choice, tree
--- cards, buttons, hints), measured with a build selected (selection line and management buttons).
-local LIST_OVERHEAD = 352
 BL.WINDOW_W, BL.WINDOW_H = 580, 640
 BL.MIN_W, BL.MIN_H = 440, 420
 BL.MAX_W, BL.MAX_H = 1000, 1000
@@ -162,16 +158,9 @@ local function currentWithPoints()
   ns.Notify(L["talents.editor.noPoints"], "warning")
 end
 
--- How many list rows a window of this height shows.
-function BL.RowsFor(height)
-  local room = height - K.scaledHeight(LIST_OVERHEAD)
-  return U.clamp(math.floor(room / K.scaledHeight(ROW_HEIGHT)), BL.ROWS_MIN, BL.ROWS_MAX)
-end
-
 -- Fills `view` (a page view: stack, content, Layout) with the controls and the list. close() hides
--- the window after a build was planned; host is the window (its height sets the visible rows).
--- Returns { Refresh = fn(skipLayout), Show = fn }.
-function BL.Build(view, close, host)
+-- the window after a build was planned. Returns { Refresh = fn(skipLayout), Show = fn }.
+function BL.Build(view, close)
   local TE, FL = ns.TalentEditor, ns.FlowLayout
   local stack = view.stack
   -- spec: the chosen talent tree, nil shows the builds of all three trees.
@@ -378,6 +367,7 @@ function BL.Build(view, close, host)
 
   -- List -------------------------------------------------------------------------------------
   local listOpts = { gap = 8 }
+  local entryCount = 0
   local list = K.NewList(view.content, {
     rowHeight = ROW_HEIGHT,
     bind = function(entry)
@@ -481,7 +471,36 @@ function BL.Build(view, close, host)
       onClick = onSelected(delete),
     },
   })
-  stack:Add(manage, { gap = 14 })
+  local MANAGE_GAP = 14
+  stack:Add(manage, { gap = MANAGE_GAP })
+
+  -- The stack hands the list the room that is left: whole rows from what remains of the window
+  -- after the texts and buttons below it, which are measured at the width they get. A list with
+  -- fewer builds than fit shrinks to them, so no blank area opens between it and the texts.
+  function list:fgGridLayout(width, room)
+    local below = 0
+    for _, text in ipairs({ pick, selectedLabel }) do
+      if text:IsShown() then
+        text:SetWidth(width)
+        below = below + text:GetStringHeight() + (text == pick and 8 or 6)
+      end
+    end
+    if manage:IsShown() then
+      below = below + manage:fgGridLayout(width) + MANAGE_GAP
+    end
+    local rowHeight = K.scaledHeight(ROW_HEIGHT)
+    -- The font size can change while the window stays built.
+    list:SetRowHeight(rowHeight)
+    local free = (room.viewHeight or 0) - room.top - room.gap - below - room.pad
+    local rows = math.min(entryCount, math.max(BL.ROWS_MIN, math.floor(free / rowHeight)))
+    local height = rows * rowHeight
+    if height ~= list:GetHeight() then
+      list:SetHeight(height)
+      -- Rows come from the height, not from the next resize event.
+      list.Refresh()
+    end
+    return height
+  end
 
   -- Refresh ------------------------------------------------------------------------------------
   -- skipLayout: the caller lays the window out.
@@ -529,8 +548,7 @@ function BL.Build(view, close, host)
     W.SetText(status, nil, table.concat(notes, "\n"))
     status:SetShown(#notes > 0)
 
-    local rows = host and BL.RowsFor(host:GetHeight()) or BL.MAX_ROWS
-    listOpts.height = K.scaledHeight(ROW_HEIGHT) * math.min(math.max(#entries, 1), rows)
+    entryCount = #entries
     list:SetShown(#entries > 0)
     list:SetData(entries)
     pick:SetShown(#entries > 0 and entry == nil)
@@ -553,6 +571,13 @@ function BL.Build(view, close, host)
     state.class, state.spec, state.selected = editorClass(), nil, nil
     refresh()
   end
+
+  -- A font size or language change alters the text heights, so the list takes the room anew.
+  ns.On("FG_UI_REFRESHED", function()
+    if view.content:IsVisible() then
+      refresh()
+    end
+  end)
 
   refresh(true)
   return { Refresh = refresh, Show = show }
@@ -641,18 +666,11 @@ local function createWindow()
   local body = CreateFrame("Frame", nil, d)
   body:SetPoint("TOPLEFT", 16, -48)
   body:SetPoint("BOTTOMRIGHT", -16, 16)
+  -- The page reflows with the window by itself, the list takes the height that is left.
   d.builds = BL.Build(ns.NewPageView(body), function()
     d:Hide()
-  end, d)
-  d.grip = createGrip(d)
-  -- The page reflows by itself; the number of list rows follows the height.
-  d:HookScript("OnSizeChanged", function()
-    ns.Debounce(d, 0.05, function()
-      if d:IsShown() then
-        d.builds.Refresh()
-      end
-    end)
   end)
+  d.grip = createGrip(d)
   return d
 end
 

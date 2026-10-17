@@ -1,4 +1,5 @@
--- Zauber WARLOCK (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of WARLOCK: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -1079,7 +1080,7 @@ ns.Data.Spells.WARLOCK = {
   {
     fid=136127,
     id=18218,
-    k="passive",
+    k="talent",
     n={de="Grimmige Reichweite",en="Grim Reach"},
   },
   {
@@ -1654,7 +1655,7 @@ ns.Data.Spells.WARLOCK = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {
@@ -1720,13 +1721,6 @@ ns.Data.Spells.WARLOCK = {
     n={de="Aderlass",en="Life Tap"},
     rk=6,
     sup=11688,
-  },
-  {
-    fid=136137,
-    i="spell_shadow_curseofachimonde",
-    id=1225177,
-    k="talent",
-    n={de="Verhängnis",en="Malediction"},
   },
   {
     fid=136158,
@@ -2275,14 +2269,14 @@ ns.Data.Spells.WARLOCK = {
     i="inv_elemental_primal_shadow",
     id=437032,
     k="talent",
-    n={en="Soul Harvest"},
+    n={de="Seelenernte",en="Soul Harvest"},
   },
   {
     fid=136160,
     i="spell_shadow_gathershadows",
     id=19028,
     k="talent",
-    l=40,
+    l=1,
     n={de="Seelenverbindung",en="Soul Link"},
   },
   {

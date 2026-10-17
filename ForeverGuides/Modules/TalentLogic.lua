@@ -243,40 +243,42 @@ end
 
 -- Build link ------------------------------------------------------------------
 
--- The talents of a tree in v1 digit order: the tree without the hotfix nodes (nv1 = true), the
--- layout of every v1 code written before those nodes existed.
-local function v1Talents(spec)
+-- The digits of a v1 code for one tree, one entry per digit in code order: { talent, node, sid, name }.
+-- The order is frozen in spec.v1 (generated from the layout the old codes were written for), and a
+-- digit means a spell: its talent is the one with that spell id in this tree today, wherever it sits
+-- now. talent is nil when the spell is gone, node, sid and name then describe the old talent. A tree
+-- without spec.v1 (no frozen layout) uses its talents in file order, without the nv1 nodes.
+local function v1Layout(spec)
   local list = {}
+  if spec.v1 then
+    local bySid = {}
+    for _, talent in ipairs(spec.talents) do
+      if talent.sid then
+        bySid[talent.sid] = talent
+      end
+    end
+    for i, digit in ipairs(spec.v1) do
+      list[i] = { talent = bySid[digit.sid], node = digit.node, sid = digit.sid, name = digit.n }
+    end
+    return list
+  end
   for _, talent in ipairs(spec.talents) do
     if not talent.nv1 then
-      list[#list + 1] = talent
+      list[#list + 1] = { talent = talent }
     end
   end
   return list
 end
 
--- Talents a hotfix replaced in place, by game node: the node kept its position (so the v1 digit
--- order is unchanged) but holds another talent now. `sid` and `name` are the replaced talent's
--- (the v1 snapshot of the website). A v1 digit there meant the old talent, so reading it drops the
--- points like the website does; the new talent has to be chosen again.
-TL.V1_REPLACED = {
-  [110857] = { sid = 12962, name = { de = "Eiserner Wille", en = "Iron Will" } },
-  [105953] = { sid = 1310236, name = { de = "Grenzenlose Wut", en = "Boundless Rage" } },
-}
-
--- The replaced talent of a node while the data still holds a different one there, else nil.
-local function replacedAt(talent)
-  local old = talent.node and TL.V1_REPLACED[talent.node]
-  if old and old.sid ~= talent.sid then
-    return old
-  end
-end
-
--- true when a node outside the v1 digits holds points: a hotfix node or a replaced talent.
+-- true when a talent that no v1 digit names holds points: a talent added after the old codes.
 local function usesNewNodes(specs, ranks)
   for _, spec in ipairs(specs) do
+    local known = {}
+    for _, digit in ipairs(v1Layout(spec)) do
+      known[digit.talent or false] = true
+    end
     for _, talent in ipairs(spec.talents) do
-      if (talent.nv1 or replacedAt(talent)) and rankOf(ranks, talent.id) > 0 then
+      if not known[talent] and rankOf(ranks, talent.id) > 0 then
         return true
       end
     end
@@ -284,14 +286,14 @@ local function usesNewNodes(specs, ranks)
   return false
 end
 
--- v1 digits: one per talent of the v1 layout. Points on hotfix nodes and on replaced talents
--- cannot be written (they would read as the old talent).
+-- v1 digits: one per digit of the frozen layout. Points on talents the layout does not name cannot
+-- be written (the digits would put them on another talent).
 function TL.EncodeV1(specs, ranks)
   local segments = {}
   for i, spec in ipairs(specs) do
     local digits = {}
-    for j, talent in ipairs(v1Talents(spec)) do
-      local rank = replacedAt(talent) and 0 or rankOf(ranks, talent.id)
+    for j, digit in ipairs(v1Layout(spec)) do
+      local rank = digit.talent and rankOf(ranks, digit.talent.id) or 0
       digits[j] = tostring(math.min(MAX_DIGIT, math.max(0, math.floor(rank))))
     end
     segments[i] = table.concat(digits)
@@ -300,7 +302,7 @@ function TL.EncodeV1(specs, ranks)
 end
 
 -- The code kept in the saved builds and sent in chat links: v1 digits while a build fits them (older
--- codes and clients stay valid), the spell-id format (v2) once a hotfix node holds points.
+-- codes and clients stay valid), the spell-id format (v2) once a talent outside the v1 layout holds points.
 function TL.Encode(specs, ranks)
   if usesNewNodes(specs, ranks) then
     return TL.EncodeV2(specs, ranks) or TL.EncodeV1(specs, ranks)
@@ -439,14 +441,14 @@ local function split(text)
   end
 end
 
--- Accepts the bare code (v1: one digit per talent of the v1 layout, so codes from before the hotfix
--- nodes still read right; v2: "v2." and spell ids, see above) or a pasted
+-- Accepts the bare code (v1: one digit per entry of the frozen layout, so codes written for older
+-- talent data still read right; v2: "v2." and spell ids, see above) or a pasted
 -- web address with ?b=<code>. Never errors:
 -- unreadable characters stay 0, digits above a talent's max rank are cut down.
 -- Returns ranks and the number of problems (wrong segment count or length,
 -- unreadable characters, clamped digits). The result is not rule-checked, see
--- TL.Normalize. The third result lists the v1 points dropped because a hotfix replaced the talent
--- (see TL.V1_REPLACED): { id, node, sid, name = { de, en }, rank } of the OLD talent. They are no
+-- TL.Normalize. The third result lists the v1 points dropped because the digit's spell is no
+-- talent of the tree any more: { node, sid, name = { de, en }, rank } of the OLD talent. They are no
 -- problems. v2 codes name the talent by spell id and never drop this way.
 function TL.Decode(text, specs)
   local ranks, problems, dropped = {}, 0, {}
@@ -465,20 +467,20 @@ function TL.Decode(text, specs)
   end
   for i, spec in ipairs(specs) do
     local segment = segments[i] or ""
-    local layout = v1Talents(spec)
+    local layout = v1Layout(spec)
     if #segment ~= #layout then
       problems = problems + 1
     end
-    for j, talent in ipairs(layout) do
+    for j, entry in ipairs(layout) do
       local char = segment:sub(j, j)
       if char ~= "" then
         local digit = char:match("^%d$") and tonumber(char)
-        local old = replacedAt(talent)
+        local talent = entry.talent
         if not digit then
           problems = problems + 1
-        elseif old then
+        elseif not talent then
           if digit > 0 then
-            dropped[#dropped + 1] = { id = talent.id, node = talent.node, sid = old.sid, name = old.name, rank = digit }
+            dropped[#dropped + 1] = { node = entry.node, sid = entry.sid, name = entry.name, rank = digit }
           end
         else
           if digit > talent.mr then
@@ -521,7 +523,7 @@ end
 
 -- Strict read of a build from outside (chat link, API): the class needs data,
 -- the code must decode cleanly and survive the rules untouched. Returns the
--- ranks and their total, or nil and the number of problems. Points dropped for a replaced talent
+-- ranks and their total, or nil and the number of problems. Points dropped for a talent the tree no longer has
 -- (third result, see TL.Decode) are no problem; points that lose their row or prerequisite through
 -- that are left out too and counted in the fourth result.
 function TL.Parse(class, text)

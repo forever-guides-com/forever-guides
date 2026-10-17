@@ -624,9 +624,13 @@ end
 function SE.Attach(f)
   local e = {}
   f.fgEdit = e
+  -- Boxed (surface and edge) and a 16 px symbol: the plain arrow next to it is easy to read as the
+  -- only control, the pencil has to stand out as a button of its own.
   e.toggle = W.Action(f, {
     icon = "pencil",
     size = 24,
+    iconSize = 16,
+    boxed = true,
     tooltip = "nav.edit.toggle",
     onClick = function()
       SE.Toggle()
@@ -634,6 +638,8 @@ function SE.Attach(f)
   })
   e.toggle.fgId = "nav-edit-toggle"
   e.toggle:SetPoint("TOPRIGHT", -38, -6)
+  -- Target of the start tour; hidden on the icon rail, where the tour skips the step.
+  ns.Anchors["FG.Sidebar.Edit"] = e.toggle
 end
 
 -- Entering and leaving -----------------------------------------------------------------------------

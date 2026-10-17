@@ -1,4 +1,5 @@
--- Zauber WARRIOR (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of WARRIOR: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -127,7 +128,7 @@ ns.Data.Spells.WARRIOR = {
     i="spell_nature_ancestralguardian",
     id=18499,
     k="spell",
-    l=32,
+    l=30,
     n={de="Berserkerwut",en="Berserker Rage"},
   },
   {
@@ -430,7 +431,7 @@ ns.Data.Spells.WARRIOR = {
     id=1160,
     k="spell",
     l=14,
-    n={de="Demoralisierungsruf",en="Demoralizing Shout"},
+    n={de="Demoralisierender Ruf",en="Demoralizing Shout"},
     rk=1,
   },
   {
@@ -495,7 +496,7 @@ ns.Data.Spells.WARRIOR = {
     rt={de="Passiv",en="Passive"},
   },
   {
-    c={"HUNTER","ROGUE","WARRIOR"},
+    c={"HUNTER","ROGUE","SHAMAN","WARRIOR"},
     fid=132147,
     i="ability_dualwield",
     id=674,
@@ -608,6 +609,20 @@ ns.Data.Spells.WARRIOR = {
     id=29787,
     k="talent",
     n={de="Fokussierte Wut",en="Focused Rage"},
+  },
+  {
+    fid=236309,
+    i="ability_warrior_incite",
+    id=1323963,
+    k="talent",
+    n={de="Zornige Präzision",en="Furious Precision"},
+  },
+  {
+    fid=135727,
+    i="racial_troll_berserk",
+    id=1323967,
+    k="talent",
+    n={de="Blutgier",en="Gore Drinker"},
   },
   {
     c={"HUNTER","ROGUE","WARRIOR"},
@@ -846,7 +861,7 @@ ns.Data.Spells.WARRIOR = {
     fid=132338,
     i="ability_warrior_cleave",
     id=12329,
-    k="talent",
+    k="passive",
     l=1,
     n={de="Verbessertes Spalten",en="Improved Cleave"},
   },
@@ -1165,7 +1180,7 @@ ns.Data.Spells.WARRIOR = {
     fid=135995,
     i="ability_warrior_secondwind",
     id=12962,
-    k="passive",
+    k="talent",
     l=1,
     n={de="Eiserner Wille",en="Iron Will"},
   },
@@ -1175,7 +1190,7 @@ ns.Data.Spells.WARRIOR = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {
@@ -1192,6 +1207,14 @@ ns.Data.Spells.WARRIOR = {
     id=9077,
     k="weapon",
     n={de="Leder",en="Leather"},
+  },
+  {
+    fid=132356,
+    i="ability_warrior_secondwind",
+    id=1323964,
+    k="talent",
+    l=1,
+    n={de="Schwelende Wut",en="Lingering Rage"},
   },
   {
     fid=135860,
@@ -1401,13 +1424,6 @@ ns.Data.Spells.WARRIOR = {
     id=200,
     k="weapon",
     n={de="Stangenwaffen",en="Polearms"},
-  },
-  {
-    fid=132222,
-    i="ability_marksmanship",
-    id=1225295,
-    k="talent",
-    n={de="Präzision",en="Precision"},
   },
   {
     fid=132938,
@@ -1952,7 +1968,7 @@ ns.Data.Spells.WARRIOR = {
     fid=135892,
     i="spell_holy_devotion",
     id=12299,
-    k="talent",
+    k="passive",
     l=1,
     n={de="Zähigkeit",en="Toughness"},
   },

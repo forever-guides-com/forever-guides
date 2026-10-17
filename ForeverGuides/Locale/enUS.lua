@@ -126,6 +126,8 @@ ns.AddLocale("enUS", {
   ["tour.addon-start.welcome.text"] = "Enter or Right arrow: next. Esc: end.",
   ["tour.addon-start.sidebar.title"] = "Navigation",
   ["tour.addon-start.sidebar.text"] = "All topics on the left, the arrow collapses them to icons.",
+  ["tour.addon-start.edit.title"] = "Edit navigation",
+  ["tour.addon-start.edit.text"] = "The pencil opens the edit mode: hide, rename and move entries and groups, for all characters or only this one.",
   ["tour.addon-start.search.title"] = "Search",
   ["tour.addon-start.search.text"] = "Search from anywhere; Ctrl+F jumps here.",
   ["tour.addon-start.data.title"] = "Data version",

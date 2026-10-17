@@ -1,4 +1,5 @@
--- Zauber SHAMAN (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of SHAMAN: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -258,6 +259,15 @@ ns.Data.Spells.SHAMAN = {
     n={de="Totem der Krankheitsreinigung",en="Disease Cleansing Totem"},
   },
   {
+    c={"HUNTER","ROGUE","SHAMAN","WARRIOR"},
+    fid=132147,
+    i="ability_dualwield",
+    id=674,
+    k="weapon",
+    n={de="Beidhändigkeit",en="Dual Wield"},
+    rt={de="Passiv",en="Passive"},
+  },
+  {
     fid=136026,
     i="spell_nature_earthshock",
     id=8042,
@@ -390,6 +400,14 @@ ns.Data.Spells.SHAMAN = {
     id=16089,
     k="talent",
     n={de="Elementarfuror",en="Elemental Fury"},
+  },
+  {
+    fid=136115,
+    i="spell_nature_wispheal",
+    id=16166,
+    k="talent",
+    l=1,
+    n={de="Elementarbeherrschung",en="Elemental Mastery"},
   },
   {
     fid=136099,
@@ -1066,13 +1084,6 @@ ns.Data.Spells.SHAMAN = {
     rt={de="Rang 2",en="Rank 1"},
   },
   {
-    fid=135824,
-    i="spell_fire_sealoffire",
-    id=16086,
-    k="talent",
-    n={de="Verbesserte Feuernova",en="Improved Fire Nova"},
-  },
-  {
     fid=136095,
     i="spell_nature_spiritwolf",
     id=16262,
@@ -1130,7 +1141,7 @@ ns.Data.Spells.SHAMAN = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {
@@ -1138,7 +1149,7 @@ ns.Data.Spells.SHAMAN = {
     i="spell_shaman_lavaburst",
     id=408490,
     k="talent",
-    l=40,
+    l=30,
     n={de="Lavaeruption",en="Lava Burst"},
     rk=1,
   },
@@ -1148,7 +1159,7 @@ ns.Data.Spells.SHAMAN = {
     i="spell_shaman_lavaburst",
     id=1238299,
     k="spell",
-    l=50,
+    l=40,
     n={de="Lavaeruption",en="Lava Burst"},
     rk=2,
     sup=408490,
@@ -1159,10 +1170,21 @@ ns.Data.Spells.SHAMAN = {
     i="spell_shaman_lavaburst",
     id=1238300,
     k="spell",
-    l=60,
+    l=50,
     n={de="Lavaeruption",en="Lava Burst"},
     rk=3,
     sup=1238299,
+  },
+  {
+    b=408490,
+    fid=237582,
+    i="spell_shaman_lavaburst",
+    id=1326047,
+    k="spell",
+    l=60,
+    n={de="Lavaeruption",en="Lava Burst"},
+    rk=4,
+    sup=1238300,
   },
   {
     c={"DRUID","HUNTER","PALADIN","ROGUE","SHAMAN","WARRIOR"},
@@ -1644,7 +1666,7 @@ ns.Data.Spells.SHAMAN = {
     i="spell_frost_summonwaterelemental",
     id=16190,
     k="talent",
-    l=40,
+    l=1,
     n={de="Totem der Manaflut",en="Mana Tide Totem"},
     rk=1,
   },
@@ -1654,7 +1676,7 @@ ns.Data.Spells.SHAMAN = {
     i="spell_frost_summonwaterelemental",
     id=17354,
     k="spell",
-    l=48,
+    l=38,
     n={de="Totem der Manaflut",en="Mana Tide Totem"},
     rk=2,
     sup=16190,
@@ -1665,10 +1687,21 @@ ns.Data.Spells.SHAMAN = {
     i="spell_frost_summonwaterelemental",
     id=17359,
     k="spell",
-    l=58,
+    l=48,
     n={de="Totem der Manaflut",en="Mana Tide Totem"},
     rk=3,
     sup=17354,
+  },
+  {
+    b=16190,
+    fid=135861,
+    i="spell_frost_summonwaterelemental",
+    id=1325256,
+    k="spell",
+    l=58,
+    n={de="Totem der Manaflut",en="Mana Tide Totem"},
+    rk=4,
+    sup=17359,
   },
   {
     fid=136055,
@@ -2364,6 +2397,13 @@ ns.Data.Spells.SHAMAN = {
     k="spell",
     l=18,
     n={de="Totem des Erdstoßes",en="Tremor Totem"},
+  },
+  {
+    fid=135824,
+    i="spell_fire_sealoffire",
+    id=16086,
+    k="talent",
+    n={de="Feuerprobe",en="Trial by Fire"},
   },
   {
     c={"HUNTER","PALADIN","SHAMAN","WARRIOR"},

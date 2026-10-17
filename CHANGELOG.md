@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.5
+
+### Added
+
+- The intro tour has a new step for the pencil that edits the navigation. Players who have seen the tour before are offered it again.
+
+### Changed
+
+- Spells, abilities and talent trees are updated to game build 70450, with new and changed spells and talents.
+- German names of spells and abilities now come from the game data.
+- Some profession spells are no longer listed as spells, because the game treats them as recipes now.
+- Old talent codes are read by spell, so a saved code keeps meaning the same talents even where the game moved them.
+- Points on talents that no longer exist are removed from an old code, and a notice names them.
+- The builds that come with the add-on are updated for the new talents.
+- The Builds window shows more builds at once, because the list uses all the free space of the window.
+- The pencil in the sidebar is easier to see, with a fill, an edge and a larger symbol.
+
 ## 0.1.4
 
 ### Added

@@ -4,6 +4,23 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.1.5] - 2026-10-17
+
+### Added
+
+- The intro tour has a new step for the pencil that edits the navigation. Players who have seen the tour before are offered it again.
+
+### Changed
+
+- Spells, abilities and talent trees are updated to game build 70450, with new and changed spells and talents.
+- German names of spells and abilities now come from the game data.
+- Some profession spells are no longer listed as spells, because the game treats them as recipes now.
+- Old talent codes are read by spell, so a saved code keeps meaning the same talents even where the game moved them.
+- Points on talents that no longer exist are removed from an old code, and a notice names them.
+- The builds that come with the add-on are updated for the new talents.
+- The Builds window shows more builds at once, because the list uses all the free space of the window.
+- The pencil in the sidebar is easier to see, with a fill, an edge and a larger symbol.
+
 ## [0.1.4] - 2026-10-16
 
 ### Added
@@ -127,6 +144,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.1.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.1...v0.1.2

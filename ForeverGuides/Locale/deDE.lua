@@ -126,6 +126,8 @@ ns.AddLocale("deDE", {
   ["tour.addon-start.welcome.text"] = "Enter oder Pfeil rechts: weiter. Esc: beenden.",
   ["tour.addon-start.sidebar.title"] = "Navigation",
   ["tour.addon-start.sidebar.text"] = "Links alle Themen, der Pfeil klappt sie auf Icons zu.",
+  ["tour.addon-start.edit.title"] = "Navigation bearbeiten",
+  ["tour.addon-start.edit.text"] = "Der Stift öffnet den Bearbeiten-Modus: Einträge und Gruppen ausblenden, umbenennen und verschieben, für alle Charaktere oder nur diesen.",
   ["tour.addon-start.search.title"] = "Suche",
   ["tour.addon-start.search.text"] = "Suche von überall, Strg+F springt hierher.",
   ["tour.addon-start.data.title"] = "Datenstand",

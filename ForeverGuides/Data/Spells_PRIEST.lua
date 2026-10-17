@@ -1,4 +1,5 @@
--- Zauber PRIEST (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of PRIEST: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -267,6 +268,13 @@ ns.Data.Spells.PRIEST = {
     id=1180,
     k="weapon",
     n={de="Dolche",en="Daggers"},
+  },
+  {
+    fid=463284,
+    i="spell_warlock_demonsoul",
+    id=1326159,
+    k="talent",
+    n={de="Dunkle Inspiration",en="Dark Inspiration"},
   },
   {
     fid=5852175,
@@ -1285,7 +1293,7 @@ ns.Data.Spells.PRIEST = {
     fid=135994,
     i="spell_magic_lesserinvisibilty",
     id=15274,
-    k="talent",
+    k="passive",
     n={de="Verbessertes Verblassen",en="Improved Fade"},
   },
   {
@@ -1464,7 +1472,7 @@ ns.Data.Spells.PRIEST = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {
@@ -2471,7 +2479,7 @@ ns.Data.Spells.PRIEST = {
     fid=136205,
     i="spell_shadow_shadowward",
     id=15318,
-    k="talent",
+    k="passive",
     n={de="Schattenaffinität",en="Shadow Affinity"},
   },
   {
@@ -2824,7 +2832,7 @@ ns.Data.Spells.PRIEST = {
     id=585,
     k="spell",
     l=1,
-    n={de="Göttliche Pein",en="Smite"},
+    n={de="Heilige Pein",en="Smite"},
     rk=1,
   },
   {

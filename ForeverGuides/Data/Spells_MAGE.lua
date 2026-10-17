@@ -1,4 +1,5 @@
--- Zauber MAGE (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of MAGE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -392,6 +393,48 @@ ns.Data.Spells.MAGE = {
     n={de="Arkanes Feingefühl",en="Arcane Subtlety"},
   },
   {
+    fid=236222,
+    i="ability_mage_netherwindpresence",
+    id=1326079,
+    k="talent",
+    l=25,
+    n={de="Arkaner Zorn",en="Arcane Wrath"},
+    rk=1,
+  },
+  {
+    b=1326079,
+    fid=236222,
+    i="ability_mage_netherwindpresence",
+    id=1326080,
+    k="talent",
+    l=36,
+    n={de="Arkaner Zorn",en="Arcane Wrath"},
+    rk=2,
+    sup=1326079,
+  },
+  {
+    b=1326079,
+    fid=236222,
+    i="ability_mage_netherwindpresence",
+    id=1326081,
+    k="talent",
+    l=48,
+    n={de="Arkaner Zorn",en="Arcane Wrath"},
+    rk=3,
+    sup=1326080,
+  },
+  {
+    b=1326079,
+    fid=236222,
+    i="ability_mage_netherwindpresence",
+    id=1326082,
+    k="talent",
+    l=60,
+    n={de="Arkaner Zorn",en="Arcane Wrath"},
+    rk=4,
+    sup=1326081,
+  },
+  {
     fid=136141,
     i="spell_shadow_darkritual",
     id=16757,
@@ -576,6 +619,7 @@ ns.Data.Spells.MAGE = {
     k="other",
     l=6,
     n={de="Schriftrolle verstehen",en="Comprehend Scroll"},
+    rt={de="Verständnis",en="Comprehension"},
   },
   {
     fid=135852,
@@ -664,7 +708,7 @@ ns.Data.Spells.MAGE = {
     id=6129,
     k="spell",
     l=32,
-    n={de="Essen beschwören",en="Conjure Food"},
+    n={de="Essen herbeizaubern",en="Conjure Food"},
     rk=4,
     sup=990,
   },
@@ -1309,6 +1353,37 @@ ns.Data.Spells.MAGE = {
     sup=7300,
   },
   {
+    fid=135845,
+    i="spell_ice_magicdamage",
+    id=1326053,
+    k="spell",
+    l=24,
+    n={de="Frostschlag",en="Frost Blast"},
+    rk=1,
+  },
+  {
+    b=1326053,
+    fid=135845,
+    i="spell_ice_magicdamage",
+    id=1326054,
+    k="spell",
+    l=36,
+    n={de="Frostschlag",en="Frost Blast"},
+    rk=2,
+    sup=1326053,
+  },
+  {
+    b=1326053,
+    fid=135845,
+    i="spell_ice_magicdamage",
+    id=1326055,
+    k="spell",
+    l=48,
+    n={de="Frostschlag",en="Frost Blast"},
+    rk=3,
+    sup=1326054,
+  },
+  {
     fid=135860,
     i="spell_frost_stun",
     id=11160,
@@ -1585,7 +1660,7 @@ ns.Data.Spells.MAGE = {
     id=400624,
     k="talent",
     l=1,
-    n={en="Heating Up"},
+    n={de="Aufwärmen",en="Heating Up"},
   },
   {
     fid=135843,
@@ -1805,6 +1880,14 @@ ns.Data.Spells.MAGE = {
     n={de="Verbesserter Gegenzauber",en="Improved Counterspell"},
   },
   {
+    fid=135819,
+    i="spell_fire_lavaspawn",
+    id=11078,
+    k="talent",
+    l=1,
+    n={de="Verbesserter Feuerschlag",en="Improved Fire Blast"},
+  },
+  {
     fid=135806,
     i="spell_fire_firearmor",
     id=11094,
@@ -1864,7 +1947,7 @@ ns.Data.Spells.MAGE = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {
@@ -2350,6 +2433,7 @@ ns.Data.Spells.MAGE = {
     k="other",
     l=6,
     n={de="Studieren",en="Study"},
+    rt={de="Verständnis",en="Comprehension"},
   },
   {
     fid=1536440,
@@ -2408,14 +2492,6 @@ ns.Data.Spells.MAGE = {
     k="racial",
     n={de="Berührung des Grabes",en="Touch of the Grave"},
     rt={de="Passive Volksfähigkeit",en="Racial Passive"},
-  },
-  {
-    fid=135819,
-    i="spell_fire_lavaspawn",
-    id=11078,
-    k="talent",
-    l=1,
-    n={de="Feuersog",en="Wake of Fire"},
   },
   {
     fid=135463,

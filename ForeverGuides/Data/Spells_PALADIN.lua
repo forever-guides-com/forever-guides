@@ -1,4 +1,5 @@
--- Zauber PALADIN (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of PALADIN: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -186,14 +187,6 @@ ns.Data.Spells.PALADIN = {
     sup=6940,
   },
   {
-    fid=135967,
-    i="spell_holy_sealofsalvation",
-    id=1038,
-    k="spell",
-    l=26,
-    n={de="Segen der Rettung",en="Blessing of Salvation"},
-  },
-  {
     fid=135970,
     id=19742,
     k="spell",
@@ -357,13 +350,6 @@ ns.Data.Spells.PALADIN = {
     k="talent",
     l=1,
     n={de="Überzeugung",en="Conviction"},
-  },
-  {
-    fid=135889,
-    i="spell_holy_crusade",
-    id=1311083,
-    k="talent",
-    n={de="Kreuzzug",en="Crusade"},
   },
   {
     fid=132269,
@@ -750,13 +736,6 @@ ns.Data.Spells.PALADIN = {
     sup=25782,
   },
   {
-    fid=135910,
-    id=25895,
-    k="spell",
-    l=60,
-    n={de="Großer Segen der Rettung",en="Greater Blessing of Salvation"},
-  },
-  {
     fid=135912,
     id=25894,
     k="spell",
@@ -977,7 +956,7 @@ ns.Data.Spells.PALADIN = {
     i="spell_holy_power",
     id=5923,
     k="talent",
-    n={de="Heilige Macht",en="Holy Power"},
+    n={de="Heilige Kraft",en="Holy Power"},
   },
   {
     fid=135880,
@@ -1267,13 +1246,6 @@ ns.Data.Spells.PALADIN = {
     n={de="Verbesserter Hammer der Gerechtigkeit",en="Improved Hammer of Justice"},
   },
   {
-    fid=626003,
-    i="classicon_paladin",
-    id=1310902,
-    k="talent",
-    n={de="Verbesserter heiliger Stoß",en="Improved Holy Strike"},
-  },
-  {
     fid=135959,
     i="spell_holy_righteousfury",
     id=25956,
@@ -1370,7 +1342,7 @@ ns.Data.Spells.PALADIN = {
     id=33391,
     k="other",
     n={de="Geübtes Reiten",en="Journeyman Riding"},
-    rt={de="Geübt",en="Journeyman"},
+    rt={de="Geselle",en="Journeyman"},
     sup=33388,
   },
   {
@@ -1481,6 +1453,13 @@ ns.Data.Spells.PALADIN = {
     id=8737,
     k="weapon",
     n={de="Panzer",en="Mail"},
+  },
+  {
+    fid=135910,
+    id=25895,
+    k="spell",
+    l=60,
+    n={de="Massenrettung",en="Mass Salvation"},
   },
   {
     c={"HUNTER","PALADIN","ROGUE","SHAMAN","WARRIOR"},
@@ -1691,6 +1670,14 @@ ns.Data.Spells.PALADIN = {
     n={de="Andacht",en="Reverence"},
   },
   {
+    fid=135944,
+    i="spell_holy_prayerofmendingtga",
+    id=1325499,
+    k="spell",
+    l=26,
+    n={de="Widerrufen",en="Revoke"},
+  },
+  {
     fid=135962,
     i="spell_holy_sealoffury",
     id=25780,
@@ -1712,6 +1699,14 @@ ns.Data.Spells.PALADIN = {
     k="talent",
     l=1,
     n={de="Heilige Pflicht",en="Sacred Duty"},
+  },
+  {
+    fid=135967,
+    i="spell_holy_sealofsalvation",
+    id=1038,
+    k="spell",
+    l=26,
+    n={de="Rettung",en="Salvation"},
   },
   {
     fid=236255,
@@ -1799,7 +1794,7 @@ ns.Data.Spells.PALADIN = {
     i="spell_holy_retributionaura",
     id=20163,
     k="spell",
-    l=25,
+    l=26,
     n={de="Siegel des Furors",en="Seal of Fury"},
     rk=3,
     sup=1311656,
@@ -2083,7 +2078,6 @@ ns.Data.Spells.PALADIN = {
     fid=135974,
     id=5502,
     k="spell",
-    l=20,
     n={de="Untote spüren",en="Sense Undead"},
   },
   {

@@ -1,4 +1,5 @@
--- Zauber GENERAL (generiert, nicht bearbeiten)
+-- Generated data, do not edit. Data as of 2026-10-16.
+-- Spell catalog of GENERAL: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
@@ -78,13 +79,6 @@ ns.Data.Spells.GENERAL = {
     k="profession",
     n={de="Rüstungsschmied",en="Armorsmith"},
     rt={de="Fachmann",en="Artisan"},
-  },
-  {
-    fid=132393,
-    id=20574,
-    k="racial",
-    n={de="Axtspezialisierung",en="Axe Specialization"},
-    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=466035,
@@ -191,13 +185,6 @@ ns.Data.Spells.GENERAL = {
     rt={de="Volk",en="Racial"},
   },
   {
-    fid=132761,
-    id=1229517,
-    k="profession",
-    n={de="Lagerstuhl",en="Camp Chair"},
-    rt={de="Stufe 1",en="Tier 1"},
-  },
-  {
     fid=136192,
     id=1255241,
     k="profession",
@@ -284,6 +271,13 @@ ns.Data.Spells.GENERAL = {
     id=10656,
     k="profession",
     n={de="Drachenlederverarbeitung",en="Dragonscale Leatherworking"},
+  },
+  {
+    fid=462325,
+    id=1259719,
+    k="racial",
+    n={de="Zorn der Erde",en="Earth Fury"},
+    rt={de="Passive Volksfähigkeit",en="Racial Passive"},
   },
   {
     fid=4630367,
@@ -452,13 +446,6 @@ ns.Data.Spells.GENERAL = {
     rt={de="Fachmann",en="Artisan"},
   },
   {
-    fid=133735,
-    id=1262985,
-    k="profession",
-    n={de="Leitfaden",en="Field Guide"},
-    rt={de="Stufe 2",en="Tier 2"},
-  },
-  {
     fid=133939,
     id=2383,
     k="profession",
@@ -569,20 +556,6 @@ ns.Data.Spells.GENERAL = {
     sup=1240929,
   },
   {
-    fid=133681,
-    id=1230117,
-    k="profession",
-    n={de="Verbandtasche",en="First Aid Kit"},
-    rt={de="Stufe 1",en="Tier 1"},
-  },
-  {
-    fid=4777763,
-    id=1229745,
-    k="profession",
-    n={de="Fischglas",en="Fish Bowl"},
-    rt={de="Stufe 1",en="Tier 1"},
-  },
-  {
     fid=136245,
     id=7620,
     k="profession",
@@ -656,24 +629,10 @@ ns.Data.Spells.GENERAL = {
     sup=1240970,
   },
   {
-    fid=132930,
-    id=1262998,
-    k="profession",
-    n={de="Angelhütte",en="Fishing Hut"},
-    rt={de="Stufe 3",en="Tier 3"},
-  },
-  {
     fid=136245,
     id=7738,
     k="profession",
     n={de="Angeln",en="Fishing Poles"},
-  },
-  {
-    fid=1053359,
-    id=1262990,
-    k="profession",
-    n={de="Angelständer",en="Fishing Rack"},
-    rt={de="Stufe 2",en="Tier 2"},
   },
   {
     fid=134435,
@@ -693,13 +652,6 @@ ns.Data.Spells.GENERAL = {
     id=20222,
     k="profession",
     n={de="Goblin-Ingenieur",en="Goblin Engineer"},
-  },
-  {
-    fid=134188,
-    id=1262980,
-    k="profession",
-    n={de="Gewächshaus",en="Greenhouse"},
-    rt={de="Stufe 2",en="Tier 2"},
   },
   {
     fid=133125,
@@ -797,13 +749,6 @@ ns.Data.Spells.GENERAL = {
     sup=1240971,
   },
   {
-    fid=133751,
-    id=1229705,
-    k="profession",
-    n={de="Räucherkerze",en="Incense Candle"},
-    rt={de="Stufe 1",en="Tier 1"},
-  },
-  {
     fid=133611,
     id=2108,
     k="profession",
@@ -871,20 +816,6 @@ ns.Data.Spells.GENERAL = {
     n={de="Lederverarbeitung",en="Leatherworking"},
     rt={de="Fachmann",en="Artisan"},
     sup=1240972,
-  },
-  {
-    fid=134419,
-    id=1230161,
-    k="profession",
-    n={de="Leitstein",en="Lodestone"},
-    rt={de="Stufe 1",en="Tier 1"},
-  },
-  {
-    fid=133042,
-    id=1259719,
-    k="racial",
-    n={de="Streitkolbenspezialisierung",en="Mace Specialization"},
-    rt={de="Passive Volksfähigkeit",en="Racial Passive"},
   },
   {
     fid=132396,
@@ -973,26 +904,12 @@ ns.Data.Spells.GENERAL = {
     sup=1240973,
   },
   {
-    fid=5931157,
-    id=1263071,
-    k="profession",
-    n={de="Geschmolzene Gießerei",en="Molten Foundry"},
-    rt={de="Stufe 3",en="Tier 3"},
-  },
-  {
     fid=136090,
     i="spell_nature_sleep",
     id=20600,
     k="racial",
     n={de="Wachsamkeit",en="Perception"},
     rt={de="Volk",en="Racial"},
-  },
-  {
-    fid=4626285,
-    id=1263001,
-    k="profession",
-    n={de="Labor des Seuchenarztes",en="Plague Doctor's Laboratory"},
-    rt={de="Stufe 4",en="Tier 4"},
   },
   {
     fid=236717,
@@ -1028,7 +945,7 @@ ns.Data.Spells.GENERAL = {
     id=1259705,
     k="racial",
     l=1,
-    n={de="Leylinie erschließen",en="Read Ley Line"},
+    n={de="Leylinie erschließen",en="Read Leyline"},
     rt={de="Volksfähigkeit",en="Racial"},
   },
   {
@@ -1039,18 +956,18 @@ ns.Data.Spells.GENERAL = {
     rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
-    fid=134385,
-    id=1262975,
-    k="profession",
-    n={de="Felsgarten",en="Rock Garden"},
-    rt={de="Stufe 2",en="Tier 2"},
+    fid=132292,
+    id=20597,
+    k="racial",
+    n={de="Gnadenlos",en="Ruthless"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
-    fid=656440,
-    id=1263070,
-    k="profession",
-    n={de="Saatenkreuzer",en="Seed Hybridizer"},
-    rt={de="Stufe 3",en="Tier 3"},
+    fid=132393,
+    id=20574,
+    k="racial",
+    n={de="Wild",en="Savage"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=132089,
@@ -1058,7 +975,7 @@ ns.Data.Spells.GENERAL = {
     id=20580,
     k="racial",
     l=1,
-    n={de="Schattenhaftigkeit",en="Shadowmeld"},
+    n={de="Schattenmimik",en="Shadowmeld"},
     rt={de="Volk",en="Racial"},
   },
   {
@@ -1162,13 +1079,6 @@ ns.Data.Spells.GENERAL = {
     rt={de="Volk",en="Racial"},
   },
   {
-    fid=132223,
-    id=20597,
-    k="racial",
-    n={de="Schwert-Spezialisierung",en="Sword Specialization"},
-    rt={de="Volk Passiv",en="Racial Passive"},
-  },
-  {
     fid=136249,
     id=3908,
     k="profession",
@@ -1255,13 +1165,6 @@ ns.Data.Spells.GENERAL = {
     id=13240,
     k="profession",
     n={de="Der Mörser: Wieder aufgeladen",en="The Mortar: Reloaded"},
-  },
-  {
-    fid=463860,
-    id=1262996,
-    k="profession",
-    n={de="Studierzimmer für Gifte",en="Toxin Study"},
-    rt={de="Stufe 2",en="Tier 2"},
   },
   {
     fid=136069,

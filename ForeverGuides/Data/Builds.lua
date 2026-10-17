@@ -1,6 +1,4 @@
--- Skillungen (generiert, nicht von Hand ändern)
--- Quelle: forever-guides.com, Skillungen von Wosande. Neu erzeugen im Website-Repo mit "npm run addon:builds",
--- Format: docs/SKILLUNGEN-FORMAT.md
+-- Skillungen (generiert, nicht bearbeiten)
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Builds = {
@@ -16,7 +14,7 @@ ns.Data.Builds = {
   },
   MAGE={
     {{a="Wosande",c="v2.004o92008jq1008ne2008nh5008nq5008o05008o55008oa3008of2008ok2008on2009ai1009aj100bma300e8r300e8u300m1q200mpt208l32108l3g1ca",d=true,l=60,p="47/4/0",t="47/4/0"}},
-    {{a="Wosande",c="v2.008jh5008jv3008k73008kc1008kr3008kv5008l04008lr3008m03008ma3008nb5008rq100mfm300mpq508l4g108l5320s4ci1ag",d=true,l=60,p="0/29/22",t="0/29/22"}},
+    {{a="Wosande",c="v2.008jh5008jv3008k73008kc1008kr3008kv5008l03008lr3008m03008ma3008nb5008rq100mfm300mpq508l4g108l5320s4ci1mf",d=true,l=60,p="0/28/22",t="0/28/22"}},
     {{a="Wosande",c="v2.008ji5008jj3008lr3008m03008m52008ma3008mf3008mk5008mp3008mu3008nb5008te1009861009mg100cxh200mpq508l5320s4ci1ga",d=true,l=60,p="0/0/51",t="0/0/51"}},
   },
   PALADIN={
@@ -26,8 +24,8 @@ ns.Data.Builds = {
   },
   PRIEST={
     {{a="Wosande",c="v2.007rg100b7c200b7d300b7n200bdo300bdr100bhl500bho300bi8300bi9200eaq500ebb508m4x108m6o108mbi10945c50991i30q9bg5tf",d=true,l=60,p="32/19/0",t="32/19/0"}},
-    {{a="Wosande",c="v2.00b7c200b7d200b7n200bdo300bdr100bhl500bho300bhu300bhx500bi4300bi8300br9100eaq500fzb100lfx208m2r108m4x108m6o10q9bg50s87i26y",d=true,l=60,p="16/35/0",t="16/35/0"}},
-    {{a="Wosande",c="v2.00b7d300b7g200bdo300bdr100bi9300brt300brv500brw500bs6500bsb200bsm100bti300bvz100bxt100dd620q9bg50q9bn20s2ri20s2v02t6",d=true,l=60,p="14/3/34",t="14/3/34"}},
+    {{a="Wosande",c="v2.00b7n200bhl500bho300bhu300bhx500bi4300bi8300br9100eaq500fzb100lfx208m2r108m4x10q9bg50s87i2gl",d=true,l=60,p="7/35/0",t="7/35/0"}},
+    {{a="Wosande",c="v2.00b7g200bi9300brt300brw500bs6500bsb200bsm100bvz100dd620q9bg50q9bn20s2ri2ft",d=true,l=60,p="7/3/23",t="7/3/23"}},
   },
   ROGUE={
     {{a="Wosande",c="v2.00akp300alg200auh200aw1500awg500awq500ax8300axa100axe300axh300axt100axv100ay2500bk7200cqp50q8zw30s3cf10s3cj1by",d=true,l=60,p="38/11/2",t="38/11/2"}},
@@ -35,12 +33,12 @@ ns.Data.Builds = {
     {{a="Wosande",c="v2.00akw200arq300as8300asf300auh200av3300av6200av8200awq500ax8200axe300axh300axn300axv100axz100ay1100cqn100nu6209x1050q8zw30s3cx1df",d=true,l=60,p="11/8/32",t="11/8/32"}},
   },
   SHAMAN={
-    {{a="Wosande",c="v2.00cdf500cdi300cdj500cdk500cex500cfs100ch0100cjj500cjq200csi300dhp500mdj200mfa308r5i308r6y10q7nw10q7p219w",d=true,l=60,p="38/13/0",t="38/13/0"}},
+    {{a="Wosande",c="v2.00cdf500cdi300cdj500cdk500cex500ch0100cjj500cjq200csi300dhp500mdj200mfa308r5i308r6y10q7nw10q7p21mc",d=true,l=60,p="37/13/0",t="37/13/0"}},
     {{a="Wosande",c="v2.00cdf500cdi300cdk500ceu200cjj500cjk500cjq200cju300cjw100dec100dhp200n9s300nrw208r76508wbo30946w10q7p210q7p32e4",d=true,l=60,p="18/33/0",t="18/33/0"}},
     {{a="Wosande",c="v2.00chc300che500chf500chh300chi500chn500cho100chq100chu500cjj500dhp500mja308r7i108r7t10q7p534d",d=true,l=60,p="0/10/41",t="0/10/41"}},
   },
   WARLOCK={
-    {{a="Wosande",c="v2.00dqk300dqq500dym200e0u500e3d100e3j500efd500egb300ehw100eiz208ncn30960w30q9cp50qh6c20s3j950s7yx1w2",d=true,l=60,p="40/11/0",t="40/11/0"}},
+    {{a="Wosande",c="v2.00dqk300dqq500dym200e0u500e3d100e3j500efd500egb300ehw100eiz208ncn30960w30qh6c20s3j950s7yx15x",d=true,l=60,p="35/11/0",t="35/11/0"}},
     {{a="Wosande",c="v2.00dq4500dqq500dsl100dtp200efd500efl300efo100efp200egb300ehw100eok100icp508ugs3094ag109g6e10q9dq20q9dt30q9dw50qh6c2qa",d=true,l=60,p="5/33/13",t="5/33/13"}},
     {{a="Wosande",c="v2.00dpu300dq4500dsl100dtp200dtz300duv500dzb500efd500egb300ehw108uhb308uhi1094y450q9e410qh6c20rqbd1sf",d=true,l=60,p="0/11/35",t="0/11/35"}},
   },
@@ -49,6 +47,6 @@ ns.Data.Builds = {
     {{a="Wosande",c="v2.009h63009ha3009hj5009hk1009i55009i75009i85009ia5009ig1009wi300cpz200cq5200i74500ifd10s2z210s31n10sdkr37m",d=true,l=60,p="18/33/0",t="18/33/0"}},
     {{a="Wosande",c="v2.009h92009hb3009hl5009hm5009hp2009hw2009i02009i85009vc3009vh3009vt100a0f100cpa500cre500igi100mzf30s31o20s31p17t",d=true,l=60,p="7/5/39",t="7/5/39"}},
   },
-  dv="mv3bfcqr",
+  dv="9w7u7t77",
   v=2,
 }
