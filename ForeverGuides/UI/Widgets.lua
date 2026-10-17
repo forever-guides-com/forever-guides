@@ -1307,6 +1307,8 @@ function W.Toggle(parent, opts)
     self:Click()
   end)
   f.Refresh = paint
+  -- The texts, for a window that paints them itself (the layer window follows its own background color).
+  f.label, f.state = label, state
   return f
 end
 

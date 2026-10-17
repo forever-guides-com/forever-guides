@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (vX.Y.Z) or latest'
+        description: 'Release tag (vX.Y.Z or vX.Y.Z-beta.N) or latest'
         type: string
         default: latest
       channel:
@@ -87,6 +87,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG_INPUT: ${{ inputs.tag }}
+          CHANNEL: ${{ inputs.channel }}
         run: |
           set -euo pipefail
           set +x
@@ -94,11 +95,15 @@ jobs:
           if [ "$tag" = latest ]; then
             tag=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq .tag_name)
           fi
-          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag '$tag' is not of the form vX.Y.Z."
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[1-9][0-9]*)?$ ]]; then
+            echo "::error::Tag '$tag' is not of the form vX.Y.Z or vX.Y.Z-beta.N."
             exit 1
           fi
           version="${tag#v}"
+          if [[ "$version" == *-beta.* ]] && [ "$CHANNEL" != beta ]; then
+            echo "::error::Tag ${tag} is a beta version and goes to the beta channel only."
+            exit 1
+          fi
           dist="${RUNNER_TEMP}/dist"
           mkdir -p "$dist"
 

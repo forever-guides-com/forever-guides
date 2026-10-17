@@ -333,6 +333,14 @@ Store.defaults = {
     lfgPanelAuto = true,
     -- The panel sits flush at the window and Blizzard's side tabs move to its right edge (Modules/LfgPanelDock.lua).
     lfgPanelDock = true,
+    -- Layer label at the minimap (Modules/LayerLabel.lua). settings.layerPos = { x, y } (offset from the
+    -- minimap centre) has no default on purpose: an absent key is the place at the bottom edge.
+    layerShow = true,
+    -- Layer network (Modules/LayerNet.lua, LayerSwitch.lua), both off until the player opts in: layerShare joins
+    -- the channel and sends zone, layer, class and free places, layerHost invites players who ask for a switch
+    -- (only works with layerShare).
+    layerShare = false,
+    layerHost = false,
   },
   frames = {
     main = { point = "CENTER", rel = "CENTER", x = 0, y = 0, w = 960, h = 620 },

@@ -4,6 +4,23 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.1.7-beta.1] - 2026-10-17
+
+### Added
+
+- Beta: A small label at the minimap shows the layer of your zone. A left click opens the layer window, a right click reads the layer again.
+- Beta: The layer window shows your layer, the zone, when it was last confirmed and the layer before. A button reads it again.
+- Beta: Switch your layer with one click. The add-on asks a host on another layer, accepts that host's group invite, waits until your layer changed and leaves the group.
+- Beta: The layer window lists the hosts of your zone with their layer. "Pick best host" tries them one after the other.
+- Beta: Layer sharing and hosting are off by default. Sharing sends your zone, layer, class and character name to other add-on users in a hidden channel.
+- The layer is read from the NPCs you see. Target any NPC or move the mouse over one to find your layer.
+- The command /fg layer opens the layer window, /fg layer hosts lists the hosts and /fg layer switch starts a switch.
+- A new settings card "Layer" holds the switches and a button to reset the position of the label.
+
+### Changed
+
+- Declining invites of strangers no longer declines the invite of the host you asked for a layer switch.
+
 ## [0.1.6] - 2026-10-17
 
 ### Added
@@ -158,6 +175,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.1.7-beta.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.6...v0.1.7-beta.1
 [0.1.6]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.3...v0.1.4

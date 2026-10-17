@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.7-beta.1 (Beta)
+
+### Added
+
+- Beta: A small label at the minimap shows the layer of your zone. A left click opens the layer window, a right click reads the layer again.
+- Beta: The layer window shows your layer, the zone, when it was last confirmed and the layer before. A button reads it again.
+- Beta: Switch your layer with one click. The add-on asks a host on another layer, accepts that host's group invite, waits until your layer changed and leaves the group.
+- Beta: The layer window lists the hosts of your zone with their layer. "Pick best host" tries them one after the other.
+- Beta: Layer sharing and hosting are off by default. Sharing sends your zone, layer, class and character name to other add-on users in a hidden channel.
+- The layer is read from the NPCs you see. Target any NPC or move the mouse over one to find your layer.
+- The command /fg layer opens the layer window, /fg layer hosts lists the hosts and /fg layer switch starts a switch.
+- A new settings card "Layer" holds the switches and a button to reset the position of the label.
+
+### Changed
+
+- Declining invites of strangers no longer declines the invite of the host you asked for a layer switch.
+
 ## 0.1.6
 
 ### Added

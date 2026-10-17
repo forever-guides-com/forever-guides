@@ -50,6 +50,8 @@ ns.AddLocale("enUS", {
   ["auto.tip.autoRelease"] = "Battlegrounds and PvP maps only.\nNot with a soulstone.",
   ["auto.set.releaseDelay"] = "Delay (ms)",
   ["auto.tip.hideErrors"] = "Hides red text like Out of range.\nChat is not touched.",
+  ["auto.tip.layerShare"] = "Shares zone, layer, class and name with\nother users of the layer channel and\naccepts the invite of the host you asked.\nAlso on the card Layer (Map).",
+  ["auto.tip.layerHost"] = "Invites players who ask you for a layer\nswitch. Needs sharing.",
   ["auto.set.errorsKeep"] = "Keep important ones",
   ["auto.tip.errorsKeep"] = "Bag full, quest log full,\nnot enough gold stay visible.",
 })
@@ -95,6 +97,8 @@ ns.AddLocale("deDE", {
   ["auto.tip.autoRelease"] = "Nur Schlachtfelder und PvP-Karten.\nNicht mit Seelenstein.",
   ["auto.set.releaseDelay"] = "Pause (ms)",
   ["auto.tip.hideErrors"] = "Blendet roten Text wie Außer Reichweite aus.\nDer Chat bleibt unberührt.",
+  ["auto.tip.layerShare"] = "Teilt Zone, Layer, Klasse und Name mit\nanderen Nutzern des Layer-Kanals und nimmt\ndie Einladung des gefragten Hosts an.\nAuch auf der Karte Layer (Karte).",
+  ["auto.tip.layerHost"] = "Lädt Spieler ein, die dich nach einem\nLayer-Wechsel fragen. Braucht das Teilen.",
   ["auto.set.errorsKeep"] = "Wichtige behalten",
   ["auto.tip.errorsKeep"] = "Tasche voll, Questlog voll,\nzu wenig Gold bleiben sichtbar.",
 })
@@ -127,7 +131,12 @@ local function toggle(view, key, label, tip, sub)
       return stored(key) == true
     end,
     set = function(value)
-      Store.set("settings." .. key, value)
+      -- Hosting needs sharing: the layer network checks that and says so.
+      if key == "layerHost" then
+        ns.LayerNet.SetHost(value)
+      else
+        Store.set("settings." .. key, value)
+      end
     end,
   })
   control.fgId = "auto-" .. key
@@ -244,6 +253,9 @@ function S.Add(view)
 
   toggle(view, "hideErrors", "auto.name.hideErrors", "auto.tip.hideErrors")
   toggle(view, "hideErrorsKeep", "auto.set.errorsKeep", "auto.tip.errorsKeep", true)
+
+  toggle(view, "layerShare", "auto.name.layerShare", "auto.tip.layerShare")
+  toggle(view, "layerHost", "auto.name.layerHost", "auto.tip.layerHost", true)
 end
 
 -- Accepting group invites per group: on the tab Guild and contacts, where the whisper invites are.
@@ -280,7 +292,8 @@ end
 
 -- A helper switches itself off after errors, and the toggles follow.
 ns.On("FG_SETTING_CHANGED", function(_, path)
-  local watched = type(path) == "string" and (path:find("^settings%.auto") or path:find("^settings%.hideErrors"))
+  local watched = type(path) == "string"
+    and (path:find("^settings%.auto") or path:find("^settings%.hideErrors") or path:find("^settings%.layer"))
   if not watched then
     return
   end
