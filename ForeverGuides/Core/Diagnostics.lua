@@ -168,6 +168,14 @@ function ns.DiagReport()
     local okSparkles, lines = pcall(ns.GatherSparkles.DiagLines)
     out[#out + 1] = okSparkles and table.concat(lines, "\n") or "sparkles: ?"
   end
+  if ns.LfgFilter then
+    local okLfg, text = pcall(ns.LfgFilter.DiagLine)
+    out[#out + 1] = okLfg and text or "lfg: ?"
+  end
+  if ns.LfgBrowseFilter then
+    local okFilter, text = pcall(ns.LfgBrowseFilter.DiagLine)
+    out[#out + 1] = okFilter and text or "lfg filter: ?"
+  end
   return table.concat(out, "\n")
 end
 

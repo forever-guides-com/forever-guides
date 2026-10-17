@@ -239,6 +239,17 @@ add({
   exec = "automatik",
 })
 add({
+  id = "lfg",
+  area = "guild",
+  example = { en = "/fg lfg", de = "/fg gruppensuche" },
+  public = true,
+  names = { "gruppensuche", "lfg" },
+  usage = "/fg gruppensuche",
+  page = "settings",
+  control = "lfg.set.panel",
+  exec = "gruppensuche",
+})
+add({
   id = "autoquest",
   area = "tools",
   example = { en = "/fg autoquest list", de = "/fg autoquest list" },
@@ -711,6 +722,7 @@ desc(
   "Quest helper exceptions: ignore <questID>, ignore npc <npcID>, list.",
   "Ausnahmen der Quest-Automatik: ignore <Quest-ID>, ignore npc <NPC-ID>, list."
 )
+desc("lfg", "Show/hide the filter panel at the group finder.", "Filter-Panel an der Gruppensuche ein-/ausblenden.")
 desc(
   "flighttimer",
   "Show/hide a 60 s example flight in the flight timer.",

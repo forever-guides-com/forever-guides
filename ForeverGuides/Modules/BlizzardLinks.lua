@@ -41,6 +41,8 @@ ns.AddLocale("enUS", {
   ["blizz.character.menu.itemlevel"] = "Item level settings",
   ["blizz.character.menu.settings"] = "Settings",
   ["blizz.set.character"] = "Button in the character window",
+  ["blizz.lfg"] = "Filter",
+  ["blizz.lfg.tip"] = "Group finder filter by Forever Guides.",
 })
 
 ns.AddLocale("deDE", {
@@ -55,6 +57,8 @@ ns.AddLocale("deDE", {
   ["blizz.character.menu.itemlevel"] = "Itemlevel-Einstellungen",
   ["blizz.character.menu.settings"] = "Einstellungen",
   ["blizz.set.character"] = "Knopf im Charakterfenster",
+  ["blizz.lfg"] = "Filter",
+  ["blizz.lfg.tip"] = "Gruppensuche-Filter von Forever Guides.",
 })
 
 local B = {}
@@ -93,11 +97,12 @@ local MENU_NAME = "ForeverGuidesCharacterMenu"
 local MENU_WIDTH, MENU_ROW = 190, 22
 local MENU_STRATA = "TOOLTIP"
 local BLOCKER_STRATA = "FULLSCREEN"
-local IDS = { "spellbook", "talents", "professions", "character" }
+local IDS = { "spellbook", "talents", "professions", "character", "lfg" }
 -- Fields of the views that may hold the tabs (frame with children or plain array).
 local TAB_FIELDS = { "TabSystem", "CategoryTabSystem", "SpecTabs", "ProfessionTabs", "tabs" }
 
--- tag names the button in the diagnostic report (L = learn list, T = talents).
+-- tag names the button in the diagnostic report (L = learn list, T = talents). action: a click runs this
+-- function instead of opening a page.
 local LINKS = {
   levels = { key = "blizz.learn", tip = "blizz.learn.tip", route = "levels", tag = "L", panel = true },
   talents = { key = "blizz.talents", tip = "blizz.talents.tip", route = "talents", tag = "T" },
@@ -110,6 +115,16 @@ local LINKS = {
     tag = "C",
     menu = true,
     frameName = "ForeverGuidesCharacterTab",
+  },
+  lfg = {
+    key = "blizz.lfg",
+    tip = "blizz.lfg.tip",
+    tag = "F",
+    action = function()
+      if ns.LfgFilterPanel then
+        ns.LfgFilterPanel.Toggle()
+      end
+    end,
   },
 }
 
@@ -217,6 +232,19 @@ local TARGETS = {
     view = CHARACTER_VIEW,
     links = { "character" },
     setting = "characterButton",
+  },
+  -- Blizzard's three tabs hang at the right edge; ours joins the column behind them (reflowSide).
+  {
+    id = "lfg",
+    parent = "LFGParentFrame",
+    view = SIDE_VIEW,
+    links = { "lfg" },
+    setting = "lfgPanel",
+    -- The docked filter panel carries the column of side tabs at its right edge.
+    edge = function()
+      local dock = ns.LfgPanelDock
+      return dock and dock.DockFrame()
+    end,
   },
 }
 
@@ -1100,19 +1128,27 @@ local function placeRow(entry)
   return true
 end
 
--- The first tab of the stack: at the right window edge, or behind the foreign tab `rel`.
+-- The frame whose right edge the column of side tabs hangs on: the window, or what a target names (the group
+-- finder: the docked filter panel).
+local function columnBase(entry)
+  local edge = entry.target.edge
+  return edge and edge() or entry.root
+end
+
+-- The first tab of the stack: at the right edge of the column base, or behind the foreign tab `rel`.
 local function anchorSide(entry, rel)
   local first = entry.stack[1]
   if not first then
     return
   end
+  local base = columnBase(entry)
   first:ClearAllPoints()
   if rel then
     first:SetPoint("TOPLEFT", rel, "BOTTOMLEFT", 0, -SIDE_GAP)
   else
-    first:SetPoint("TOPLEFT", entry.root, "TOPRIGHT", SIDE_INSET, -SIDE_DROP)
+    first:SetPoint("TOPLEFT", base, "TOPRIGHT", SIDE_INSET, -SIDE_DROP)
   end
-  entry.anchor = rel
+  entry.anchor, entry.base = rel, base
 end
 
 -- Lowest tab of the list that does not hang behind ours (that would be a loop).
@@ -1133,7 +1169,12 @@ local function reflowSide(entry)
     return layoutSide(entry)
   end
   local frames = candidates(bases(entry))
-  local _, _, group, tabs = findTabs(entry.target.view, frames, entry.root)
+  local base = columnBase(entry)
+  if not entry.anchor and entry.base ~= base then
+    -- The column moved to another frame (the panel docked or undocked): hang on its new edge.
+    anchorSide(entry, nil)
+  end
+  local _, _, group, tabs = findTabs(entry.target.view, frames, base)
   applyLevel(entry, topLevel(frames, entry.parent))
   local system = field(entry.parent, "CategoryTabSystem")
   if isFrame(system) then
@@ -1385,6 +1426,12 @@ local function attach(target, parent, root)
           openPage(link, root)
         end
       end
+    elseif link.action then
+      handler = function()
+        stats.click = stats.click + 1
+        stats.last = link.tag .. " action"
+        link.action()
+      end
     elseif link.panel then
       handler = function()
         stats.click = stats.click + 1
@@ -1559,6 +1606,21 @@ function B.Discover(reason, enumerate)
   end
 end
 
+-- The buttons of an area (a copy), empty while it is not attached.
+function B.Buttons(id)
+  local entry = attached[id]
+  return entry and { unpack(entry.buttons) } or {}
+end
+
+-- Marks the buttons of an area as selected or not (panels opened from a tab).
+function B.SetSelected(id, on)
+  for _, button in ipairs(B.Buttons(id)) do
+    if type(button.fgSetSelected) == "function" then
+      button:fgSetSelected(on == true)
+    end
+  end
+end
+
 -- The spellbook panel of the attached spellbook view, or nil.
 function B.Panel()
   local entry = attached.spellbook
@@ -1722,6 +1784,13 @@ ns.On("ADDON_LOADED", function(_, name)
     ns.Debounce("blizz-links-late", LATE_DELAY, function()
       B.Discover("ADDON_LOADED")
     end)
+  end
+end)
+
+-- The switch "offer filter panel" of the group finder card.
+ns.On("FG_SETTING_CHANGED", function(_, path)
+  if path == "settings.lfgPanel" then
+    B.Discover("settings")
   end
 end)
 

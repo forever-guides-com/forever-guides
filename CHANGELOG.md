@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.6
+
+### Added
+
+- A filter panel docks to the right side of the Group Finder and opens with it. A tab below the game's tabs shows or hides it.
+- The group list can be filtered by role, class, group size, leader level, playstyle, name or dungeon, and how long a listing has been up. Entries that do not match are hidden.
+- Choose dungeons in the panel and start the search there, without listing yourself first. All dungeons are checked by default.
+- The dungeon list shows every dungeon with its level range and marks those that fit your level. Long names are shortened, the level range always stays readable.
+- Show only groups looking for players, only players looking for a group, or only groups with a free slot, with presets for one click.
+- A new settings card "Group finder" shows whether the Group Finder lists all dungeons or only those for your level, and switches it.
+- The panel can be switched off, shown automatically when the Group Finder opens, and docked to the window.
+- With docking on, the game's tabs and ours move to the right edge of the panel.
+- The command /fg gruppensuche (also /fg lfg) shows or hides the panel.
+
 ## 0.1.5
 
 ### Added
