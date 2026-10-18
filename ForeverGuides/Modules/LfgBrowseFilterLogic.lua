@@ -8,16 +8,22 @@
 -- that is missing never hides an entry: the filter fails open. Titles and comments of the listings are protected
 -- and never part of a record.
 --
--- Record fields (all optional): numMembers, age (seconds), playstyle (generalPlaystyle, 0 = none given),
--- leaderName, leaderClass (classFilename), leaderLevel, leaderRoles (lfgRoles: tank, healer, dps), counts (member
+-- Record fields (all optional): numMembers, maxPlayers (largest maxNumPlayers of the activities), age (seconds),
+-- playstyle (generalPlaystyle, 0 = none given), leaderName, leaderClass (classFilename), leaderLevel, counts (member
 -- counts: TANK_REMAINING, HEALER_REMAINING, DAMAGER_REMAINING and one number per class token), activityNames.
 --
--- Groups and players (state.show, state.onlyOpen). A listing with more than one member is a group, with one
--- member (or fewer) a single player. show.groups and show.players hide their kind when switched off, and they
--- alone decide whether players are seen. onlyOpen (on by default) acts on groups only: a group stays when it has a
--- free slot, the sum of the three *_REMAINING counts being above 0, a single player is never hidden by it. An
--- entry stays when its kind is on AND (it is a player OR onlyOpen is off OR it has a free slot). Unreadable member
--- numbers or counts keep the entry like everywhere else.
+-- Groups and players (state.show). A listing with more than one member is a group, with one member (or fewer) a
+-- single player. state.show is one of "all" (default), "groups" and "players": the mode names the kind that is
+-- seen. Older files hold a table { groups, players } of two switches, LB.ShowMode reads both (both on or both off
+-- is "all"). A group is always hidden when it has no free slot, the sum of the three *_REMAINING counts being
+-- above 0 keeps it, a single player is never hidden by that. Unreadable member numbers or counts keep the entry
+-- like everywhere else. So do counters that say nothing: all three missing, or all three 0 in a group with fewer
+-- members than maxPlayers (a raid whose counters the game does not fill).
+--
+-- Matching groups (state.matchRoles, state.seek). state.seek is the set of roles the player searches as (tank,
+-- healer, damage; true = chosen). With the switch on and a role chosen, a group stays only when a chosen role has
+-- a free slot, the rule of Blizzard's HasRemainingSlotsForLocalPlayerRole. Single players are not touched, and an
+-- unreadable counter of a chosen role keeps the entry.
 --
 -- The dungeon choice (state.categoryID, state.activities) is no result filter: it is the input of the search
 -- (panel and Modules/LfgBrowseSearch.lua). Helpers for it live here because they need no game call.
@@ -27,7 +33,7 @@ local LB = {}
 ns.LfgBrowseFilterLogic = LB
 
 LB.ROLES = { "tank", "healer", "damage" }
--- Key of the remaining slots per role in the member counts, and of the role flag of a single player.
+-- Key of the remaining slots per role in the member counts, and of the role in the game's role tables.
 LB.ROLE_COUNTS = { tank = "TANK_REMAINING", healer = "HEALER_REMAINING", damage = "DAMAGER_REMAINING" }
 LB.ROLE_FLAGS = { tank = "tank", healer = "healer", damage = "dps" }
 -- Group sizes 1 to 4, and 5 for "5 and more".
@@ -36,18 +42,14 @@ LB.SIZES = { 1, 2, 3, 4, 5 }
 LB.PLAYSTYLES = { 1, 2, 3, 4 }
 -- Entry age limits in seconds, 0 = off.
 LB.AGES = { 0, 30, 60, 120, 300 }
+-- Most languages kept in the stored choice.
+LB.MAX_LANGUAGES = 40
 -- Used when the client names no classes.
 LB.CLASSES = { "WARRIOR", "PALADIN", "HUNTER", "ROGUE", "PRIEST", "SHAMAN", "MAGE", "WARLOCK", "DRUID" }
 LB.MAX_LEVEL = 100
 LB.TEXT_LIMIT = 200
--- Switches of the kind of listing.
-LB.SHOW = { "groups", "players" }
--- Presets of the kind switches: what each one sets.
-LB.PRESETS = {
-  groups = { show = { groups = true, players = false }, onlyOpen = true },
-  players = { show = { groups = false, players = true }, onlyOpen = false },
-  all = { show = { groups = true, players = true }, onlyOpen = false },
-}
+-- Modes of the kind of listing, in panel order.
+LB.SHOW = { "groups", "players", "all" }
 LB.MAX_ACTIVITIES = 200
 -- Panel width in pixels at 100 % font: default, smallest, largest, and the one column mode.
 LB.WIDTH = { base = 600, min = 480, max = 900, single = 280 }
@@ -77,13 +79,78 @@ local function list(value)
   return type(value) == "table" and value or nil
 end
 
--- Lower case that also folds the Latin-1 letters of UTF-8 text (the game's string.lower leaves them alone).
+-- Upper to lower case for the letters the game's string.lower leaves alone, keyed by their two UTF-8 bytes:
+-- Latin-1 (without the multiplication sign), OE and the Cyrillic capitals.
+local FOLD = { ["\197\146"] = "\197\147" }
+local function fold(lead, from, to, targetLead, shift)
+  for byte = from, to do
+    FOLD[string.char(lead, byte)] = string.char(targetLead, byte + shift)
+  end
+end
+fold(195, 128, 150, 195, 32)
+fold(195, 152, 158, 195, 32)
+fold(208, 128, 143, 209, 16)
+fold(208, 144, 159, 208, 32)
+fold(208, 160, 175, 209, -32)
+
+-- ASCII letters only: string.lower follows the C locale of the process, and a locale that maps bytes above 127
+-- turns the lead byte of a UTF-8 letter into another byte.
+local LOWER = {}
+for byte = 65, 90 do
+  LOWER[string.char(byte)] = string.char(byte + 32)
+end
+
+-- Lower case that also folds those letters. Bytes of any other script pass through unchanged.
 function LB.Fold(value)
-  return (
-    value:lower():gsub("\195([\128-\150\152-\158])", function(byte)
-      return "\195" .. string.char(byte:byte() + 32)
-    end)
-  )
+  return (value:gsub("[A-Z]", LOWER):gsub("[\195\197\208][\128-\191]", FOLD))
+end
+
+-- Cuts text to at most max bytes without splitting a UTF-8 character.
+function LB.Clip(value, max)
+  if #value <= max then
+    return value
+  end
+  local cut = max
+  while cut > 0 do
+    local byte = value:byte(cut + 1)
+    if byte < 128 or byte > 191 then
+      break
+    end
+    cut = cut - 1
+  end
+  return value:sub(1, cut)
+end
+
+-- Latin-1 letters with their plain base letter, as UTF-8 second bytes after \195, so names sort like a reader expects.
+local BASE_LETTER = {}
+for _, range in ipairs({
+  { 160, 165, "a" },
+  { 167, 167, "c" },
+  { 168, 171, "e" },
+  { 172, 175, "i" },
+  { 177, 177, "n" },
+  { 178, 182, "o" },
+  { 184, 184, "o" },
+  { 185, 188, "u" },
+  { 189, 189, "y" },
+  { 191, 191, "y" },
+  { 159, 159, "ss" },
+}) do
+  for byte = range[1], range[2] do
+    BASE_LETTER[byte] = range[3]
+  end
+end
+
+-- Text as the filter compares it: folded, accents removed, umlauts as the usual two letters (a-umlaut becomes ae,
+-- o-umlaut oe, u-umlaut ue, sharp s ss), so "Baerbel" finds "Bärbel" and "cafe" finds "café". Other scripts stay.
+local PLAIN = { ["\197\147"] = "oe" }
+for byte, letters in pairs(BASE_LETTER) do
+  PLAIN[string.char(195, byte)] = letters
+end
+PLAIN["\195\164"], PLAIN["\195\182"], PLAIN["\195\188"], PLAIN["\195\166"] = "ae", "oe", "ue", "ae"
+
+function LB.Plain(value)
+  return (LB.Fold(value):gsub("[\195\197][\128-\191]", PLAIN))
 end
 
 -- The terms of the text box: one per line or comma separated, folded, empty ones dropped.
@@ -93,7 +160,8 @@ function LB.ParseTerms(value)
     return terms
   end
   for part in LB.Fold(value):gmatch("[^,\n\r]+") do
-    part = part:gsub("^%s+", ""):gsub("%s+$", "")
+    -- Space and tab only: a locale dependent %s may count a continuation byte of a letter as white space.
+    part = part:gsub("^[ \t]+", ""):gsub("[ \t]+$", "")
     if part ~= "" then
       terms[#terms + 1] = part
     end
@@ -135,17 +203,33 @@ local function limit(value)
   return type(value) == "number" and value > 0 and value or nil
 end
 
--- Ids of the filters that act with this state, in panel order.
+-- The mode of a stored value: a mode name, an older table of two switches, anything else is "all".
+function LB.ShowMode(value)
+  for _, mode in ipairs(LB.SHOW) do
+    if value == mode then
+      return mode
+    end
+  end
+  if type(value) == "table" then
+    local groups, players = value.groups ~= false, value.players ~= false
+    if groups and not players then
+      return "groups"
+    elseif players and not groups then
+      return "players"
+    end
+  end
+  return "all"
+end
+
+-- Ids of the filters that act with this state, in panel order. The free slot rule always acts.
 function LB.Active(state)
   local out = {}
-  if restricts(state.show, LB.SHOW) then
+  if LB.ShowMode(state.show) ~= "all" then
     out[#out + 1] = "kind"
   end
-  if state.onlyOpen == true then
-    out[#out + 1] = "open"
-  end
-  if restricts(state.roles, LB.ROLES) then
-    out[#out + 1] = "role"
+  out[#out + 1] = "open"
+  if state.matchRoles == true and #LB.ChosenRoles(state.seek) > 0 then
+    out[#out + 1] = "match"
   end
   if #hiddenClasses(state) > 0 then
     out[#out + 1] = "class"
@@ -175,57 +259,75 @@ function LB.Needs(state)
     active[id] = true
   end
   return {
-    counts = active.role or active.class or active.open or false,
-    leader = active.role or active.class or active.level or false,
+    counts = true, -- the free slot rule always reads them
+    leader = active.class or active.level or false,
     activities = active.text or false,
   }
 end
 
--- The values every pass uses once: the folded terms and the classes that are off.
+-- The values every pass uses once: the terms in the form of LB.Plain and the classes that are off.
 function LB.Context(state)
-  return { terms = LB.ParseTerms(state.text), classes = hiddenClasses(state), needs = LB.Needs(state) }
+  local terms = {}
+  for i, term in ipairs(LB.ParseTerms(state.text)) do
+    terms[i] = LB.Plain(term)
+  end
+  return { terms = terms, classes = hiddenClasses(state), needs = LB.Needs(state) }
 end
 
 -- Predicates: true keeps the entry. An unknown value keeps it too.
 
-local function roles(rec, state)
-  local checked = {}
+-- Remaining slots per role of a group record, { tank, healer, damage } with nil for an unreadable number; nil
+-- when the counters say nothing (see the header).
+local function slots(rec)
+  local counts = list(rec.counts)
+  if not counts then
+    return nil
+  end
+  local out, known, total = {}, false, 0
   for _, role in ipairs(LB.ROLES) do
-    if on(state.roles, role) then
-      checked[#checked + 1] = role
+    local free = number(counts[LB.ROLE_COUNTS[role]])
+    out[role] = free
+    if free then
+      known, total = true, total + free
     end
   end
-  if #checked == #LB.ROLES then
+  if not known then
+    return nil
+  end
+  local members, capacity = number(rec.numMembers), number(rec.maxPlayers)
+  if total == 0 and members and capacity and capacity > 0 and members < capacity then
+    return nil
+  end
+  return out
+end
+
+-- Roles of a stored set that are chosen, in LB.ROLES order.
+function LB.ChosenRoles(set)
+  local out = {}
+  for _, role in ipairs(LB.ROLES) do
+    if type(set) == "table" and set[role] == true then
+      out[#out + 1] = role
+    end
+  end
+  return out
+end
+
+-- A group needs a free slot for a chosen role. Without the switch, a chosen role or a usable counter it stays.
+local function matching(rec, state)
+  local chosen = LB.ChosenRoles(state.seek)
+  if state.matchRoles ~= true or #chosen == 0 then
     return true
   end
   local members = number(rec.numMembers)
-  if not members then
+  if not members or members <= 1 then
     return true
   end
-  if members <= 1 then
-    local flags = list(rec.leaderRoles)
-    if not flags then
-      return true
-    end
-    for _, role in ipairs(checked) do
-      local raw = flags[LB.ROLE_FLAGS[role]]
-      local flag = LB.safe(raw)
-      if flag == true then
-        return true
-      end
-      if raw ~= nil and flag == nil then
-        return true
-      end
-    end
-    return false
-  end
-  local counts = list(rec.counts)
-  if not counts then
+  local free = slots(rec)
+  if not free then
     return true
   end
-  for _, role in ipairs(checked) do
-    local free = number(counts[LB.ROLE_COUNTS[role]])
-    if free == nil or free > 0 then
+  for _, role in ipairs(chosen) do
+    if free[role] == nil or free[role] > 0 then
       return true
     end
   end
@@ -276,7 +378,7 @@ local function playstyle(rec, state)
 end
 
 local function contains(value, terms)
-  value = LB.Fold(value)
+  value = LB.Plain(value)
   for _, term in ipairs(terms) do
     if value:find(term, 1, true) then
       return true
@@ -319,36 +421,35 @@ local function age(rec, state)
   return value < maximum
 end
 
--- Group or player switch, then the free slot rule (see the header).
+-- The mode, then the free slot rule for groups (see the header).
 local function kind(rec, state)
   local members = number(rec.numMembers)
   if not members then
     return true
   end
   local group = members > 1
-  if not on(state.show, group and "groups" or "players") then
+  local mode = LB.ShowMode(state.show)
+  if mode ~= "all" and mode ~= (group and "groups" or "players") then
     return false
   end
-  if state.onlyOpen ~= true or not group then
+  if not group then
     return true
   end
-  local counts = list(rec.counts)
-  if not counts then
+  local free = slots(rec)
+  if not free then
     return true
   end
-  local free, unknown = 0, false
+  local total = 0
   for _, role in ipairs(LB.ROLES) do
-    local n = number(counts[LB.ROLE_COUNTS[role]])
-    if n == nil then
-      unknown = true
-    else
-      free = free + n
+    if free[role] == nil then
+      return true
     end
+    total = total + free[role]
   end
-  return free > 0 or unknown
+  return total > 0
 end
 
-local PREDICATES = { kind, roles, classes, sizes, leaderLevel, playstyle, words, age }
+local PREDICATES = { kind, matching, classes, sizes, leaderLevel, playstyle, words, age }
 
 -- True when the entry stays visible. A missing record, an unreadable one and a failing rule keep the entry.
 function LB.Matches(rec, state, ctx)
@@ -408,6 +509,30 @@ local function cleanSet(set, keys)
   return out
 end
 
+-- A set where only an explicit true counts as chosen.
+local function cleanChosen(set, keys)
+  local out = {}
+  for _, key in ipairs(keys) do
+    out[key] = type(set) == "table" and set[key] == true
+  end
+  return out
+end
+
+-- The languages of the search choice: a set of client codes ("deDE", "koKR"). Codes the client does not offer
+-- stay stored (another client may), so only the shape is checked here.
+function LB.CleanLanguages(set)
+  local out, count = {}, 0
+  if type(set) == "table" then
+    for code, value in pairs(set) do
+      if value == true and type(code) == "string" and code:find("^%l%l%u%u$") and count < LB.MAX_LANGUAGES then
+        out[code] = true
+        count = count + 1
+      end
+    end
+  end
+  return out
+end
+
 local function cleanLimit(value, max)
   value = tonumber(value)
   if not value or value ~= value or value < 1 then
@@ -420,12 +545,16 @@ end
 function LB.Clean(state)
   state.v = 1
   state.open = state.open == true
-  state.roles = cleanSet(state.roles, LB.ROLES)
+  -- The old role filter (a set of switches that hide) is gone: its values mean nothing for the new choice.
+  state.roles = nil
+  state.seek = cleanChosen(state.seek, LB.ROLES)
+  state.matchRoles = state.matchRoles == true
+  state.languages = LB.CleanLanguages(state.languages)
   state.sizes = cleanSet(state.sizes, LB.SIZES)
   state.playstyles = cleanSet(state.playstyles, LB.PLAYSTYLES)
-  state.show = cleanSet(state.show, LB.SHOW)
-  -- On by default: only an explicit false stays off.
-  state.onlyOpen = state.onlyOpen ~= false
+  state.show = LB.ShowMode(state.show)
+  -- The free slot rule is no setting any more: an old stored value is dropped.
+  state.onlyOpen = nil
   state.categoryID = cleanLimit(state.categoryID, 1e9)
   state.width = cleanLimit(state.width, 4000)
   local chosen, count = {}, 0
@@ -451,7 +580,7 @@ function LB.Clean(state)
   state.classes = kept
   state.levelMin = cleanLimit(state.levelMin, LB.MAX_LEVEL)
   state.levelMax = cleanLimit(state.levelMax, LB.MAX_LEVEL)
-  state.text = type(state.text) == "string" and state.text:sub(1, LB.TEXT_LIMIT) or ""
+  state.text = type(state.text) == "string" and LB.Clip(state.text, LB.TEXT_LIMIT) or ""
   local maxAge = tonumber(state.maxAge) or 0
   local valid = false
   for _, seconds in ipairs(LB.AGES) do
@@ -461,8 +590,18 @@ function LB.Clean(state)
   return state
 end
 
--- Keys of the state that are no result filter: they survive "reset filters".
-local KEPT = { open = true, v = true, categoryID = true, activities = true, noActivities = true, width = true }
+-- Keys of the state that are no result filter (search input, the roles the game also holds): they survive
+-- "reset filters".
+local KEPT = {
+  open = true,
+  v = true,
+  categoryID = true,
+  activities = true,
+  noActivities = true,
+  width = true,
+  seek = true,
+  languages = true,
+}
 
 -- Back to the default filters; the panel, its dungeon choice and its width stay.
 function LB.Reset(state)
@@ -482,29 +621,13 @@ end
 
 -- Presets and dungeon choice -----------------------------------------------------------------------------------
 
--- Sets the kind switches and the free slot switch of a preset ("groups", "players", "all"); false for an unknown id.
-function LB.ApplyPreset(state, id)
-  local preset = LB.PRESETS[id]
-  if not preset then
+-- Sets the kind of listing ("groups", "players", "all"); false for an unknown id.
+function LB.SetShow(state, id)
+  if LB.ShowMode(id) ~= id then
     return false
   end
-  state.show = { groups = preset.show.groups, players = preset.show.players }
-  state.onlyOpen = preset.onlyOpen
+  state.show = id
   return true
-end
-
--- The preset the state matches, nil when the switches are set by hand.
-function LB.PresetOf(state)
-  for id, preset in pairs(LB.PRESETS) do
-    if
-      on(state.show, "groups") == preset.show.groups
-      and on(state.show, "players") == preset.show.players
-      and (state.onlyOpen == true) == preset.onlyOpen
-    then
-      return id
-    end
-  end
-  return nil
 end
 
 local function levels(entry)
@@ -560,26 +683,6 @@ function LB.InRange(entry, level)
     return false
   end
   return (low <= 0 or level >= low) and (high <= 0 or level <= high)
-end
-
--- Latin-1 letters with their plain base letter, as UTF-8 second bytes after \195, so names sort like a reader expects.
-local BASE_LETTER = {}
-for _, range in ipairs({
-  { 160, 165, "a" },
-  { 167, 167, "c" },
-  { 168, 171, "e" },
-  { 172, 175, "i" },
-  { 177, 177, "n" },
-  { 178, 182, "o" },
-  { 184, 184, "o" },
-  { 185, 188, "u" },
-  { 189, 189, "y" },
-  { 191, 191, "y" },
-  { 159, 159, "ss" },
-}) do
-  for byte = range[1], range[2] do
-    BASE_LETTER[byte] = range[3]
-  end
 end
 
 -- Folded name without accents and umlauts, for sorting.
@@ -704,6 +807,54 @@ function LB.SearchIDs(chosen, available, none)
     end
   end
   return out
+end
+
+-- Languages of the search --------------------------------------------------------------------------------------------
+
+-- Entries { code, name, locked } for the language choice: the codes the client offers plus the ones it always adds
+-- (own, a set; locked), those first, then by name. name(code) is the display name. No offer, no entries.
+function LB.LanguageEntries(offered, own, name)
+  local out, seen = {}, {}
+  if type(offered) ~= "table" or #offered == 0 then
+    return out
+  end
+  local function add(code)
+    if type(code) == "string" and code ~= "" and not seen[code] then
+      seen[code] = true
+      out[#out + 1] = { code = code, name = name(code), locked = type(own) == "table" and own[code] == true }
+    end
+  end
+  for _, code in ipairs(offered) do
+    add(code)
+  end
+  for _, code in ipairs(ns.U.sortedKeys(type(own) == "table" and own or {})) do
+    add(code)
+  end
+  table.sort(out, function(a, b)
+    if a.locked ~= b.locked then
+      return a.locked
+    end
+    local ka, kb = LB.SortKey(a.name), LB.SortKey(b.name)
+    if ka ~= kb then
+      return ka < kb
+    end
+    return a.code < b.code
+  end)
+  return out
+end
+
+-- The language filter of the search: the locked languages plus the chosen ones among the entries (codes the client
+-- does not offer are never sent). nil when that is only the locked language, the client then searches as before.
+function LB.LanguageSearch(entries, chosen)
+  local out, extra = {}, false
+  for _, entry in ipairs(entries) do
+    if entry.locked then
+      out[entry.code] = true
+    elseif type(chosen) == "table" and chosen[entry.code] == true then
+      out[entry.code], extra = true, true
+    end
+  end
+  return extra and out or nil
 end
 
 -- Panel size -------------------------------------------------------------------------------------------------------

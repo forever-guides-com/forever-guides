@@ -1,5 +1,5 @@
 -- Shared safety net of the automatic helpers (AutoRepair, AutoSummon, AutoResurrect, AutoQuest,
--- AutoSocial, AutoRoleCheck, AutoRelease, HideErrors, and the layer switch: LayerNet, LayerSwitch). Every helper is off by default, runs through Guard.Run
+-- AutoSocial, AutoRoleCheck, AutoRelease, HideErrors). Every helper is off by default, runs through Guard.Run
 -- (protected call, three errors switch the helper off), stays quiet in combat and while the
 -- override key is held (HideErrors only filters text, so it ignores both), and reads names and
 -- GUIDs only after the secret-value check.
@@ -22,8 +22,6 @@ Guard.FEATURES = {
   "autoSocialAcceptGuild",
   "autoSocialAcceptContacts",
   "autoRoleCheck",
-  "layerShare",
-  "layerHost",
 }
 -- One helper with several switches: it runs while any of them is on and switches all of them off
 -- after repeated errors.
@@ -54,8 +52,6 @@ ns.AddLocale("enUS", {
   ["auto.name.autoSocialAcceptContacts"] = "Contacts may invite me",
   ["auto.name.autoInvite"] = "Accepting invites",
   ["auto.name.autoRoleCheck"] = "Auto role check",
-  ["auto.name.layerShare"] = "Layer sharing",
-  ["auto.name.layerHost"] = "Layer help",
   ["auto.hint.autoRepair"] = "Repairs at the merchant by itself.\nHold %s to stop it.",
   ["auto.hint.autoSummon"] = "Accepts summons after a delay.\nHold %s to stop it.",
   ["auto.hint.autoResurrect"] = "Accepts resurrections of friends.\nHold %s to stop it.",
@@ -67,8 +63,6 @@ ns.AddLocale("enUS", {
   ["auto.hint.autoSocialAcceptGuild"] = "Accepts group invites of guild members.\nNot while you are queued.\nHold %s to stop it.",
   ["auto.hint.autoSocialAcceptContacts"] = "Accepts group invites of your contacts.\nThe list also holds strangers from trade and groups.\nNot while you are queued.\nHold %s to stop it.",
   ["auto.hint.autoRoleCheck"] = "Confirms role checks with your saved roles.\nNothing happens without a saved role.\nHold %s to stop it.",
-  ["auto.hint.layerShare"] = "Shares zone, layer, class and name with all\nadd-on users in the layer channel. Accepts the\ninvite of the host you asked for a layer switch.\nHold %s to stop it.",
-  ["auto.hint.layerHost"] = "Invites players who ask for your layer.\nNot in combat, not in instances.\nHold %s to stop it.",
   ["auto.off"] = "%s switched off after %d errors, see /fg errors",
 })
 ns.AddLocale("deDE", {
@@ -87,8 +81,6 @@ ns.AddLocale("deDE", {
   ["auto.name.autoSocialAcceptContacts"] = "Kontakte dürfen einladen",
   ["auto.name.autoInvite"] = "Einladungen annehmen",
   ["auto.name.autoRoleCheck"] = "Auto-Rollenabfrage",
-  ["auto.name.layerShare"] = "Layer teilen",
-  ["auto.name.layerHost"] = "Layer-Hilfe",
   ["auto.hint.autoRepair"] = "Repariert beim Händler von selbst.\nHalte %s gedrückt, um es zu stoppen.",
   ["auto.hint.autoSummon"] = "Nimmt Beschwörungen nach einer Pause an.\nHalte %s gedrückt, um es zu stoppen.",
   ["auto.hint.autoResurrect"] = "Nimmt Wiederbelebungen von Freunden an.\nHalte %s gedrückt, um es zu stoppen.",
@@ -100,8 +92,6 @@ ns.AddLocale("deDE", {
   ["auto.hint.autoSocialAcceptGuild"] = "Nimmt Einladungen von Gildenmitgliedern an.\nNicht während einer Warteschlange.\nHalte %s gedrückt, um es zu stoppen.",
   ["auto.hint.autoSocialAcceptContacts"] = "Nimmt Einladungen deiner Kontakte an.\nDie Liste enthält auch Fremde aus Handel und Gruppen.\nNicht während einer Warteschlange.\nHalte %s gedrückt, um es zu stoppen.",
   ["auto.hint.autoRoleCheck"] = "Bestätigt Rollenabfragen mit deinen gespeicherten Rollen.\nOhne gespeicherte Rolle passiert nichts.\nHalte %s gedrückt, um es zu stoppen.",
-  ["auto.hint.layerShare"] = "Teilt Zone, Layer, Klasse und Name mit allen\nAddon-Nutzern im Layer-Kanal. Nimmt die Einladung\ndes Hosts an, den du für einen Wechsel fragst.\nHalte %s gedrückt, um es zu stoppen.",
-  ["auto.hint.layerHost"] = "Lädt Spieler ein, die nach deinem Layer fragen.\nNicht im Kampf, nicht in Instanzen.\nHalte %s gedrückt, um es zu stoppen.",
   ["auto.off"] = "%s ausgeschaltet nach %d Fehlern, siehe /fg fehler",
 })
 

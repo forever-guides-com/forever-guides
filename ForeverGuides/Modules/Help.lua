@@ -324,6 +324,18 @@ local function build(container)
     }),
     { height = 26, width = 260 }
   )
+  para("feedback", "community.hint", { role = "ui" })
+  add(
+    "feedback",
+    W.Button(view.content, {
+      key = "community.button",
+      width = 200,
+      onClick = function()
+        ns.Dialogs.Copy("community.dialog", ns.Community.address, "help.copyHint")
+      end,
+    }),
+    { height = 26, width = 200 }
+  )
 
   -- About (data status + about text) ---------------------------------------
   local dataText = para("about", nil, { text = "" })

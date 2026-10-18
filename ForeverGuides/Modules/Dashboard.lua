@@ -528,9 +528,150 @@ local function rosterSection(view)
   return section
 end
 
+-- Stream invitation ------------------------------------------------------------
+
+local PROMO_BAR, PROMO_PAD, PROMO_GAP = 6, 16, 10
+local PROMO_BUTTON_W, PROMO_BUTTON_H = 210, 34
+
+-- A large card with the channel address and a button that opens the copy dialog (an add-on cannot open a
+-- web page). The address and the texts come from ns.Channel (UI/MainFrame.lua). The card lays itself out
+-- through fgGridLayout, its height follows the wrapped texts and the font size.
+local function streamBanner(view)
+  local channel = ns.Channel
+  local card = CreateFrame("Frame", nil, view.content)
+  W.FadeWithWindow(W.Fill(card, "surface2", 1))
+  W.Border(card, "accent2", 0.9, 2)
+  local bar = card:CreateTexture(nil, "ARTWORK")
+  bar:SetPoint("TOPLEFT")
+  bar:SetPoint("BOTTOMLEFT")
+  bar:SetWidth(PROMO_BAR)
+  ns.Bind(bar, function(t)
+    t:SetColorTexture(Theme.color("accent2"))
+  end)
+
+  local badge = W.Badge(card, "channel.promo.badge", "accent2")
+  local title =
+    W.Text(card, { key = "channel.promo.title", role = "h2", family = "heading", color = "text", wrap = true })
+  local text = W.Text(card, { key = "channel.promo.text", role = "text", color = "textSecondary", wrap = true })
+  local address = W.Text(card, { text = channel.text, role = "h2", family = "heading", color = "accent2" })
+  local button = W.Action(card, {
+    key = "channel.promo.button",
+    icon = "play",
+    variant = "stream",
+    height = PROMO_BUTTON_H,
+    width = PROMO_BUTTON_W,
+    tooltip = "bar.channel",
+    tooltipText = "channel.promo.tip",
+    onClick = function()
+      ns.Dialogs.Copy("bar.channel", channel.address, "help.copyHint")
+    end,
+  })
+
+  function card:fgGridLayout(width)
+    local x = PROMO_BAR + PROMO_PAD
+    local inner = math.max(1, width - x - PROMO_PAD)
+    local y = PROMO_PAD
+    badge:ClearAllPoints()
+    badge:SetPoint("TOPLEFT", card, "TOPLEFT", x, -y)
+    y = y + badge:GetHeight() + PROMO_GAP
+    for _, fs in ipairs({ title, text }) do
+      fs:ClearAllPoints()
+      fs:SetPoint("TOPLEFT", card, "TOPLEFT", x, -y)
+      fs:SetWidth(inner)
+      y = y + math.ceil(fs:GetStringHeight()) + PROMO_GAP
+    end
+    -- Address and button share a row when they fit, otherwise the button goes below the address.
+    local bw = math.min(inner, math.ceil(PROMO_BUTTON_W * math.max(1, Theme.fontRatio("ui"))))
+    local bh = ns.PageKit.scaledHeight(PROMO_BUTTON_H)
+    local aw, ah = math.ceil(address:GetStringWidth()), math.ceil(address:GetStringHeight())
+    button:SetSize(bw, bh)
+    button:ClearAllPoints()
+    address:ClearAllPoints()
+    local rowH
+    if aw + PROMO_PAD + bw <= inner then
+      rowH = math.max(ah, bh)
+      address:SetPoint("TOPLEFT", card, "TOPLEFT", x, -(y + (rowH - ah) / 2))
+      button:SetPoint("TOPLEFT", card, "TOPLEFT", x + aw + PROMO_PAD, -(y + (rowH - bh) / 2))
+    else
+      address:SetPoint("TOPLEFT", card, "TOPLEFT", x, -y)
+      button:SetPoint("TOPLEFT", card, "TOPLEFT", x, -(y + ah + PROMO_GAP))
+      rowH = ah + PROMO_GAP + bh
+    end
+    local h = y + rowH + PROMO_PAD
+    card:SetHeight(h)
+    return h
+  end
+  card.button = button
+  return card
+end
+
+-- Smaller card under the stream invitation: the community server with the same copy dialog. The address and the
+-- texts come from ns.Community (UI/MainFrame.lua). Address and button share a row when they fit.
+local COMMUNITY_PAD, COMMUNITY_GAP, COMMUNITY_BUTTON_W, COMMUNITY_BUTTON_H = 12, 10, 210, 30
+
+local function communityCard(view)
+  local community = ns.Community
+  local card = W.Card(view.content)
+  -- The title wraps like the text, so a narrow page or a large font never cuts it.
+  local title =
+    W.Text(card, { key = "community.title", role = "h3", family = "heading", color = "accent2", wrap = true })
+  local text = W.Text(card, { key = "community.text", role = "text", color = "textSecondary", wrap = true })
+  local address = W.Text(card, { text = community.text, role = "ui", color = "text" })
+  local button = W.Action(card, {
+    key = "community.button",
+    icon = "share",
+    height = COMMUNITY_BUTTON_H,
+    width = COMMUNITY_BUTTON_W,
+    tooltip = "community.dialog",
+    tooltipText = "community.tip",
+    onClick = function()
+      ns.Dialogs.Copy("community.dialog", community.address, "help.copyHint")
+    end,
+  })
+
+  function card:fgGridLayout(width)
+    local inner = math.max(1, width - 2 * COMMUNITY_PAD)
+    local y = COMMUNITY_PAD
+    for _, fs in ipairs({ title, text }) do
+      fs:ClearAllPoints()
+      fs:SetPoint("TOPLEFT", card, "TOPLEFT", COMMUNITY_PAD, -y)
+      fs:SetWidth(inner)
+      y = y + math.ceil(fs:GetStringHeight()) + COMMUNITY_GAP
+    end
+    local bw = math.min(inner, math.ceil(COMMUNITY_BUTTON_W * math.max(1, Theme.fontRatio("ui"))))
+    local bh = ns.PageKit.scaledHeight(COMMUNITY_BUTTON_H)
+    local aw, ah = math.ceil(address:GetStringWidth()), math.ceil(address:GetStringHeight())
+    button:SetSize(bw, bh)
+    button:ClearAllPoints()
+    address:ClearAllPoints()
+    local rowH
+    -- The address is one unbreakable word, so it only shows where it fits whole (the copy dialog shows it anyway).
+    address:SetShown(aw <= inner)
+    if aw + COMMUNITY_GAP + bw <= inner then
+      rowH = math.max(ah, bh)
+      button:SetPoint("TOPLEFT", card, "TOPLEFT", COMMUNITY_PAD, -(y + (rowH - bh) / 2))
+      address:SetPoint("TOPLEFT", card, "TOPLEFT", COMMUNITY_PAD + bw + COMMUNITY_GAP, -(y + (rowH - ah) / 2))
+    elseif aw <= inner then
+      button:SetPoint("TOPLEFT", card, "TOPLEFT", COMMUNITY_PAD, -y)
+      address:SetPoint("TOPLEFT", card, "TOPLEFT", COMMUNITY_PAD, -(y + bh + COMMUNITY_GAP))
+      rowH = bh + COMMUNITY_GAP + ah
+    else
+      button:SetPoint("TOPLEFT", card, "TOPLEFT", COMMUNITY_PAD, -y)
+      rowH = bh
+    end
+    local h = y + rowH + COMMUNITY_PAD
+    card:SetHeight(h)
+    return h
+  end
+  card.title, card.button = title, button
+  return card
+end
+
 local function build(container)
   local view = ns.NewPageView(container)
   ns.AddParagraph(view, "dashboard.welcome", { color = "text", role = "text" })
+  view.stream = view.stack:Add(streamBanner(view), { gap = 14 })
+  view.community = view.stack:Add(communityCard(view), { gap = 14 })
 
   local charCard = W.Card(view.content, { key = "dashboard.character" })
   local charText = W.Text(charCard, { role = "text", wrap = true })

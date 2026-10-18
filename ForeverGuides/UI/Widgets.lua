@@ -612,6 +612,15 @@ local VARIANTS = {
     borderAlpha = 0.8,
     borderHover = "accent2",
   },
+  -- Filled in the fixed purple of the channel link (white text, AA on both fills).
+  stream = {
+    bg = "stream",
+    bgHover = "streamHi",
+    text = "streamText",
+    textHover = "streamText",
+    border = "streamHi",
+    borderAlpha = 1,
+  },
   -- The footer Save button: a filled accent button at rest, a warning fill while data is unsaved
   -- (UI/SaveUI.lua). Text on both fills passes AA in every theme (tests/test_savestate.lua).
   save = {
@@ -786,7 +795,7 @@ local function fitAction(b, maxWidth)
   return fullWidth(b)
 end
 
--- opts: key|text (fixed text), label (short locale key, hidden by the setting "buttonLabels" and
+-- opts: key|text (fixed text), labelRole (font role of the text, default ui), label (short locale key, hidden by the setting "buttonLabels" and
 -- when there is no room), icon (name of ns.UI_ICONS), variant (primary, secondary, ghost, icon,
 -- danger, gold; default secondary, icon without text), size (height 24, 28 or 32; icon-only buttons
 -- are square), height/width (exact, for the adapters), tooltip + tooltipText (locale keys, the
@@ -836,7 +845,7 @@ function W.Action(parent, opts)
     b.label = W.Text(b, {
       key = hasText and opts.key or opts.label,
       text = opts.text,
-      role = "ui",
+      role = opts.labelRole or "ui",
       color = v.text,
       justify = "CENTER",
     })
@@ -1307,8 +1316,6 @@ function W.Toggle(parent, opts)
     self:Click()
   end)
   f.Refresh = paint
-  -- The texts, for a window that paints them itself (the layer window follows its own background color).
-  f.label, f.state = label, state
   return f
 end
 
@@ -1345,6 +1352,7 @@ function W.Checkbox(parent, opts)
     self:Click()
   end)
   f.Refresh = paint
+  f.label, f.box = label, box
   return f
 end
 

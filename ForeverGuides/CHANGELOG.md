@@ -4,6 +4,32 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.1.7] - 2026-10-18
+
+### Added
+
+- The start page, the Help page and the last setup step invite you to the livestream and the community server, each with a button that opens the address for copying.
+- The setup shows both addresses below the text, and the livestream button uses the color of the channel.
+- The title bar channel field is filled purple and shows the live channel address in a larger font.
+- Group Finder: choose the search languages from all the game offers. Your game language is always included, one search shows at most 100 groups.
+- Group Finder: the new section "I search as" stays in sync with the roles of the game's listing view, you can switch off all roles, and roles your class cannot play are disabled.
+- Group Finder: the switch "Show matching groups" hides groups with no free slot for your role. Single players stay visible.
+
+### Changed
+
+- Group Finder: the filter panel stays open on all three tabs. A click on Search shows the Search tab with the results, whichever tab you are on.
+- Group Finder: the Show section has three buttons for groups, players or everything. Groups without a free slot are always hidden.
+- Group Finder: when you switch the category in the panel, nothing is checked at first. "All" checks everything, the first start still checks all dungeons.
+- Group Finder: the text filter ignores case, accents and umlauts and finds Russian, Korean and Chinese names.
+- Group Finder: raid groups whose slots the game does not count stay visible.
+- Group Finder: the panel check boxes react at once and can be clicked anywhere on their row or icon.
+
+### Fixed
+
+- Group Finder: switching "Show all dungeons" in the settings no longer leaves the game's own search blocked. A reload is offered after the change.
+- Group Finder: the role choice no longer flickers or jumps back on a fast click.
+- Group Finder: the Dungeons category shows in the panel dropdown even when the game delivers the categories late.
+
 ## [0.1.7-beta.1] - 2026-10-17
 
 ### Added
@@ -175,6 +201,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.1.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.7-beta.1...v0.1.7
 [0.1.7-beta.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.6...v0.1.7-beta.1
 [0.1.6]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.4...v0.1.5

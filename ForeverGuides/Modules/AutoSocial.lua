@@ -6,8 +6,7 @@
 -- (autoSocialAcceptFriends), guild members (autoSocialAcceptGuild) and contacts, the recently seen
 -- players (autoSocialAcceptContacts). Never while queued for a dungeon, raid, group finder or
 -- battleground, because joining a group would end the queue.
--- The override key leaves the decision to the player. An invite from the host of a layer switch is left to
--- LayerSwitch.lua, which accepts it (and nothing else) when the player asked that host.
+-- The override key leaves the decision to the player.
 local _, ns = ...
 local Guard, L = ns.AutoGuard, ns.L
 
@@ -63,9 +62,6 @@ local function queued()
   return not known
 end
 
--- The layer switch (LayerSwitch.lua) takes this check too: it must not end a queue either.
-S.Queued = queued
-
 local function hidePopup(which)
   if Guard.Has("StaticPopup_Hide") then
     Guard.Call("StaticPopup_Hide", which)
@@ -111,11 +107,6 @@ end
 function S.OnDecline(inviter, _, _, _, _, _, guid)
   inviter = Guard.Safe(inviter)
   if Guard.Paused() or type(inviter) ~= "string" or inviter == "" or queued() then
-    return
-  end
-  -- The host of a layer switch the player asked for is no stranger: that invite is the point of the switch.
-  local layer = ns.LayerSwitch
-  if layer and layer.Expects(inviter) then
     return
   end
   if settings().autoSocialDecline == true and not Guard.Related(inviter, guid) then

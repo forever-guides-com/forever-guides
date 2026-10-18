@@ -1,7 +1,9 @@
 -- Filter panel at the right side of Blizzard's group finder (LFGParentFrame). Docked (settings.lfgPanelDock, the
 -- default) it sits flush at the window and the column of side tabs hangs at its right edge (Modules/LfgPanelDock.lua),
 -- otherwise it sits beside the column of side tabs.
--- It shows only while the window is open and its browse list is active. By default it opens by itself with the
+-- It shows while the window is open, on all three of its tabs (listing, browse, who). Only the browse tab holds the
+-- list: on the other two the counter gives way to a note where the list is, and a search switches to the browse
+-- tab (S.ShowList; the note stays when that is not possible). By default it opens by itself with the
 -- window (settings.lfgPanelAuto, hook installed, no LFG Filter Forever); closing it (X or side tab) keeps it shut
 -- until the window opens again, nothing of that is stored. With the setting off the player opens it with the
 -- side tab, /fg gruppensuche or /fg lfg and the choice is stored (lfgFilter.open). The rules live in Modules/LfgBrowseFilterLogic.lua, the hook that removes the
@@ -9,7 +11,9 @@
 -- and stores the choices in ns.db.lfgFilter.
 --
 -- Layout: two columns over the height of the window. Left the dungeons (category, All, None, My level and the list
--- of activities with its own scroll area), right the filters (own scroll area), below both the search button, the
+-- of activities with its own scroll area), right the filters (own scroll area: kind of listing, "I search as" with
+-- the switch for matching groups, class, size, level, playstyle, text, age and last the search languages, which
+-- are search input like the dungeons but too long for the dungeon column), below both the search button, the
 -- counter line and the reset button. The width is 600 px at 100 % font (480 at the least, 900 at the most, all
 -- scaled with the font size), the columns share it 50 : 50, a grip at the right edge changes it (mouse, or the
 -- keys Left and Right with the focus on the grip; stored in lfgFilter.width). With too little room right of the
@@ -47,22 +51,32 @@ ns.AddLocale("enUS", {
   ["lfgp.search"] = "Search",
   ["lfgp.searching"] = "Searching...",
   ["lfgp.search.none"] = "Choose at least one dungeon",
+  ["lfgp.search.noneActivity"] = "Choose at least one activity",
+  ["lfgp.hint.list"] = "The list is in the Search tab.",
   ["lfgp.search.failed"] = "Search failed. Please wait a moment and try again.",
   ["lfgp.search.blocked"] = "Search is blocked right now.",
   ["lfgp.show"] = "Show",
-  ["lfgp.show.groups"] = "Groups looking for players",
-  ["lfgp.show.players"] = "Players looking for a group",
-  ["lfgp.show.open"] = "Only groups with a free slot",
-  ["lfgp.show.open.tip"] = "Affects groups only",
+  ["lfgp.selected"] = "selected",
+  ["lfgp.unselected"] = "not selected",
   ["lfgp.preset.groups"] = "Groups seek players",
   ["lfgp.preset.players"] = "Players seek group",
   ["lfgp.preset.all"] = "Show everything",
   ["lfgp.resize"] = "Panel width",
   ["lfgp.resize.hint"] = "Drag or use Left and Right.\nEnter resets.",
-  ["lfgp.roles"] = "Role",
+  ["lfgp.roles"] = "I search as",
   ["lfgp.role.tank"] = "Tank",
   ["lfgp.role.healer"] = "Healer",
   ["lfgp.role.damage"] = "Damage",
+  ["lfgp.roles.group"] = "In a group your group role applies.",
+  ["lfgp.roles.class"] = "Your class cannot play this role.",
+  ["lfgp.roles.blocked"] = "The roles could not be passed to the game.",
+  ["lfgp.match"] = "Show matching groups",
+  ["lfgp.match.tip"] = "Only groups with a free slot for your role.\nWorks when you choose at least one role.",
+  ["lfgp.langs"] = "Languages",
+  ["lfgp.langs.locked"] = "Your game language is always included.",
+  ["lfgp.langs.none"] = "No extra ones",
+  ["lfgp.langs.hint"] = "Groups of other languages appear in the list,\nthe game does not show the language of a single group.",
+  ["lfgp.langs.cap"] = "One search returns at most 100 groups.\nChoose fewer dungeons or languages for a fuller list.",
   ["lfgp.classes"] = "Class",
   ["lfgp.sizes"] = "Group size",
   ["lfgp.size.1"] = "1",
@@ -87,7 +101,7 @@ ns.AddLocale("enUS", {
   ["lfgp.age.120"] = "Under 2 min",
   ["lfgp.age.300"] = "Under 5 min",
   ["lfgp.reset"] = "Reset filters",
-  ["lfgp.where"] = "The filter shows in the group finder, on the search tab.",
+  ["lfgp.where"] = "The filter shows in the group finder.",
   ["lfgp.off"] = "Filter panel is off, see Settings > Guild and contacts.",
 })
 ns.AddLocale("deDE", {
@@ -112,22 +126,32 @@ ns.AddLocale("deDE", {
   ["lfgp.search"] = "Suchen",
   ["lfgp.searching"] = "Suche läuft...",
   ["lfgp.search.none"] = "Mindestens einen Dungeon wählen",
+  ["lfgp.search.noneActivity"] = "Mindestens eine Aktivität wählen",
+  ["lfgp.hint.list"] = "Die Liste siehst du im Reiter Suchen.",
   ["lfgp.search.failed"] = "Suche fehlgeschlagen. Bitte kurz warten und erneut versuchen.",
   ["lfgp.search.blocked"] = "Die Suche ist gerade gesperrt.",
   ["lfgp.show"] = "Zeigen",
-  ["lfgp.show.groups"] = "Gruppen, die Spieler suchen",
-  ["lfgp.show.players"] = "Spieler, die eine Gruppe suchen",
-  ["lfgp.show.open"] = "Nur Gruppen mit freiem Platz",
-  ["lfgp.show.open.tip"] = "Wirkt nur auf Gruppen",
+  ["lfgp.selected"] = "ausgewählt",
+  ["lfgp.unselected"] = "nicht ausgewählt",
   ["lfgp.preset.groups"] = "Gruppen suchen Spieler",
   ["lfgp.preset.players"] = "Spieler suchen Gruppe",
   ["lfgp.preset.all"] = "Alles zeigen",
   ["lfgp.resize"] = "Panelbreite",
   ["lfgp.resize.hint"] = "Ziehen oder Pfeiltasten.\nEnter setzt zurück.",
-  ["lfgp.roles"] = "Rolle",
+  ["lfgp.roles"] = "Ich suche als",
   ["lfgp.role.tank"] = "Tank",
   ["lfgp.role.healer"] = "Heiler",
   ["lfgp.role.damage"] = "Schaden",
+  ["lfgp.roles.group"] = "In einer Gruppe gilt deine Gruppenrolle.",
+  ["lfgp.roles.class"] = "Deine Klasse kann diese Rolle nicht.",
+  ["lfgp.roles.blocked"] = "Die Rollen konnten nicht an das Spiel übergeben werden.",
+  ["lfgp.match"] = "Passende Gruppen anzeigen",
+  ["lfgp.match.tip"] = "Nur Gruppen mit freiem Platz für deine Rolle.\nWirkt, wenn du mindestens eine Rolle wählst.",
+  ["lfgp.langs"] = "Sprachen",
+  ["lfgp.langs.locked"] = "Deine Spielsprache ist immer dabei.",
+  ["lfgp.langs.none"] = "Keine zusätzlichen",
+  ["lfgp.langs.hint"] = "Gruppen anderer Sprachen erscheinen in der Liste,\ndie Sprache der einzelnen Gruppe zeigt das Spiel nicht an.",
+  ["lfgp.langs.cap"] = "Eine Suche liefert höchstens 100 Gruppen.\nWähle weniger Dungeons oder Sprachen\nfür eine vollständigere Liste.",
   ["lfgp.classes"] = "Klasse",
   ["lfgp.sizes"] = "Gruppengröße",
   ["lfgp.size.1"] = "1",
@@ -152,7 +176,7 @@ ns.AddLocale("deDE", {
   ["lfgp.age.120"] = "Unter 2 Min.",
   ["lfgp.age.300"] = "Unter 5 Min.",
   ["lfgp.reset"] = "Filter zurücksetzen",
-  ["lfgp.where"] = "Der Filter erscheint in der Gruppensuche, im Reiter Suche.",
+  ["lfgp.where"] = "Der Filter erscheint in der Gruppensuche.",
   ["lfgp.off"] = "Filter-Panel ist aus (Einstellungen, Gilde und Kontakte).",
 })
 
@@ -165,6 +189,7 @@ local GAP = 4 -- between the side tab column and the panel (not docked)
 local FALLBACK = 56 -- width of the tab column when it cannot be measured (tab inset 4 plus tab 52)
 local LEVEL_LIFT = 20 -- above the group finder window
 local APPLY_DELAY = 0.3 -- typing: the list changes after a pause
+local CLICK_DELAY = 0.12 -- clicks: the work after them runs once per burst of clicks
 local ATTACH_DELAY = 0.5
 local RETRY_DELAY, RETRIES = 2, 3
 local GRIP_WIDTH, KEY_STEP = 8, 20
@@ -174,7 +199,7 @@ local built, attached, attachPending
 -- Runtime only, reset whenever the group finder opens: the player closed the panel, or opened it with the tab.
 local dismissed, manual = false, false
 local buildFailed -- building the frame raised once; only a click on the tab tries again
-local refreshStatus
+local refreshStatus, refreshSearchButton
 
 -- The dungeon column: what the game offers (snapshot), the category shown and its activities in display order.
 local snapshot, category, entries = nil, 0, {}
@@ -199,10 +224,39 @@ local function apply()
   H.Apply()
 end
 
--- Writes one value of the state and filters again.
+-- A click changes the state and the shown control at once (a table write, nothing else). The heavy part waits in
+-- `queue` and runs once, CLICK_DELAY after the first click of a burst: the roles go to the game, the changes are
+-- announced, the list is filtered once, the counter and the layout follow. Clicks are never refused: they only join
+-- the queue, whatever runs or loads at that moment.
+local queue = { paths = {}, order = {}, apply = false, languages = false }
+local flushing = false -- while the run works, the events it raises must not do the work a second time
+
+-- Typing has its own, longer pause so that it never holds the run of a click back.
+local function schedule(delay)
+  ns.Debounce(delay and "lfg-panel-typed" or "lfg-panel-apply", delay or CLICK_DELAY, P.Flush)
+end
+
+-- Queues the announcement of one changed value; what = "apply" when the list must be filtered again.
+local function enqueue(path, what, delay)
+  if not queue.paths[path] then
+    queue.paths[path] = true
+    queue.order[#queue.order + 1] = path
+  end
+  if what == "apply" then
+    queue.apply = true
+  elseif what == "languages" then
+    queue.languages = true
+  end
+  schedule(delay)
+end
+
+-- Writes one value of the state (one level deep) and queues the filtering.
 local function set(path, value)
-  ns.Store.set("lfgFilter." .. path, value)
-  apply()
+  local s = state()
+  if s then
+    s[path] = value
+    enqueue(path, "apply")
+  end
 end
 
 -- One entry of a set of switches (numbers and class tokens are keys, so no path text).
@@ -210,14 +264,16 @@ local function setSwitch(field, key, value)
   local s = state()
   if s then
     s[field][key] = value
-    ns.Emit("FG_SETTING_CHANGED", "lfgFilter." .. field, s[field])
-    apply()
+    enqueue(field, "apply")
   end
 end
 
 local function typed(path, value)
-  ns.Store.set("lfgFilter." .. path, value)
-  ns.Debounce("lfg-panel-apply", APPLY_DELAY, apply)
+  local s = state()
+  if s then
+    s[path] = value
+    enqueue(path, "apply", APPLY_DELAY)
+  end
 end
 
 -- Classes the game knows, with its own names; the addon's list when the client names none.
@@ -245,6 +301,29 @@ end
 
 -- Controls ---------------------------------------------------------------------------------------------------------
 
+-- The pressed look over the whole button: on the moment the mouse goes down, off on release, when the mouse leaves
+-- or the button hides. The action itself runs on release (OnClick). The shade lies above the fills and below the
+-- symbols.
+local function pressable(button)
+  local shade = button:CreateTexture(nil, "BORDER")
+  shade:SetAllPoints()
+  shade:SetColorTexture(1, 1, 1, 0.14)
+  shade:Hide()
+  local function release()
+    shade:Hide()
+  end
+  button:HookScript("OnMouseDown", function()
+    shade:Show()
+  end)
+  button:HookScript("OnMouseUp", release)
+  button:HookScript("OnLeave", release)
+  button:HookScript("OnHide", release)
+  button.shade = shade
+  return button
+end
+
+local ROW_HEIGHT = 24 -- least height of a line of check boxes, so the click area is generous
+
 -- A caption with checkboxes in columns. o: key, items = { { value, key } }, columns, get(value), set(value, on).
 local function checkGroup(parent, o)
   local f = CreateFrame("Frame", nil, parent)
@@ -252,7 +331,7 @@ local function checkGroup(parent, o)
   caption:SetPoint("TOPLEFT")
   local boxes = {}
   for _, item in ipairs(o.items) do
-    boxes[#boxes + 1] = W.Checkbox(f, {
+    boxes[#boxes + 1] = pressable(W.Checkbox(f, {
       key = item.key,
       get = function()
         return o.get(item.value)
@@ -260,11 +339,11 @@ local function checkGroup(parent, o)
       set = function(on)
         o.set(item.value, on)
       end,
-    })
+    }))
   end
   function f:fgGridLayout(width)
     local top = math.ceil(caption:GetStringHeight()) + 4
-    local row = Theme.lineHeight(22, "ui")
+    local row = math.max(ROW_HEIGHT, Theme.lineHeight(ROW_HEIGHT, "ui"))
     local colWidth = math.max(1, (width - 6 * (o.columns - 1)) / o.columns)
     for i, box in ipairs(boxes) do
       local col, line = (i - 1) % o.columns, math.floor((i - 1) / o.columns)
@@ -320,15 +399,23 @@ local function classGroup(parent)
       local s = state()
       if s then
         -- Only the classes switched off are stored.
-        if s.classes[token] == false then
-          setSwitch("classes", token, nil)
-        else
+        local on = s.classes[token] ~= false
+        if on then
           setSwitch("classes", token, false)
+        else
+          setSwitch("classes", token, nil)
         end
-        group.Refresh()
+        for _, button in ipairs(group.buttons) do
+          if button.value == token then
+            button:SetSelected(not on)
+          end
+        end
       end
     end,
   })
+  for _, button in ipairs(group.buttons) do
+    pressable(button)
+  end
   -- Several classes can be on: the group's own refresh knows one selection only.
   function group.Refresh()
     local s = state()
@@ -377,88 +464,59 @@ local function levelRow(parent)
   return f
 end
 
--- Show group: presets, kinds of listing, free slot ----------------------------------------------------------------
+-- Show group: one choice of three buttons -------------------------------------------------------------------------
 
+local SHOW_CHECK = 12
+
+-- The mode is a single choice: the selected button has the filled ring of W.Action, a check mark and the word
+-- "selected" in its accessible name, so the state does not rest on color.
 local function showGroup(parent)
   local f = CreateFrame("Frame", nil, parent)
   local caption = W.Text(f, { key = "lfgp.show", role = "ui", family = "heading", color = "accent2" })
   caption:SetPoint("TOPLEFT")
-  local presets, boxes = {}, {}
-  for _, id in ipairs({ "groups", "players", "all" }) do
-    presets[#presets + 1] = {
-      id = id,
-      button = W.Action(f, {
-        key = "lfgp.preset." .. id,
-        variant = "secondary",
-        size = 24,
-        onClick = function()
-          local s = state()
-          if s then
-            LB.ApplyPreset(s, id)
-            ns.Emit("FG_SETTING_CHANGED", "lfgFilter", s)
-            apply()
-            f.Refresh()
-          end
-        end,
-      }),
-    }
-  end
-  local function box(key, get, put, tip)
-    boxes[#boxes + 1] = W.Checkbox(f, {
+  local buttons = {}
+  for _, id in ipairs(LB.SHOW) do
+    local key = "lfgp.preset." .. id
+    local button = W.Action(f, {
       key = key,
-      tooltip = tip and key,
-      tooltipText = tip,
-      get = function()
+      variant = "secondary",
+      size = 24,
+      onClick = function()
         local s = state()
-        return not s or get(s)
-      end,
-      set = function(on)
-        put(on)
-        f.Refresh()
+        if s and LB.SetShow(s, id) then
+          f.Refresh()
+          enqueue("show", "apply")
+        end
       end,
     })
+    button.check = W.CheckMark(button, SHOW_CHECK, "text")
+    button.check:SetPoint("LEFT", button, "LEFT", 8, 0)
+    button.check:Hide()
+    function button.fgName()
+      local name = L[key]
+      return button.fgSelected and string.format("%s, %s", name, L["lfgp.selected"]) or name
+    end
+    buttons[#buttons + 1] = { id = id, button = button }
   end
-  box("lfgp.show.groups", function(s)
-    return s.show.groups ~= false
-  end, function(on)
-    setSwitch("show", "groups", on)
-  end)
-  box("lfgp.show.players", function(s)
-    return s.show.players ~= false
-  end, function(on)
-    setSwitch("show", "players", on)
-  end)
-  box("lfgp.show.open", function(s)
-    return s.onlyOpen == true
-  end, function(on)
-    set("onlyOpen", on)
-  end, "lfgp.show.open.tip")
   function f:fgGridLayout(width)
     local top = math.ceil(caption:GetStringHeight()) + 4
-    local button, row = Theme.lineHeight(24, "ui"), Theme.lineHeight(22, "ui")
-    for i, preset in ipairs(presets) do
-      preset.button:ClearAllPoints()
-      preset.button:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(top + (i - 1) * (button + 4)))
-      preset.button:SetSize(width, button)
+    local height = Theme.lineHeight(24, "ui")
+    for i, item in ipairs(buttons) do
+      item.button:ClearAllPoints()
+      item.button:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(top + (i - 1) * (height + 4)))
+      item.button:SetSize(width, height)
     end
-    top = top + #presets * (button + 4) + 4
-    for i, item in ipairs(boxes) do
-      item:ClearAllPoints()
-      item:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(top + (i - 1) * (row + 2)))
-      item:SetSize(width, row)
-    end
-    local height = top + #boxes * (row + 2)
-    f:SetHeight(height)
-    return height
+    local total = top + #buttons * (height + 4) - 4
+    f:SetHeight(total)
+    return total
   end
   function f.Refresh()
     local s = state()
-    local current = s and LB.PresetOf(s)
-    for _, preset in ipairs(presets) do
-      preset.button:SetSelected(preset.id == current)
-    end
-    for _, item in ipairs(boxes) do
-      item.Refresh()
+    local current = LB.ShowMode(s and s.show)
+    for _, item in ipairs(buttons) do
+      local on = item.id == current
+      item.button:SetSelected(on)
+      item.button.check:SetShown(on)
     end
   end
   return f
@@ -477,9 +535,9 @@ local function chooseActivities(chosen)
   local s = state()
   if s then
     LB.SetChosen(s, chosen, entries)
-    ns.Emit("FG_SETTING_CHANGED", "lfgFilter.activities", s.activities)
-    built.list.Refresh()
-    refreshStatus()
+    built.list.Paint()
+    refreshSearchButton()
+    enqueue("activities")
   end
 end
 
@@ -489,15 +547,15 @@ local function toggleActivity(id)
     local chosen = LB.Chosen(s, entries)
     chosen[id] = chosen[id] ~= true or nil
     LB.SetChosen(s, chosen, entries)
-    ns.Emit("FG_SETTING_CHANGED", "lfgFilter.activities", s.activities)
-    refreshStatus()
+    refreshSearchButton()
+    enqueue("activities")
   end
 end
 
 -- The tab order: head, dungeon column, its rows, filter column, foot, grip.
 local function rebuildItems()
   local out = {}
-  for _, key in ipairs({ "head", "left", "rows", "right", "foot", "grip" }) do
+  for _, key in ipairs({ "head", "left", "rows", "right", "langs", "foot", "grip" }) do
     for _, item in ipairs(built.parts[key]) do
       out[#out + 1] = item
     end
@@ -533,7 +591,7 @@ end
 -- One row: a checkbox, the name (cut with "..." when it does not fit), the level range at the right edge (never
 -- cut, the tooltip has both whole) and, under the name, the marker for the activities of the player's level.
 local function newRow(parent)
-  local row = CreateFrame("Button", nil, parent)
+  local row = pressable(CreateFrame("Button", nil, parent))
   local box = CreateFrame("Frame", nil, row)
   box:SetSize(16, 16)
   box:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -3)
@@ -548,9 +606,13 @@ local function newRow(parent)
   row.label:SetPoint("TOPLEFT", row, "TOPLEFT", 24, -3)
   row.label:SetPoint("TOPRIGHT", row.level, "TOPLEFT", -LEVEL_GAP, 0)
   row.mark = W.Text(row, { key = "lfgp.mark", role = "small", color = "accent2" })
-  function row.paint()
+  -- chosen: the checked set of the list when the caller has it (one pass for all rows).
+  function row.paint(chosen)
     local s = state()
-    local on = s ~= nil and row.id ~= nil and LB.Chosen(s, entries)[row.id] == true
+    if s and row.id ~= nil and not chosen then
+      chosen = LB.Chosen(s, entries)
+    end
+    local on = s ~= nil and row.id ~= nil and chosen[row.id] == true
     check:SetShown(on)
     boxOn:SetShown(on)
     border.set(on and "actionHi" or "white", on and 1 or 0.4)
@@ -566,7 +628,9 @@ local function newRow(parent)
   function row.fgName()
     return row.spoken
   end
-  ns.Bind(row, row.paint)
+  ns.Bind(row, function()
+    row.paint()
+  end)
   row:SetScript(
     "OnClick",
     ns.Wrap("lfg-dungeon", function()
@@ -587,7 +651,7 @@ local function newRow(parent)
   return row
 end
 
-local function bindRow(row, entry, level)
+local function bindRow(row, entry, level, chosen)
   row.id = entry.id
   row.text = LB.ActivityName(entry, string.format(L["lfgp.activity.unknown"], entry.id))
   row.range = LB.ActivityLevels(entry)
@@ -596,7 +660,7 @@ local function bindRow(row, entry, level)
   row.level:SetText(row.range)
   row.mine = LB.InRange(entry, level)
   row.mark:SetShown(row.mine)
-  row.paint()
+  row.paint(chosen)
   row:Show()
 end
 
@@ -606,11 +670,21 @@ local function dungeonList(parent)
   local rows = {}
   local probe = W.Text(list, { role = "ui", text = LEVEL_PROBE })
   probe:Hide()
+  -- Only the check marks: what a click on a row, All, None or My level changes.
+  function list.Paint()
+    local s = state()
+    local chosen = s and LB.Chosen(s, entries) or {}
+    for i = 1, #entries do
+      rows[i].paint(chosen)
+    end
+  end
   function list.Refresh()
     local level = playerLevel()
+    local s = state()
+    local chosen = s and LB.Chosen(s, entries) or {}
     for i, entry in ipairs(entries) do
       rows[i] = rows[i] or newRow(list)
-      bindRow(rows[i], entry, level)
+      bindRow(rows[i], entry, level, chosen)
     end
     for i = #entries + 1, #rows do
       rows[i].id = nil
@@ -657,12 +731,42 @@ local function dungeonList(parent)
   return list
 end
 
+-- The dungeon category the game offers, 0 while it offers none.
+local function dungeonCategory()
+  local best = snapshot and LB.PickCategory(snapshot.categories)
+  return best and best.id or 0
+end
+
+-- Whether Blizzard's browse list is the tab the window shows (the only one that holds the list).
+local function listShown()
+  local list = browse()
+  return list == nil or list:IsVisible() == true
+end
+
+-- The categories can arrive after the panel: the dropdown asks again a few times while it holds none.
+local lateTries, latePending = 0, false
+
 -- Reads what the game offers and shows the category and its activities.
 local function refreshDungeons()
   if not built then
     return
   end
   snapshot = S.Snapshot()
+  local timer = rawget(_G, "C_Timer")
+  if #snapshot.categories > 0 then
+    lateTries = 0
+  elseif not latePending and lateTries < RETRIES and type(timer) == "table" and type(timer.After) == "function" then
+    latePending, lateTries = true, lateTries + 1
+    pcall(timer.After, RETRY_DELAY, function()
+      latePending = false
+      if built and built.frame:IsShown() then
+        ns.Safe("lfg-panel", function()
+          refreshDungeons()
+          refreshStatus()
+        end)
+      end
+    end)
+  end
   local s = state()
   category = LB.ResolveCategory(s and s.categoryID or 0, snapshot.categories)
   -- The first time the dungeon category the game offers is stored, so the choice is explicit from then on.
@@ -682,6 +786,355 @@ local function refreshDungeons()
   entries = snapshot.activities[category] or {}
   built.category.Refresh()
   built.list.Refresh()
+end
+
+-- I search as -------------------------------------------------------------------------------------------------------
+
+-- The art of Blizzard's listing view: the round atlases of the window first, else the sheet UI-LFG-ICON-ROLES with the
+-- cell of the role (GetTexCoordsForRole when the client has it, otherwise the grid of 67 px cells in 256 px) and its
+-- round backgrounds sheet. The symbol never carries the state alone, the check box on it does.
+local ROLE_ART = {
+  tank = { id = "TANK", atlas = "UI-LFG-RoleIcon-Tank", grid = { 1, 2 } },
+  healer = { id = "HEALER", atlas = "UI-LFG-RoleIcon-Healer", grid = { 2, 1 } },
+  damage = { id = "DAMAGER", atlas = "UI-LFG-RoleIcon-DPS", grid = { 2, 2 } },
+}
+local ROLE_SHEET = "Interface\\LFGFrame\\UI-LFG-ICON-ROLES"
+local ROLE_BACKS = "Interface\\LFGFrame\\UI-LFG-ICONS-ROLEBACKGROUNDS"
+local SHEET_CELL = 67 / 256
+local ROLE_ICON, ROLE_BACK_RATIO, ROLE_BOX = 40, 1.25, 16
+
+local function hasAtlas(name)
+  local api = rawget(_G, "C_Texture")
+  if type(api) ~= "table" or type(api.GetAtlasInfo) ~= "function" then
+    return false
+  end
+  local ok, info = pcall(api.GetAtlasInfo, name)
+  return ok and info ~= nil
+end
+
+-- The four texture coordinates a client function answers for a role, nil when it has none.
+local function clientCoords(name, id)
+  local fn = rawget(_G, name)
+  if type(fn) ~= "function" then
+    return nil
+  end
+  local ok, left, right, top, bottom = pcall(fn, id)
+  return ok and bottom ~= nil and { left, right, top, bottom } or nil
+end
+
+-- What the symbol of a role is drawn from: { atlas, background } or { file, coords, backFile, backCoords }.
+function P.RoleIcon(role)
+  local art = ROLE_ART[role]
+  if not art then
+    return nil
+  end
+  if hasAtlas(art.atlas) then
+    local back = art.atlas .. "-Background"
+    return { atlas = art.atlas, background = hasAtlas(back) and back or nil }
+  end
+  local x, y = art.grid[1], art.grid[2]
+  local coords = clientCoords("GetTexCoordsForRole", art.id)
+    or { (x - 1) * SHEET_CELL, x * SHEET_CELL, (y - 1) * SHEET_CELL, y * SHEET_CELL }
+  local backCoords = clientCoords("GetBackgroundTexCoordsForRole", art.id)
+  return { file = ROLE_SHEET, coords = coords, backFile = backCoords and ROLE_BACKS or nil, backCoords = backCoords }
+end
+
+local function paintArt(texture, atlas, file, coords)
+  if atlas then
+    texture:SetAtlas(atlas)
+    texture:SetTexCoord(0, 1, 0, 1)
+  elseif file then
+    texture:SetTexture(file)
+    texture:SetTexCoord(unpack(coords))
+  end
+  texture:SetShown(atlas ~= nil or file ~= nil)
+end
+
+-- One role: only the round symbol, the check box sits on its lower left corner like in Blizzard's listing view.
+-- The whole cell is the button (Tab, Space, Enter and click like every check box). The name and the state are in
+-- the tooltip and in the name for the screen reader. A role the class cannot play is dimmed and does nothing, yet
+-- stays focusable so its tooltip says why.
+local function roleCell(parent, role)
+  local Roles = ns.LfgRoles
+  local cell
+  cell = pressable(W.Checkbox(parent, {
+    get = function()
+      return Roles.Shown()[role]
+    end,
+    set = function(on)
+      if not cell.blocked and Roles.Queue(role, on) then
+        schedule()
+      end
+    end,
+  }))
+  cell.label:Hide()
+  cell.role = role
+  cell.back = cell:CreateTexture(nil, "BACKGROUND")
+  cell.icon = cell:CreateTexture(nil, "ARTWORK")
+  local tip
+  local paintBox = cell.Refresh
+  function cell.Refresh()
+    paintBox()
+    local art = P.RoleIcon(role)
+    cell.art = art
+    if art then
+      paintArt(cell.icon, art.atlas, art.file, art.coords)
+      paintArt(cell.back, art.background, art.backFile, art.backCoords)
+    end
+    -- A role the game holds stays switchable, so it can be switched off again.
+    cell.blocked = not Roles.CanPlay(role) and not Roles.Shown()[role]
+    local alpha = cell.blocked and 0.4 or 1
+    cell.icon:SetDesaturated(cell.blocked)
+    cell.icon:SetAlpha(alpha)
+    cell.back:SetAlpha(alpha)
+    cell.box:SetAlpha(alpha)
+    if cell.tipping then
+      tip()
+    end
+  end
+  function cell.fgName()
+    local name = L["lfgp.role." .. role]
+    local text = string.format("%s, %s", name, L[Roles.Shown()[role] and "lfgp.selected" or "lfgp.unselected"])
+    return cell.blocked and string.format("%s, %s", text, L["lfgp.roles.class"]) or text
+  end
+  function tip()
+    cell.tipping = true
+    local name = L["lfgp.role." .. role]
+    local title = Roles.Shown()[role] and string.format("%s, %s", name, L["lfgp.selected"]) or name
+    ns.ShowTooltip(cell, title, cell.blocked and L["lfgp.roles.class"] or nil)
+  end
+  local function untip()
+    cell.tipping = false
+    ns.HideTooltip()
+  end
+  cell:HookScript("OnEnter", tip)
+  cell:HookScript("OnLeave", untip)
+  cell.fgOnFocus, cell.fgOnBlur = tip, untip
+  cell.Refresh()
+  return cell
+end
+
+-- The three roles (several possible, state.seek, kept in step with the game by Modules/LfgRoles.lua), the switch for
+-- matching groups and one note line: the group role in a group, or that the roles did not reach the game. In a group
+-- the cells show the assigned role and change nothing; they stay focusable so the keyboard reaches the note.
+local function rolesGroup(parent)
+  local Roles = ns.LfgRoles
+  local f = CreateFrame("Frame", nil, parent)
+  local caption = W.Text(f, { key = "lfgp.roles", role = "ui", family = "heading", color = "accent2" })
+  caption:SetPoint("TOPLEFT")
+  local cells = {}
+  for _, role in ipairs(LB.ROLES) do
+    cells[#cells + 1] = roleCell(f, role)
+  end
+  local match = pressable(W.Checkbox(f, {
+    key = "lfgp.match",
+    tooltip = "lfgp.match",
+    tooltipText = "lfgp.match.tip",
+    get = function()
+      local s = state()
+      return s ~= nil and s.matchRoles == true
+    end,
+    set = function(on)
+      set("matchRoles", on)
+    end,
+  }))
+  local note = W.Text(f, { role = "small", color = "textMuted", wrap = true })
+  function f:fgGridLayout(width)
+    local top = math.ceil(caption:GetStringHeight()) + 4
+    local row = math.max(ROW_HEIGHT, Theme.lineHeight(ROW_HEIGHT, "ui"))
+    local gap = 6
+    local column = math.max(1, math.floor((width - 2 * gap) / 3))
+    -- The check box overlaps the ring by half its size. The symbol shrinks (not below 32) before the cells would
+    -- run into each other.
+    local overlap = math.floor(ROLE_BOX / 2)
+    local fit = math.floor((column - overlap) / ROLE_BACK_RATIO)
+    local icon = math.max(32, math.min(Theme.lineHeight(ROLE_ICON, "ui"), fit))
+    local back = math.floor(icon * ROLE_BACK_RATIO + 0.5)
+    local size = back + overlap
+    local cellHeight = size
+    for i, cell in ipairs(cells) do
+      local left = (i - 1) * (column + gap) + math.max(0, math.floor((column - size) / 2))
+      cell:ClearAllPoints()
+      cell:SetPoint("TOPLEFT", f, "TOPLEFT", left, -top)
+      cell:SetSize(size, size)
+      cell.back:ClearAllPoints()
+      cell.back:SetPoint("TOPRIGHT", cell, "TOPRIGHT", 0, 0)
+      cell.back:SetSize(back, back)
+      cell.icon:ClearAllPoints()
+      cell.icon:SetPoint("CENTER", cell.back, "CENTER", 0, 0)
+      cell.icon:SetSize(icon, icon)
+      cell.box:ClearAllPoints()
+      cell.box:SetPoint("BOTTOMLEFT", cell, "BOTTOMLEFT", 0, 0)
+    end
+    local y = top + cellHeight + 6
+    match:ClearAllPoints()
+    match:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
+    match:SetSize(math.max(1, width), row)
+    y = y + row + 2
+    if note:IsShown() then
+      note:ClearAllPoints()
+      note:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -(y + 2))
+      note:SetWidth(math.max(1, width))
+      y = y + 2 + math.ceil(note:GetStringHeight())
+    end
+    f:SetHeight(y)
+    return y
+  end
+  function f.Refresh()
+    local _, grouped = Roles.Shown()
+    for _, cell in ipairs(cells) do
+      cell.Refresh()
+      cell:SetAlpha(grouped and 0.6 or 1)
+    end
+    match.Refresh()
+    local key = grouped and "lfgp.roles.group" or Roles.Note() and "lfgp.roles." .. Roles.Note() or nil
+    W.SetText(note, key)
+    W.SetColor(note, grouped and "textMuted" or "warning")
+    note:SetShown(key ~= nil)
+  end
+  f.cells = cells
+  return f
+end
+
+-- Search languages -------------------------------------------------------------------------------------------------
+
+-- What the game offers (S.Languages) as checkboxes, the player's own language first, checked and locked, then the
+-- buttons All and "No extra ones", the note and, with more than one language, the note about the 100 results. The
+-- group is hidden while the game offers none. Rows are made when needed and reused. The checked ones are stored in
+-- state.languages (codes only, a code the client does not offer stays stored and is never sent).
+local function languageGroup(parent)
+  local f = CreateFrame("Frame", nil, parent)
+  local caption = W.Text(f, { key = "lfgp.langs", role = "ui", family = "heading", color = "accent2" })
+  caption:SetPoint("TOPLEFT")
+  local rows, offered = {}, {}
+  local function chosen()
+    local s = state()
+    return s and s.languages or {}
+  end
+  local function store(code, on)
+    local s = state()
+    if s then
+      s.languages[code] = on or nil
+    end
+  end
+  -- Every box shows its state now; the note about the 100 results and the layout follow in the queued run.
+  local function pick(on)
+    for _, entry in ipairs(offered) do
+      if not entry.locked then
+        store(entry.code, on)
+      end
+    end
+    for _, row in ipairs(rows) do
+      if row.code then
+        row.Refresh()
+      end
+    end
+    enqueue("languages", "languages")
+  end
+  local all = W.Action(f, {
+    key = "lfgp.all",
+    variant = "secondary",
+    size = 24,
+    onClick = function()
+      pick(true)
+    end,
+  })
+  local none = W.Action(f, {
+    key = "lfgp.langs.none",
+    variant = "secondary",
+    size = 24,
+    onClick = function()
+      pick(false)
+    end,
+  })
+  local hint = W.Text(f, { key = "lfgp.langs.hint", role = "small", color = "textMuted", wrap = true })
+  local cap = W.Text(f, { key = "lfgp.langs.cap", role = "small", color = "warning", wrap = true })
+
+  local function newLanguageRow()
+    local row
+    local from = #ns.Focus.items
+    row = pressable(W.Checkbox(f, {
+      text = "",
+      get = function()
+        -- The box paints once while it is made, before `row` exists.
+        return row ~= nil and (row.locked == true or chosen()[row.code] == true)
+      end,
+      set = function(on)
+        if row.code and not row.locked then
+          store(row.code, on)
+          enqueue("languages", "languages")
+        end
+      end,
+    }))
+    local function tip()
+      if row.locked then
+        ns.ShowTooltip(row, L["lfgp.langs.locked"])
+      end
+    end
+    row:HookScript("OnEnter", tip)
+    row:HookScript("OnLeave", ns.HideTooltip)
+    row.fgOnFocus, row.fgOnBlur = tip, ns.HideTooltip
+    if built then
+      for _, item in ipairs(claimFocus(from)) do
+        table.insert(built.parts.langs, item)
+      end
+    end
+    return row
+  end
+
+  function f:fgGridLayout(width)
+    local top = math.ceil(caption:GetStringHeight()) + 4
+    local button, line = Theme.lineHeight(24, "ui"), math.max(ROW_HEIGHT, Theme.lineHeight(ROW_HEIGHT, "ui"))
+    local half = math.max(1, math.floor((width - 4) / 2))
+    all:ClearAllPoints()
+    all:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -top)
+    all:SetSize(half, button)
+    none:ClearAllPoints()
+    none:SetPoint("TOPLEFT", f, "TOPLEFT", half + 4, -top)
+    none:SetSize(math.max(1, width - half - 4), button)
+    local y = top + button + 6
+    for i = 1, #offered do
+      rows[i]:ClearAllPoints()
+      rows[i]:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
+      rows[i]:SetSize(math.max(1, width), line)
+      y = y + line + 2
+    end
+    y = y + 4
+    for _, text in ipairs({ hint, cap }) do
+      if text:IsShown() then
+        text:ClearAllPoints()
+        text:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
+        text:SetWidth(math.max(1, width))
+        y = y + math.ceil(text:GetStringHeight()) + 4
+      end
+    end
+    f:SetHeight(y)
+    return y
+  end
+
+  function f.Refresh()
+    offered = S.Languages()
+    for i, entry in ipairs(offered) do
+      rows[i] = rows[i] or newLanguageRow()
+      local row = rows[i]
+      row.code, row.locked = entry.code, entry.locked
+      W.SetText(row.label, nil, entry.name)
+      row:SetAlpha(entry.locked and 0.6 or 1)
+      row.Refresh()
+      row:Show()
+    end
+    for i = #offered + 1, #rows do
+      rows[i].code = nil
+      rows[i]:Hide()
+    end
+    f:SetShown(#offered > 0 and not H.Foreign())
+    hint:SetShown(#offered > 0)
+    cap:SetShown(LB.LanguageSearch(offered, chosen()) ~= nil)
+    if built then
+      rebuildItems()
+    end
+  end
+  return f
 end
 
 -- Keyboard ------------------------------------------------------------------------------------------------------
@@ -879,6 +1332,19 @@ end
 
 -- Building -----------------------------------------------------------------------------------------------------
 
+-- The label and the switch of the search button: busy, nothing chosen or ready. A click on the dungeons calls it at
+-- once, so a search right after the last dungeon was checked is not refused.
+function refreshSearchButton()
+  if not built then
+    return
+  end
+  local busy = S.Busy()
+  local none = state() ~= nil and state().noActivities == true
+  local noneKey = category == dungeonCategory() and "lfgp.search.none" or "lfgp.search.noneActivity"
+  W.SetText(built.search.label, busy and "lfgp.searching" or none and noneKey or "lfgp.search")
+  built.search:SetEnabled(not busy and not none)
+end
+
 function refreshStatus()
   if not built then
     return
@@ -894,6 +1360,8 @@ function refreshStatus()
     line, color = L["lfgp.search.failed"], "warning"
   elseif note == "blocked" then
     line, color = L["lfgp.search.blocked"], "warning"
+  elseif not listShown() then
+    line, color = L["lfgp.hint.list"], "textSecondary"
   elseif not H.HasList() then
     line, color = L["lfgp.nosearch"], "textSecondary"
   else
@@ -904,10 +1372,7 @@ function refreshStatus()
   built.line:SetShown(not foreign)
   built.reset:SetShown(not foreign)
   built.search:SetShown(not foreign)
-  local busy = S.Busy()
-  local none = state() ~= nil and state().noActivities == true
-  W.SetText(built.search.label, busy and "lfgp.searching" or none and "lfgp.search.none" or "lfgp.search")
-  built.search:SetEnabled(not busy and not none)
+  refreshSearchButton()
   if built.frame:IsShown() then
     layout()
   end
@@ -918,12 +1383,55 @@ local function refreshControls()
     return
   end
   local foreign = H.Foreign()
+  ns.LfgRoles.Sync()
   for _, group in ipairs(built.groups) do
     group:SetShown(not foreign)
     group.Refresh()
   end
+  lateTries = 0
   refreshDungeons()
   refreshStatus()
+end
+
+-- The work of the clicks since the last run, once. The shown state is long up to date; this hands the roles to the
+-- game, announces the changes, filters the list, and refreshes the counter and the layout one time.
+function P.Flush()
+  local pending = queue
+  if #pending.order == 0 and not ns.LfgRoles.Pending() then
+    return
+  end
+  queue = { paths = {}, order = {}, apply = false, languages = false }
+  flushing = true
+  local ok, err = pcall(function()
+    local Roles = ns.LfgRoles
+    local roles = Roles.Flush()
+    local s = state()
+    for _, path in ipairs(pending.order) do
+      -- The empty path is the whole state (reset).
+      ns.Emit(
+        "FG_SETTING_CHANGED",
+        path == "" and "lfgFilter" or "lfgFilter." .. path,
+        path == "" and s or s and s[path]
+      )
+    end
+    -- The write of the roles filters through the event of its own; the clicks of other controls share that pass.
+    if pending.apply and not roles then
+      apply()
+    end
+    if built then
+      if roles then
+        built.roles.Refresh()
+      end
+      if pending.languages then
+        built.languages.Refresh()
+      end
+      refreshStatus()
+    end
+  end)
+  flushing = false
+  if not ok then
+    ns.Log.warn("lfg panel: %s", tostring(err))
+  end
 end
 
 local function build(parent)
@@ -937,7 +1445,7 @@ local function build(parent)
   W.Border(frame, "accentDim", 1)
   frame:SetScript("OnKeyDown", onKey)
 
-  local parts = { head = {}, left = {}, rows = {}, right = {}, foot = {}, grip = {} }
+  local parts = { head = {}, left = {}, rows = {}, right = {}, langs = {}, foot = {}, grip = {} }
   -- Controls register in creation order; each block takes its own from the shared list.
   local function block(key, make)
     local from = #ns.Focus.items
@@ -986,9 +1494,10 @@ local function build(parent)
       end,
       set = function(value)
         local s = state()
-        if s then
+        if s and value ~= category then
           ns.Store.set("lfgFilter.categoryID", value)
-          s.activities, s.noActivities = {}, false
+          -- An active switch starts empty: the player picks what to search ("None", the button says so).
+          s.activities, s.noActivities = {}, true
           ns.Emit("FG_SETTING_CHANGED", "lfgFilter.activities", s.activities)
           refreshDungeons()
           refreshStatus()
@@ -1036,6 +1545,7 @@ local function build(parent)
   local rightView = ns.NewPageView(right)
   rightView.stack.pad = 4
   local content, stack = rightView.content, rightView.stack
+  local rolesFrame, languageFrame
   local status = W.Text(content, { role = "small", color = "warning", wrap = true })
   stack:Add(status, { gap = 8 })
   local groups = {}
@@ -1045,16 +1555,8 @@ local function build(parent)
   end
   block("right", function()
     add(showGroup(content))
-    add(switchGroup(content, {
-      key = "lfgp.roles",
-      field = "roles",
-      columns = 2,
-      items = {
-        { value = "tank", key = "lfgp.role.tank" },
-        { value = "healer", key = "lfgp.role.healer" },
-        { value = "damage", key = "lfgp.role.damage" },
-      },
-    }))
+    rolesFrame = rolesGroup(content)
+    add(rolesFrame)
     add(classGroup(content))
     add(switchGroup(content, {
       key = "lfgp.sizes",
@@ -1087,7 +1589,7 @@ local function build(parent)
     local area = W.TextArea(textGroup, {
       height = 56,
       onChange = function(text)
-        typed("text", text:sub(1, LB.TEXT_LIMIT))
+        typed("text", LB.Clip(text, LB.TEXT_LIMIT))
       end,
     })
     local textHint = W.Text(textGroup, { key = "lfgp.text.hint", role = "small", color = "textMuted", wrap = true })
@@ -1127,6 +1629,8 @@ local function build(parent)
     })
     groups[#groups + 1] = age
     stack:Add(age, { height = 46, gap = 6 })
+    languageFrame = languageGroup(content)
+    add(languageFrame)
     stack:Add(CreateFrame("Frame", nil, content), { height = 8 })
   end)
 
@@ -1141,7 +1645,9 @@ local function build(parent)
       size = 32,
       onClick = function()
         local s = state()
-        S.Run(category, s and s.activities, s and s.noActivities)
+        if S.Run(category, s and s.activities, s and s.noActivities, s and s.languages) then
+          S.ShowList()
+        end
         H.Ensure()
       end,
     })
@@ -1154,9 +1660,8 @@ local function build(parent)
         local s = state()
         if s then
           LB.Reset(s)
-          ns.Emit("FG_SETTING_CHANGED", "lfgFilter", s)
-          apply()
           refreshControls()
+          enqueue("", "apply")
         end
       end,
     })
@@ -1229,6 +1734,8 @@ local function build(parent)
     divider = divider,
     grip = grip,
     groups = groups,
+    roles = rolesFrame,
+    languages = languageFrame,
     options = options,
     category = categoryBox,
     list = list,
@@ -1334,16 +1841,10 @@ local function intent()
   return s ~= nil and s.open == true
 end
 
--- Whether the panel is wanted: offered, wanted by the player, and the browse list of the open window is active.
+-- Whether the panel is wanted: offered, wanted by the player, and the window is open (whatever tab it shows).
 local function wanted()
-  local win, list = window(), browse()
-  return state() ~= nil
-    and intent()
-    and H.Offered()
-    and win ~= nil
-    and win:IsShown()
-    and list ~= nil
-    and list:IsVisible()
+  local win = window()
+  return state() ~= nil and intent() and H.Offered() and win ~= nil and win:IsShown()
 end
 
 -- Esc closes the panel first only when the player opened it (tab or command). An automatic panel stays out of the
@@ -1388,7 +1889,8 @@ function P.Update()
         refreshControls()
         built.frame:Show()
       end
-      layout()
+      -- A tab switch of the window changes the note in the foot; the status lays the panel out again.
+      refreshStatus()
       applyEsc()
     else
       built.frame:Hide()
@@ -1470,6 +1972,7 @@ local function hook(frame, opening)
     pcall(frame.HookScript, frame, "OnShow", function()
       if opening then
         dismissed, manual = false, false
+        ns.Safe("lfg-roles", ns.LfgRoles.Sync)
       end
       ns.Safe("lfg-panel", P.Update)
     end)
@@ -1491,6 +1994,7 @@ function P.Attach()
   end
   attached = true
   hook(win, true)
+  -- Showing or hiding the list is the tab switch of the window: the panel stays, its note changes.
   hook(list)
   P.Update()
   return true
@@ -1560,7 +2064,11 @@ local function syncOverlay()
 end
 
 -- The hook counts changed (a search, a filter, a pause) or a search started or ended.
-ns.On("FG_LFG_FILTER_CHANGED", refreshStatus)
+ns.On("FG_LFG_FILTER_CHANGED", function()
+  if not flushing then
+    refreshStatus()
+  end
+end)
 ns.On("FG_LFG_SEARCH_CHANGED", function()
   refreshStatus()
   ns.Safe("lfg-search-overlay", syncOverlay)
@@ -1579,10 +2087,22 @@ end)
 for _, event in ipairs({ "LFG_LIST_AVAILABILITY_UPDATE", "PLAYER_LEVEL_UP" }) do
   ns.On(event, function()
     if built and built.frame:IsShown() then
+      built.languages.Refresh()
       refreshDungeons()
+      refreshStatus()
     end
   end)
 end
+
+-- The roles changed (panel, Blizzard's listing view, a group): the boxes and the note follow.
+ns.On("FG_LFG_ROLES_CHANGED", function()
+  if built and not flushing then
+    built.roles.Refresh()
+    if built.frame:IsShown() then
+      built.rightView:Layout()
+    end
+  end
+end)
 
 -- Another screen size or UI scale changes the room right of the window.
 for _, event in ipairs({ "DISPLAY_SIZE_CHANGED", "UI_SCALE_CHANGED" }) do
@@ -1596,6 +2116,7 @@ end
 -- Language change: captions and the counter follow, the rows are laid out again.
 ns.On("FG_LOCALE_CHANGED", function()
   if built then
+    built.languages.Refresh()
     refreshStatus()
     layout()
   end

@@ -27,8 +27,48 @@ local ICON = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
 -- place of the address; the texts are added here, so this file is the only one of the release with the name
 -- (tools/build_release.py ALLOWED_HITS).
 local CHANNEL = { text = "twitch.tv/wosande", address = "https://twitch.tv/wosande" }
-ns.AddLocale("enUS", { ["bar.channel"] = "Copy Twitch channel" })
-ns.AddLocale("deDE", { ["bar.channel"] = "Twitch-Kanal kopieren" })
+-- The start page shows the same channel as an invitation (Modules/Dashboard.lua); it reads the address and the
+-- invitation texts from here, so the platform is still named in this file only.
+ns.Channel = CHANNEL
+-- The community server, shown on the start page and the Help page as a button that opens the copy dialog. Address and
+-- texts live here with the channel, so this file stays the only one of a release that names a platform.
+ns.Community = { text = "discord.gg/gdJ8eYMG6y", address = "https://discord.gg/gdJ8eYMG6y" }
+-- Height of the channel field in the title bar (the website field is 22), cut down to what the bar leaves.
+local CHANNEL_H = 26
+ns.AddLocale("enUS", {
+  ["bar.channel"] = "Copy Twitch channel",
+  ["bar.channel.live"] = "live on " .. CHANNEL.text,
+  ["channel.promo.badge"] = "Livestream",
+  ["channel.promo.title"] = "Questions or feedback? Join our livestream!",
+  ["channel.promo.text"] = "Ask your questions, send feedback or tell us what the add-on is missing. In the Twitch chat we talk to you directly.",
+  ["channel.promo.button"] = "Copy channel link",
+  ["channel.promo.tip"] = "Opens a window with the link to paste into your browser.",
+  ["channel.row"] = "Questions or feedback? Livestream",
+  ["community.row"] = "Community and support: Discord",
+  ["community.title"] = "Community and support",
+  ["community.text"] = "Join our Discord server for questions, feedback, announcements and help from other players.",
+  ["community.hint"] = "Discord server: questions, feedback and help from players.\nLink for copying only.",
+  ["community.button"] = "Copy Discord link",
+  ["community.dialog"] = "Copy Discord invite",
+  ["community.tip"] = "Opens a window with the link to paste into your browser.",
+})
+ns.AddLocale("deDE", {
+  ["bar.channel"] = "Twitch-Kanal kopieren",
+  ["bar.channel.live"] = "live auf " .. CHANNEL.text,
+  ["channel.promo.badge"] = "Livestream",
+  ["channel.promo.title"] = "Fragen oder Feedback? Komm in unseren Livestream!",
+  ["channel.promo.text"] = "Stell deine Fragen, gib Rückmeldung oder sag uns, was dir im Addon fehlt. Im Twitch-Chat sprechen wir direkt mit dir.",
+  ["channel.promo.button"] = "Kanal-Link kopieren",
+  ["channel.promo.tip"] = "Öffnet ein Fenster mit dem Link, den du im Browser einfügst.",
+  ["channel.row"] = "Fragen oder Feedback? Livestream",
+  ["community.row"] = "Community und Support: Discord",
+  ["community.title"] = "Community und Support",
+  ["community.text"] = "Tritt unserem Discord-Server bei: Fragen, Feedback, Ankündigungen und Hilfe von anderen Spielern.",
+  ["community.hint"] = "Discord-Server: Fragen, Feedback und Hilfe von Spielern.\nLink nur zum Kopieren.",
+  ["community.button"] = "Discord-Link kopieren",
+  ["community.dialog"] = "Discord-Einladung kopieren",
+  ["community.tip"] = "Öffnet ein Fenster mit dem Link, den du im Browser einfügst.",
+})
 
 local function frameDB()
   return ns.db.frames.main
@@ -465,18 +505,35 @@ local function buildTitleBar()
   -- write to the OS clipboard directly, clicking opens the usual pre-selected copy box instead.
   -- Main.SetBarLink changes the text and the address of the website field.
   -- When the text has no room, a symbol with the same action takes its place, the name in its tooltip.
-  local function linkField(titleKey, icon, text, copy)
-    local field = W.Button(bar, { text = text, variant = "ghost", width = 160, height = 22, onClick = copy })
-    local symbol = W.Action(bar, { icon = icon, size = 24, tooltip = titleKey, onClick = copy })
+  -- spec: the field (text or key, plus variant, labelRole, height); the symbol takes the variant of the field.
+  local function linkField(titleKey, icon, spec, copy)
+    local field = W.Action(bar, {
+      text = spec.text,
+      key = spec.key,
+      variant = spec.variant or "ghost",
+      labelRole = spec.labelRole,
+      width = 160,
+      height = spec.height or 22,
+      tooltip = spec.key and titleKey or nil,
+      onClick = copy,
+      wrap = "button",
+    })
+    local symbol = W.Action(bar, { icon = icon, size = 24, variant = spec.variant, tooltip = titleKey, onClick = copy })
     return field, symbol
   end
   parts.link = { text = "forever-guides.com" }
-  parts.website, parts.websiteIcon = linkField("help.websiteButton", "share", parts.link.text, function()
+  parts.website, parts.websiteIcon = linkField("help.websiteButton", "share", { text = parts.link.text }, function()
     ns.Dialogs.Copy("help.websiteButton", parts.link.address or ns.Website)
   end)
-  parts.channel, parts.channelIcon = linkField("bar.channel", "play", CHANNEL.text, function()
-    ns.Dialogs.Copy("bar.channel", CHANNEL.address)
-  end)
+  -- The channel is the one call to action of the bar: filled in the channel purple with a larger text than the rest.
+  parts.channel, parts.channelIcon = linkField(
+    "bar.channel",
+    "play",
+    { key = "bar.channel.live", variant = "stream", labelRole = "h3", height = CHANNEL_H },
+    function()
+      ns.Dialogs.Copy("bar.channel", CHANNEL.address)
+    end
+  )
 
   local close = W.Action(bar, { icon = "close", size = W.CLOSE_SIZE, tooltip = "common.close" })
   close:SetScript("OnClick", function()
@@ -819,6 +876,7 @@ layoutBar = function()
   for _, field in ipairs({ p.website, p.channel }) do
     field:SetWidth(math.max(LINK_MIN, math.ceil(field.label:GetStringWidth()) + 24))
   end
+  p.channel:SetHeight(math.min(CHANNEL_H, cap))
   local size = {
     logo = square(p.logo, LOGO_SIZE),
     gear = square(p.gear, m.gear),

@@ -25,6 +25,11 @@ Theme.colors = {
   info = "#4a8fe0",
   alliance = "#4a8fe0",
   horde = "#e05c4a",
+  -- The fixed purple of the author's channel link (title bar, start page): the same in every theme, white text
+  -- on both fills passes AA (4.6:1 and 6.3:1).
+  stream = "#9146ff",
+  streamHi = "#772ce8",
+  streamText = "#ffffff",
   -- Learn list area headers: light backgrounds that carry one black text color.
   sectionLearned = "#bdbdbd",
   sectionAvailable = "#7bc98c",

@@ -250,17 +250,6 @@ add({
   exec = "gruppensuche",
 })
 add({
-  id = "layer",
-  area = "map",
-  example = { en = "/fg layer", de = "/fg ebene" },
-  public = true,
-  names = { "layer", "ebene" },
-  usage = "/fg layer [status|refresh|hosts|switch|cancel]",
-  page = "settings",
-  control = { "layer.set.open", "layer.win.players", "layer.win.best", "layer.win.cancel" },
-  exec = "layer",
-})
-add({
   id = "autoquest",
   area = "tools",
   example = { en = "/fg autoquest list", de = "/fg autoquest list" },
@@ -732,11 +721,6 @@ desc(
   "autoquest",
   "Quest helper exceptions: ignore <questID>, ignore npc <npcID>, list.",
   "Ausnahmen der Quest-Automatik: ignore <Quest-ID>, ignore npc <NPC-ID>, list."
-)
-desc(
-  "layer",
-  "Layer window of this zone, status prints the layer in the chat, refresh reads it again, hosts lists the hosts of the zone, switch asks them for a layer switch, cancel stops it.",
-  "Layer-Fenster dieser Zone, status gibt den Layer im Chat aus, refresh liest ihn neu ein, hosts listet die Hosts der Zone, switch fragt sie nach einem Layer-Wechsel, cancel bricht ihn ab."
 )
 desc("lfg", "Show/hide the filter panel at the group finder.", "Filter-Panel an der Gruppensuche ein-/ausblenden.")
 desc(

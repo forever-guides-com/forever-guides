@@ -329,18 +329,10 @@ Store.defaults = {
     instanceResetAnnounce = true,
     -- Filter panel and side tab at the group finder (Modules/LfgBrowseFilter.lua, BlizzardLinks.lua).
     lfgPanel = true,
-    -- The panel appears by itself when the group finder opens on its browse list (Modules/LfgFilterPanel.lua).
+    -- The panel appears by itself when the group finder opens, on any of its tabs (Modules/LfgFilterPanel.lua).
     lfgPanelAuto = true,
     -- The panel sits flush at the window and Blizzard's side tabs move to its right edge (Modules/LfgPanelDock.lua).
     lfgPanelDock = true,
-    -- Layer label at the minimap (Modules/LayerLabel.lua). settings.layerPos = { x, y } (offset from the
-    -- minimap centre) has no default on purpose: an absent key is the place at the bottom edge.
-    layerShow = true,
-    -- Layer network (Modules/LayerNet.lua, LayerSwitch.lua), both off until the player opts in: layerShare joins
-    -- the channel and sends zone, layer, class and free places, layerHost invites players who ask for a switch
-    -- (only works with layerShare).
-    layerShare = false,
-    layerHost = false,
   },
   frames = {
     main = { point = "CENTER", rel = "CENTER", x = 0, y = 0, w = 960, h = 620 },
@@ -374,14 +366,20 @@ Store.defaults = {
   drawings = { lastOpened = "" },
   -- Filter panel of the group finder (Modules/LfgBrowseFilterLogic.lua): own schema number in v, repaired on
   -- read (LfgBrowseFilterLogic.Clean). A missing entry of a checkbox group counts as on, classes keep only the
-  -- ones switched off; levelMin, levelMax and maxAge 0 = off. show = kinds of listing, onlyOpen = groups need a
-  -- free slot (on by default, single players are not affected), categoryID 0 = the dungeon category, activities = set of chosen activity ids (empty counts as all
-  -- of the category: shown checked and searched), noActivities = the player chose none (only true with an empty
-  -- activities set), width 0 = automatic panel width.
+  -- ones switched off; levelMin, levelMax and maxAge 0 = off. show = kind of listing ("all", "groups" or "players"; older
+  -- files hold a table of two switches, read as such). Groups without a free slot are always hidden, so there is
+  -- no switch for it. categoryID 0 = the dungeon category, activities = set of chosen activity ids (empty counts as
+  -- all of the category: shown checked and searched), noActivities = the player chose none (only true with an empty
+  -- activities set), width 0 = automatic panel width. seek = roles the player searches as (set, true = chosen,
+  -- kept in step with the game's role choice; all false is a valid choice), matchRoles = show only groups with a free slot for them, languages =
+  -- set of extra search languages (client codes; the own language is always searched and not stored). An older
+  -- roles table (the removed role filter) is dropped on read.
   lfgFilter = {
     v = 1,
     open = false,
-    roles = { tank = true, healer = true, damage = true },
+    seek = { tank = false, healer = false, damage = false },
+    matchRoles = false,
+    languages = {},
     classes = {},
     sizes = { [1] = true, [2] = true, [3] = true, [4] = true, [5] = true },
     levelMin = 0,
@@ -389,8 +387,7 @@ Store.defaults = {
     playstyles = { [1] = true, [2] = true, [3] = true, [4] = true },
     text = "",
     maxAge = 0,
-    show = { groups = true, players = true },
-    onlyOpen = true,
+    show = "all",
     categoryID = 0,
     activities = {},
     noActivities = false,

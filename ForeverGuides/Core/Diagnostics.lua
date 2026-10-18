@@ -176,6 +176,10 @@ function ns.DiagReport()
     local okFilter, text = pcall(ns.LfgBrowseFilter.DiagLine)
     out[#out + 1] = okFilter and text or "lfg filter: ?"
   end
+  if ns.LfgRoles then
+    local okRoles, text = pcall(ns.LfgRoles.DiagLine)
+    out[#out + 1] = okRoles and text or "lfg roles: ?"
+  end
   return table.concat(out, "\n")
 end
 

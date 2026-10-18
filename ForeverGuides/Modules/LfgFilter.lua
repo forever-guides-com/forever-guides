@@ -2,6 +2,10 @@
 -- dungeons"). The CVar is the only source of truth, read live whenever the card needs it. It is written only on a
 -- click of the user (switch or reset button), never at load, and the addon keeps no copy of the value. The
 -- frames of the group finder are neither touched nor hooked.
+-- A write from addon code taints the CVAR_UPDATE dispatch: the game's CVarCallbackRegistry caches the value in
+-- the tainted stack and every later read taints the game's own search until the cache is refilled, in practice
+-- until a reload. No call path avoids that (SetCVar and C_CVar.SetCVar dispatch the event inside the caller),
+-- so after a write the card asks for a reload and /fg diag reports it.
 local _, ns = ...
 local Guard, L, LL = ns.AutoGuard, ns.L, ns.LfgFilterLogic
 local W = ns.W
@@ -11,8 +15,10 @@ ns.LfgFilter = R
 
 ns.AddLocale("enUS", {
   ["lfg.set.heading"] = "Group finder",
-  ["lfg.set.all"] = "Show all dungeons",
-  ["lfg.set.hint"] = "Off hides activities outside your level range, and the gear icon at the top right of the group finder changes the same setting.",
+  ["lfg.set.all"] = "Switch here (reload afterwards)",
+  ["lfg.set.hint"] = "The best way is the gear icon at the top right of the group finder.\nIt needs no reload.",
+  ["lfg.reload.notice"] = "Blizzard's group finder needs a reload to work cleanly.",
+  ["lfg.reload.button"] = "Reload now",
   ["lfg.set.reset"] = "Reset to default",
   ["lfg.state.on"] = "Show all dungeons: On",
   ["lfg.state.off"] = "Show all dungeons: Off (only activities for your level)",
@@ -29,8 +35,10 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["lfg.set.heading"] = "Gruppensuche",
-  ["lfg.set.all"] = "Alle Dungeons zeigen",
-  ["lfg.set.hint"] = "Aus blendet Aktivitäten außerhalb deines Stufenbereichs aus, und das Zahnrad oben rechts in der Gruppensuche ändert dieselbe Einstellung.",
+  ["lfg.set.all"] = "Hier umschalten (danach Neuladen)",
+  ["lfg.set.hint"] = "Am besten änderst du das mit dem Zahnrad oben rechts in der Gruppensuche.\nDort ist kein Neuladen nötig.",
+  ["lfg.reload.notice"] = "Damit Blizzards Gruppensuche sauber arbeitet, ist ein Neuladen nötig.",
+  ["lfg.reload.button"] = "Jetzt neu laden",
   ["lfg.set.reset"] = "Auf Standard zurücksetzen",
   ["lfg.state.on"] = "Alle Dungeons zeigen: An",
   ["lfg.state.off"] = "Alle Dungeons zeigen: Aus (nur Aktivitäten für deine Stufe)",
@@ -58,8 +66,15 @@ function R.Current()
   return LL.State(R.Raw())
 end
 
+-- True after a write of this addon until the next reload (the tainted cache of the game lives that long).
+local reloadNeeded = false
+
+function R.ReloadNeeded()
+  return reloadNeeded
+end
+
 function R.DiagLine()
-  return "lfg: showAllDungeons=" .. LL.DiagValue(R.Raw())
+  return "lfg: showAllDungeons=" .. LL.DiagValue(R.Raw()) .. (reloadNeeded and " reloadNeeded=ja" or "")
 end
 
 local function setFunction()
@@ -80,6 +95,8 @@ function R.Refresh()
   end
   built.toggle:Refresh()
   built.status:Refresh()
+  built.notice:SetShown(reloadNeeded)
+  built.reload:SetShown(reloadNeeded)
   if built.status:IsVisible() then
     built.card:Layout()
   end
@@ -93,7 +110,10 @@ function R.Write(wanted)
     ns.Notify(L[reason], "warning")
     return false
   end
+  local before = R.Raw()
   local called = pcall(set, LL.CVAR, wanted)
+  -- A write that raised may still have gone through, so a changed value counts as well.
+  reloadNeeded = reloadNeeded or called or R.Raw() ~= before
   local confirmed = called and LL.Confirmed(wanted, R.Raw())
   if not confirmed then
     ns.Notify(L["lfg.error"], "error")
@@ -104,20 +124,14 @@ end
 
 -- Settings ---------------------------------------------------------------------------------------
 
+-- The reload of the game from a click; asks first in a group or instance, tells when the game refuses.
+local function reloadClick()
+  ns.SaveUI.ConfirmedReload()
+end
+
 function R.AddSettings(card)
   built = { card = card }
   ns.AddHeading(card, "lfg.set.heading")
-  local toggle = W.Toggle(card.content, {
-    key = "lfg.set.all",
-    get = function()
-      return R.Current() == "on"
-    end,
-    set = function(on)
-      R.Write(LL.Target(on))
-    end,
-  })
-  toggle.fgId = "lfg-all"
-  card.stack:Add(toggle, { height = 24, gap = 6 })
 
   local status = W.Text(card.content, { role = "ui", wrap = true })
   status.fgId = "lfg-state"
@@ -129,7 +143,19 @@ function R.AddSettings(card)
   status:Refresh()
   card.stack:Add(status, { gap = 6 })
 
-  ns.AddParagraph(card, "lfg.set.hint", { role = "micro", color = "textMuted", gap = 8 })
+  ns.AddParagraph(card, "lfg.set.hint", { role = "micro", color = "textMuted", gap = 10 })
+
+  local toggle = W.Toggle(card.content, {
+    key = "lfg.set.all",
+    get = function()
+      return R.Current() == "on"
+    end,
+    set = function(on)
+      R.Write(LL.Target(on))
+    end,
+  })
+  toggle.fgId = "lfg-all"
+  card.stack:Add(toggle, { height = 24, gap = 10 })
 
   local reset = W.Button(card.content, {
     key = "lfg.set.reset",
@@ -139,7 +165,21 @@ function R.AddSettings(card)
     end,
   })
   reset.fgId = "lfg-reset"
-  card.stack:Add(reset, { height = 28, width = 220, gap = 14 })
+  card.stack:Add(reset, { height = 28, width = 220, gap = 10 })
+
+  local notice = W.Text(card.content, { key = "lfg.reload.notice", role = "ui", color = "warning", wrap = true })
+  notice.fgId = "lfg-reload-notice"
+  notice:Hide()
+  card.stack:Add(notice, { gap = 6 })
+
+  local reload = W.Button(card.content, {
+    key = "lfg.reload.button",
+    width = 220,
+    onClick = ns.SaveState.Click(reloadClick),
+  })
+  reload.fgId = "lfg-reload"
+  reload:Hide()
+  card.stack:Add(reload, { height = 28, width = 220, gap = 14 })
 
   local panel = W.Toggle(card.content, {
     key = "lfg.set.panel",
@@ -179,7 +219,8 @@ function R.AddSettings(card)
   dock.fgId = "lfg-panel-dock"
   card.stack:Add(dock, { height = 24, gap = 6 })
   ns.AddParagraph(card, "lfg.set.panelDockHint", { role = "micro", color = "textMuted", gap = 8 })
-  built.toggle, built.status = toggle, status
+  built.toggle, built.status, built.notice, built.reload = toggle, status, notice, reload
+  R.Refresh()
 end
 
 -- The frames of the group finder stay untouched here; the tab and the hook follow the switch themselves.

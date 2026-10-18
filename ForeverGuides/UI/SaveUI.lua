@@ -54,6 +54,9 @@ local function reloadConfirmed(afterReload)
   end
 end
 
+-- For other cards that need a reload (Modules/LfgFilter.lua); call it inside SaveState.Click.
+SaveUI.ConfirmedReload = reloadConfirmed
+
 local function onSaveClick()
   reloadConfirmed()
 end

@@ -2,17 +2,52 @@
 -- with the choice of the panel (Modules/LfgFilterPanel.lua). The result list is Blizzard's own, the filter hook
 -- (Modules/LfgBrowseFilter.lua) works on it as for every other search.
 --
--- C_LFGList.Search(categoryID, 0, 0, nil, false, nil, activityIDs): filter, preferred filters, language, cross
+-- C_LFGList.Search(categoryID, 0, 0, languages, false, nil, activityIDs): filter, preferred filters, language, cross
 -- faction and advanced filter as Blizzard's own search sends them (LFGBrowse_DoSearch). An empty activity list
--- returns nothing, so an empty choice means every activity of the category; "None" is its own state (no search). The call needs a real click, so S.Run is
--- only called from the click of the panel's button, never from a timer or an event.
+-- returns nothing, so an empty choice means every activity of the category; "None" is its own state (no search).
+-- The languages are a set of client codes, nil while only the player's own language is searched (the client adds
+-- that one itself). The call needs a real click, so S.Run is only called from the click of the panel's button,
+-- never from a timer or an event. One search returns at most 100 results, whatever the choice.
 --
 -- The answer is asynchronous: busy until LFG_LIST_SEARCH_RESULTS_RECEIVED or LFG_LIST_SEARCH_FAILED, or until the
 -- time limit. There is no check before the call. A refusal by the client shows as ADDON_ACTION_BLOCKED naming the
 -- function, the search then ends with the note "blocked". Blizzard's frame lists the result through the same
--- events by itself; nothing of Blizzard's is written or called here.
+-- events by itself; nothing of Blizzard's is written here.
+--
+-- S.ShowList: after a started search the window shows its browse tab (the list), whatever tab the click came from.
+-- Blizzard's SetActiveTab is a local of its file, so the global handler of tab 2 is the way in (it is what the
+-- tab button of the old style calls). Found by name and id only, never by a tab text: the texts are translated.
+-- One attempt per click, outside combat, with the filter hook in place and without LFG Filter Forever. A raise or
+-- a refusal ends the switching for the session and leaves the search running; the panel keeps its note.
 local addonName, ns = ...
 local Guard, LB = ns.AutoGuard, ns.LfgBrowseFilterLogic
+
+ns.AddLocale("enUS", {
+  ["lfgp.lang.deDE"] = "German",
+  ["lfgp.lang.enUS"] = "English",
+  ["lfgp.lang.esES"] = "Spanish (Spain)",
+  ["lfgp.lang.esMX"] = "Spanish (Latin America)",
+  ["lfgp.lang.frFR"] = "French",
+  ["lfgp.lang.itIT"] = "Italian",
+  ["lfgp.lang.koKR"] = "Korean",
+  ["lfgp.lang.ptBR"] = "Portuguese",
+  ["lfgp.lang.ruRU"] = "Russian",
+  ["lfgp.lang.zhCN"] = "Chinese (Simplified)",
+  ["lfgp.lang.zhTW"] = "Chinese (Traditional)",
+})
+ns.AddLocale("deDE", {
+  ["lfgp.lang.deDE"] = "Deutsch",
+  ["lfgp.lang.enUS"] = "Englisch",
+  ["lfgp.lang.esES"] = "Spanisch (Spanien)",
+  ["lfgp.lang.esMX"] = "Spanisch (Lateinamerika)",
+  ["lfgp.lang.frFR"] = "Französisch",
+  ["lfgp.lang.itIT"] = "Italienisch",
+  ["lfgp.lang.koKR"] = "Koreanisch",
+  ["lfgp.lang.ptBR"] = "Portugiesisch",
+  ["lfgp.lang.ruRU"] = "Russisch",
+  ["lfgp.lang.zhCN"] = "Chinesisch (vereinfacht)",
+  ["lfgp.lang.zhTW"] = "Chinesisch (traditionell)",
+})
 
 local S = {}
 ns.LfgBrowseSearch = S
@@ -20,6 +55,8 @@ ns.LfgBrowseSearch = S
 S.TIMEOUT = 15
 
 local busy, note, generation = false, nil, 0
+-- ShowList: a switch is running (a refusal then belongs to it, not to the search), and the session switch.
+local switching, switchFailed = false, false
 
 local function api()
   local list = rawget(_G, "C_LFGList")
@@ -42,6 +79,64 @@ end
 local function label(value)
   value = Guard.Safe(value)
   return type(value) == "string" and value ~= "" and value or nil
+end
+
+-- Language codes ----------------------------------------------------------------------------------------------------
+
+-- The codes of a game answer, whether it is a list of codes or a set keyed by code. Sorted, so the order is stable.
+local function codes(value)
+  value = Guard.Safe(value)
+  local out = {}
+  if type(value) ~= "table" then
+    return out
+  end
+  for _, code in ipairs(value) do
+    code = label(code)
+    if code then
+      out[#out + 1] = code
+    end
+  end
+  local keyed = {}
+  for key, flag in pairs(value) do
+    if type(key) == "string" and Guard.Safe(flag) == true then
+      keyed[#keyed + 1] = key
+    end
+  end
+  table.sort(keyed)
+  for _, code in ipairs(keyed) do
+    out[#out + 1] = code
+  end
+  return out
+end
+
+-- The game's own text for a code where one exists: Blizzard names Spanish and Chinese alike in the group finder
+-- texts, those four use their locale texts.
+local NAME_GLOBALS =
+  { esES = "ESES", esMX = "ESMX", zhCN = "LOCALE_DISPLAY_NAME_ZHCN", zhTW = "LOCALE_DISPLAY_NAME_ZHTW" }
+
+-- Display name of a language code: Blizzard's text in the player's language, else ours, else the code itself.
+function S.LanguageName(code)
+  local text = label(rawget(_G, NAME_GLOBALS[code] or ("LFG_LIST_LANGUAGE_" .. code:upper())))
+  if text then
+    return text
+  end
+  local key = "lfgp.lang." .. code
+  local own = ns.L[key]
+  return own ~= key and own or code
+end
+
+-- Entries { code, name, locked } of the languages the client offers for a search, the player's own language
+-- (the client's default filter, always searched) locked. Empty when the client offers none.
+function S.Languages()
+  local list = api()
+  if not list then
+    return {}
+  end
+  local own = {}
+  for _, code in ipairs(codes(call(list.GetDefaultLanguageSearchFilter))) do
+    own[code] = true
+  end
+  return LB.LanguageEntries(codes(call(list.GetAvailableLanguageSearchFilter)), own, S.LanguageName)
 end
 
 -- The ids the game offers for a category, whatever the level filter of Blizzard's own dropdown says.
@@ -126,8 +221,8 @@ local function finish(result)
 end
 
 -- Starts a search for a category with the chosen activities (a set of ids; none = the player chose "None", which
--- searches nothing and sets no note). Only from a click.
-function S.Run(categoryID, chosen, none)
+-- searches nothing and sets no note) and the chosen extra languages (a set of codes). Only from a click.
+function S.Run(categoryID, chosen, none, languages)
   if busy or none == true then
     return false
   end
@@ -143,6 +238,7 @@ function S.Run(categoryID, chosen, none)
     changed()
     return false
   end
+  local languageFilter = LB.LanguageSearch(S.Languages(), languages)
   busy, note = true, nil
   generation = generation + 1
   local mine = generation
@@ -150,7 +246,7 @@ function S.Run(categoryID, chosen, none)
   -- The game's function is called from a Lua closure, not handed to pcall: a protected function reached through
   -- pcall is refused as UNKNOWN() in this client, the same call from a plain statement is not.
   local ok, err = pcall(function()
-    list.Search(categoryID, 0, 0, nil, false, nil, ids)
+    list.Search(categoryID, 0, 0, languageFilter, false, nil, ids)
   end)
   if not ok then
     ns.Log.warn("lfg search: %s", tostring(err))
@@ -177,6 +273,53 @@ function S.Run(categoryID, chosen, none)
   return true
 end
 
+local function frameOf(name)
+  local frame = rawget(_G, name)
+  return type(frame) == "table" and frame or nil
+end
+
+-- Shows Blizzard's browse tab after Run started a search. True when the tab was switched, false when nothing was
+-- done or the switch failed. Only from the click that started the search, like Run.
+function S.ShowList()
+  local filter = ns.LfgBrowseFilter
+  local window, list = frameOf("LFGParentFrame"), frameOf("LFGBrowseFrame")
+  local show = rawget(_G, "LFGParentFrameTab2_OnClick")
+  if
+    not (busy and note == nil)
+    or switchFailed
+    or type(show) ~= "function"
+    or not (window and list)
+    or not (filter and filter.Installed() and not filter.Foreign())
+    or Guard.Blocked()
+    or window:IsShown() ~= true
+    or list:IsVisible() == true
+  then
+    return false
+  end
+  local secure = rawget(_G, "securecall")
+  switching = true
+  -- A Lua closure, not the game's function handed to pcall (see Run). securecall keeps the taint of this click
+  -- out of the tab's own code, which refreshes the dropdowns of the list.
+  local ok, err = pcall(function()
+    if type(secure) == "function" then
+      secure(show)
+    else
+      show()
+    end
+  end)
+  switching = false
+  if not ok then
+    switchFailed = true
+    ns.Log.warn("lfg tab: %s", tostring(err))
+  end
+  if ok and not switchFailed then
+    -- Run's clear skipped the list while its tab was hidden, and the tab's own redraw may have read the old
+    -- list back: empty it now that it is visible.
+    ns.Safe("lfg-browse-clear", filter.Clear)
+  end
+  return ok and not switchFailed
+end
+
 ns.On("LFG_LIST_SEARCH_RESULTS_RECEIVED", function()
   if busy then
     finish(nil)
@@ -191,6 +334,14 @@ end)
 
 -- The client names the add-on and the function it refused.
 ns.On("ADDON_ACTION_BLOCKED", function(_, blockedAddon, func)
+  if switching then
+    -- The tab switch was refused: the search itself is fine.
+    if blockedAddon == addonName and not switchFailed then
+      switchFailed = true
+      ns.Log.warn("lfg tab blocked: %s", tostring(func))
+    end
+    return
+  end
   -- A protected call reached through the engine's own wrappers is reported as UNKNOWN(), so that counts too.
   local name = tostring(func)
   if busy and blockedAddon == addonName and (name:find("Search", 1, true) or name:find("UNKNOWN", 1, true)) then

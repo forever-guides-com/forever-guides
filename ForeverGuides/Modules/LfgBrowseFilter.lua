@@ -39,7 +39,7 @@ local installed, applying, paused, dirty, noticed = false, false, false, false, 
 local pending = false -- an install timer is running
 local searched = false -- the game answered a search
 local counts = { shown = 0, total = 0 }
-local activityNames = {}
+local activityNames, activityLimits = {}, {}
 
 local function browseFrame()
   local frame = rawget(_G, "LFGBrowseFrame")
@@ -135,6 +135,43 @@ local function activityName(api, activityID)
   return name or nil
 end
 
+-- The largest group size (maxNumPlayers) of the activities of a result, nil when none is readable. 0 means
+-- unlimited in the game and counts as unknown.
+local function maxPlayers(api, info)
+  local ids = type(info) == "table" and Guard.Safe(info.activityIDs)
+  local best
+  for _, activityID in ipairs(type(ids) == "table" and ids or {}) do
+    local id = Guard.Safe(activityID)
+    if type(id) == "number" then
+      local limit = activityLimits[id]
+      if limit == nil then
+        local data = Guard.Safe(call(api.GetActivityInfoTable, id))
+        local value = type(data) == "table" and Guard.Safe(data.maxNumPlayers) or nil
+        limit = type(value) == "number" and value == value and value > 0 and value or false
+        activityLimits[id] = limit
+      end
+      if limit and (not best or limit > best) then
+        best = limit
+      end
+    end
+  end
+  return best
+end
+
+-- Whether all three role counters are readable and 0.
+local function allZero(answer)
+  answer = Guard.Safe(answer)
+  if type(answer) ~= "table" then
+    return false
+  end
+  for _, role in ipairs(LB.ROLES) do
+    if Guard.Safe(answer[LB.ROLE_COUNTS[role]]) ~= 0 then
+      return false
+    end
+  end
+  return true
+end
+
 -- Whether the game dropped the result since the list was made (delisted, or the list is from an older search).
 -- Blizzard's tooltip indexes the info of a row without a check, so such an id must never stay on screen. An
 -- unreadable answer or a missing API keeps the id.
@@ -194,6 +231,11 @@ local function read(id, needs)
   end
   if needs.counts then
     rec.counts = call(api.GetSearchResultMemberCounts, id)
+    -- The size of the activity only tells a full group from a raid with unfilled counters, so it is read for
+    -- three zeros only.
+    if allZero(rec.counts) then
+      rec.maxPlayers = maxPlayers(api, info)
+    end
   end
   return rec
 end
@@ -202,6 +244,12 @@ end
 
 local function changed()
   ns.Emit("FG_LFG_FILTER_CHANGED")
+end
+
+-- Blizzard redraws the list when its tab shows again (OnShow runs UpdateResultList and with it our hook), so a
+-- list on a tab that is not shown is left alone.
+local function drawable(browse)
+  return type(browse.IsVisible) ~= "function" or browse:IsVisible() == true
 end
 
 local function redraw(browse, ids)
@@ -227,6 +275,24 @@ local function fail(browse, err)
   changed()
 end
 
+-- In a group only the assigned role counts for "matching groups": the state the rules see then carries it.
+local function effective(state)
+  local roles = ns.LfgRoles
+  if not roles then
+    return state
+  end
+  local shown, grouped = roles.Shown()
+  if not grouped then
+    return state
+  end
+  local view = {}
+  for key, value in pairs(state) do
+    view[key] = value
+  end
+  view.seek = shown
+  return view
+end
+
 -- Filters the list of the last search and redraws when the ids changed. In combat it waits.
 function H.Apply()
   local browse = browseFrame()
@@ -242,12 +308,12 @@ function H.Apply()
   local live = alive(raw)
   local ids
   if state and H.Offered() and not paused then
-    ids, counts = LB.Run(live, read, state)
+    ids, counts = LB.Run(live, read, effective(state))
   else
     ids, counts = live, { shown = #live, total = #live }
   end
   changed()
-  if LB.Same(ids, browse.results) then
+  if not drawable(browse) or LB.Same(ids, browse.results) then
     return
   end
   applying = true
@@ -273,7 +339,7 @@ function H.Clear()
   end
   dirty = false
   changed()
-  if LB.Same({}, browse.results) then
+  if not drawable(browse) or LB.Same({}, browse.results) then
     return
   end
   applying = true
@@ -396,6 +462,13 @@ end
 
 ns.On("PLAYER_REGEN_ENABLED", function()
   if dirty then
+    H.Apply()
+  end
+end)
+
+-- The roles the player searches as changed (panel, Blizzard's listing view, group).
+ns.On("FG_LFG_ROLES_CHANGED", function()
+  if installed then
     H.Apply()
   end
 end)

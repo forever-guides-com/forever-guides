@@ -145,19 +145,34 @@ local function addControl(view, c)
   return widget
 end
 
--- Text on the left, one button on the right; grows with the wrapped text.
-local function addRow(view, textOpts, buttonKey, onClick)
+-- Text on the left, one button on the right; grows with the wrapped text. tooltipKey names the button when its
+-- label alone does not say what it acts on.
+-- extra (optional): { variant = button variant, link = address shown under the text }.
+local function addRow(view, textOpts, buttonKey, onClick, tooltipKey, extra)
+  extra = extra or {}
   local row = CreateFrame("Frame", nil, view.area.content)
   local buttonWidth = math.floor(ROW_BUTTON_W * factor() + 0.5)
-  local button = W.Button(row, { key = buttonKey, width = buttonWidth, onClick = onClick })
+  local button = W.Button(
+    row,
+    { key = buttonKey, width = buttonWidth, onClick = onClick, tooltip = tooltipKey, variant = extra.variant }
+  )
   button:SetPoint("TOPRIGHT")
   textOpts.role, textOpts.color, textOpts.wrap = "ui", "text", true
   row.text = W.Text(row, textOpts)
   row.text:SetPoint("TOPLEFT", 0, -6)
+  if extra.link then
+    row.link = W.Text(row, { text = extra.link, role = "ui", color = "accent2", wrap = true })
+    row.link:SetPoint("TOPLEFT", row.text, "BOTTOMLEFT", 0, -2)
+  end
   row.button = button
   function row:fgGridLayout(width)
     row.text:SetWidth(math.max(40, width - buttonWidth - 12))
-    local h = math.max(ROW_MIN_H, row.text:GetStringHeight() + 12)
+    local linkHeight = 0
+    if row.link then
+      row.link:SetWidth(math.max(40, width - buttonWidth - 12))
+      linkHeight = row.link:GetStringHeight() + 2
+    end
+    local h = math.max(ROW_MIN_H, row.text:GetStringHeight() + linkHeight + 12)
     row:SetHeight(h)
     return h
   end
@@ -224,6 +239,30 @@ local BLOCKS = {
     ns.Bind(view.summary, function(fs)
       fs:SetText(summaryText())
     end)
+  end,
+  -- The livestream and the community server: texts, names and addresses come from ns.Channel and ns.Community
+  -- (UI/MainFrame.lua, the one place of both), a button opens the copy dialog.
+  community = function(view)
+    local invites = {
+      {
+        text = "channel.row",
+        title = "bar.channel",
+        address = ns.Channel.address,
+        shown = ns.Channel.text,
+        variant = "stream",
+      },
+      {
+        text = "community.row",
+        title = "community.dialog",
+        address = ns.Community.address,
+        shown = ns.Community.text,
+      },
+    }
+    for _, invite in ipairs(invites) do
+      addRow(view, { key = invite.text }, "setup.copy", function()
+        ns.Dialogs.Copy(invite.title, invite.address, "help.copyHint")
+      end, invite.title, { variant = invite.variant, link = invite.shown })
+    end
   end,
   info = function(view)
     for _, info in ipairs({ { "tutorials", "setup.info.tutorials" }, { "help", "setup.info.help" } }) do

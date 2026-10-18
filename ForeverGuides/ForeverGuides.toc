@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.1.7-beta.1
+## Version: 0.1.7
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -369,18 +369,9 @@ Modules\LfgFilter.lua
 Modules\LfgBrowseFilterLogic.lua
 Modules\LfgBrowseFilter.lua
 Modules\LfgBrowseSearch.lua
+Modules\LfgRoles.lua
 Modules\LfgPanelDock.lua
 Modules\LfgFilterPanel.lua
-Modules\LayerLogic.lua
-Modules\LayerNetLogic.lua
-Modules\LayerSwitchLogic.lua
-Modules\Layer.lua
-Modules\LayerNet.lua
-Modules\LayerSwitch.lua
-Modules\LayerLabel.lua
-Modules\LayerWindowNet.lua
-Modules\LayerWindowKeys.lua
-Modules\LayerWindow.lua
 Modules\InstanceGapsLogic.lua
 Modules\TypographySettings.lua
 

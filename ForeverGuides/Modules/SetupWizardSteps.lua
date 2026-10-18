@@ -572,4 +572,4 @@ step("invitations", 70, {
 })
 
 -- Closes every run: lists what was changed and where to change it later.
-step("done", 80, {}, { closing = true, layout = { "title", "summary", "info", "text" } })
+step("done", 80, {}, { closing = true, layout = { "title", "summary", "info", "community", "text" } })
