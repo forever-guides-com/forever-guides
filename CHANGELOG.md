@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.0
+
+### Changed
+
+- Version number: this version has the same content as 0.1.8 and carries the minor number because the experience bar and the mouse cursor ring are two new areas.
+
 ## 0.1.8
 
 ### Added

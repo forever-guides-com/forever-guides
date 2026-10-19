@@ -4,6 +4,12 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.2.0] - 2026-10-19
+
+### Changed
+
+- Version number: this version has the same content as 0.1.8 and carries the minor number because the experience bar and the mouse cursor ring are two new areas.
+
 ## [0.1.8] - 2026-10-19
 
 ### Added
@@ -237,6 +243,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.2.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.7-beta.1...v0.1.7
 [0.1.7-beta.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.6...v0.1.7-beta.1
