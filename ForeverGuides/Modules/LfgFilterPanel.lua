@@ -1210,7 +1210,7 @@ local function onKey(frame, key)
     end
     return false
   end)
-  pcall(frame.SetPropagateKeyboardInput, frame, not handled)
+  ns.PropagateKeys(frame, not handled)
 end
 
 -- Layout ----------------------------------------------------------------------------------------------------------
@@ -1862,7 +1862,7 @@ local function applyEsc()
   built.esc = on
   ns.WindowShell.SetEsc(built.frame, on)
   if not on and ns.can.propagateKeyboard then
-    pcall(built.frame.SetPropagateKeyboardInput, built.frame, true)
+    ns.PropagateKeys(built.frame, true)
     pcall(built.frame.EnableKeyboard, built.frame, true)
   end
 end

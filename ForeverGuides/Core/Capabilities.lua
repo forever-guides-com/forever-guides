@@ -194,6 +194,27 @@ function ns.ProtectedAllowed(frame)
   return not ok or allowed ~= false
 end
 
+-- Key propagation of a frame. In combat the client blocks the call and reports it as an addon
+-- action, so nothing is called then and the frame keeps its last state. The method runs inside
+-- a Lua closure: a protected function handed straight to pcall shows up as UNKNOWN(). Returns
+-- whether the call ran.
+function ns.PropagateKeys(frame, flag)
+  local inCombat = rawget(_G, "InCombatLockdown")
+  if type(inCombat) == "function" then
+    local ok, locked = pcall(inCombat)
+    if ok and locked then
+      return false
+    end
+  end
+  local method = frame and frame.SetPropagateKeyboardInput
+  if type(method) ~= "function" then
+    return false
+  end
+  return (pcall(function()
+    method(frame, flag)
+  end))
+end
+
 function ns.ClientInfo()
   local info = {}
   if type(GetBuildInfo) == "function" then

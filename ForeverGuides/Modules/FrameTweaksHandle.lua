@@ -133,7 +133,7 @@ local function onKey(self, key)
   elseif (key == "ENTER" or key == "SPACE") and focusIn(self) then
     handled = ns.Focus.activate()
   end
-  pcall(self.SetPropagateKeyboardInput, self, not handled)
+  ns.PropagateKeys(self, not handled)
 end
 
 -- Click elsewhere closes at once; leaving the panel and the handle closes after a short delay.

@@ -507,19 +507,19 @@ function MZ.Attach(ctx)
   end
 
   local keys = CreateFrame("Frame", nil, canvas)
-  keys:SetPropagateKeyboardInput(true)
+  ns.PropagateKeys(keys, true)
   keys:SetScript("OnKeyDown", function(self, key)
     -- Propagation cannot change in combat; the game then keeps every key.
     if InCombatLockdown() then
       return
     end
     local _, handled = ns.Safe("map-zoom-key", ctl.Key, key)
-    self:SetPropagateKeyboardInput(not handled)
+    ns.PropagateKeys(self, not handled)
   end)
   keys:EnableKeyboard(false)
   ctl.keys = keys
   ns.On("PLAYER_REGEN_DISABLED", function()
-    pcall(keys.SetPropagateKeyboardInput, keys, true)
+    ns.PropagateKeys(keys, true)
   end)
 
   return ctl

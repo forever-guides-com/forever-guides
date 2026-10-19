@@ -244,7 +244,7 @@ local function build(container)
       elseif wrapped then
         b:SetPoint("TOPLEFT", bar, "TOPLEFT", 4, -BAR_H)
       else
-        b:SetPoint("TOPLEFT", dropdown, "TOPRIGHT", 10, -18)
+        b:SetPoint("TOPLEFT", dropdown, "TOPRIGHT", 10, -W.DROPDOWN_FIELD_Y)
       end
       previous = b
     end
@@ -815,7 +815,7 @@ local function build(container)
   end
 
   local keys = CreateFrame("Frame", nil, container)
-  keys:SetPropagateKeyboardInput(true)
+  ns.PropagateKeys(keys, true)
   keys:SetScript("OnKeyDown", function(self, key)
     if InCombatLockdown() then
       return
@@ -827,7 +827,7 @@ local function build(container)
     elseif container:IsMouseOver() and not (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()) then
       handled = view.OnKey(key) == true
     end
-    self:SetPropagateKeyboardInput(not handled)
+    ns.PropagateKeys(self, not handled)
   end)
   keys:EnableKeyboard(false)
 

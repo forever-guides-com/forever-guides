@@ -141,6 +141,38 @@ Store.defaults = {
       barHeight = 8,
       barColor = "c9a670",
     },
+    -- Experience bar (Modules/XpBarWindow.lua): window shown and pinned, chosen layout, saved layouts
+    -- (seeded from the presets on first use), opacity, then the tracker options (Modules/XpTracker.lua).
+    xpBar = {
+      shown = false,
+      pinned = false,
+      layoutId = "classic",
+      layouts = {},
+      alpha = 1,
+      autoPause = false,
+      sessionResetOnLogin = false,
+      chatLevelUp = false,
+      -- Where the level-up line goes once chatLevelUp is on: own chat window, group (party, raid or
+      -- instance group), guild, say.
+      chat = { self = true, group = false, guild = false, say = false },
+      hideInCombat = false,
+      showAtMax = false,
+    },
+    -- Mouse cursor ring (Modules/Cursor.lua): the switch (off by default, then nothing runs), the frame layer,
+    -- the mouselook mode (hide, keep, center), five yes/no rules, the chosen layout and the saved layouts
+    -- (seeded from the presets on first use), all account wide.
+    cursorRing = {
+      enabled = false,
+      strata = "TOOLTIP",
+      mouselook = "hide",
+      combatOnly = false,
+      instanceOnly = false,
+      needsTarget = false,
+      hideMounted = false,
+      hideInVehicle = false,
+      layoutId = "standard",
+      layouts = {},
+    },
     -- Gathering sparkles (Modules/GatherSparkles.lua): on, ore, herbs, quest objects, quest item glitter
     -- (graphics settings), locked nodes shown without the profession, icons of the game over objects,
     -- style (auto, original, particles), gap of the effect below the plate center (offsetY, plate
@@ -439,6 +471,8 @@ Store.defaults = {
   prices = { v = 1, lastRequest = 0, houses = {} },
   -- Last weekly reset the client reported (server time epoch, 0 unknown), see Modules/RaidWeek.lua.
   weekReset = 0,
+  -- XP per level step the client reported, [build][level] = UnitXPMax (Modules/XpTracker.lua).
+  xpLearned = {},
   imports = {},
   chars = {},
   errors = {},
@@ -451,6 +485,8 @@ Store.charDefaults = {
   legacy = { v = 1, ranks = {} },
   -- Per character override of the sub-addon switches: [id] = true or false, nil follows the account.
   subaddons = {},
+  -- XP bar (Modules/XpTracker.lua): session (empty = none yet) and the played seconds at the start of each level.
+  xp = { levelStart = {}, session = {} },
   -- nav (navigation layout of this character) is absent until the user edits the menu for this
   -- character only; an empty table would count as an override that wins over the account layout.
 }

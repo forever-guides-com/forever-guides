@@ -488,15 +488,15 @@ end
 
 local function setupKeys(rec)
   local keys = CreateFrame("Frame", nil, rec.panel)
-  if type(keys.SetPropagateKeyboardInput) ~= "function" then
+  if not ns.can.propagateKeyboard then
     return
   end
-  pcall(keys.SetPropagateKeyboardInput, keys, true)
+  ns.PropagateKeys(keys, true)
   keys:EnableKeyboard(true)
   keys:SetScript(
     "OnKeyDown",
     ns.Wrap("auctionlink-keys", function(self, key)
-      pcall(self.SetPropagateKeyboardInput, self, not onKey(rec, key))
+      ns.PropagateKeys(self, not onKey(rec, key))
     end)
   )
   rec.keys = keys

@@ -399,9 +399,7 @@ local function newPopup(kind, name, w, h)
       else
         used = false
       end
-      if self.SetPropagateKeyboardInput then
-        self:SetPropagateKeyboardInput(not used)
-      end
+      ns.PropagateKeys(self, not used)
     end)
   )
   p:Hide()

@@ -4,6 +4,42 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.1.8] - 2026-10-19
+
+### Added
+
+- A new experience bar window shows your XP as a bar with texts you place yourself, and percentages count across several levels.
+- The experience bar has four presets. A click on it opens a menu, pinning fixes the position, and a pencil button opens the layout editor.
+- The experience bar has no title bar or frame. Unpinned, drag the bar itself and scale it with the grip at the bottom right. A click brings the window to the front.
+- Pause and reset the session and see the time per level from your played time. Percentages, rested XP and targets end at the highest level your game allows.
+- An optional chat message at a level up goes to your own chat window, the group, the guild or Say. The game usually blocks Say for add-ons, so you get a hint and the line in your own window.
+- A page in the tools area gathers all experience bar settings. The command /fg xp (also erfahrung, xpbar) takes pause, reset, edit, time and chat, and a key binding and a settings card are included.
+- Experience bar layouts can be created, duplicated, renamed and deleted, on the page, in the click menu and in the layout editor.
+- Layout editor: set bars, texts and rectangles with colors, font, size and placeholders. A text can have a background, and a warning names too little contrast.
+- Layout editor: a slim band under the title bar holds save, undo, redo, reset, export and import, and the layout list sits beside it. A star marks unsaved changes, and a dialog asks before you switch.
+- Layout editor: eight handles change width and height in the preview, the border has its own opacity, and Live, info, grid and real values sit in one row.
+- Layout editor: add, remove (trash button, Ctrl+Z brings it back) and rename elements (F2). Names survive export and import, and every element type has a short description.
+- Mouse cursor ring: a ring, shape or crosshair follows the mouse cursor, with presets and layouts of your own from the layout editor. It is off by default, and while it is off nothing runs for it.
+- Mouse cursor ring: color, opacity, rotation, blending, line thickness (1 to 64 pixels) and an inner fill are adjustable, and all eight shapes also exist filled.
+- Mouse cursor ring: visibility rules for combat, instances, target, mount and vehicle, the screen layer, and the behavior while the camera turns (hide, keep at the cursor, screen center).
+- Mouse cursor ring: the command /fg cursor (also mauszeiger, ring) takes on, off, edit and reset. A key binding, a settings card on the General tab and a page in the tools area are included.
+- Mouse cursor ring: the Trail element shows particles or lightning behind the pointer, and the Click effect element a growing ring on left and right click. Reduced motion turns the trail off.
+- Mouse cursor ring: timers for the global cooldown, for casting and channeling (with a flash on interrupt) and for the swing of each weapon (main hand, off hand, ranged) as a ring or a bar.
+- Mouse cursor ring: when the game's own swing bars are on, the panel of the swing timer points it out and never changes the setting.
+- Mouse cursor ring: a health ring and a resource ring with start point, direction and colors, red at low health. The game hides these values from add-ons, so the rings show no numbers.
+- Mouse cursor ring: the range element shows whether the target is in range, out of range or unknown, as a ring, a dot, text with the distance band (0-5 up to 35+ yards) or both.
+- Mouse cursor ring: the range check asks your spells first, then items and the interact distance, or you choose melee, a distance or a spell. The status line names the source.
+- Mouse cursor ring: more presets (ring with trail, ring with click effect, timers, swing timer, health, resource and range, distance text) and an editor preview with simulation.
+
+### Changed
+
+- Dropdowns have a little more space between the label and the field.
+
+### Fixed
+
+- Pressing keys in combat with a window open no longer adds entries to the error list.
+- Sliders follow the pointer while you hold the mouse button, and the mouse wheel scrolls the page unless a slider was pressed.
+
 ## [0.1.7] - 2026-10-18
 
 ### Added
@@ -201,6 +237,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.1.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.7-beta.1...v0.1.7
 [0.1.7-beta.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.6...v0.1.7-beta.1
 [0.1.6]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.5...v0.1.6

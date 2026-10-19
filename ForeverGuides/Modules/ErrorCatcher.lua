@@ -243,10 +243,37 @@ function EC.ActionStack()
   return stack ~= "" and head .. "\n" .. stack or head
 end
 
+-- A module that provokes a refusal on purpose (a call the game is known to block) announces it: for the
+-- given seconds a blocked call of our own addon whose function name contains one of the words is not recorded.
+local expected = {}
+
+function EC.ExpectBlock(seconds, ...)
+  for _, word in ipairs({ ... }) do
+    expected[word] = clock() + seconds
+  end
+end
+
+local function isExpected(addon, func)
+  if not Logic.IsOwn(addon) then
+    return false
+  end
+  local now = clock()
+  func = tostring(func)
+  for word, untilTime in pairs(expected) do
+    if now <= untilTime and func:find(word, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
 local function onAction(kind, text)
   return function(_, addon, func)
     if addon == nil or addon == "" then
       addon = "?"
+    end
+    if kind == "blocked" and isExpected(addon, func) then
+      return
     end
     local okStack, stack = pcall(EC.ActionStack)
     pcall(EC.Capture, kind, text .. tostring(func), okStack and stack or "", tostring(addon), "event")

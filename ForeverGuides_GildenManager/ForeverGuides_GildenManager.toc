@@ -4,7 +4,7 @@
 ## Notes-deDE: Gildenwerkzeuge für Forever Guides: Main und Alt, eigene Notizen, Inaktivitätsliste und Gildenaktionen mit Vorschau.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 0.1.7
+## Version: 0.1.8
 ## Dependencies: ForeverGuides
 ## DefaultState: disabled
 ## LoadOnDemand: 1

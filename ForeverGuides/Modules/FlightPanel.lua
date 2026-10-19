@@ -145,7 +145,7 @@ local function onKey(self, key)
       handled = true
     end
   end
-  pcall(self.SetPropagateKeyboardInput, self, not handled)
+  ns.PropagateKeys(self, not handled)
 end
 
 local function toggleRow(panel, key, labelKey, y)
@@ -273,10 +273,10 @@ end
 
 local function setupKeys(taxi)
   local keys = CreateFrame("Frame", nil, taxi)
-  if type(keys.SetPropagateKeyboardInput) ~= "function" then
+  if not ns.can.propagateKeyboard then
     return
   end
-  pcall(keys.SetPropagateKeyboardInput, keys, true)
+  ns.PropagateKeys(keys, true)
   keys:EnableKeyboard(true)
   keys:SetScript("OnKeyDown", ns.Wrap("flightpanel-keys", onKey))
 end

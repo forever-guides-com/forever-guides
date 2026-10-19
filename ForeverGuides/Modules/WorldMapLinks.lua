@@ -338,9 +338,7 @@ local function ensureOverlay()
     if handled then
       WML.SetPlacing(false)
     end
-    if self.SetPropagateKeyboardInput then
-      pcall(self.SetPropagateKeyboardInput, self, not handled)
-    end
+    ns.PropagateKeys(self, not handled)
   end)
   keys:Hide()
   return overlay
@@ -685,9 +683,7 @@ local function buildButtonMenu()
     else
       handled = false
     end
-    if self.SetPropagateKeyboardInput then
-      pcall(self.SetPropagateKeyboardInput, self, not handled)
-    end
+    ns.PropagateKeys(self, not handled)
   end)
   return p
 end

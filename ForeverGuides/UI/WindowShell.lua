@@ -563,7 +563,7 @@ local function onEscKey(self, key)
   local _, handled = ns.Safe("esc-key", function()
     return key == "ESCAPE" and Esc.Close(self)
   end)
-  pcall(self.SetPropagateKeyboardInput, self, not handled)
+  ns.PropagateKeys(self, not handled)
 end
 
 -- on = true: the window takes part (newest on top), false: it leaves, e.g. a pinned note that
@@ -593,7 +593,7 @@ function Shell.SetEsc(frame, on)
   if not frame:GetScript("OnKeyDown") then
     frame:SetScript("OnKeyDown", onEscKey)
   end
-  pcall(frame.SetPropagateKeyboardInput, frame, true)
+  ns.PropagateKeys(frame, true)
   pcall(frame.EnableKeyboard, frame, true)
   Esc.Push(frame)
 end

@@ -198,8 +198,8 @@ function FL.FitDropdown(dropdown)
   local button = dropdown:GetChildren()
   if button then
     button:ClearAllPoints()
-    button:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 0, -18)
-    button:SetPoint("TOPRIGHT", dropdown, "TOPRIGHT", 0, -18)
+    button:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 0, -W.DROPDOWN_FIELD_Y)
+    button:SetPoint("TOPRIGHT", dropdown, "TOPRIGHT", 0, -W.DROPDOWN_FIELD_Y)
   end
   return dropdown
 end

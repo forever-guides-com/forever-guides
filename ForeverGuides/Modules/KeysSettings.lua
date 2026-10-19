@@ -77,7 +77,7 @@ local function addRow(view, id, onChange)
     end,
   })
   row.reset.fgId = "keys-reset-" .. id
-  row.reset:SetPoint("TOPLEFT", dd, "TOPLEFT", FIELD_WIDTH + 8, -18)
+  row.reset:SetPoint("TOPLEFT", dd, "TOPLEFT", FIELD_WIDTH + 8, -W.DROPDOWN_FIELD_Y)
   view.stack:Add(dd, { height = 46, width = FIELD_WIDTH + 8 + RESET_SIZE, gap = 2 })
   ns.AddParagraph(view, "keys.desc." .. id, { role = "micro", color = "textMuted", gap = 6 })
   row.conflict = W.Text(view.content, { role = "micro", color = "warning", wrap = true })

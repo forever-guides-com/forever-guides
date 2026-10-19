@@ -59,4 +59,10 @@
   <Binding name="FOREVERGUIDES_DURABILITY" category="ADDONS">
     ForeverGuides.KeyBindings.Durability()
   </Binding>
+  <Binding name="FOREVERGUIDES_XPBAR" category="ADDONS">
+    ForeverGuides.KeyBindings.XpBar()
+  </Binding>
+  <Binding name="FOREVERGUIDES_CURSORRING" category="ADDONS">
+    ForeverGuides.KeyBindings.CursorRing()
+  </Binding>
 </Bindings>

@@ -391,9 +391,7 @@ function MM.NewMenu(entries)
       else
         handled = false
       end
-      if self.SetPropagateKeyboardInput then
-        pcall(self.SetPropagateKeyboardInput, self, not handled)
-      end
+      ns.PropagateKeys(self, not handled)
     end)
     return p
   end

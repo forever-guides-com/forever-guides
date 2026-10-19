@@ -29,12 +29,15 @@ local WS = {}
 ns.WindowStyle = WS
 
 WS.FALLBACK = { bg = "1a1a1a", alpha = 0.92, autoHide = false }
+-- Kinds with their own built-in opacity: the layout editor holds dense controls and never lets the page
+-- behind it shine through.
+WS.KIND_FALLBACK = { canvaseditor = { alpha = 1 } }
 WS.SHADOW_MODES = { "auto", "on", "off" }
 -- "auto" shadows the text when the window is more transparent than this.
 WS.SHADOW_BELOW = 0.45
 WS.FADE_TIME, WS.HIDE_DELAY = 0.12, 0.4
 -- Settings key prefix per window kind: <prefix>Bg, <prefix>Alpha, <prefix>AutoHide.
-WS.PREFIX = { note = "noteWindow", drawing = "drawingWindow" }
+WS.PREFIX = { note = "noteWindow", drawing = "drawingWindow", canvaseditor = "canvasEditorWindow" }
 WS.SHADOW_KEY = "windowTextShadow"
 -- "Always show the window frame" (default on): a shell border keeps this opacity at least.
 WS.BORDER_KEY = "windowBorderAlways"
@@ -69,9 +72,10 @@ end
 function WS.Defaults(kind)
   local s = (ns.db and ns.db.settings) or {}
   local prefix = WS.PREFIX[kind] or WS.PREFIX.note
+  local own = WS.KIND_FALLBACK[kind] or {}
   return {
     bg = WS.cleanHex(s[prefix .. "Bg"], WS.FALLBACK.bg),
-    alpha = WS.cleanAlpha(s[prefix .. "Alpha"], WS.FALLBACK.alpha),
+    alpha = WS.cleanAlpha(s[prefix .. "Alpha"], own.alpha or WS.FALLBACK.alpha),
     autoHide = s[prefix .. "AutoHide"] == true,
     textShadow = WS.cleanShadow(s[WS.SHADOW_KEY]),
     border = s[WS.BORDER_KEY] ~= false,

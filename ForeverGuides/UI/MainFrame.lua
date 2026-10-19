@@ -447,7 +447,7 @@ local function setupKeyboard()
     return
   end
   Main.keyboardReady = true
-  frame:SetPropagateKeyboardInput(true)
+  ns.PropagateKeys(frame, true)
   frame:EnableKeyboard(true)
   frame:SetScript("OnKeyDown", function(self, key)
     -- Propagation may not be changed in combat; the game then handles keys, Esc still closes.
@@ -458,10 +458,10 @@ local function setupKeyboard()
       return
     end
     local _, handled = ns.Safe("key", handleKey, key)
-    self:SetPropagateKeyboardInput(not handled)
+    ns.PropagateKeys(self, not handled)
   end)
   ns.On("PLAYER_REGEN_DISABLED", function()
-    pcall(frame.SetPropagateKeyboardInput, frame, true)
+    ns.PropagateKeys(frame, true)
   end)
 end
 

@@ -1398,6 +1398,88 @@ function W.ReleaseGate(s, opts)
   return gate
 end
 
+-- The nearest ancestor of `frame` that scrolls with the mouse wheel: that frame and its handler, or nil.
+local function wheelParent(frame)
+  local p = frame:GetParent()
+  while p do
+    local handler = p.GetScript and p:GetScript("OnMouseWheel")
+    if handler then
+      return p, handler
+    end
+    p = p:GetParent()
+  end
+  return nil
+end
+
+-- The wheel over a slider scrolls the page it sits in. It adjusts the slider only after the slider was pressed
+-- (until the pointer leaves it), while it has the keyboard focus, or when nothing around it scrolls.
+local function wheelOnSlider(s, delta, move)
+  if not (s.fgActive or Focus.current == s) then
+    local parent, handler = wheelParent(s)
+    if handler then
+      handler(parent, delta)
+      return
+    end
+  end
+  move(delta)
+end
+
+-- While the thumb is held the value follows the pointer from here too: the engine's own drag did not follow
+-- in the add-on windows (a click set the value, a drag did not), so the position of the pointer is read every
+-- frame until the button is let go. The values it sets go through the normal OnValueChanged path.
+local function followPointer(s)
+  local function stop()
+    s:SetScript("OnUpdate", nil)
+  end
+  local function step()
+    local down, cursor = rawget(_G, "IsMouseButtonDown"), rawget(_G, "GetCursorPosition")
+    if type(down) ~= "function" or type(cursor) ~= "function" or not down("LeftButton") then
+      stop()
+      return
+    end
+    local left, width, scale = s:GetLeft(), s:GetWidth(), s:GetEffectiveScale()
+    local thumb = s.GetThumbTexture and s:GetThumbTexture()
+    local thumbWidth = thumb and thumb:GetWidth() or 0
+    local x = cursor()
+    if not (type(left) == "number" and type(width) == "number" and type(scale) == "number" and type(x) == "number") then
+      return
+    end
+    local usable = width - thumbWidth
+    local lo, hi = s:GetMinMaxValues()
+    if usable <= 0 or type(lo) ~= "number" or type(hi) ~= "number" or scale <= 0 then
+      return
+    end
+    local v = lo + ns.U.clamp((x / scale - left - thumbWidth / 2) / usable, 0, 1) * (hi - lo)
+    local unit = s:GetValueStep()
+    if type(unit) == "number" and unit > 0 then
+      v = lo + math.floor((v - lo) / unit + 0.5) * unit
+    end
+    v = ns.U.clamp(v, lo, hi)
+    if v ~= s:GetValue() then
+      s:SetValue(v)
+    end
+  end
+  s:HookScript("OnMouseDown", function()
+    s:SetScript("OnUpdate", step)
+  end)
+  s:HookScript("OnMouseUp", stop)
+  s:HookScript("OnHide", stop)
+end
+
+-- Marks a slider as active while it is pressed and the pointer stays on it.
+local function trackActive(s)
+  s:HookScript("OnMouseDown", function()
+    s.fgActive = true
+  end)
+  s:HookScript("OnLeave", function()
+    s.fgActive = false
+  end)
+  s:HookScript("OnHide", function()
+    s.fgActive = false
+  end)
+  followPointer(s)
+end
+
 -- opts: key, min, max, step, get(), set(v, anchor), format(v) -> string
 -- applyOn = "release": set runs once when the thumb is let go (anchor: the thumb), see W.ReleaseGate.
 function W.Slider(parent, opts)
@@ -1457,6 +1539,20 @@ function W.Slider(parent, opts)
         opts.set(v, W.ThumbAnchor(s))
       end,
     })
+  -- A refresh while the thumb is held would pull it back from under the mouse and the drag would stick;
+  -- a slider with a release gate marks the hold in the gate.
+  if not gate then
+    s:HookScript("OnMouseDown", function()
+      s.fgHeld = true
+    end)
+    s:HookScript("OnMouseUp", function()
+      s.fgHeld = false
+      sync()
+    end)
+    s:HookScript("OnHide", function()
+      s.fgHeld = false
+    end)
+  end
   s:SetScript(
     "OnValueChanged",
     ns.Wrap("slider", function(_, v)
@@ -1479,8 +1575,9 @@ function W.Slider(parent, opts)
     s:SetValue(ns.U.clamp(s:GetValue() + delta * opts.step, opts.min, opts.max))
   end
   s:EnableMouseWheel(true)
+  trackActive(s)
   s:SetScript("OnMouseWheel", function(_, delta)
-    move(delta)
+    wheelOnSlider(s, delta, move)
   end)
   Focus.register(s, nil)
   function s.fgArrow(_, delta)
@@ -1582,8 +1679,17 @@ function W.CompactSlider(parent, opts)
     end)
   )
   s:EnableMouseWheel(true)
+  trackActive(s)
+  if not gate then
+    s:HookScript("OnMouseDown", function()
+      s.fgHeld = true
+    end)
+    s:HookScript("OnMouseUp", function()
+      s.fgHeld = false
+    end)
+  end
   s:SetScript("OnMouseWheel", function(_, delta)
-    move(delta)
+    wheelOnSlider(s, delta, move)
   end)
   function s.fgArrow(_, delta)
     move(delta)
@@ -1762,6 +1868,7 @@ local function getPopup()
   popup:SetFrameStrata("TOOLTIP")
   popup:SetFrameLevel(blocker:GetFrameLevel() + 5)
   popup:SetClampedToScreen(true)
+  -- Solid on purpose: the list lies over page text and must never follow a window opacity.
   W.Fill(popup, "surface", 1)
   W.Border(popup, "accentDim", 1)
   popup.rows = {}
@@ -1769,21 +1876,28 @@ local function getPopup()
   return popup
 end
 
+-- Distance from the top of a dropdown to its field: the label line plus a clear gap.
+W.DROPDOWN_FIELD_Y = 20
+
 -- opts: key (label), options = { { value, key|text, quality } }, get(), set(v), width, tooltip and tooltipText
 -- (locale keys). An option with a quality shows its text in the item color of that quality.
+-- The frame has a height only: the owner gives it a width (SetWidth, or anchors on both sides) when it
+-- places the dropdown itself, otherwise its width is undefined and the client may draw nothing.
+-- f.button is the clickable button, f.arrow its chevron frame (a frame level change of the wrapper does not
+-- move them), f:Open([anchor]) opens the list.
 function W.Dropdown(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(46)
-  local label = W.Text(f, { key = opts.key, role = "ui" })
+  local label = W.Text(f, { key = opts.key, role = "ui", color = "textMuted" })
   label:SetPoint("TOPLEFT")
   f.label = label
   local b = CreateFrame("Button", nil, f)
   b:SetHeight(24)
-  b:SetPoint("TOPLEFT", 0, -18)
+  b:SetPoint("TOPLEFT", 0, -W.DROPDOWN_FIELD_Y)
   b:SetWidth(opts.width or 220)
   W.Fill(b, "surface2")
   W.Border(b, "white", 0.25)
-  local current = W.Text(b, { role = "ui" })
+  local current = W.Text(b, { role = "ui", color = "text" })
   current:SetPoint("LEFT", 8, 0)
   local arrow = W.Glyph(b, "chevron-down", 12, "textMuted")
   arrow:SetPoint("RIGHT", -8, 0)
@@ -1803,7 +1917,7 @@ function W.Dropdown(parent, opts)
     current:SetText(textOf(opts.get()))
   end
   ns.Bind(f, paint)
-  local function open()
+  local function open(anchor)
     local p = getPopup()
     for _, r in ipairs(p.rows) do
       r:Hide()
@@ -1818,12 +1932,26 @@ function W.Dropdown(parent, opts)
         r.hl:SetColorTexture(1, 1, 1, 0)
         r.text = W.Text(r, { role = "ui" })
         r.text:SetPoint("LEFT", 8, 0)
+        -- An option may carry a tooltip text (o.tooltip), shown on hover and on keyboard focus.
+        local function showTip()
+          if r.fgTip then
+            ns.ShowTooltip(r, r.fgTipTitle, r.fgTip)
+          end
+        end
+        local function hideTip()
+          if r.fgTip then
+            ns.HideTooltip()
+          end
+        end
         r:SetScript("OnEnter", function()
           r.hl:SetColorTexture(1, 1, 1, 0.08)
+          showTip()
         end)
         r:SetScript("OnLeave", function()
           r.hl:SetColorTexture(1, 1, 1, 0)
+          hideTip()
         end)
+        r.fgOnFocus, r.fgOnBlur = showTip, hideTip
         Focus.register(r, function(self)
           self:Click()
         end)
@@ -1833,6 +1961,7 @@ function W.Dropdown(parent, opts)
       r:SetPoint("TOPLEFT", 1, -1 - (i - 1) * 22)
       r:SetPoint("TOPRIGHT", -1, -1 - (i - 1) * 22)
       r.text:SetText(optionText(o))
+      r.fgTip, r.fgTipTitle = o.tooltip, optionText(o)
       W.SetColor(r.text, o.value == opts.get() and "accent" or "text")
       r:SetScript(
         "OnClick",
@@ -1846,8 +1975,12 @@ function W.Dropdown(parent, opts)
     end
     p:SetSize(b:GetWidth(), #opts.options * 22 + 2)
     p:ClearAllPoints()
-    p:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -2)
-    p:SetScale(b:GetEffectiveScale() / UIParent:GetEffectiveScale())
+    if anchor then
+      p:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -2)
+    else
+      p:SetPoint("TOPLEFT", b, "BOTTOMLEFT", 0, -2)
+    end
+    p:SetScale((anchor or b):GetEffectiveScale() / UIParent:GetEffectiveScale())
     blocker:Show()
     p:Show()
     for i, o in ipairs(opts.options) do
@@ -1871,5 +2004,11 @@ function W.Dropdown(parent, opts)
   end)
   attachTooltip(b, opts.tooltip, opts.tooltipText)
   f.Refresh = paint
+  f.button, f.arrow = b, arrow
+  -- Opens the option list like a click on the button. With an anchor frame the list drops from its
+  -- bottom right edge instead, for another control that offers the same choice.
+  function f:Open(anchor)
+    open(anchor)
+  end
   return f
 end

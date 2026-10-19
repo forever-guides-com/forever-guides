@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.1.7
+## Version: 0.1.8
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -61,6 +61,7 @@ Data\BossModels.lua
 Data\BossPins.lua
 Data\Travel.lua
 Data\FlightLengths.lua
+Data\XpTable.lua
 Data\Abilities_WARRIOR.lua
 Data\Abilities_PALADIN.lua
 Data\Abilities_HUNTER.lua
@@ -259,6 +260,11 @@ Modules\FlightRoute.lua
 Modules\FlightTimerLogic.lua
 Modules\FlightLabels.lua
 Modules\FlightPanel.lua
+Modules\CanvasLogic.lua
+Modules\CanvasRender.lua
+Modules\CanvasEditorControls.lua
+Modules\CanvasEditor.lua
+Modules\CursorAssets.lua
 Modules\GatherSparklesLogic.lua
 Modules\GatherSparkles.lua
 Modules\GatherSparklesSettings.lua
@@ -333,6 +339,23 @@ Modules\DurabilityLogic.lua
 Modules\DurabilityView.lua
 Modules\DurabilityWindow.lua
 Modules\DurabilitySettings.lua
+Modules\XpLogic.lua
+Modules\XpTracker.lua
+Modules\LayoutSet.lua
+Modules\XpBarLayout.lua
+Modules\XpBarWindow.lua
+Modules\XpBarSettings.lua
+Modules\XpBarPage.lua
+Modules\CursorLogic.lua
+Modules\CursorElements.lua
+Modules\CursorSim.lua
+Modules\CursorValuesLogic.lua
+Modules\CursorValues.lua
+Modules\CursorTrail.lua
+Modules\CursorTimers.lua
+Modules\Cursor.lua
+Modules\CursorSettings.lua
+Modules\CursorPage.lua
 Modules\ProfessionRouteLogic.lua
 Modules\ProfessionListLogic.lua
 Modules\PeerComm.lua

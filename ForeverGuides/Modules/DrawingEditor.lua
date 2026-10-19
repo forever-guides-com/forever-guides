@@ -1836,14 +1836,14 @@ local function setupKeyboard()
     return
   end
   keyboardReady = true
-  frame:SetPropagateKeyboardInput(true)
+  ns.PropagateKeys(frame, true)
   frame:EnableKeyboard(true)
   frame:SetScript("OnKeyDown", function(self, key)
     if InCombatLockdown() then
       return
     end
     local _, handled = ns.Safe("draw-key", handleKey, key)
-    self:SetPropagateKeyboardInput(not handled)
+    ns.PropagateKeys(self, not handled)
   end)
 end
 

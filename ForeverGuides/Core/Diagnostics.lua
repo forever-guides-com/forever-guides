@@ -126,6 +126,22 @@ function ns.DiagReport()
     local okEsc, esc = pcall(ns.EscStack.Report)
     line(out, "%s", okEsc and esc or "esc stack: ?")
   end
+  if ns.XpTracker then
+    local okXp, xp = pcall(ns.XpTracker.Info)
+    if okXp and type(xp) == "table" then
+      line(
+        out,
+        "xp table=%s factor=%s estimated=%s learned=%d session=%s",
+        tostring(xp.tableBuild),
+        tostring(xp.factor),
+        xp.estimated and "yes" or "no",
+        tonumber(xp.learned) or 0,
+        xp.running and "running" or "paused"
+      )
+    else
+      line(out, "xp table: ?")
+    end
+  end
   for _, fn in ipairs(ns.DevTools and ns.DevTools.diag or {}) do
     local okTool, text = pcall(fn)
     line(out, "%s", okTool and text or "dev tool: ?")
@@ -179,6 +195,10 @@ function ns.DiagReport()
   if ns.LfgRoles then
     local okRoles, text = pcall(ns.LfgRoles.DiagLine)
     out[#out + 1] = okRoles and text or "lfg roles: ?"
+  end
+  if ns.Cursor then
+    local okCursor, text = pcall(ns.Cursor.DiagLine)
+    out[#out + 1] = okCursor and text or "cursor ring: ?"
   end
   return table.concat(out, "\n")
 end

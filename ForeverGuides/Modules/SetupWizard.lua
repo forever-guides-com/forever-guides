@@ -523,14 +523,14 @@ local function setupKeys()
     return
   end
   keysReady = true
-  frame:SetPropagateKeyboardInput(true)
+  ns.PropagateKeys(frame, true)
   frame:EnableKeyboard(true)
   frame:SetScript("OnKeyDown", function(self, key)
     if inCombat() then
       return
     end
     local _, handled = ns.Safe("setup-key", handleKey, key)
-    self:SetPropagateKeyboardInput(not handled)
+    ns.PropagateKeys(self, not handled)
   end)
 end
 

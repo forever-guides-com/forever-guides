@@ -206,6 +206,27 @@ add({
   exec = "durability",
 })
 add({
+  id = "xpbar",
+  area = "tools",
+  example = { en = "/fg xp", de = "/fg erfahrung" },
+  public = true,
+  names = { "erfahrung", "xp", "xpbar" },
+  usage = "/fg erfahrung [pause | reset | edit | zeit <von> <bis> | chat an|aus | chat <selbst|gruppe|gilde|sagen> an|aus]",
+  page = "xpbar",
+  control = "xpbar.set.show",
+})
+add({
+  id = "cursor",
+  area = "tools",
+  example = { en = "/fg cursor", de = "/fg mauszeiger" },
+  public = true,
+  names = { "mauszeiger", "cursor", "ring" },
+  usage = "/fg mauszeiger [an | aus | edit | reset]",
+  page = "cursor",
+  control = "cursor.set.enabled",
+  exec = "mauszeiger",
+})
+add({
   id = "einkauf",
   area = "professions",
   example = { en = "/fg shopping", de = "/fg einkauf" },
@@ -614,6 +635,8 @@ C.PAGE_AREA = {
   drawings = "tools",
   calc = "tools",
   durability = "tools",
+  xpbar = "tools",
+  cursor = "tools",
   macros = "tools",
 }
 for page, area in pairs(C.PAGE_AREA) do
@@ -668,6 +691,8 @@ C.bindings.FOREVERGUIDES_WAYPOINT_ARROW = { page = "waypoints", control = "wp.se
 C.bindings.FOREVERGUIDES_WAYPOINT_HERE = { page = "waypoints", control = "wp.here" }
 C.bindings.FOREVERGUIDES_CALC = { page = "calc", control = "page.calc" }
 C.bindings.FOREVERGUIDES_DURABILITY = { page = "durability", control = "page.durability" }
+C.bindings.FOREVERGUIDES_XPBAR = { page = "xpbar", control = "xpbar.set.show" }
+C.bindings.FOREVERGUIDES_CURSORRING = { page = "cursor", control = "cursor.set.enabled" }
 
 local EN = {}
 local DE = {}
@@ -696,6 +721,16 @@ desc(
   "durability",
   "Durability window: condition of your equipment in percent per part, toggles the window.",
   "Haltbarkeits-Fenster: Zustand der Ausrüstung in Prozent je Teil, schaltet das Fenster um."
+)
+desc(
+  "xpbar",
+  "Experience bar: toggles the window. Also pause, reset, edit, time <from> <to>, chat on|off, chat <channel> on|off.",
+  "Erfahrungsleiste: schaltet das Fenster um. Auch pause, reset, edit, zeit <von> <bis>, chat an|aus, chat <Kanal> an|aus."
+)
+desc(
+  "cursor",
+  "Mouse cursor ring: toggles the ring that follows the cursor. Also on, off, edit, reset.",
+  "Mauszeiger-Ring: schaltet den Ring um, der dem Zeiger folgt. Auch an, aus, edit, reset."
 )
 desc(
   "einkauf",
@@ -831,8 +866,8 @@ DE["help.commandRun"] = "Ausführen"
 EN["help.commandRunTip"] = "Runs this command as if typed in chat."
 DE["help.commandRunTip"] = "Führt den Befehl aus, als hättest du ihn im Chat getippt."
 EN["help.bindings"] =
-  "Key bindings: Esc > Options > Key Bindings > AddOns > Forever Guides, none set by default.\nBindable: window, search, compact window, location screenshot, notes, drawings, talent editor, learn list, map, route window, weapon masters, class trainers, share, waypoints, calculator, durability window.\nEvery action also has a button in the window."
+  "Key bindings: Esc > Options > Key Bindings > AddOns > Forever Guides, none set by default.\nBindable: window, search, compact window, location screenshot, notes, drawings, talent editor, learn list, map, route window, weapon masters, class trainers, share, waypoints, calculator, durability window, experience bar, mouse cursor ring.\nEvery action also has a button in the window."
 DE["help.bindings"] =
-  "Tastenbelegung: Esc > Optionen > Tastaturbelegung > AddOns > Forever Guides, standardmäßig leer.\nBelegbar: Fenster, Suche, Kompaktfenster, Orts-Screenshot, Notizen, Zeichnungen, Talent-Editor, Lernliste, Karte, Routen-Fenster, Waffenmeister, Klassenlehrer, Teilen, Wegpunkte, Rechner, Haltbarkeits-Fenster.\nJede Aktion gibt es auch als Knopf im Fenster."
+  "Tastenbelegung: Esc > Optionen > Tastaturbelegung > AddOns > Forever Guides, standardmäßig leer.\nBelegbar: Fenster, Suche, Kompaktfenster, Orts-Screenshot, Notizen, Zeichnungen, Talent-Editor, Lernliste, Karte, Routen-Fenster, Waffenmeister, Klassenlehrer, Teilen, Wegpunkte, Rechner, Haltbarkeits-Fenster, Erfahrungsleiste, Mauszeiger-Ring.\nJede Aktion gibt es auch als Knopf im Fenster."
 ns.AddLocale("enUS", EN)
 ns.AddLocale("deDE", DE)
