@@ -135,6 +135,7 @@ local function createRow(parent)
   row:SetScript("OnEnter", showRowTip)
   row:SetScript("OnLeave", ns.HideTooltip)
   row.actions = W.MapActionButtons(row, { mapTip = "proftrainers.mapTip", markerTip = "proftrainers.markerTip" })
+  K.RowHover(row, { extraFrames = { row.actions.map, row.actions.marker } })
   row.actions:SetPoint("TOPRIGHT", -8, -ROW_ACTION_TOP)
   row.title = W.Text(row, { role = "ui" })
   row.ranks = W.Text(row, { role = "micro", color = "textSecondary" })
@@ -185,6 +186,7 @@ local function bindRow(row, entry)
     row.pos:SetText(L["proftrainers.noPos"])
     W.SetColor(row.pos, "warning")
   end
+  row.paintHover()
 end
 
 local function build(container)

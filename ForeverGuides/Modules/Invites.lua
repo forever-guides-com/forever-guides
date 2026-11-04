@@ -3,7 +3,10 @@
 -- InviteLogic; this file asks the game for the facts and does the invite. Every game call is
 -- wrapped in pcall. The sender name goes to the game exactly as the whisper delivered it
 -- ("first surname", never cut at a blank). Off until a keyword is set.
-local _, ns = ...
+-- The group invite is automatic. The guild invite is not: the game only takes it from a click, so a
+-- whisper opens a request window or bar (InvitePrompt) and the guild call runs in the click handler of its button only.
+-- Every whisper with a keyword ends in one chat line that says what happened, also for a "no".
+local addonName, ns = ...
 local IL, PN = ns.InviteLogic, ns.PlayerName
 
 local I = {}
@@ -24,6 +27,37 @@ ns.AddLocale("enUS", {
   ["invite.why.group-full"] = "Your group is full.",
   ["invite.why.not-leader"] = "Only the group leader can invite.",
   ["invite.why.error"] = "The game refused the invite.",
+  ["invite.fb.line"] = "%s whispered %s: %s",
+  ["invite.fb.invited"] = "invited to the group",
+  ["invite.fb.guild-ready"] = "guild invite is ready, click the button on screen",
+  ["invite.fb.guild-waiting"] = "in combat, the guild invite waits until it ends",
+  ["invite.fb.guild-sent"] = "invited to the guild",
+  ["invite.fb.guild-blocked"] = "the game blocked the direct call, click the button once more",
+  ["invite.fb.guild-secure"] = "guild invite command sent, the game reports the result",
+  ["invite.fb.guild-combat"] = "in combat, the guild invite waits",
+  ["invite.fb.failed"] = "invite failed (%s)",
+  ["invite.fb.off"] = "the automatic invite is off",
+  ["invite.fb.no-sender"] = "the sender is unknown",
+  ["invite.fb.blocked"] = "the player is on your block list",
+  ["invite.fb.no-permission"] = "you may not invite to the guild (no right)",
+  ["invite.fb.mode-unavailable"] = "the selected sender group is not available here",
+  ["invite.fb.mode"] = "the player is not in your allowed group",
+  ["invite.fb.away"] = "you are away or busy",
+  ["invite.fb.level-unknown"] = "the level of the player is unknown",
+  ["invite.fb.level"] = "the level is too low",
+  ["invite.fb.faction"] = "the player belongs to the other faction",
+  ["invite.fb.in-guild"] = "the player is already in the guild",
+  ["invite.fb.in-group"] = "the player is already in your group",
+  ["invite.fb.group-full"] = "your group is full",
+  ["invite.fb.not-leader"] = "only the group leader can invite",
+  ["invite.fb.rate-sender"] = "already handled a moment ago",
+  ["invite.fb.rate-global"] = "too many invites in a short time",
+  ["invite.fb.not-in-game"] = "no character found for this Battle.net contact (not in the game)",
+  ["invite.fb.other-client"] = "the Battle.net contact plays another WoW version",
+  ["invite.fb.no-api"] = "not available in this client",
+  ["invite.fb.error"] = "the game refused the invite",
+  ["invite.fb.unsafe-name"] = "the name cannot be used",
+  ["invite.fb.not-from-click"] = "the guild invite needs a click",
 })
 ns.AddLocale("deDE", {
   ["invite.kind.group"] = "Gruppe",
@@ -40,6 +74,37 @@ ns.AddLocale("deDE", {
   ["invite.why.group-full"] = "Deine Gruppe ist voll.",
   ["invite.why.not-leader"] = "Nur der Gruppenleiter kann einladen.",
   ["invite.why.error"] = "Das Spiel hat die Einladung abgelehnt.",
+  ["invite.fb.line"] = "%s hat %s geflüstert: %s",
+  ["invite.fb.invited"] = "in die Gruppe eingeladen",
+  ["invite.fb.guild-ready"] = "Gildeneinladung bereit, klicke den Knopf auf dem Bildschirm",
+  ["invite.fb.guild-waiting"] = "im Kampf, die Gildeneinladung wartet bis zum Kampfende",
+  ["invite.fb.guild-sent"] = "in die Gilde eingeladen",
+  ["invite.fb.guild-blocked"] = "das Spiel hat den direkten Aufruf blockiert, klicke den Knopf noch einmal",
+  ["invite.fb.guild-secure"] = "Gilden-Einladungsbefehl gesendet, das Spiel meldet das Ergebnis",
+  ["invite.fb.guild-combat"] = "im Kampf, die Gildeneinladung wartet",
+  ["invite.fb.failed"] = "Einladung fehlgeschlagen (%s)",
+  ["invite.fb.off"] = "die automatische Einladung ist aus",
+  ["invite.fb.no-sender"] = "der Absender ist unbekannt",
+  ["invite.fb.blocked"] = "der Spieler steht auf deiner Sperrliste",
+  ["invite.fb.no-permission"] = "du darfst nicht in die Gilde einladen (kein Recht)",
+  ["invite.fb.mode-unavailable"] = "die gewählte Absendergruppe ist hier nicht verfügbar",
+  ["invite.fb.mode"] = "der Spieler gehört nicht zu deiner erlaubten Gruppe",
+  ["invite.fb.away"] = "du bist abwesend oder beschäftigt",
+  ["invite.fb.level-unknown"] = "die Stufe des Spielers ist unbekannt",
+  ["invite.fb.level"] = "die Stufe ist zu niedrig",
+  ["invite.fb.faction"] = "der Spieler gehört zur anderen Fraktion",
+  ["invite.fb.in-guild"] = "der Spieler ist schon in der Gilde",
+  ["invite.fb.in-group"] = "der Spieler ist schon in deiner Gruppe",
+  ["invite.fb.group-full"] = "deine Gruppe ist voll",
+  ["invite.fb.not-leader"] = "nur der Gruppenleiter kann einladen",
+  ["invite.fb.rate-sender"] = "gerade schon bearbeitet",
+  ["invite.fb.rate-global"] = "zu viele Einladungen in kurzer Zeit",
+  ["invite.fb.not-in-game"] = "kein Charakter zu diesem Battle.net-Kontakt gefunden (nicht im Spiel)",
+  ["invite.fb.other-client"] = "der Battle.net-Kontakt spielt eine andere WoW-Version",
+  ["invite.fb.no-api"] = "in diesem Client nicht verfügbar",
+  ["invite.fb.error"] = "das Spiel hat die Einladung abgelehnt",
+  ["invite.fb.unsafe-name"] = "der Name kann nicht verwendet werden",
+  ["invite.fb.not-from-click"] = "die Gildeneinladung braucht einen Klick",
 })
 
 local PREFIX = { group = "inviteGroup", guild = "inviteGuild" }
@@ -98,6 +163,12 @@ end
 
 function I.ResetRate()
   rate = IL.NewRate()
+end
+
+-- A declined or closed request starts the wait of its sender again from now on, so asking again right after
+-- declining waits the chosen time.
+function I.Touch(kind, sender)
+  IL.RateTouch(rate, IL.RateKey(kind, sender), clock())
 end
 
 -- Settings -------------------------------------------------------------------------------------
@@ -255,8 +326,10 @@ local function levelOf(name)
   return type(info) == "table" and tonumber(info.level) or nil
 end
 
+-- Retail allows guilds and groups across the factions, the game answers itself when it refuses: only the
+-- Classic based clients (Forever) check the faction before the invite. nil counts as unknown and never blocks.
 local function sameFaction(guid)
-  if not guid then
+  if not guid or (ns.Client and ns.Client.IsRetail()) then
     return nil
   end
   local ok, _, _, _, race = protected("GetPlayerInfoByGUID", guid)
@@ -317,6 +390,32 @@ end
 
 -- Actions ----------------------------------------------------------------------------------------------
 
+-- The game reports a call it refuses (a restricted function outside a click) as an event, not as a Lua
+-- error, so no pcall can see it. The flag is only set for the length of one call.
+local blockedFlag = nil
+local function onBlocked(_, who)
+  if who == addonName and blockedFlag ~= nil then
+    blockedFlag = true
+  end
+end
+ns.On("ADDON_ACTION_FORBIDDEN", onBlocked)
+ns.On("ADDON_ACTION_BLOCKED", onBlocked)
+
+-- Runs fn(name). Answers "sent", "blocked" (the game refused it by event) or false and a reason.
+local function guarded(fn, name)
+  blockedFlag = false
+  local ok = pcall(fn, name)
+  local blocked = blockedFlag
+  blockedFlag = nil
+  if blocked then
+    return "blocked"
+  end
+  if ok then
+    return "sent"
+  end
+  return false, "error"
+end
+
 -- Returns ok, reason of the failure.
 local function inviteGroup(name)
   local party = g("C_PartyInfo")
@@ -324,21 +423,39 @@ local function inviteGroup(name)
   if type(fn) ~= "function" then
     return false, "no-api"
   end
-  local ok = pcall(fn, name)
-  return ok, not ok and "error" or nil
+  local status, why = guarded(fn, name)
+  return status == "sent", status == "blocked" and "error" or why
 end
 
-local function inviteGuild(name)
+-- Depth of the click handler of the guild bar that is running. The guild call needs a click and is
+-- refused for every other caller, a chat event above all.
+local clickDepth = 0
+
+-- The guild invite, the only place that calls the game for it. Answers "sent", "blocked" or false and a
+-- reason.
+function I.GuildInviteFromClick(name)
+  if clickDepth == 0 then
+    return false, "not-from-click"
+  end
   if not I.CanGuild() then
     return false, "no-permission"
   end
   local info = g("C_GuildInfo")
-  local fn = g("GuildInvite") or (type(info) == "table" and info.Invite)
+  local fn = type(info) == "table" and type(info.Invite) == "function" and info.Invite or g("GuildInvite")
   if type(fn) ~= "function" then
     return false, "no-api"
   end
-  local ok = pcall(fn, name)
-  return ok, not ok and "error" or nil
+  return guarded(fn, name)
+end
+
+local function clickInvite(name)
+  clickDepth = clickDepth + 1
+  local ok, status, why = pcall(I.GuildInviteFromClick, name)
+  clickDepth = clickDepth - 1
+  if ok then
+    return status, why
+  end
+  return false, "error"
 end
 
 local function reply(kind, cfg, name, battleNetId)
@@ -358,42 +475,165 @@ local function reply(kind, cfg, name, battleNetId)
   end
 end
 
-local function process(kind, text, sender, guid, label, battleNetId)
+-- Feedback ----------------------------------------------------------------------------------------------
+
+-- Without a keyword setting the plain words still get an answer, so a whisper never vanishes silently.
+local DEFAULT_WORD = { group = "inv", guild = "ginv" }
+local FEEDBACK_WINDOW = 30
+local told = {}
+
+-- A hidden (secret) value of Retail 12 must not be compared, measured or shown.
+local function isSecret(value)
+  local check = g("issecretvalue")
+  if type(check) ~= "function" then
+    return false
+  end
+  local ok, hidden = pcall(check, value)
+  return not ok or hidden == true
+end
+
+local function plainString(value)
+  return type(value) == "string" and value ~= "" and not isSecret(value) and value or nil
+end
+
+-- One chat line "<who> whispered <word>: <result>". A refusal repeats at most once per window and
+-- sender; what was done (invited, asked) always shows.
+local function feedback(cfg, who, keyword, code, why, repeatable)
+  if cfg.notify == false then
+    return
+  end
+  if repeatable then
+    local now, key = clock(), tostring(who):lower() .. "|" .. keyword .. "|" .. code
+    if told[key] and now - told[key] < FEEDBACK_WINDOW then
+      return
+    end
+    told[key] = now
+  end
+  local result = ns.L["invite.fb." .. code] or code
+  if why then
+    result = string.format(result, ns.L["invite.fb." .. why] or why)
+  end
+  ns.Notify.chat(string.format(ns.L["invite.fb.line"], who, keyword, result))
+end
+
+-- What the whisper line and the friend list tell about the sender (class and level), for the look of the
+-- request. Missing values stay out; nothing is asked of the game beyond what it already knows.
+local function senderInfo(name, guid)
+  local info = {}
+  if guid and not isSecret(guid) then
+    local ok, className, token = protected("GetPlayerInfoByGUID", guid)
+    if ok then
+      info.className, info.class = plainString(className), plainString(token)
+    end
+  end
+  info.level = levelOf(name)
+  return info
+end
+
+-- The bar of a guild request; the invite itself happens on its click (see GuildInviteFromClick).
+local function askGuild(cfg, name, who, keyword, battleNetId, info)
+  local prompt = ns.InvitePrompt
+  if not prompt then
+    return false, "no-api"
+  end
+  local function sent(target)
+    record("guild", who, "invited", "ok")
+    feedback(cfg, who, keyword, "guild-sent")
+    if cfg.replyOn then
+      reply("guild", cfg, target, battleNetId)
+    end
+  end
+  local state, why = prompt.Request(name, {
+    invite = function(target)
+      local status, reason = clickInvite(target)
+      if status == "sent" then
+        sent(target)
+      elseif status == "blocked" then
+        feedback(cfg, who, keyword, "guild-blocked")
+      else
+        feedback(cfg, who, keyword, "failed", reason or "error")
+      end
+      return status
+    end,
+    combat = function()
+      feedback(cfg, who, keyword, "guild-combat", nil, true)
+    end,
+    closed = function(target)
+      I.Touch("guild", target)
+    end,
+    sent = function(target)
+      sent(target)
+      feedback(cfg, who, keyword, "guild-secure")
+    end,
+  }, info)
+  return state, why
+end
+
+local function process(kind, text, sender, guid, label, battleNetId, missing)
   local cfg = I.Config(kind)
-  if not cfg.enabled or not IL.Match(text, cfg.words) then
+  local keyword = IL.Match(text, #cfg.words > 0 and cfg.words or { DEFAULT_WORD[kind] })
+  if not keyword then
+    return nil
+  end
+  local who = plainString(sender) or plainString(label) or "?"
+  if not cfg.enabled or #cfg.words == 0 then
+    feedback(cfg, who, keyword, "off", nil, true)
     return nil
   end
   local s = ns.db.settings
   local now = clock()
-  local decision = IL.Decide({
-    kind = kind,
-    cfg = cfg,
-    message = text,
-    sender = sender,
-    self = PN.Self(),
-    allow = IL.ParseNames(s.inviteAllow),
-    block = IL.ParseNames(s.inviteBlock),
-    now = now,
-    rate = rate,
-    get = facts(sender, guid, battleNetId ~= nil),
-  })
-  local name = type(sender) == "string" and sender or tostring(label or "?")
+  local decision
+  if plainString(sender) == nil then
+    decision = { action = "ignore", reason = missing or "no-sender", keyword = keyword }
+  else
+    decision = IL.Decide({
+      kind = kind,
+      cfg = cfg,
+      message = text,
+      sender = sender,
+      self = PN.Self(),
+      allow = IL.ParseNames(s.inviteAllow),
+      block = IL.ParseNames(s.inviteBlock),
+      now = now,
+      rate = rate,
+      cooldown = IL.CleanCooldown(s.inviteSenderCooldown),
+      globalLimit = IL.CleanGlobalLimit(s.inviteGlobalLimit),
+      get = facts(sender, guid, battleNetId ~= nil),
+    })
+  end
   local result, reason = "ignored", decision.reason
   if decision.action == "invite" then
-    local ok, why = (kind == "guild" and inviteGuild or inviteGroup)(sender)
     IL.RateRecord(rate, IL.RateKey(kind, sender), now)
-    result, reason = ok and "invited" or "failed", ok and "ok" or why
-    if ok and cfg.replyOn then
-      reply(kind, cfg, sender, battleNetId)
+    if kind == "guild" then
+      local state, why = askGuild(cfg, PN.Clean(sender), who, keyword, battleNetId, senderInfo(sender, guid))
+      if state then
+        result, reason = "asked", state
+        -- A request in line is not worth a chat line each: 200 of them would fill the chat.
+        if state ~= "queued" then
+          feedback(cfg, who, keyword, state == "ready" and "guild-ready" or "guild-waiting")
+        end
+      else
+        result, reason = "failed", why
+        feedback(cfg, who, keyword, "failed", why)
+      end
+    else
+      local ok, why = inviteGroup(sender)
+      result, reason = ok and "invited" or "failed", ok and "ok" or why
+      if ok and cfg.replyOn then
+        reply(kind, cfg, sender, battleNetId)
+      end
+      if ok then
+        feedback(cfg, who, keyword, "invited")
+      else
+        feedback(cfg, who, keyword, "failed", why)
+      end
     end
-    if cfg.notify then
-      local line = ns.L[ok and "invite.chat.invited" or "invite.chat.failed"]
-      ns.Notify.chat(string.format(line, name, ns.L["invite.kind." .. kind]))
-    end
+  elseif reason ~= "self" then
+    feedback(cfg, who, keyword, reason, nil, true)
   end
   -- A repeat inside the sender window is not worth a log line.
   if reason ~= "rate-sender" then
-    record(kind, name, result, reason)
+    record(kind, who, result, reason)
   end
   return decision, result
 end
@@ -438,7 +678,7 @@ end
 -- Entry points -------------------------------------------------------------------------------------
 
 function I.OnWhisper(text, sender, guid)
-  if not ns.db or type(text) ~= "string" then
+  if not ns.db or type(text) ~= "string" or isSecret(text) or isSecret(sender) then
     return
   end
   for _, kind in ipairs({ "group", "guild" }) do
@@ -446,20 +686,40 @@ function I.OnWhisper(text, sender, guid)
   end
 end
 
+-- The character of a Battle.net contact: name (Retail "Name-Realm", Forever "First Surname") or nil and
+-- the reason code ("not-in-game", "other-client").
+local function resolveBattleNet(id)
+  local api = g("C_BattleNet")
+  local info = type(api) == "table" and type(id) == "number" and not isSecret(id) and try(api.GetAccountInfoByID, id)
+  local game = type(info) == "table" and info.gameAccountInfo
+  if type(game) ~= "table" or game.clientProgram ~= "WoW" then
+    return nil, "not-in-game"
+  end
+  local mine, theirs = g("WOW_PROJECT_ID"), game.wowProjectID
+  if type(mine) == "number" and type(theirs) == "number" and mine ~= theirs then
+    return nil, "other-client"
+  end
+  local character = plainString(game.characterName)
+  if not character then
+    return nil, "not-in-game"
+  end
+  local full
+  if PN.MultiWord() then
+    full = PN.Clean(character)
+  else
+    full = PN.ForWhisper(character, nil, plainString(game.realmName))
+  end
+  return full ~= "" and full or nil, "not-in-game"
+end
+
 -- Battle.net whisper: the invite goes to the WoW character of that friend.
 function I.OnBattleNetWhisper(text, label, id)
-  if not ns.db or type(text) ~= "string" then
+  if not ns.db or type(text) ~= "string" or isSecret(text) then
     return
   end
-  local name
-  local api = g("C_BattleNet")
-  local info = type(api) == "table" and try(api.GetAccountInfoByID, id)
-  local game = type(info) == "table" and info.gameAccountInfo
-  if type(game) == "table" and game.clientProgram == "WoW" and type(game.characterName) == "string" then
-    name = PN.Normalize(PN.ForWhisper(game.characterName, nil, game.realmName))
-  end
+  local name, code = resolveBattleNet(id)
   for _, kind in ipairs({ "group", "guild" }) do
-    process(kind, text, name ~= "" and name or nil, nil, label, id)
+    process(kind, text, name, nil, label, id, code)
   end
 end
 

@@ -1,5 +1,5 @@
 -- The bar on Blizzard's world map (created by WorldMapLinks.lua): collapsed it is a narrow strip
--- "Forever Guides" with an arrow, opened it has two sections as tabs. It sits at the top right of
+-- "Forever Guides" with an arrow, opened it has five sections as tabs. It sits at the top right of
 -- the canvas, the header drags it anywhere inside the canvas and four corner buttons put it in a
 -- corner. The position is a corner of the canvas plus the offset from it (settings.worldMapPanelPos),
 -- the bar always unfolds towards the inside: upwards in the lower half, downwards otherwise, and
@@ -8,10 +8,15 @@
 -- goal from the known places, the fastest route as a short step list, and the actions of the
 -- addon's map page. Route planning is the page's own logic: TravelLogic computes, MapRouteList (a
 -- hidden instance) takes the route as waypoints or points the arrow at the next stop. The stops are
--- places without exact map coordinates, so no lines are drawn on Blizzard's map.
+-- places without exact map coordinates, so no lines are drawn on Blizzard's map. Flights: the nearest flight
+-- points with their distance (FlightPointList), a click sets the waypoint. Like every control of the bar it
+-- stays out of the Tab ring, the keyboard route is /fg flights. Gather: the spots of ores and herbs and the
+-- explored look on the map (WorldMapGatherTab.lua, built when the tab is first used). Guild: the filters and the
+-- legend of the guild members on the map and the own side of sharing (WorldMapGuildTab.lua, symbol tab).
 local _, ns = ...
 local W, L, Theme, TL = ns.W, ns.L, ns.Theme, ns.TravelLogic
 local MRL, PL, MW, MM = ns.MapRouteList, ns.MapPlaceList, ns.MapWorld, ns.MapMarkers
+local FP, MI = ns.FlightPointsLogic, ns.MapIcons
 local WP = ns.Waypoints
 local B = ns.BlizzardLinks
 
@@ -29,8 +34,14 @@ local CORNER_OK = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRI
 local POS_KEY = "settings.worldMapPanelPos"
 local STEP_H, PICK_ROWS, MAX_ROWS, MAX_STEPS = 16, 5, 8, 8
 local DOT, DURATION_W, ZONE_W = 12, 44, 84
+local FLIGHT_ROW_H, FLIGHT_DIST_W, FLIGHT_BADGE, FLIGHT_TEXT_X, FLIGHT_TICK = 30, 74, 14, 34, 1
+local TAB_IDS = { "markers", "route", "flights", "gather", "guild" }
+-- The guild tab is a symbol without text, so the four labeled tabs keep their room.
+local GUILD_TAB_W = 24
+local TAB_W = (INNER - GUILD_TAB_W - (#TAB_IDS - 1) * GAP) / (#TAB_IDS - 1)
 local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local LOGO = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
+local HEXAGON = "Interface\\AddOns\\ForeverGuides\\Media\\map_hexagon.png" -- the shape of the member symbols
 
 local function setting(key, default)
   local s = ns.db and ns.db.settings
@@ -177,7 +188,13 @@ function Bar.Create(map)
   end
 
   local function currentTab()
-    return setting("worldMapPanelTab", "markers") == "route" and "route" or "markers"
+    local id = setting("worldMapPanelTab", "markers")
+    for _, tabId in ipairs(TAB_IDS) do
+      if tabId == id then
+        return id
+      end
+    end
+    return "markers"
   end
 
   local head = button(f, {
@@ -334,12 +351,14 @@ function Bar.Create(map)
   end
 
   local tabs = {}
-  local function newTab(id, key)
+  local gt, gu
+  local function newTab(id, key, tooltip)
     local b = button(f, {
       key = key,
       variant = "ghost",
-      width = (INNER - GAP) / 2,
+      width = TAB_W,
       height = TAB_H,
+      tooltip = tooltip,
       onClick = function()
         ns.Store.set("settings.worldMapPanelTab", id)
         r.picking = nil
@@ -358,6 +377,42 @@ function Bar.Create(map)
   end
   newTab("markers", "map.marker.heading")
   newTab("route", "map.route")
+  newTab("flights", "fp.tab", "fp.list.title")
+  newTab("gather", "wm.gather.tab")
+  do
+    local b = W.Action(f, {
+      texture = HEXAGON,
+      variant = "ghost",
+      width = GUILD_TAB_W,
+      height = TAB_H,
+      tooltip = "wm.guild.tab.title",
+      tooltipText = "wm.guild.tab.tip",
+      wrap = "button",
+      onClick = function()
+        ns.Store.set("settings.worldMapPanelTab", "guild")
+        r.picking = nil
+        f:Layout()
+      end,
+    })
+    B.LeaveFocusRing(b)
+    -- A square hexagon in the middle, not stretched over the whole tab.
+    local base = b.fgPlace
+    b.fgPlace = function(self)
+      base(self)
+      self.icon:ClearAllPoints()
+      self.icon:SetPoint("CENTER")
+      self.icon:SetSize(GUILD_TAB_W - 10, GUILD_TAB_W - 10)
+    end
+    b.fgPlace(b)
+    b.bar = b:CreateTexture(nil, "ARTWORK")
+    b.bar:SetPoint("BOTTOMLEFT")
+    b.bar:SetPoint("BOTTOMRIGHT")
+    b.bar:SetHeight(2)
+    ns.Bind(b.bar, function(t)
+      t:SetColorTexture(Theme.color("accent2"))
+    end)
+    tabs.guild = b
+  end
 
   -- Markers --------------------------------------------------------------------------------
   local mk = CreateFrame("Frame", nil, f)
@@ -783,6 +838,133 @@ function Bar.Create(map)
     return y
   end
 
+  -- Flights --------------------------------------------------------------------------------
+  local fl = CreateFrame("Frame", nil, f)
+  fl.rows = {}
+  fl.msg = W.Text(fl, { role = "micro", color = "textMuted", wrap = true })
+
+  -- Two lines: name and distance, below the name "not discovered" (text, so it does not rest on the color).
+  -- A check in front marks the flight point the active waypoint is on.
+  local function newFlightRow()
+    local row = listRow(fl)
+    row:SetHeight(FLIGHT_ROW_H)
+    row:RegisterForClicks("LeftButtonUp")
+    row.check = ns.IconDraw.new(row, 10)
+    row.check:SetPoint("LEFT", row, "LEFT", 2, 0)
+    row.check:Draw("check")
+    row.check:SetTint("accent2")
+    row.badge = MI.NewBadge(row)
+    row.badge.box:SetPoint("LEFT", row, "LEFT", 16, 0)
+    row.name = W.Text(row, { role = "ui", color = "text" })
+    row.name:SetPoint("LEFT", row, "LEFT", FLIGHT_TEXT_X, 6)
+    row.name:SetPoint("RIGHT", row, "RIGHT", -(FLIGHT_DIST_W + 8), 6)
+    row.dist = W.Text(row, { role = "micro", color = "textSecondary", justify = "RIGHT" })
+    row.dist:SetPoint("RIGHT", row, "RIGHT", -4, 6)
+    row.dist:SetWidth(FLIGHT_DIST_W)
+    row.status = W.Text(row, { key = "fp.list.unknown", role = "micro", color = "textMuted" })
+    row.status:SetPoint("LEFT", row, "LEFT", FLIGHT_TEXT_X, -7)
+    row:HookScript("OnEnter", function(self)
+      if self.point then
+        ns.ShowTooltip(self, self.point.name, FP.TooltipText(self.state, self.yards, L, self.active))
+      end
+    end)
+    row:SetScript(
+      "OnClick",
+      ns.Wrap("wm-flight-row", function(self)
+        if self.point then
+          ns.FlightPointList.SetWaypoint(self.point)
+        end
+      end)
+    )
+    return row
+  end
+
+  -- Returns the height of the page; avail is the room the page may use.
+  local function layoutFlights(avail)
+    local rows, positioned = ns.FlightPointList.Rows()
+    local y = 0
+    local note = not positioned and "fp.list.noPosition" or #rows == 0 and "fp.list.empty" or nil
+    fl.msg:SetShown(note ~= nil)
+    if note then
+      W.SetText(fl.msg, note)
+      fl.msg:ClearAllPoints()
+      fl.msg:SetPoint("TOPLEFT", fl, "TOPLEFT", 0, 0)
+      fl.msg:SetWidth(INNER)
+      y = math.ceil(fl.msg:GetStringHeight()) + GAP
+    end
+    local shown = math.min(#rows, clamp(math.floor((avail - y) / FLIGHT_ROW_H), 1, FP.COUNT_MAX))
+    for i = 1, shown do
+      local row = fl.rows[i]
+      if not row then
+        row = newFlightRow()
+        fl.rows[i] = row
+      end
+      local d = rows[i]
+      row.point, row.state, row.yards, row.active = d.point, d.state, d.yards, d.active
+      row.badge:Set("flightMaster", d.point.faction, FLIGHT_BADGE, false, d.undiscovered)
+      row.check:SetShown(d.active)
+      W.SetText(row.name, nil, d.name)
+      W.SetColor(row.name, d.active and "accent2" or d.undiscovered and "textMuted" or "text")
+      W.SetText(row.dist, nil, d.distance)
+      row.status:SetShown(d.undiscovered)
+      row:ClearAllPoints()
+      row:SetPoint("TOPLEFT", fl, "TOPLEFT", 0, -y)
+      row:Show()
+      y = y + FLIGHT_ROW_H
+    end
+    for i = shown + 1, #fl.rows do
+      fl.rows[i].point = nil
+      fl.rows[i]:Hide()
+    end
+    return y
+  end
+
+  -- The distances change while the player moves: one pass a second, only while the page is on screen
+  -- (the client stops OnUpdate of a hidden frame, the handler is also dropped on hide) and never in combat.
+  local tick = ns.Wrap("wm-flight-tick", function(page, elapsed)
+    page.acc = page.acc + elapsed
+    if page.acc < FLIGHT_TICK then
+      return
+    end
+    page.acc = 0
+    if not (InCombatLockdown and InCombatLockdown()) then
+      f:Layout()
+    end
+  end)
+  fl:SetScript("OnShow", function(page)
+    page.acc = 0
+    page:SetScript("OnUpdate", tick)
+  end)
+  fl:SetScript("OnHide", function(page)
+    page:SetScript("OnUpdate", nil)
+  end)
+
+  -- Gather: built when the tab is first used, so the data add-on of the materials is not touched before.
+  local function gatherPage()
+    if not gt then
+      gt = ns.WorldMapGatherTab.Create(f, INNER, {
+        relayout = function()
+          f:Refresh()
+        end,
+      })
+      f.parts.gather = gt
+    end
+    return gt
+  end
+
+  -- Guild: built when the tab is first used.
+  local function guildPage()
+    if not gu then
+      gu = ns.WorldMapGuildTab.Create(f, INNER, {
+        relayout = function()
+          f:Refresh()
+        end,
+      })
+      f.parts.guild = gu
+    end
+    return gu
+  end
+
   -- Layout -------------------------------------------------------------------------------------
   -- Header at the canvas edge the bar is anchored on, content on the inner side of it.
   function f:Layout()
@@ -802,8 +984,14 @@ function Bar.Create(map)
     for _, b in ipairs(head.corners) do
       b:SetShown(open)
     end
-    for _, page in ipairs({ mk, rt }) do
+    for _, page in ipairs({ mk, rt, fl }) do
       page:Hide()
+    end
+    if gt then
+      gt:Hide()
+    end
+    if gu then
+      gu:Hide()
     end
     for _, tab in pairs(tabs) do
       tab:SetShown(open)
@@ -821,18 +1009,28 @@ function Bar.Create(map)
     local avail = math.max(60, mapHeight - dy - MARGIN - reserve - pageTop - PAD)
     local id = currentTab()
     local x = PAD
-    for _, tabId in ipairs({ "markers", "route" }) do
+    for _, tabId in ipairs(TAB_IDS) do
       local tab = tabs[tabId]
       tab:ClearAllPoints()
       tab:SetPoint(edge .. "LEFT", f, edge .. "LEFT", x, up and top or -top)
       tab.bar:SetShown(tabId == id)
-      W.SetColor(tab.label, tabId == id and "accent" or "textSecondary")
-      x = x + (INNER - GAP) / 2 + GAP
+      if tab.label then
+        W.SetColor(tab.label, tabId == id and "accent" or "textSecondary")
+      else
+        tab.icon:SetVertexColor(Theme.color(tabId == id and "accent" or "textSecondary"))
+      end
+      x = x + tab:GetWidth() + GAP
     end
-    local page = id == "markers" and mk or rt
+    local lazy = id == "gather" and gatherPage or id == "guild" and guildPage or nil
+    local page = lazy and lazy() or ({ markers = mk, route = rt, flights = fl })[id]
     page:ClearAllPoints()
     page:SetPoint(edge .. "LEFT", f, edge .. "LEFT", PAD, up and pageTop or -pageTop)
-    local height = id == "markers" and layoutMarkers(avail) or layoutRoute(avail)
+    local height
+    if lazy then
+      height = page:Layout(avail)
+    else
+      height = ({ markers = layoutMarkers, route = layoutRoute, flights = layoutFlights })[id](avail)
+    end
     page:SetSize(INNER, height)
     page:Show()
     r.w, r.h = OPEN_W, pageTop + height + PAD
@@ -840,7 +1038,7 @@ function Bar.Create(map)
     place()
   end
 
-  f.parts = { head = head, tabs = tabs, markers = mk, route = rt }
+  f.parts = { head = head, tabs = tabs, markers = mk, route = rt, flights = fl }
 
   function f:Refresh()
     if f:IsShown() then
@@ -855,6 +1053,9 @@ function Bar.Create(map)
     f:Refresh()
   end)
   ns.On("FG_UI_REFRESHED", function()
+    f:Refresh()
+  end)
+  ns.On("FG_PACKAGE_CHANGED", function()
     f:Refresh()
   end)
   return f

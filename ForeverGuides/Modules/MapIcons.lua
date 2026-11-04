@@ -13,14 +13,17 @@ ns.MapIcons = MI
 
 ns.AddLocale("enUS", {
   ["map.kind.inn"] = "Inn",
+  ["map.kind.raidEntrance"] = "Raid entrance",
 })
 ns.AddLocale("deDE", {
   ["map.kind.inn"] = "Gasthaus",
+  ["map.kind.raidEntrance"] = "Raideingang",
 })
 
 -- Kinds in legend order. The data (Data\Travel.lua k) uses city, flightMaster, harbor,
 -- instanceEntrance, landmark, tram and zeppelinTower; portal and inn are drawn when places of
--- that kind show up.
+-- that kind show up. raidEntrance (the raid markers of Modules/MapMarkerLogic.lua) is not in the
+-- legend list, no place of the map data has that kind.
 MI.KINDS =
   { "city", "flightMaster", "harbor", "zeppelinTower", "tram", "portal", "instanceEntrance", "landmark", "inn" }
 
@@ -36,6 +39,7 @@ local RANK = {
   tram = 3,
   portal = 3,
   instanceEntrance = 4,
+  raidEntrance = 4,
   landmark = 5,
   inn = 6,
 }
@@ -56,6 +60,7 @@ local ATLAS = {
   tram = { "poi-transportation-tram" },
   portal = { "MagePortalAlliance", "MagePortalHorde" },
   instanceEntrance = { "Dungeon", "Raid" },
+  raidEntrance = { "Raid", "Dungeon" },
   landmark = { "poi-hub", "VignetteEvent" },
   inn = { "Innkeeper" },
 }
@@ -79,6 +84,7 @@ local LETTER = {
   tram = "T",
   portal = "P",
   instanceEntrance = "I",
+  raidEntrance = "R",
   landmark = "L",
   inn = "B",
 }
@@ -90,6 +96,7 @@ local PLATE = {
   tram = "warning",
   portal = "sectionLocked",
   instanceEntrance = "parchment",
+  raidEntrance = "warning",
   landmark = "textMuted",
   inn = "sectionAvailable",
 }
@@ -99,6 +106,7 @@ local FRAME = { A = "alliance", H = "horde" }
 
 MI.DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 MI.RING = 2 -- width of the faction frame around the symbol
+MI.DIM_ALPHA = 0.55 -- dimmed symbol, e.g. an undiscovered flight point (not the filter dim of MapPins)
 MI.MEDIA = "Interface\\AddOns\\ForeverGuides\\Media\\"
 
 -- Lookups of the client, cached per name; MI.Reset forgets them (tests, probe).
@@ -211,9 +219,14 @@ function MI.NewBadge(parent)
     tex:SetSize(b.size + 2 * extra, b.size + 2 * extra)
   end
 
-  -- kind: a data kind, faction: "A" | "H" | "B", size: edge of the symbol without the frame.
-  function b:Set(kind, faction, size, estimated)
+  -- kind: a data kind, faction: "A" | "H" | "B", size: edge of the symbol without the frame,
+  -- estimated: frame at reduced opacity, dim: faded and desaturated symbol (the owner also says so in the tooltip),
+  -- letter: draws the plate with this letter whatever atlas or shape the client has, with an outline.
+  function b:Set(kind, faction, size, estimated, dim, letter)
     local spec = MI.Spec(kind)
+    if letter then
+      spec = { kind = spec.kind, source = "fallback", letter = letter, plate = spec.plate, tried = spec.tried }
+    end
     local disc = MI.DiscKnown()
     self.spec, self.faction, self.size, self.shape = spec, faction, size, disc and "disc" or "square"
     self.token = MI.FactionToken(faction)
@@ -245,8 +258,18 @@ function MI.NewBadge(parent)
       self.letter:ClearAllPoints()
       self.letter:SetPoint("CENTER", self.box, "CENTER")
       W.SetText(self.letter, nil, spec.letter)
+      if letter then
+        Theme.applyFont(self.letter, "micro", "body", "OUTLINE")
+      end
       self.letter:Show()
     end
+    -- The alpha goes on the parts one by one, the glow and the selection ring keep their own.
+    local alpha = dim and MI.DIM_ALPHA or 1
+    for _, part in ipairs({ self.ring, self.plate, self.icon, self.letter }) do
+      part:SetAlpha(alpha)
+    end
+    self.icon:SetDesaturated(dim == true)
+    self.dim = dim == true
     self:Highlight(self.level)
     self:Select(self.selected)
   end
@@ -265,4 +288,179 @@ function MI.NewBadge(parent)
   end
 
   return b
+end
+
+-- Text arrows for a client without line objects, by quarter turn: east, north, west, south.
+local ARROW_TEXT = { ">", "^", "<", "v" }
+
+-- Opacity of the strokes of an estimated arrow.
+local FAINT = 0.7
+
+local function canDrawLines()
+  return ns.can.lineObject and ns.can.lineThickness and ns.can.lineColorTexture or false
+end
+
+-- How the zone transition arrow draws on this client, for /fg mapdiag: whether line objects exist, whether
+-- the client resolves the triangle file of the add-on (the arrow no longer needs it) and the file lookup used.
+function MI.ArrowInfo()
+  local lookup = (C_Texture and C_Texture.GetFileIDFromPath and "C_Texture.GetFileIDFromPath")
+    or (GetFileIDFromPath and "GetFileIDFromPath")
+    or "none"
+  return {
+    lines = canDrawLines(),
+    fileKnown = fileKnown(MI.MEDIA .. SHAPE.zeppelinTower),
+    lookup = lookup,
+  }
+end
+
+-- A zone transition arrow on `parent`: a plate with a frame, an arrow of three line strokes (shaft and
+-- two head lines, drawn by the client, so no texture file is involved) turned to the direction, and a glow
+-- for hover. Without line objects the plate carries a text arrow. The owner anchors arrow.box and sets size
+-- and direction through Set. A dashed arrow (an estimate) draws the shaft as short pieces (arrow.dashes,
+-- made when first needed) and a little fainter.
+function MI.NewArrow(parent)
+  local a = { level = 0, strokes = {}, dashes = {} }
+  a.box = parent:CreateTexture(nil, "BACKGROUND")
+  a.ring = parent:CreateTexture(nil, "BACKGROUND", nil, 1)
+  a.plate = parent:CreateTexture(nil, "BORDER")
+  a.glow = parent:CreateTexture(nil, "ARTWORK", nil, 3)
+  a.glow:SetBlendMode("ADD")
+  a.letter = W.Text(parent, { role = "micro", color = "text", justify = "CENTER" })
+  if canDrawLines() then
+    for i = 1, 3 do
+      a.strokes[i] = parent:CreateLine(nil, "ARTWORK", nil, 1)
+    end
+  end
+
+  local function around(tex, extra)
+    tex:ClearAllPoints()
+    tex:SetPoint("CENTER", a.box, "CENTER")
+    tex:SetSize(a.size + 2 * extra, a.size + 2 * extra)
+  end
+
+  local function stroke(line, p, thickness, alpha)
+    line:SetThickness(thickness)
+    line:SetColorTexture(Theme.color("text", alpha))
+    line:SetStartPoint("CENTER", a.box, p[1], p[2])
+    line:SetEndPoint("CENTER", a.box, p[3], p[4])
+    line:Show()
+  end
+
+  -- size: edge of the plate without the frame, angle: direction in radians, counterclockwise from
+  -- east as on the map, dashed: draw it as an estimate.
+  function a:Set(size, angle, dashed)
+    local disc = MI.DiscKnown()
+    angle = angle or 0
+    dashed = dashed == true
+    self.size, self.angle, self.dashed = size, angle, dashed
+    self.box:SetSize(size, size)
+    around(self.ring, MI.RING)
+    around(self.plate, 0)
+    around(self.glow, 0)
+    paint(self.ring, disc, Theme.color("accent2", 1))
+    paint(self.plate, disc, Theme.color("bg", 0.9))
+    paint(self.glow, disc, 1, 1, 1, 1)
+    if #self.strokes > 0 then
+      local shape, thickness = ns.ZoneBorderLogic.ArrowLines(angle, size, dashed)
+      local alpha = dashed and FAINT or 1
+      local heads = #shape - 2
+      stroke(self.strokes[2], shape[heads + 1], thickness, alpha)
+      stroke(self.strokes[3], shape[heads + 2], thickness, alpha)
+      if dashed then
+        self.strokes[1]:Hide()
+        for i = 1, heads do
+          self.dashes[i] = self.dashes[i] or parent:CreateLine(nil, "ARTWORK", nil, 1)
+          stroke(self.dashes[i], shape[i], thickness, alpha)
+        end
+      else
+        stroke(self.strokes[1], shape[1], thickness, alpha)
+      end
+      for i = dashed and heads + 1 or 1, #self.dashes do
+        self.dashes[i]:Hide()
+      end
+      self.letter:Hide()
+    else
+      self.letter:ClearAllPoints()
+      self.letter:SetPoint("CENTER", self.box, "CENTER")
+      W.SetText(self.letter, nil, ARROW_TEXT[math.floor(angle / (math.pi / 2) + 0.5) % 4 + 1])
+      self.letter:SetAlpha(dashed and FAINT or 1)
+      self.letter:Show()
+    end
+    self:Highlight(self.level)
+  end
+
+  function a:Highlight(level)
+    self.level = level
+    self.glow:SetAlpha(level)
+    self.glow:SetShown(level > 0)
+  end
+
+  return a
+end
+
+local function num(v)
+  return type(v) == "number" and string.format("%.4g", v) or tostring(v)
+end
+
+-- The look of a badge as text lines for /fg mapdiag: the symbol it chose and every part with its texture or
+-- atlas, shown state, size, alpha, tint and draw layer. Each line is built on its own and never raises.
+function MI.Describe(badge)
+  local lines = {}
+  local function add(fn)
+    local ok, text = pcall(fn)
+    lines[#lines + 1] = ok and text or ("  error: " .. tostring(text))
+  end
+  add(function()
+    local spec = badge.spec
+    local known = {}
+    for _, name in ipairs(spec.tried or {}) do
+      known[#known + 1] = name .. "=" .. (atlasKnown(name) and "yes" or "no")
+    end
+    return string.format(
+      "  symbol: kind=%s source=%s atlas=%s shape=%s letter=%s plate=%s disc=%s size=%s atlases: %s",
+      spec.kind,
+      spec.source,
+      tostring(spec.atlas),
+      tostring(spec.shape),
+      spec.letter,
+      spec.plate,
+      badge.shape,
+      num(badge.size),
+      #known > 0 and table.concat(known, " ") or "none"
+    )
+  end)
+  -- A font string has no atlas, and an unset one has no text: neither may fall through to a texture method.
+  local function content(part)
+    if part:GetObjectType() == "FontString" then
+      return part:GetText()
+    end
+    return (part.GetAtlas and part:GetAtlas()) or part:GetTexture()
+  end
+  for _, name in ipairs({ "box", "sel", "ring", "plate", "icon", "glow", "letter" }) do
+    add(function()
+      local part = badge[name]
+      local layer, sub = part:GetDrawLayer()
+      local tint = part.GetVertexColor or part.GetTextColor
+      local r, g, b, a
+      if tint then
+        r, g, b, a = tint(part)
+      end
+      return string.format(
+        "  %s: %s shown=%s size=%sx%s alpha=%s color=%s,%s,%s,%s layer=%s/%s",
+        name,
+        tostring(content(part)),
+        tostring(part:IsShown()),
+        num(part:GetWidth()),
+        num(part:GetHeight()),
+        num(part:GetAlpha()),
+        num(r),
+        num(g),
+        num(b),
+        num(a),
+        tostring(layer),
+        tostring(sub)
+      )
+    end)
+  end
+  return lines
 end

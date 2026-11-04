@@ -915,7 +915,7 @@ local function newFrame()
       NW.ToggleAutoHide(f.noteId)
     end)
   )
-  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title" })
+  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title", opens = true })
   f.look:SetPoint("RIGHT", f.autoHide, "LEFT", -2, 0)
   f.look:SetScript(
     "OnClick",
@@ -931,7 +931,7 @@ local function newFrame()
       NW.SetEditing(f.noteId, not f.editing)
     end)
   )
-  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "notes.win.openAddon" })
+  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "notes.win.openAddon", opens = true })
   f.open:SetPoint("RIGHT", f.edit, "LEFT", -2, 0)
   f.open:SetScript(
     "OnClick",

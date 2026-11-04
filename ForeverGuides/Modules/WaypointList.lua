@@ -342,6 +342,7 @@ local function bindRow(wp)
       {
         icon = "share",
         tooltip = L["wp.act.share"],
+        opens = true,
         onClick = function()
           ns.Share.Open(wp.title, WL.formatLine(wp))
         end,
@@ -349,6 +350,7 @@ local function bindRow(wp)
       {
         icon = "pencil",
         tooltip = L["wp.act.edit"],
+        opens = true,
         onClick = function()
           showEdit(wp)
         end,
@@ -392,8 +394,8 @@ local function buildList(pane, view)
         WP.Next()
       end,
     },
-    { id = "import", label = "act.import", icon = "import", tooltip = "wp.import", onClick = showImport },
-    { id = "export", label = "act.export", icon = "export", tooltip = "wp.export", onClick = showExport },
+    { id = "import", label = "act.import", icon = "import", tooltip = "wp.import", opens = true, onClick = showImport },
+    { id = "export", label = "act.export", icon = "export", tooltip = "wp.export", opens = true, onClick = showExport },
     {
       id = "clear",
       label = "act.clear",
@@ -508,6 +510,7 @@ local function buildSettings(pane, view)
       icon = "palette",
       tooltip = "wp.set.look",
       width = 240,
+      opens = true,
       onClick = function()
         if ns.WaypointArrow.IsShown() then
           ns.WaypointArrow.OpenLook()

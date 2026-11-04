@@ -11,7 +11,7 @@ local frame, sidebar, content, contentHost, header, footer, search
 local views = {}
 local currentView
 
--- Skin "forever": the title bar moves into the metal band above the window (see "Title bar" below), the page
+-- Skin "forever": the title bar moves into the metal bar at the top of the window (see "Title bar" below), the page
 -- header stays under it. band.on = true while the bar sits in the band, band.rect = Skins.BandRect, band.tier = how
 -- many reductions the width needed (in both styles), band.state = what is still shown. parts = the controls of the
 -- title bar, built once in buildTitleBar (tests and diagnostics read band and band.parts).
@@ -35,6 +35,7 @@ ns.Channel = CHANNEL
 ns.Community = { text = "discord.gg/gdJ8eYMG6y", address = "https://discord.gg/gdJ8eYMG6y" }
 -- Height of the channel field in the title bar (the website field is 22), cut down to what the bar leaves.
 local CHANNEL_H = 26
+local FIELD_H = 22
 ns.AddLocale("enUS", {
   ["bar.channel"] = "Copy Twitch channel",
   ["bar.channel.live"] = "live on " .. CHANNEL.text,
@@ -540,7 +541,7 @@ local function buildTitleBar()
     frame:Hide()
   end)
   parts.close = close
-  local settings = W.Action(bar, { icon = "gear", size = 24, tooltip = "page.settings" })
+  local settings = W.Action(bar, { icon = "gear", size = 24, tooltip = "page.settings", opens = true })
   settings:SetScript("OnClick", function()
     ns.Router:navigate("settings")
   end)
@@ -612,7 +613,7 @@ local function buildTitleBar()
   parts.lang, parts.langDE, parts.langEN = langToggle, langDE, langEN
   parts.langRing = { deDE = langDERing, enUS = langENRing }
 
-  local help = W.Action(bar, { icon = "help", size = 26, tooltip = "page.help" })
+  local help = W.Action(bar, { icon = "help", size = 26, tooltip = "page.help", opens = true })
   help:SetScript("OnClick", function()
     ns.Router:navigate("help")
   end)
@@ -644,7 +645,8 @@ end
 -- Page header: room left of the title (back, forward), least title width before the buttons shrink to
 -- their icons, size and gap of the buttons on the right.
 local HEADER_LEFT, HEADER_TITLE_MIN = 74, 140
-local HEADER_BUTTON_MAX, HEADER_BUTTON_HEIGHT, HEADER_BUTTON_GAP = 96, 24, 6
+-- 96 px of text and icon plus the "opens" mark of the commands button.
+local HEADER_BUTTON_MAX, HEADER_BUTTON_HEIGHT, HEADER_BUTTON_GAP = 112, 24, 6
 
 local function buildHeader(parent)
   local h = CreateFrame("Frame", nil, parent)
@@ -683,6 +685,7 @@ local function buildHeader(parent)
     width = HEADER_BUTTON_MAX,
     height = HEADER_BUTTON_HEIGHT,
     tooltip = "pagecmd.tip",
+    opens = true,
     onClick = function()
       ns.CommandHelp.OpenForPage((ns.RouterClass.parse(ns.Router.current)))
     end,
@@ -743,14 +746,14 @@ end
 -- Title bar: responsive in both styles ------------------------------------------------------------------------------
 
 -- The title bar holds the logo and the name on the left, the link field in the middle, the search and the symbols
--- on the right. In the skin "forever" it sits in the metal band above the window (UI/WindowShell.lua) and replaces
+-- on the right. In the skin "forever" it sits in the metal bar at the top of the window (UI/WindowShell.lua) and replaces
 -- the dark bar; the page header (arrows, title, tour and commands) is not part of it, it stays in the content
 -- area under the bar like in the flat look. Nothing is built twice, layoutBar only anchors the controls again, for
 -- the style in force and for the width of the window.
 
 -- Gaps between symbols and between groups.
 local BAR_GAP, BAR_GROUP = 4, 10
--- Sizes per style: the flat title bar keeps its larger symbols, the band takes smaller ones with room above and below
+-- Sizes per style: the flat title bar keeps its larger symbols, the metal bar takes smaller ones with room above and below
 -- (pad = bar edge to logo, edge = bar edge to the close button).
 local BAR_FLAT = { pad = 10, edge = 8, gear = 24, help = 26, dock = 26, web = 24, search = 26 }
 local BAR_BAND = { pad = 6, edge = 4, gear = 20, help = 20, dock = 20, web = 20, search = 24 }
@@ -867,7 +870,7 @@ layoutBar = function()
   local logoText = ns.WindowShell.Of(frame).titleText
   -- No control is taller than the bar minus the gap above and below it (everything is centered on the bar).
   local height = band.on and band.rect and band.rect.height or p.bar:GetHeight() or 0
-  local cap = math.max(16, height - 2 * metrics.gap)
+  local cap = math.max(12, height - 2 * metrics.gap)
   local function square(f, natural)
     local side = math.min(natural, cap)
     f:SetSize(side, side)
@@ -877,6 +880,10 @@ layoutBar = function()
     field:SetWidth(math.max(LINK_MIN, math.ceil(field.label:GetStringWidth()) + 24))
   end
   p.channel:SetHeight(math.min(CHANNEL_H, cap))
+  -- The 22 px fields (website link, language toggle) shrink with the bar as well.
+  for _, f in ipairs({ p.website, p.lang, p.langDE, p.langEN }) do
+    f:SetHeight(math.min(FIELD_H, cap))
+  end
   local size = {
     logo = square(p.logo, LOGO_SIZE),
     gear = square(p.gear, m.gear),
@@ -885,7 +892,7 @@ layoutBar = function()
     web = square(p.websiteIcon, m.web),
     chan = square(p.channelIcon, m.web),
     lang = p.lang:GetWidth(),
-    close = p.close:GetWidth(),
+    close = band.on and square(p.close, ns.W.CLOSE_SIZE) or p.close:GetWidth(),
     link = p.website:GetWidth(),
     channel = p.channel:GetWidth(),
   }
@@ -1124,6 +1131,15 @@ local function raiseOnPanelShow(panel)
   if type(panel) ~= "table" or InCombatLockdown() then
     return
   end
+  if panel == rawget(_G, "WorldMapFrame") then
+    -- Not inside ShowUIPanel: the map fills its pins during that call.
+    ns.MapOps.Defer("raise WorldMapFrame", function()
+      if not InCombatLockdown() then
+        pcall(panel.Raise, panel)
+      end
+    end)
+    return
+  end
   pcall(panel.Raise, panel)
 end
 
@@ -1148,7 +1164,6 @@ local function create()
     shadowScale = 0.6,
     fade = "main",
     band = true,
-    bandSize = "main",
   })
   frame:Hide()
 

@@ -46,6 +46,13 @@ end
 
 -- Roster ----------------------------------------------------------------------------------------
 
+-- Minutes since last online as a lower bound: the server rounds to years, months, days and hours, a
+-- month has at least 28 days and a year may be counted two days short. m.ago stays the display value.
+function GL.AgoMin(years, months, days, hours)
+  local d = years * 365 + months * 28 + days - (years > 0 and 2 or 0)
+  return math.max(0, d) * 1440 + hours * 60
+end
+
 -- raw: the values of GetGuildRosterInfo(index) as a table; last: { years, months, days, hours } of
 -- GetGuildRosterLastOnline(index) or nil. nil for a row without a name.
 function GL.Normalize(index, raw, last)
@@ -76,6 +83,7 @@ function GL.Normalize(index, raw, last)
     local y, mo, d, h = num(last[1]) or 0, num(last[2]) or 0, num(last[3]) or 0, num(last[4]) or 0
     m.last = { years = y, months = mo, days = d, hours = h }
     m.ago = ((y * 365 + mo * 30 + d) * 24) + h
+    m.agoMin = GL.AgoMin(y, mo, d, h)
   end
   return m
 end

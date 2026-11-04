@@ -60,6 +60,12 @@ function ns.On(event, fn)
   end
 end
 
+-- True when the game delivers `event` to the add-on's frame (for diagnostics; false for our own messages).
+function ns.IsEventRegistered(event)
+  local ok, registered = pcall(frame.IsEventRegistered, frame, event)
+  return ok and registered == true
+end
+
 function ns.Emit(message, ...)
   dispatch(message, ...)
 end

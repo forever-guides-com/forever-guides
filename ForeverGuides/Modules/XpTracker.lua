@@ -1,11 +1,15 @@
 -- The game side of the experience bar: reads XP, rested XP and the quest log, keeps the session
--- (gain, active time, pause), the played time per level and the learned level sizes, and hands the
--- window one Snapshot(). Every game value goes through rawget and pcall and has to be a plain number,
--- so a missing API or a secret value leaves the old reading in place and never raises. The arithmetic
--- lives in Modules/XpLogic.lua.
--- Per character (ForeverGuidesCharDB.xp): session and levelStart[level] (played seconds when the level
--- began). Account wide (ForeverGuidesDB.xpLearned[build][level]): XP per level the client reported.
--- SavedVariables are written on reload and logout only, so the session is saved at every change.
+-- (gain, active time, pause, sources), the played time per level and the learned level sizes, and hands
+-- the window one Snapshot(). Every game value goes through rawget and pcall and has to be a plain
+-- number, so a missing API or a secret value leaves the old reading in place and never raises. The
+-- arithmetic lives in Modules/XpLogic.lua.
+-- The gain is the difference between two readings of UnitXP. The events that carry an amount (kill and
+-- discovery lines, quest turn-ins) fill the source sums and, while no reading can confirm them, count
+-- the gain themselves (see hold and settle).
+-- Per character (ForeverGuidesCharDB.xp): session, last (the reading the gain is measured from) and
+-- levelStart[level] (played seconds when the level began). Account wide (ForeverGuidesDB.xpLearned
+-- [build][level]): XP per level the client reported. SavedVariables are written on reload and logout
+-- only, so the session is saved at every change.
 local addonName, ns = ...
 local XL, U = ns.XpLogic, ns.U
 
@@ -15,9 +19,14 @@ ns.XpTracker = XT
 local QUEST_DELAY = 0.5
 local PLAYED_EVERY = 600
 local LEVEL_UP_TIMEOUT = 5
+-- Seconds an event amount waits for a reading that confirms it before it counts on its own.
+local SETTLE_DELAY = 5
+local PAYLOAD_LETTERS = 60
 -- Seconds after a level-up event in which a reading from before it is dropped.
 local LEVEL_UP_WINDOW = 3
-local STALE_SESSION = 1800
+-- Seconds after the last save from which a login starts a new session (setting sessionResetOnLogin): a
+-- reload or a short disconnect keeps the session, a normal new login does not.
+local STALE_SESSION = 600
 -- Longest a played answer may be older than the level-up it is taken for, in seconds.
 local ANSWER_SLACK = 30
 local MAX_QUESTS = 200
@@ -30,6 +39,15 @@ local st = {
   atMax = false,
   questToken = 0,
   levelUpSeq = 0,
+  -- Event XP no reading has confirmed yet, one episode at a time (the id tells a timer which one it is for).
+  pending = { sum = 0, id = 0 },
+  -- XP counted from events while the base reading lagged: the next difference includes it again.
+  direct = 0,
+  -- XP a difference proved beyond the pending amounts, which late event lines may still claim.
+  budget = nil,
+  -- For XT.Debug: how often each event came, how each update ended.
+  events = {},
+  outcomes = {},
 }
 local listeners = {}
 local spare = { levelStart = {}, session = {} }
@@ -158,9 +176,12 @@ local function sizes()
 end
 
 local function persist()
+  local store = charStore()
   if st.session then
-    charStore().session = XL.SessionSave(st.session, now(), U.now())
+    store.session = XL.SessionSave(st.session, now(), U.now())
   end
+  -- A base that lags behind counted events would count them twice after a reload: none is saved then.
+  store.last = st.direct == 0 and XL.BaseSave(st.last, U.now()) or nil
 end
 
 local function fire()
@@ -171,9 +192,47 @@ end
 
 -- XP and level ---------------------------------------------------------------------------------------------------
 
+-- Why a game value is not usable, for the counters of XT.Debug.
+local function why(name, ...)
+  local fn = global(name)
+  if not fn then
+    return "missing"
+  end
+  local ok, value = pcall(fn, ...)
+  if not ok then
+    return "error"
+  end
+  if value ~= nil and readable(value) == nil then
+    return "secret"
+  end
+  return type(value) == "number" and "invalid" or type(value)
+end
+
+local function tally(name)
+  st.outcomes[name] = (st.outcomes[name] or 0) + 1
+end
+
+-- Counts a difference two readings proved. What the events already counted while the base lagged is
+-- left out, the event amounts waiting for a reading are covered by it (a `partial` reading, the
+-- level-up with its XP not yet known, covers no more than it holds). Returns the name of the outcome.
+local function creditGain(gain, partial)
+  if gain <= 0 then
+    return "zero"
+  end
+  local owed = math.min(st.direct, gain)
+  st.direct = st.direct - owed
+  XL.Record(st.session, gain - owed)
+  local pending = st.pending
+  local covered = partial and math.min(pending.sum, gain) or pending.sum
+  pending.sum = pending.sum - covered
+  st.budget = { xp = math.max(0, gain - owed - covered), at = now() }
+  return st.session.running and "gain" or "paused"
+end
+
 -- Reads level, XP and rested XP, counts the gain while the session runs and learns the level size.
--- `forced` is the level a PLAYER_LEVEL_UP announced, for a client whose UnitLevel is late.
-local function update(forced)
+-- `forced` is the level a PLAYER_LEVEL_UP announced, for a client whose UnitLevel is late. Returns the
+-- name of the outcome.
+local function reading(forced)
   local level = read("UnitLevel", "player")
   local xp, max = read("UnitXP", "player"), read("UnitXPMax", "player")
   local last = st.last
@@ -183,13 +242,13 @@ local function update(forced)
   -- reading is dropped. Later on a lower value is a resync and counts no gain.
   if not forced and last and st.levelUpAt and now() - st.levelUpAt <= LEVEL_UP_WINDOW then
     if level and (level < last.level or (level == last.level and xp and xp < last.xp)) then
-      return
+      return "window"
     end
   end
   local late = forced ~= nil and (level == nil or level < forced)
   if late and last and last.level >= forced then
     st.level = last.level
-    return
+    return "late"
   end
   -- At a level-up the XP the client reports may still be the old one (same XP, same size as before the
   -- level). Then it is not used: the rest of the old level counts and the new level starts at 0, the next
@@ -203,8 +262,12 @@ local function update(forced)
     level, xp, max = forced, 0, nil
   end
   st.level = level or st.level
-  if not level or not xp or (not unreliable and (not max or max <= 0)) then
-    return
+  if not level then
+    return "unreadable:level:" .. why("UnitLevel", "player")
+  elseif not xp then
+    return "unreadable:xp:" .. why("UnitXP", "player")
+  elseif not unreliable and (not max or max <= 0) then
+    return "unreadable:max:" .. why("UnitXPMax", "player")
   end
   local learned = learnedTable()
   if unreliable then
@@ -213,10 +276,19 @@ local function update(forced)
   elseif learned then
     learned[level] = max
   end
+  local outcome = "nobase"
   if last and st.session then
-    XL.Record(st.session, (XL.Gain(last, { level = level, xp = xp, max = max }, sizesOf(learned, level, max))))
+    local gain = XL.Gain(last, { level = level, xp = xp, max = max }, sizesOf(learned, level, max))
+    outcome = creditGain(gain, unreliable)
+  elseif last then
+    outcome = "nosession"
   end
   st.last = { level = level, xp = xp, max = max }
+  return outcome
+end
+
+local function update(forced)
+  tally(reading(forced))
 end
 
 -- Played time ------------------------------------------------------------------------------------------------------
@@ -478,6 +550,67 @@ local function scheduleQuestScan()
   end
 end
 
+-- Event XP -----------------------------------------------------------------------------------------------------------
+
+local settle
+
+-- An event amount waits SETTLE_DELAY seconds for a reading that confirms it. Lines that come after the
+-- reading which already counted their XP claim the budget it left, so they wait for nothing.
+local function hold(xp)
+  local budget, pending = st.budget, st.pending
+  if budget and now() - budget.at <= SETTLE_DELAY then
+    local claimed = math.min(xp, budget.xp)
+    budget.xp, xp = budget.xp - claimed, xp - claimed
+  end
+  if xp <= 0 then
+    return
+  end
+  if pending.sum <= 0 then
+    pending.id = pending.id + 1
+    local id = pending.id
+    after(SETTLE_DELAY, function()
+      if id == pending.id then
+        settle()
+      end
+    end)
+  end
+  pending.sum = pending.sum + xp
+end
+
+-- No reading confirmed the amounts in time: the readings are tried once more, and what they still do
+-- not cover counts as the events reported it. The base is then behind (`direct`), so the difference
+-- that comes later leaves these amounts out.
+settle = function()
+  local pending = st.pending
+  if pending.sum <= 0 or not st.session then
+    return
+  end
+  local hadBase = st.last ~= nil
+  update()
+  local rest = pending.sum
+  if rest > 0 then
+    pending.sum = 0
+    local counted = XL.Record(st.session, rest)
+    if hadBase then
+      st.direct = st.direct + counted
+    end
+    tally("direct")
+  end
+  persist()
+  fire()
+end
+
+-- An amount an event reports: the source sums take it, the gain waits for a reading.
+local function source(src)
+  local s = st.session
+  if not st.ready or not s or XL.RecordSource(s, src) == 0 then
+    return
+  end
+  hold(src.xp)
+  persist()
+  fire()
+end
+
 -- Session -------------------------------------------------------------------------------------------------------------
 
 local function changeSession(changed)
@@ -517,6 +650,8 @@ local function start()
     end
   end
   st.session = session or XL.SessionNew(t, wall)
+  -- A reload keeps the gain between the last reading and now (only with the session it belongs to).
+  st.last = session and XL.BaseLoad(charStore().last, wall) or nil
   update()
   syncAfk()
   persist()
@@ -582,6 +717,8 @@ end
 
 function XT.ResetSession()
   st.session = XL.SessionNew(now(), U.now())
+  -- Amounts still waiting belong to the old session.
+  st.pending.sum, st.budget = 0, nil
   changeSession(true)
 end
 
@@ -631,6 +768,127 @@ function XT.Info()
   }
 end
 
+-- Diagnostics ---------------------------------------------------------------------------------------------------------
+
+local DEBUG_EVENTS = {
+  "PLAYER_XP_UPDATE",
+  "UPDATE_EXHAUSTION",
+  "PLAYER_ENTERING_WORLD",
+  "PLAYER_LEVEL_UP",
+  "TIME_PLAYED_MSG",
+  "QUEST_TURNED_IN",
+  "CHAT_MSG_COMBAT_XP_GAIN",
+  "CHAT_MSG_SYSTEM",
+}
+
+-- The arguments of an event as one short text (secret values and errors named, not shown).
+local function payloadText(...)
+  local count = select("#", ...)
+  if count == 0 then
+    return "(none)"
+  end
+  local parts = {}
+  for i = 1, count do
+    local value = select(i, ...)
+    if value ~= nil and readable(value) == nil then
+      parts[i] = "secret"
+    else
+      local ok, shown = pcall(tostring, value)
+      parts[i] = ok and shown or "?"
+    end
+  end
+  local text = table.concat(parts, ", ")
+  return #text > PAYLOAD_LETTERS and text:sub(1, PAYLOAD_LETTERS) .. "..." or text
+end
+
+local function seen(event, ...)
+  local entry = st.events[event]
+  if not entry then
+    entry = { count = 0 }
+    st.events[event] = entry
+  end
+  entry.count, entry.at, entry.payload = entry.count + 1, now(), payloadText(...)
+end
+
+-- What a game function answers right now: { type, secret, value } (value for numbers and strings only).
+local function rawValue(name, ...)
+  local fn = global(name)
+  if not fn then
+    return { type = "missing" }
+  end
+  local ok, value = pcall(fn, ...)
+  if not ok then
+    return { type = "error" }
+  end
+  local secret = value ~= nil and readable(value) == nil
+  local kind = type(value)
+  return { type = kind, secret = secret, value = not secret and (kind == "number" or kind == "string") and value or nil }
+end
+
+local function copy(map)
+  local out = {}
+  for key, value in pairs(map) do
+    out[key] = value
+  end
+  return out
+end
+
+-- For /fg xpdiag, nothing in it changes the state: per event the count, the clock of the last one, its
+-- payload and whether the client delivers it; how each update ended; the raw readings now; the session
+-- and its sources; the event XP still waiting (pending), counted ahead of a reading (direct) and the
+-- budget of late lines.
+function XT.Debug()
+  local t = now()
+  local events = {}
+  for _, name in ipairs(DEBUG_EVENTS) do
+    local entry = st.events[name] or { count = 0 }
+    events[#events + 1] = {
+      name = name,
+      count = entry.count,
+      at = entry.at,
+      payload = entry.payload,
+      registered = ns.IsEventRegistered(name),
+    }
+  end
+  local s = st.session
+  local session
+  if s then
+    session = {
+      running = s.running,
+      since = s.since,
+      active = XL.ActiveSeconds(s, t),
+      gained = s.gained,
+      auto = s.auto,
+      startedAt = s.startedAt,
+    }
+    for _, field in ipairs(XL.SOURCE_FIELDS) do
+      session[field] = s[field]
+    end
+  end
+  local saved = type(ns.charDB) == "table" and type(ns.charDB.xp) == "table" and ns.charDB.xp or {}
+  return {
+    now = t,
+    ready = st.ready,
+    events = events,
+    outcomes = copy(st.outcomes),
+    raw = {
+      level = rawValue("UnitLevel", "player"),
+      xp = rawValue("UnitXP", "player"),
+      max = rawValue("UnitXPMax", "player"),
+      rested = rawValue("GetXPExhaustion"),
+      secrets = global("issecretvalue") ~= nil,
+    },
+    last = st.last and copy(st.last) or nil,
+    session = session,
+    onCharDB = type(ns.charDB) == "table",
+    savedSession = saved.session ~= nil,
+    savedBase = saved.last ~= nil,
+    pending = st.pending.sum,
+    direct = st.direct,
+    budget = st.budget and st.budget.xp or 0,
+  }
+end
+
 -- Events ---------------------------------------------------------------------------------------------------------------------
 
 local function refresh()
@@ -643,21 +901,27 @@ local function refresh()
 end
 
 ns.On("PLAYER_LOGIN", start)
-ns.On("PLAYER_ENTERING_WORLD", function()
+ns.On("PLAYER_ENTERING_WORLD", function(event, ...)
+  seen(event, ...)
   if st.ready then
     refresh()
   else
     start()
   end
 end)
-ns.On("PLAYER_XP_UPDATE", function(_, unit)
+ns.On("PLAYER_XP_UPDATE", function(event, unit)
+  seen(event, unit)
   if unit == nil or unit == "player" then
     refresh()
   end
 end)
-ns.On("UPDATE_EXHAUSTION", refresh)
+ns.On("UPDATE_EXHAUSTION", function(event, ...)
+  seen(event, ...)
+  refresh()
+end)
 
-ns.On("PLAYER_LEVEL_UP", function(_, newLevel)
+ns.On("PLAYER_LEVEL_UP", function(event, newLevel, ...)
+  seen(event, newLevel, ...)
   if not st.ready then
     return
   end
@@ -679,6 +943,46 @@ ns.On("PLAYER_LEVEL_UP", function(_, newLevel)
   fire()
 end)
 
+-- The lines and amounts the client reports: the sums of the sources and the fallback for a reading
+-- that fails. PLAYER_XP_UPDATE stays the truth for the gain.
+local parsers
+
+local function chatParsers()
+  parsers = parsers
+    or XL.ChatParsers(function(name)
+      local text = rawget(_G, name)
+      return type(text) == "string" and text or nil
+    end)
+  return parsers
+end
+
+ns.On("QUEST_TURNED_IN", function(event, questId, xpReward)
+  seen(event, questId, xpReward)
+  local xp = numberOf(true, xpReward)
+  if xp and xp > 0 then
+    source({ kind = "quest", xp = xp })
+  end
+end)
+
+ns.On("CHAT_MSG_COMBAT_XP_GAIN", function(event, text)
+  seen(event, text)
+  local line = type(text) == "string" and readable(text) or nil
+  local gain = line and XL.ParseGain(chatParsers(), line)
+  -- A line without a creature is the quest turn-in, which QUEST_TURNED_IN already reports.
+  if gain and gain.kind == "kill" then
+    source(gain)
+  end
+end)
+
+ns.On("CHAT_MSG_SYSTEM", function(event, text)
+  local line = type(text) == "string" and readable(text) or nil
+  local xp = line and XL.ParseExplore(chatParsers(), line)
+  if xp and xp > 0 then
+    seen(event, text)
+    source({ kind = "explore", xp = xp })
+  end
+end)
+
 ns.On("QUEST_LOG_UPDATE", function()
   if st.ready then
     scheduleQuestScan()
@@ -690,9 +994,10 @@ ns.On("UNIT_QUEST_LOG_CHANGED", function(_, unit)
   end
 end)
 
-ns.On("TIME_PLAYED_MSG", function(...)
+ns.On("TIME_PLAYED_MSG", function(event, ...)
+  seen(event, ...)
   if st.ready then
-    onPlayed(...)
+    onPlayed(event, ...)
   end
 end)
 

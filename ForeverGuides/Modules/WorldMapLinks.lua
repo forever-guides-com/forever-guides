@@ -5,8 +5,11 @@
 -- Nothing is written into Blizzard tables except hooks: hooksecurefunc on OnMapChanged,
 -- OnCanvasScaleChanged, OnCanvasSizeChanged and RefreshOverlayFrames, HookScript on the map, a click
 -- handler (AddCanvasClickHandler, the way Blizzard's own data providers listen: it returns true only
--- for the clicks we use) and a cursor handler. Every frame we create is a child of the map under our
--- own name, anchored to Blizzard frames but never the other way round. The button sits at the right
+-- for the clicks we use) and a cursor handler, both added after combat and idle in combat. A hook
+-- (WML.HookMethod, WML.HookScript) only queues its work for the next frame: Blizzard builds its pins
+-- and quest entries inside the hooked call, and code of ours running there would taint that path. Every
+-- frame we create is a child of the map under our own name, anchored to Blizzard frames but never the
+-- other way round. The button sits at the right
 -- edge of the canvas below the stacked tracking buttons: its spot is searched from the measured
 -- rectangles of the overlay frames, so it never covers a neighbor whatever the layout (Mainline or
 -- Camelot) puts there.
@@ -95,8 +98,29 @@ local PLACE_TRIES = 24
 local LIFT_MIN, LIFT_ZONE = 30, 320 -- the bar keeps clear of the coordinates strip and the left overlays
 local COSMIC_MAP, MAP_COSMIC = 946, 0
 local WORLD_AND_CONTINENT = { [1] = true, [2] = true } -- Enum.UIMapType: markers of child maps show here
-local LEVEL_PIN, LEVEL_UI = 1500, 2000 -- above Blizzard's pins, then above ours
 local LEVEL_CAP = 9990
+-- Frame levels of everything we draw on Blizzard's world map, bottom to top. All but ui count from the canvas,
+-- ui from the map. Measured on the canvas of the Forever client (/fg mapdiag lists them): MapExplorationPin 2002
+-- (opaque, full canvas), FogOfWarPin 2006, QuestBlobPin 2007, ScenarioBlobPin 2008, MapHighlightPin 2009,
+-- QuestPin 2740 to 2758, GroupMembersPin 2920.
+-- reveal stays far below the client's explored pieces on purpose: it only fills what the client has not drawn,
+-- and a piece drawn over it is the same picture. The pins lie over the exploration and the highlight (which
+-- would take their mouse and tooltips) and under the quest pins: spots, then zone transition arrows (they sit
+-- on the zone edge, flight points and instance markers win where they meet), flight points, instance markers,
+-- guild members, and the waypoint pins on top, which count up per entry (room for about 500 before the quest
+-- pins). The controls clear the client's quest pins, stay under the dungeon panel (3000) and keep room for
+-- the overlay at ui + 100.
+local LEVELS = {
+  reveal = 1,
+  spots = 2020,
+  arrows = 2090,
+  flights = 2100,
+  instances = 2110,
+  guild = 2150,
+  waypoints = 2200,
+  ui = 2850,
+}
+WML.LEVELS = LEVELS
 local PIN_RING = 4
 local CURSOR = "MAP_PIN_CURSOR"
 local HANDLER_PRIORITY = 100
@@ -109,6 +133,7 @@ local pins = {}
 local placing = false
 local fieldCtl, markerMenu, buttonMenu
 local hooked = {}
+local handlersAdded = false
 
 -- Blizzard access ----------------------------------------------------------------------
 
@@ -149,6 +174,7 @@ local function capi(name, ...)
     return r[2], r[3], r[4], r[5]
   end
 end
+WML.CApi = capi
 
 local function rectOf(frame)
   local ok, l, r, t, b = pcall(function()
@@ -171,12 +197,23 @@ end
 
 -- Frame level of our controls on the map: above the canvas and Blizzard's overlays.
 function WML.UILevel()
-  return level(LEVEL_UI)
+  return level(LEVELS.ui)
+end
+
+-- Frame level of the layer `key` of WML.LEVELS on the canvas.
+function WML.CanvasLevel(canvas, key)
+  return math.min(canvas:GetFrameLevel() + LEVELS[key], LEVEL_CAP)
 end
 
 local function enabled(key)
   local s = ns.db and ns.db.settings
   return not s or s[key] ~= false
+end
+WML.Enabled = enabled
+
+-- Blizzard's world map frame once attached, else nil.
+function WML.Map()
+  return map
 end
 
 -- The map shown in Blizzard's window (uiMapID), nil when the client reports none.
@@ -189,6 +226,7 @@ local function mapType(id)
   local info = capi("GetMapInfo", id)
   return type(info) == "table" and info.mapType or nil
 end
+WML.MapType = mapType
 
 local function isCosmic(id)
   return id == COSMIC_MAP or mapType(id) == MAP_COSMIC
@@ -196,6 +234,11 @@ end
 
 function WML.Container()
   return field(map, "ScrollContainer") or map
+end
+
+-- The canvas the markers sit on, nil when the client has none.
+function WML.Canvas()
+  return call(map, "GetCanvas")
 end
 
 -- Placement ----------------------------------------------------------------------------
@@ -330,7 +373,7 @@ local function ensureOverlay()
   end
   overlay = CreateFrame("Frame", "ForeverGuidesWorldMapOverlay", map)
   overlay:SetAllPoints(WML.Container())
-  overlay:SetFrameLevel(level(LEVEL_UI + 100))
+  overlay:SetFrameLevel(level(LEVELS.ui + 100))
   keys = CreateFrame("Frame", nil, overlay)
   keys:EnableKeyboard(true)
   keys:SetScript("OnKeyDown", function(self, key)
@@ -398,14 +441,15 @@ local function placeMarker(nx, ny)
 end
 
 -- Handler of the canvas: true only for the clicks we use (marker mode or the marker key held), so Blizzard's
--- own click handling (navigating into a zone) stays untouched for every other click.
+-- own click handling (navigating into a zone) stays untouched for every other click. Idle in combat.
 local function onCanvasClick(_, mouse, nx, ny)
-  if mouse ~= "LeftButton" or not enabled("worldMapPanel") then
+  if ns.InCombat() or mouse ~= "LeftButton" or not enabled("worldMapPanel") then
     return false
   end
   if not (placing or ns.Keys.Matches("mapMarker")) then
     return false
   end
+  ns.MapOps.Record("canvas click", "marker")
   placeMarker(nx, ny)
   return true
 end
@@ -517,17 +561,24 @@ local function newPin(canvas)
   return pin
 end
 
--- Position of a waypoint on the shown map: its own map, or for pinned markers on a world or
--- continent map the place of their zone inside it.
-local function project(wp, id, kind)
-  if wp.map == id then
-    return wp.x, wp.y
+-- Position of a point of map `from` on the shown map `id` (of map type `kind`): the point itself, or
+-- on a world or continent map the place of its zone inside it. nil when the client has no rectangle.
+function WML.Project(from, x, y, id, kind)
+  if from == id then
+    return x, y
   end
-  if wp.pinned and WORLD_AND_CONTINENT[kind] then
-    local rect = MW.Rect(capi("GetMapRectOnMap", wp.map, id))
+  if WORLD_AND_CONTINENT[kind] then
+    local rect = MW.Rect(capi("GetMapRectOnMap", from, id))
     if rect then
-      return MW.Place(rect, wp.x, wp.y)
+      return MW.Place(rect, x, y)
     end
+  end
+end
+
+-- Waypoints of other maps show only when pinned.
+local function project(wp, id, kind)
+  if wp.map == id or wp.pinned then
+    return WML.Project(wp.map, wp.x, wp.y, id, kind)
   end
 end
 
@@ -538,11 +589,56 @@ local function placePin(pin, canvas, scale)
   pin:ClearAllPoints()
   pin:SetPoint("CENTER", canvas, "TOPLEFT", canvas:GetWidth() * pin.nx / s, -canvas:GetHeight() * pin.ny / s)
 end
+WML.PlacePin = placePin
+
+-- The state of a pin frame for /fg mapdiag as short texts; every call is guarded.
+function WML.PinInfo(pin)
+  local info = {}
+  local function get(key, fn)
+    local r = { pcall(fn) }
+    local parts = {}
+    for i = 2, 6 do
+      local v = r[i]
+      if v ~= nil then
+        parts[#parts + 1] = type(v) == "number" and string.format("%.6g", v) or tostring(v)
+      end
+    end
+    info[key] = r[1] and table.concat(parts, ",") or "error"
+  end
+  get("shown", function()
+    return pin:IsShown()
+  end)
+  get("visible", function()
+    return pin:IsVisible()
+  end)
+  get("parent", function()
+    local parent = pin:GetParent()
+    return parent and (parent:GetName() or tostring(parent))
+  end)
+  get("level", function()
+    return pin:GetFrameLevel()
+  end)
+  get("scale", function()
+    return pin:GetScale()
+  end)
+  get("size", function()
+    return pin:GetWidth(), pin:GetHeight()
+  end)
+  get("point", function()
+    local point, rel, relPoint, x, y = pin:GetPoint(1)
+    return point, rel and (rel:GetName() or tostring(rel)), relPoint, x, y
+  end)
+  get("alpha", function()
+    return pin:GetEffectiveAlpha()
+  end)
+  return info
+end
 
 local function canvasScale()
   local scale = call(map, "GetCanvasScale")
   return WL.readable(scale) and scale > 0 and scale or 1
 end
+WML.CanvasScale = canvasScale
 
 local function hidePins(from)
   for i = from or 1, #pins do
@@ -553,7 +649,7 @@ end
 
 -- Zoom and canvas size changes: only position and scale, no new data.
 function WML.RescalePins()
-  local canvas = call(map, "GetCanvas")
+  local canvas = WML.Canvas()
   if not canvas then
     return
   end
@@ -569,7 +665,7 @@ function WML.RefreshPins()
   if map and not ns.ProtectedAllowed(map) then
     return
   end
-  local canvas = map and enabled("worldMapPins") and isShown(map) and call(map, "GetCanvas")
+  local canvas = map and enabled("worldMapPins") and isShown(map) and WML.Canvas()
   local id = canvas and WML.MapID()
   if not id then
     hidePins()
@@ -583,7 +679,7 @@ function WML.RefreshPins()
     end
   end
   MM.SortPins(items)
-  local base, scale = canvas:GetFrameLevel() + LEVEL_PIN, canvasScale()
+  local base, scale = WML.CanvasLevel(canvas, "waypoints"), canvasScale()
   for i, it in ipairs(items) do
     local pin = pins[i]
     if not pin then
@@ -725,7 +821,7 @@ local function ensureButton()
     end,
   })
   B.LeaveFocusRing(button)
-  button:SetFrameLevel(level(LEVEL_UI))
+  button:SetFrameLevel(WML.UILevel())
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   button.icon:ClearAllPoints()
   button.icon:SetPoint("TOPLEFT", 2, -2)
@@ -789,23 +885,43 @@ function WML.Apply()
     WML.SetPlacing(false)
   end
   WML.RefreshPins()
+  ns.Emit("FG_WORLDMAP_VIEW", "map")
 end
 
-local function hookMethod(name, fn)
-  if hooked[name] or type(hooksecurefunc) ~= "function" or type(field(map, name)) ~= "function" then
-    return
+-- Post-hook of the method `name` of the map for the module `owner`, once per pair. Returns whether it hooked.
+function WML.HookMethod(owner, name, fn)
+  local key = owner .. ":" .. name
+  if hooked[key] or not map or type(hooksecurefunc) ~= "function" or type(field(map, name)) ~= "function" then
+    return false
   end
-  hooked[name] = true
-  pcall(hooksecurefunc, map, name, function()
-    ns.Safe("wm-" .. name, fn)
+  hooked[key] = true
+  local label = "hook " .. key
+  return pcall(hooksecurefunc, map, name, function()
+    ns.MapOps.Defer(label, fn)
   end)
 end
 
+-- Post-hook of the script `script` of the map for the module `owner`, once per pair.
+function WML.HookScript(owner, script, fn)
+  local key = owner .. ":" .. script
+  if hooked[key] or not map or type(map.HookScript) ~= "function" then
+    return false
+  end
+  hooked[key] = true
+  local label = "script " .. key
+  return pcall(map.HookScript, map, script, function()
+    ns.MapOps.Defer(label, fn)
+  end)
+end
+
+-- The map, the zoom and the size of the canvas tell the modules that draw on the map (kind "map", "scale",
+-- "size", "hide") with the message FG_WORLDMAP_VIEW.
 local function onMapChanged()
   WML.RefreshPins()
   if bar and bar:IsShown() then
     bar:Refresh()
   end
+  ns.Emit("FG_WORLDMAP_VIEW", "map")
 end
 
 function WML.OnShow()
@@ -818,6 +934,27 @@ function WML.OnHide()
   if fieldCtl then
     fieldCtl.Close()
   end
+  ns.Emit("FG_WORLDMAP_VIEW", "hide")
+end
+
+-- The click and cursor handlers write into Blizzard's handler lists, so they are added once, out of
+-- combat; PLAYER_REGEN_ENABLED calls this again when the map attached during a fight.
+local function addHandlers()
+  if handlersAdded or not map or ns.InCombat() then
+    return
+  end
+  handlersAdded = true
+  ns.MapOps.Record("add canvas handlers")
+  if type(field(map, "AddCanvasClickHandler")) == "function" then
+    pcall(map.AddCanvasClickHandler, map, ns.Wrap("wm-click", onCanvasClick), HANDLER_PRIORITY)
+  end
+  if type(field(map, "AddCursorHandler")) == "function" then
+    pcall(map.AddCursorHandler, map, function()
+      if placing and not ns.InCombat() then
+        return CURSOR
+      end
+    end, HANDLER_PRIORITY)
+  end
 end
 
 function WML.Attach()
@@ -829,33 +966,31 @@ function WML.Attach()
     return false
   end
   attached = true
-  pcall(map.HookScript, map, "OnShow", ns.Wrap("wm-show", WML.OnShow))
-  pcall(map.HookScript, map, "OnHide", ns.Wrap("wm-hide", WML.OnHide))
-  pcall(
-    map.HookScript,
-    map,
-    "OnSizeChanged",
-    ns.Wrap("wm-size", function()
-      ns.Debounce("wm-relayout", 0.05, WML.Relayout)
-    end)
-  )
-  hookMethod("OnMapChanged", onMapChanged)
-  hookMethod("OnCanvasScaleChanged", WML.RescalePins)
-  hookMethod("OnCanvasSizeChanged", WML.RescalePins)
-  hookMethod("RefreshOverlayFrames", WML.Relayout)
-  if type(field(map, "AddCanvasClickHandler")) == "function" then
-    pcall(map.AddCanvasClickHandler, map, ns.Wrap("wm-click", onCanvasClick), HANDLER_PRIORITY)
-  end
-  if type(field(map, "AddCursorHandler")) == "function" then
-    pcall(map.AddCursorHandler, map, function()
-      if placing then
-        return CURSOR
-      end
-    end, HANDLER_PRIORITY)
-  end
+  WML.HookScript("links", "OnShow", WML.OnShow)
+  WML.HookScript("links", "OnHide", WML.OnHide)
+  WML.HookScript("links", "OnSizeChanged", function()
+    ns.Debounce("wm-relayout", 0.05, WML.Relayout)
+  end)
+  WML.HookMethod("links", "OnMapChanged", onMapChanged)
+  WML.HookMethod("links", "OnCanvasScaleChanged", function()
+    WML.RescalePins()
+    ns.Emit("FG_WORLDMAP_VIEW", "scale")
+  end)
+  WML.HookMethod("links", "OnCanvasSizeChanged", function()
+    WML.RescalePins()
+    ns.Emit("FG_WORLDMAP_VIEW", "size")
+  end)
+  WML.HookMethod("links", "RefreshOverlayFrames", WML.Relayout)
+  addHandlers()
   WML.Apply()
   return true
 end
+
+ns.On("PLAYER_REGEN_ENABLED", function()
+  if attached then
+    addHandlers()
+  end
+end)
 
 ns.On("PLAYER_LOGIN", function()
   WML.Attach()

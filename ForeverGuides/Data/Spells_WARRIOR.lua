@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-04.
 -- Spell catalog of WARRIOR: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -343,6 +343,15 @@ ns.Data.Spells.WARRIOR = {
     id=9078,
     k="weapon",
     n={de="Stoff",en="Cloth"},
+  },
+  {
+    c={"DRUID","MAGE","PALADIN","PRIEST","ROGUE","SHAMAN","WARRIOR"},
+    fid=132366,
+    i="ability_warrior_warcry",
+    id=21563,
+    k="racial",
+    n={de="Befehlsgewalt",en="Command"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=132325,
@@ -1138,6 +1147,13 @@ ns.Data.Spells.WARRIOR = {
     n={de="Verbesserter Donnerknall",en="Improved Thunder Clap"},
   },
   {
+    fid=132369,
+    i="ability_whirlwind",
+    id=1310315,
+    k="talent",
+    n={de="Verbesserter Wirbelwind",en="Improved Whirlwind"},
+  },
+  {
     fid=132307,
     i="ability_rogue_sprint",
     id=20252,
@@ -1444,11 +1460,11 @@ ns.Data.Spells.WARRIOR = {
     sup=6552,
   },
   {
-    fid=132369,
-    i="ability_whirlwind",
-    id=1310315,
+    fid=132334,
+    i="ability_warrior_bloodfrenzy",
+    id=1329555,
     k="talent",
-    n={de="Wütende Schläge",en="Raging Blows"},
+    n={de="Tollkühne Schwünge",en="Reckless Swings"},
   },
   {
     fid=132109,

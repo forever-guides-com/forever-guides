@@ -1042,8 +1042,20 @@ end
 
 -- Registration ---------------------------------------------------------------------------------------------------
 
-E.Register("trail", { render = renderTrail, drive = driveTrail, release = releaseTrail, panel = T.TrailPanel })
-E.Register("click", { render = renderClick, drive = driveClick, release = releaseClick, panel = T.ClickPanel })
+E.Register("trail", {
+  render = renderTrail,
+  drive = driveTrail,
+  release = releaseTrail,
+  panel = T.TrailPanel,
+  hosts = { cursor = true },
+})
+E.Register("click", {
+  render = renderClick,
+  drive = driveClick,
+  release = releaseClick,
+  panel = T.ClickPanel,
+  hosts = { cursor = true },
+})
 
 local function setTrailTime(sim, _, t)
   sim.trailT = t

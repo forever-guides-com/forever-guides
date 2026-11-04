@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-04.
 -- Learn list of SHAMAN.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -28,7 +28,7 @@ ns.Data.Abilities.SHAMAN = {
   {
     i="ability_shaman_totemrelocation",
     l=0,
-    n={de="Totemische Projektion",en="Totemic Projection"},
+    n={de="Totemischer Ruf",en="Totemic Call"},
     sid=437009,
     sp="shaman-enhancement",
   },

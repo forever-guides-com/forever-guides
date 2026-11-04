@@ -367,7 +367,7 @@ local function create()
     end)
   )
 
-  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title" })
+  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title", opens = true })
   f.look:SetPoint("RIGHT", -2, 0)
   f.look:SetScript(
     "OnClick",
@@ -411,6 +411,7 @@ local function create()
     height = BUTTON_H,
     tooltip = "profshop.title",
     tooltipText = "profroute.shopTip",
+    opens = true,
     onClick = function()
       SW.Open()
     end,

@@ -20,6 +20,9 @@ Theme.colors = {
   action = "#0f6064",
   actionHi = "#5fd3d8",
   success = "#6fae7c",
+  -- Fill of the main button that confirms a request: white text passes AA on both (5.4:1 and 7.2:1).
+  confirm = "#1f6f3a",
+  confirmHover = "#175c30",
   warning = "#e0954a",
   danger = "#e05c4a",
   info = "#4a8fe0",
@@ -182,6 +185,11 @@ function Theme.colorblind()
   return settings().colorblind == true or ns.GetCVar("colorblindMode") == "1"
 end
 
+-- High contrast or colorblind mode: controls then carry a cue that does not rely on color alone.
+function Theme.accessibleMode()
+  return Theme.highContrast() or Theme.colorblind()
+end
+
 function Theme.reduceMotion()
   return settings().reduceMotion == true
 end
@@ -332,6 +340,12 @@ function Theme.rgb(name)
     or Theme.classColors[name]
     or name
   return U.hex(hex)
+end
+
+-- A token as "#rrggbb" in the theme, skin and contrast mode in force (for Theme.readable and the contrast math).
+function Theme.hex(name)
+  local r, g, b = Theme.rgb(name)
+  return string.format("#%02x%02x%02x", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5)
 end
 
 function Theme.color(name, alpha)

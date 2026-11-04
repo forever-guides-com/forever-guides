@@ -4,6 +4,10 @@
 -- an empty or partial answer must not wipe what an earlier visit found.
 --
 -- ns.db.recipes = { v = 1, chars = { ["Name-Realm"] = { ids = { sorted spell ids }, at = server time } } }
+--
+-- The recipes of the character that is logged in are also kept in memory for this session, whether or not
+-- the roster is saved (CharRoster.Enabled only decides about the saved list). That view is what the
+-- guild sync reads (K.Own*): never another character of the account.
 local _, ns = ...
 local R = ns.RecipeLogic
 local Roster = ns.CharRoster
@@ -28,6 +32,10 @@ local scratch = { v = VERSION, chars = {} }
 local checked
 -- Sets of spell ids per character, rebuilt when the saved list is replaced.
 local setCache = {}
+-- Recipes read this session for the logged-in character: { key, ids }. Never saved.
+local session = { key = nil, ids = {} }
+-- Merged view of saved and session list of the logged-in character, rebuilt when either list changes.
+local ownCache
 
 local function number(v)
   return type(v) == "number" and v == v and v >= 0 and v <= 1e11 and v or 0
@@ -76,6 +84,7 @@ end
 -- Forgets the checked state (tests).
 function K.Reset()
   checked, setCache, K.Last = nil, {}, nil
+  session, ownCache = { key = nil, ids = {} }, nil
   scratch = { v = VERSION, chars = {} }
 end
 
@@ -120,6 +129,52 @@ end
 
 function K.Has(key, spell)
   return K.Set(key)[spell] == true
+end
+
+-- The logged-in character as { key, ids, set }: saved and session recipes joined, nil without a key.
+local function ownView()
+  local key = Roster.CurrentKey()
+  if not key then
+    return nil
+  end
+  local e = store().chars[key]
+  local saved = e and e.ids or nil
+  local fresh = session.key == key and session.ids or nil
+  if not (ownCache and ownCache.key == key and ownCache.saved == saved and ownCache.fresh == fresh) then
+    local merged = R.MergeIds(saved, fresh, R.MAX_KNOWN)
+    ownCache = { key = key, saved = saved, fresh = fresh, ids = merged, set = R.IdSet(merged) }
+  end
+  return ownCache
+end
+
+-- Key and sorted spell ids (a copy) of the logged-in character only, empty without one.
+function K.Own()
+  local view = ownView()
+  local out = {}
+  for i, id in ipairs(view and view.ids or {}) do
+    out[i] = id
+  end
+  return view and view.key or nil, out
+end
+
+function K.OwnHas(spell)
+  local view = ownView()
+  return view ~= nil and view.set[spell] == true
+end
+
+-- The ids of the logged-in character inside the recipe universe of one profession slug (sorted).
+function K.OwnJobIds(slug)
+  local view = ownView()
+  local universe = ns.RecipeUniverse and view and ns.RecipeUniverse.Get(slug)
+  local out = {}
+  if universe then
+    for _, id in ipairs(view.ids) do
+      if universe.rank[id] then
+        out[#out + 1] = id
+      end
+    end
+  end
+  return out
 end
 
 -- Name of a character key for display: the roster name, else the key without its realm.
@@ -196,12 +251,10 @@ local function read()
   return ids, listed
 end
 
--- Reads the profession window and adds the learned recipes to the current character. Returns true when
--- the saved list changed.
+-- Reads the profession window and adds the learned recipes to the logged-in character: always in the
+-- session view, in the saved list only while the roster is saved. Returns true when the view of the
+-- character grew. FG_RECIPES_CHANGED(key, added ids) follows.
 function K.Capture()
-  if not Roster.Enabled() then
-    return false
-  end
   local key = Roster.CurrentKey()
   if not key then
     return false
@@ -214,15 +267,27 @@ function K.Capture()
   if #ids == 0 then
     return false
   end
-  local chars = store().chars
-  local old = chars[key]
-  local merged, changed = R.MergeIds(old and old.ids, ids, R.MAX_KNOWN)
-  chars[key] = { ids = changed and merged or (old and old.ids or merged), at = Roster.Now() }
-  prune(key)
-  if changed then
-    ns.Emit("FG_RECIPES_CHANGED", key)
+  local before = ownView()
+  local had = before and before.set or {}
+  session = { key = key, ids = (R.MergeIds(session.key == key and session.ids or nil, ids, R.MAX_KNOWN)) }
+  if Roster.Enabled() then
+    local chars = store().chars
+    local old = chars[key]
+    local merged, grew = R.MergeIds(old and old.ids, ids, R.MAX_KNOWN)
+    chars[key] = { ids = grew and merged or (old and old.ids or merged), at = Roster.Now() }
+    prune(key)
   end
-  return changed
+  local after = ownView()
+  local added = {}
+  for _, id in ipairs(after.ids) do
+    if not had[id] then
+      added[#added + 1] = id
+    end
+  end
+  if #added > 0 then
+    ns.Emit("FG_RECIPES_CHANGED", key, added)
+  end
+  return #added > 0
 end
 
 local function schedule()

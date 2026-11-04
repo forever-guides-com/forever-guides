@@ -184,6 +184,7 @@ local function build(container)
     width = BUTTON_WIDTH,
     tooltip = "loot.copy",
     tooltipText = "loot.copyTip",
+    opens = true,
     onClick = function()
       ns.Dialogs.Copy("loot.export.title", LC.BuildExport(), "loot.export.hint")
     end,

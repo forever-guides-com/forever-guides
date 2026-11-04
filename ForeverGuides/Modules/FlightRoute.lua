@@ -65,11 +65,12 @@ end
 
 -- Flight points of the open window: { list = { { slot, name, state, match } ... }, bySlot }, or
 -- nil and the reason ("combat", "closed", "empty"). match is FlightLogic.match of the name.
-function FR.Nodes()
+-- anyTime reads the client lists without a shown window (TAXIMAP_OPENED can come before it is shown).
+function FR.Nodes(anyTime)
   if inCombat() then
     return nil, "combat"
   end
-  if not FR.OpenFrame() then
+  if not (anyTime or FR.OpenFrame()) then
     return nil, "closed"
   end
   local list, bySlot, viaTaxi, viaMap = {}, {}, false, false

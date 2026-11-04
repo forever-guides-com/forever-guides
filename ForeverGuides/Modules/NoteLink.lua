@@ -14,16 +14,26 @@
 -- Player names (senders, whisper targets) are full names with an optional
 -- surname ("First Surname") and realm ("-Realm"), see PlayerName.lua. A sender
 -- is used exactly as the chat event gave it.
--- Transfer (addon prefix FGNOTE, always WHISPER, every message <= 255 bytes):
---   Q <nonce> <id> <hash> [kind]   request (receiver -> sender), kind "N" or "D",
---                                  left out for notes
---   D <nonce> <seq> <total> <data> one chunk (sender -> receiver)
---   N <nonce> <reason>             refusal ("gone")
+-- Everything that moves between players is opt-in (function linkShare, Core/Consent.lua):
+--   receive  chat links of others become clickable, a click asks the sender by whisper
+--   send     the own links are served to whoever asks, only for content shared in this session
+-- Without consent a token stays plain text, nothing is requested, nothing is answered, not even a
+-- refusal. One local line per session says that a link was seen.
+-- Transfer through ns.Comm (function LK, whisper, one block per message, the envelope id is the
+-- transfer id):
+--   Q <id8><hash8><kind>   request (receiver -> sender), kind a capital letter (N note, D drawing ...)
+--   D <seq>/<total>/<data> one chunk (sender -> receiver)
+--   N gone                 refusal, only for content this session shared and no longer holds
+-- Old clients ask in the format of prefix FGNOTE (transition, Comm.RegisterLegacy): such a request is
+-- answered in that format, and only under the same rules.
+--   Q <nonce> <id> <hash> [kind]   D <nonce> <seq> <total> <data>   N <nonce> gone   (tab separated)
 local _, ns = ...
 local W, L, U, N, M, C = ns.W, ns.L, ns.U, ns.Notes, ns.Markup, ns.MacroCore
+local Comm, CL, Consent = ns.Comm, ns.CommLogic, ns.Consent
 
-local NL = { PREFIX = "FGNOTE", LINK = "FGNote", TOKEN = "FGN" }
+local NL = { PREFIX = "FGNOTE", FN = "linkShare", LINK = "FGNote", TOKEN = "FGN" }
 ns.NoteLink = NL
+local FN = NL.FN
 
 -- The client accepts 255 bytes per chat message, stay clear of it.
 local LIMIT = 240
@@ -38,6 +48,11 @@ local TIMEOUT = 15
 local SEND_GAP = 0.2
 local SHARED_MAX = 20
 local SERVE_MAX = 3
+-- Chunks that may wait in the line of Comm before the sender holds back, and seconds a held answer
+-- is kept up.
+local QUEUE_SOFT = 10
+local QUEUE_WAIT = 1
+local SERVE_SPAN = 120
 -- Read by the size verdict of the drawings (DrawingLink.ShareInfo).
 NL.CHUNK, NL.CHUNK_GAP = CHUNK, SEND_GAP
 local ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -63,6 +78,12 @@ ns.AddLocale("enUS", {
   ["notelink.sendFailed"] = "The request to %s could not be sent.",
   ["notelink.err.tooLarge"] = "This note is too large to share in chat.",
   ["notelink.err.unavailable"] = "Sharing unavailable (compression library missing).",
+  ["notelink.blocked"] = "Not possible in combat.",
+  ["notelink.optInHint"] = "Forever Guides link from %s. To open it: switch on sharing.",
+  ["notelink.optin.title"] = "Open link",
+  ["notelink.optin.body"] = "Link from %s. Opening it asks that player for the content.",
+  ["optin.send.linkShare"] = "Links in chat need sharing.",
+  ["optin.recv.linkShare"] = "Opening links needs sharing.",
 })
 ns.AddLocale("deDE", {
   ["notelink.label"] = "Notiz",
@@ -80,6 +101,12 @@ ns.AddLocale("deDE", {
   ["notelink.sendFailed"] = "Die Anfrage an %s konnte nicht gesendet werden.",
   ["notelink.err.tooLarge"] = "Diese Notiz ist zu groß, um sie im Chat zu teilen.",
   ["notelink.err.unavailable"] = "Teilen nicht verfügbar (Kompressionsbibliothek fehlt).",
+  ["notelink.blocked"] = "Im Kampf nicht möglich.",
+  ["notelink.optInHint"] = "Forever-Guides-Link von %s. Zum Öffnen: Teilen aktivieren.",
+  ["notelink.optin.title"] = "Link öffnen",
+  ["notelink.optin.body"] = "Link von %s. Zum Öffnen fragt das Addon den Spieler nach dem Inhalt.",
+  ["optin.send.linkShare"] = "Links im Chat brauchen Teilen.",
+  ["optin.recv.linkShare"] = "Links öffnen braucht Teilen.",
 })
 
 local function fmt(key, ...)
@@ -224,6 +251,8 @@ local function randomString(n)
 end
 
 function NL.Register(entry)
+  -- The ring of Comm outlives the 20 snapshots: an id that fell out of them is refused with "gone".
+  Comm.NoteShared(FN, entry.id)
   shared[entry.id] = entry
   sharedOrder[#sharedOrder + 1] = entry.id
   while #sharedOrder > SHARED_MAX do
@@ -279,17 +308,46 @@ end
 
 -- Addon messages ----------------------------------------------------------------------
 
-local function sendAddon(msg, target)
-  local api = C_ChatInfo
-  if not (api and api.SendAddonMessage) then
-    return false
+local LEGACY_FNS = { FN }
+
+-- Payloads of function linkShare, strictly checked. Returns { t = "Q", id, hash, letter },
+-- { t = "D", seq, total, data }, { t = "N", reason } or nil.
+local function decodePayload(payload)
+  local id, hash, letter = payload:match("^(" .. ID_PAT .. ")(" .. HASH_PAT .. ")(%u)$")
+  if id then
+    return KINDS[letter] and { t = "Q", id = id, hash = hash, letter = letter } or nil
   end
-  local ok, res = pcall(api.SendAddonMessage, NL.PREFIX, msg, "WHISPER", target)
-  if not ok or res == false then
-    return false
+  local seq, total, data = payload:match("^(%d+)/(%d+)/([%w%(%)]*)$")
+  if seq then
+    seq, total = tonumber(seq), tonumber(total)
+    if #data <= CHUNK and total <= MAX_CHUNKS and seq >= 1 and seq <= total then
+      return { t = "D", seq = seq, total = total, data = data }
+    end
+    return nil
   end
-  local success = Enum and Enum.SendAddonMessageResult and Enum.SendAddonMessageResult.Success or 0
-  return not (type(res) == "number" and res ~= success)
+  if payload == "gone" then
+    return { t = "N", reason = "gone" }
+  end
+end
+
+-- One chunk of an answer. A job that was asked in the old format answers in it.
+local function emitData(job, i, piece)
+  if job.legacy then
+    return Comm.SendLegacy(NL.PREFIX, "whisper", LEGACY_FNS, function(allowed)
+      return allowed[FN] and string.format("D\t%s\t%d\t%d\t%s", job.nonce, i, job.total, piece) or nil
+    end, { priority = "reply", target = job.to })
+  end
+  local payload = string.format("%d/%d/%s", i, job.total, piece)
+  return Comm.Send(FN, "D", payload, "whisper", job.to, { priority = "reply", id = job.nonce })
+end
+
+local function emitGone(to, nonce, legacy)
+  if legacy then
+    return Comm.SendLegacy(NL.PREFIX, "whisper", LEGACY_FNS, function(allowed)
+      return allowed[FN] and string.format("N\t%s\tgone", nonce) or nil
+    end, { priority = "reply", target = to })
+  end
+  return Comm.Send(FN, "N", "gone", "whisper", to, { priority = "reply", id = nonce })
 end
 
 local serving = {}
@@ -302,47 +360,94 @@ local function servingCount()
   return n
 end
 
-local function pump(job)
-  local i = job.i
-  local piece = job.code:sub((i - 1) * CHUNK + 1, i * CHUNK)
-  local sent = sendAddon(string.format("D\t%s\t%d\t%d\t%s", job.nonce, i, job.total, piece), job.to)
-  if not sent or i >= job.total then
-    serving[job.key] = nil
-    return
-  end
-  job.i = i + 1
+local pump
+
+local function later(job, delay)
   C_Timer.After(
-    SEND_GAP,
+    delay,
     ns.Wrap("notelink-serve", function()
       pump(job)
     end)
   )
 end
 
--- Sender side: answers a request for content of `kind` this player shared.
-local function serve(requester, nonce, id, hash, kind)
+-- Hands the chunks to the line of Comm one by one: it paces them, the job only keeps the queue short.
+function pump(job)
+  if serving[job.key] ~= job then
+    return
+  end
+  if not Consent.Allows(FN, "send", "chat") or Comm.clock() > job.deadline then
+    serving[job.key] = nil
+    return
+  end
+  if Comm.Queued() >= QUEUE_SOFT then
+    return later(job, QUEUE_WAIT)
+  end
+  local i = job.i
+  local sent = emitData(job, i, job.code:sub((i - 1) * CHUNK + 1, i * CHUNK))
+  if not sent or i >= job.total then
+    serving[job.key] = nil
+    return
+  end
+  job.i = i + 1
+  later(job, SEND_GAP)
+end
+
+-- Sender side: answers a request for content of `kind`. Comm lets a v2 request through only for an
+-- id of this session; the old format is checked here. Anything else gets silence.
+local function serve(requester, nonce, id, hash, kind, legacy)
   local key = PN.Key(requester)
   if key == "" or isSelf(requester) or serving[key] then
     return
   end
-  local entry = shared[id]
-  if not entry or entry.hash ~= hash or (entry.kind or "N") ~= kind then
-    sendAddon(string.format("N\t%s\tgone", nonce), requester)
+  if not Consent.Allows(FN, "send", "chat") or not Comm.WasShared(FN, id) then
     return
   end
-  if servingCount() >= SERVE_MAX then
+  local entry = shared[id]
+  if not entry then
+    emitGone(requester, nonce, legacy)
+    return
+  end
+  if entry.hash ~= hash or (entry.kind or "N") ~= kind or servingCount() >= SERVE_MAX then
     return
   end
   local job = {
     key = key,
     to = requester,
     nonce = nonce,
+    legacy = legacy,
     code = entry.code,
     total = math.ceil(#entry.code / CHUNK),
     i = 1,
+    deadline = Comm.clock() + SERVE_SPAN,
   }
   serving[key] = job
   pump(job)
+end
+
+-- A request that came through Comm (see the registration below).
+local function onRequest(sender, value, ctx)
+  if value.t == "Q" then
+    serve(sender, ctx.id, value.id, value.hash, value.letter, false)
+  end
+end
+
+-- A request in the old format of prefix FGNOTE, text as on the wire.
+local function onLegacy(text, sender, ctx)
+  if not ctx.allowed[FN] or text:sub(1, 2) ~= "Q\t" then
+    return
+  end
+  -- The kind is optional on the wire, a request without one is for a note.
+  local nonce, id, hash, letter = text:match("^Q\t(%w+)\t([a-z0-9]+)\t([0-9a-f]+)\t(%u)$")
+  if not nonce then
+    nonce, id, hash = text:match("^Q\t(%w+)\t([a-z0-9]+)\t([0-9a-f]+)$")
+    letter = "N"
+  end
+  if nonce and #nonce <= 12 and #id == 8 and #hash == 8 and KINDS[letter] and Comm.WasShared(FN, id) then
+    if Comm.TakeAnswer(sender) then
+      serve(sender, nonce, id, hash, letter, true)
+    end
+  end
 end
 
 -- Receiver side ------------------------------------------------------------------------
@@ -353,6 +458,7 @@ local pending
 local function fail(p, key)
   if pending == p then
     pending = nil
+    Comm.Close(FN, p.sender, p.nonce)
     ns.Notify(fmt(KINDS[p.kind].prefix .. "." .. key, p.sender), "warning")
   end
 end
@@ -381,6 +487,7 @@ end
 
 local function finish(p)
   pending = nil
+  Comm.Close(FN, p.sender, p.nonce)
   local spec = KINDS[p.kind]
   local result, why = spec.decode(table.concat(p.parts, "", 1, p.total), p.hash)
   if not result then
@@ -412,75 +519,94 @@ local function receive(p, seq, total, data)
   end
 end
 
--- Handles CHAT_MSG_ADDON. Replies are only accepted for the one open request,
--- from the player asked, with the matching nonce.
-function NL.OnAddon(prefix, text, channel, sender)
-  if
-    prefix ~= NL.PREFIX
-    or channel ~= "WHISPER"
-    or type(text) ~= "string"
-    or type(sender) ~= "string"
-    or #text > 255
-  then
-    return
-  end
-  local kind = text:sub(1, 2)
-  if kind == "Q\t" then
-    -- The kind is optional on the wire, a request without one is for a note.
-    local nonce, id, hash, letter = text:match("^Q\t(%w+)\t([a-z0-9]+)\t([0-9a-f]+)\t(%u)$")
-    if not nonce then
-      nonce, id, hash = text:match("^Q\t(%w+)\t([a-z0-9]+)\t([0-9a-f]+)$")
-      letter = "N"
-    end
-    if nonce and #nonce <= 12 and #id == 8 and #hash == 8 and KINDS[letter] then
-      serve(sender, nonce, id, hash, letter)
-    end
-    return
-  end
+-- An answer that came through Comm: only for the one open request, from the player asked, with the
+-- id of the request (Comm let it pass for that, the checks here keep a stale window harmless).
+local function onAnswer(sender, value, ctx)
   local p = pending
-  if not p or not PN.Equal(sender, p.sender) then
+  if not p or ctx.id ~= p.nonce or not PN.Equal(sender, p.sender) then
     return
   end
-  if kind == "D\t" then
-    local nonce, seq, total, data = text:match("^D\t(%w+)\t(%d+)\t(%d+)\t([%w%(%)]*)$")
-    total = tonumber(total)
-    if nonce == p.nonce and total and total >= 1 and total <= MAX_CHUNKS then
-      receive(p, tonumber(seq), total, data)
-    end
-  elseif kind == "N\t" then
-    local nonce, reason = text:match("^N\t(%w+)\t(%a+)$")
-    if nonce == p.nonce then
-      fail(p, reason == "gone" and "gone" or "badData")
-    end
+  if value.t == "D" then
+    receive(p, value.seq, value.total, value.data)
+  elseif value.t == "N" then
+    fail(p, value.reason == "gone" and "gone" or "badData")
   end
 end
 
+-- The opt-in hint in place of a transfer: a small window with the notice for receiving.
+local optInView
+
+local function showOptIn(sender)
+  if not optInView then
+    local d = ns.Dialogs.Create("ForeverGuidesNoteLinkOptIn", 460, 190)
+    optInView = d
+    W.SetText(d.title, "notelink.optin.title")
+    d.body = W.Text(d, { role = "ui", color = "textSecondary", wrap = true })
+    d.body:SetPoint("TOPLEFT", 16, -44)
+    d.body:SetPoint("RIGHT", -16, 0)
+    d.notice = ns.OptInNotice.Banner(d, {
+      fn = FN,
+      dir = "receive",
+      aud = "chat",
+      textKey = "optin.recv.linkShare",
+      showWhenOn = false,
+      onChanged = function()
+        d:Hide()
+      end,
+    })
+    d.notice:SetPoint("TOPLEFT", 16, -92)
+    d.notice:SetPoint("TOPRIGHT", -16, -92)
+    d.notice:Fit(428)
+    d.close = W.Action(d, {
+      label = "act.close",
+      icon = "close",
+      tooltip = "common.close",
+      width = 110,
+      onClick = function()
+        d:Hide()
+      end,
+    })
+    d.close:SetPoint("BOTTOMRIGHT", -16, 14)
+  end
+  W.SetText(optInView.body, nil, fmt("notelink.optin.body", PN.Normalize(sender)))
+  optInView.notice:Update(true)
+  optInView:Show()
+  return optInView
+end
+NL.ShowOptIn = showOptIn
+
 -- Asks `sender` for shared content of `letter` (default a note). `title` is the
--- one from the chat link, for kinds that do not carry their own.
+-- one from the chat link, for kinds that do not carry their own. Needs the receive consent: without
+-- it nothing is sent and the hint opens.
 function NL.Request(sender, id, hash, letter, title)
   letter = letter or "N"
-  if not (C_ChatInfo and C_ChatInfo.SendAddonMessage) then
-    ns.Notify(L["notelink.noApi"], "warning")
-    return
+  if pending then
+    Comm.Close(FN, pending.sender, pending.nonce)
+    pending = nil
   end
   local p = {
     sender = sender,
     hash = hash,
     kind = letter,
     title = title,
-    nonce = randomString(6),
+    nonce = CL.NewId(Comm.random),
     parts = {},
     got = 0,
     bytes = 0,
   }
   pending = p
-  local request = string.format("Q\t%s\t%s\t%s", p.nonce, id, hash)
-  if letter ~= "N" then
-    request = request .. "\t" .. letter
-  end
-  if not sendAddon(request, sender) then
+  local ok, why = Comm.Send(FN, "Q", id .. hash .. letter, "whisper", sender, { priority = "click", id = p.nonce })
+  if not ok then
     pending = nil
-    ns.Notify(fmt("notelink.sendFailed", sender), "error")
+    if why == "consent" then
+      showOptIn(sender)
+    elseif why == "combat" or why == "restricted" then
+      ns.Notify(L["notelink.blocked"], "warning")
+    elseif why == "no-api" then
+      ns.Notify(L["notelink.noApi"], "warning")
+    else
+      ns.Notify(fmt("notelink.sendFailed", sender), "error")
+    end
     return
   end
   ns.Notify(fmt(KINDS[letter].prefix .. ".loading", sender), "info")
@@ -488,12 +614,17 @@ function NL.Request(sender, id, hash, letter, title)
 end
 
 -- Opens shared content from a chat payload. `sender` comes from the chat event,
--- `title` from the link text (only used by kinds without a title in the data).
+-- `title` from the link text (only used by kinds without a title in the data). Without the receive
+-- consent only the hint opens, also for a link that was made before the consent went off.
 function NL.Open(sender, payload, letter, title)
   letter = letter or "N"
   local spec = KINDS[letter]
   local p = NL.ParsePayload(payload)
   if not (spec and p) then
+    return false
+  end
+  if not Consent.Allows(FN, "receive", "chat") then
+    showOptIn(sender)
     return false
   end
   if p.kind == "i" then
@@ -552,7 +683,7 @@ end
 -- message with a local clickable link. Notes are looked at before other kinds,
 -- so a message with both only converts the note. Returns the new message or
 -- nil when unchanged.
-function NL.Rewrite(msg, sender)
+local function rewrite(msg, sender)
   if type(msg) ~= "string" or not msg:find("FG", 1, true) or type(sender) ~= "string" then
     return nil
   end
@@ -607,10 +738,44 @@ local CHAT_EVENTS = {
   "CHANNEL",
 }
 
+-- Needs the receive consent: without it the token stays text and the filter does nothing else.
+function NL.Rewrite(msg, sender)
+  if not Consent.Allows(FN, "receive", "chat") then
+    return nil
+  end
+  return rewrite(msg, sender)
+end
+
+-- One local line per session that a link was seen and what switches it on. Sends nothing.
+local hinted = false
+
+local function hintOnce(msg, sender)
+  if hinted or PN.Equal(sender, PN.Self()) or not rewrite(msg, sender) then
+    return
+  end
+  hinted = true
+  local who = PN.Normalize(sender)
+  C_Timer.After(
+    0,
+    ns.Wrap("notelink-hint", function()
+      ns.Notify(fmt("notelink.optInHint", who), "info")
+    end)
+  )
+end
+
 local function chatFilter(_, event, msg, sender, ...)
+  local guard = ns.AutoGuard
+  local text, name = guard and guard.Safe(msg), guard and guard.Safe(sender)
+  if type(text) ~= "string" or type(name) ~= "string" then
+    return false
+  end
   -- For an outgoing whisper the event names the recipient, the author is us.
-  local who = event == "CHAT_MSG_WHISPER_INFORM" and PN.Self() or sender
-  local ok, out = pcall(NL.Rewrite, msg, who)
+  local who = event == "CHAT_MSG_WHISPER_INFORM" and PN.Self() or name
+  if not Consent.Allows(FN, "receive", "chat") then
+    pcall(hintOnce, text, who)
+    return false
+  end
+  local ok, out = pcall(rewrite, text, who)
   if ok and out then
     return false, out, sender, ...
   end
@@ -640,12 +805,24 @@ end
 if hooksecurefunc then
   pcall(hooksecurefunc, "SetItemRef", ns.Wrap("notelink-click", NL.OnLink))
 end
-if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
-  pcall(C_ChatInfo.RegisterAddonMessagePrefix, NL.PREFIX)
-end
-ns.On("CHAT_MSG_ADDON", function(_, prefix, text, channel, sender)
-  NL.OnAddon(prefix, text, channel, sender)
-end)
+
+-- The line of Comm: function LK by whisper, and the old prefix FGNOTE for clients that did not update
+-- yet (they ask in the old format, such a request runs through the same consent checks).
+Comm.Register(FN, {
+  version = 1,
+  audiences = { "whisper" },
+  on = { Q = onRequest, D = onAnswer, N = onAnswer },
+  decode = decodePayload,
+  request = "Q",
+  service = function(value)
+    return value.t == "Q" and value.id or nil
+  end,
+})
+Comm.RegisterLegacy(
+  NL.PREFIX,
+  { audiences = { "whisper" }, functions = LEGACY_FNS, direction = "send", handler = onLegacy }
+)
+Consent.MarkAvailable(FN)
 
 -- Viewer -------------------------------------------------------------------------------
 

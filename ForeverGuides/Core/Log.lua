@@ -57,10 +57,12 @@ end
 
 -- One list for our own ns.Safe errors and for what the catcher records. Entry: msg, ctx,
 -- kind ("error", "blocked", "forbidden", "warning"), addon, stack, count, first, last
--- (server time), session (of the last occurrence). Old entries lack kind, addon, session.
+-- (server time), session (of the last occurrence), ops (blocked map calls only). Old entries lack kind,
+-- addon, session.
 local MAX_STORED = 100
 local MAX_MSG = 500
 local MAX_STACK = 1500
+local MAX_OPS = 1500
 local SESSION_CAP = 100
 local Errors = { list = {}, sessionCount = 0, dropped = 0, MAX_STORED = MAX_STORED }
 ns.Errors = Errors
@@ -127,7 +129,8 @@ local function shortStack(stack)
   return table.concat(lines, "\n")
 end
 
--- spec: msg, kind, addon, ctx, stack (already shortened). Returns entry, isNew; nil when a
+-- spec: msg, kind, addon, ctx, stack (already shortened), ops (text of the map operations before a blocked
+-- map call, the newest occurrence wins). Returns entry, isNew; nil when a
 -- repeat is dropped because the session already counted SESSION_CAP occurrences.
 function Errors.add(spec)
   local msg = Errors.clip(spec.msg, MAX_MSG)
@@ -147,6 +150,9 @@ function Errors.add(spec)
       if (e.stack or "") == "" and spec.stack and spec.stack ~= "" then
         e.stack = Errors.clip(spec.stack, MAX_STACK)
       end
+      if spec.ops then
+        e.ops = Errors.clip(spec.ops, MAX_OPS)
+      end
       if ns.Emit then
         ns.Emit("FG_ERRORS_CHANGED")
       end
@@ -160,6 +166,7 @@ function Errors.add(spec)
     kind = kind,
     addon = addon,
     stack = Errors.clip(spec.stack or "", MAX_STACK),
+    ops = spec.ops and Errors.clip(spec.ops, MAX_OPS) or nil,
     count = 1,
     first = now,
     last = now,

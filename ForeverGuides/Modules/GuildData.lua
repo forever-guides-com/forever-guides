@@ -74,6 +74,9 @@ local function read()
   end
   local count = call(g("GetNumGuildMembers"))
   count = count and tonumber(count[1]) or 0
+  -- Rows can be fewer than the total (filter "online only", unreadable rows): a reader that finds
+  -- departures must compare both.
+  snap.total, snap.takenAt = count, clock()
   local ranks = {}
   for i = 1, math.min(count, D.MAX_MEMBERS) do
     local raw = call(g("GetGuildRosterInfo"), i)

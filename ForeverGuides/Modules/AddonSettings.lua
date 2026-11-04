@@ -141,6 +141,7 @@ end
 
 -- Cards of the page that was built last; a rebuilt page replaces the list.
 local built = {}
+local clientLine
 
 local function addCard(card, entry)
   local id, s = entry.id, card.stack
@@ -215,10 +216,18 @@ function AS.AddSettings(view)
   ns.AddHeading(view, "addons.set.heading")
   ns.AddParagraph(view, "addons.set.intro", { role = "micro", color = "textMuted" })
   ns.AddParagraph(view, "addons.set.hint", { role = "micro", color = "textSecondary" })
+  clientLine = ns.AddParagraph(view, nil, { text = ns.Client.Line(), role = "micro", color = "textMuted" })
   for _, entry in ipairs(S.List()) do
     addCard(view.grid:Card(), entry)
   end
 end
+
+-- The client override changed (/fg dev client): the line shows the new client.
+ns.On("FG_CLIENT_CHANGED", function()
+  if clientLine then
+    W.SetText(clientLine, nil, ns.Client.Line())
+  end
+end)
 
 -- A switch changed (here, in the wizard or on the guild page): every card reads its state again.
 ns.On("FG_SUBADDON_CHANGED", function()

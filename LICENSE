@@ -5,8 +5,9 @@ Deutsch (English version below)
 ===============================
 
 Geltungsbereich: Diese Lizenz gilt für das gesamte Paket Forever Guides, also
-für alle mitgelieferten Ordner (ForeverGuides, ForeverGuides_GildenManager,
-ForeverGuides_MapData, ForeverGuides_Professions, ForeverGuides_Recipes) und
+für alle mitgelieferten Ordner (ForeverGuides, ForeverGuides_Gathering,
+ForeverGuides_GildenManager, ForeverGuides_MapData, ForeverGuides_Professions,
+ForeverGuides_Recipes, ForeverGuides_Chat) und
 alle darin enthaltenen eigenen Dateien, Daten und Texte. Komponenten Dritter
 siehe Abschnitt 4.
 
@@ -71,8 +72,9 @@ English
 =======
 
 Scope: This license applies to the entire Forever Guides package, that is, to
-all bundled folders (ForeverGuides, ForeverGuides_GildenManager,
-ForeverGuides_MapData, ForeverGuides_Professions, ForeverGuides_Recipes) and to
+all bundled folders (ForeverGuides, ForeverGuides_Gathering,
+ForeverGuides_GildenManager, ForeverGuides_MapData, ForeverGuides_Professions,
+ForeverGuides_Recipes, ForeverGuides_Chat) and to
 all original files, data and texts in them. For third-party components see
 section 4.
 

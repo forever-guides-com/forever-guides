@@ -276,25 +276,31 @@ local function typed(path, value)
   end
 end
 
--- Classes the game knows, with its own names; the addon's list when the client names none.
+-- Highest class ID the client may know; Classic numbers the classes with gaps (Druid is 11), so GetNumClasses()
+-- is not the last ID.
+local MAX_CLASS_ID = 20
+
+-- Classes the game knows, with its own names, then the addon's own classes the client did not name.
 local function classEntries()
-  local out = {}
-  local count, info = rawget(_G, "GetNumClasses"), rawget(_G, "GetClassInfo")
-  if type(count) == "function" and type(info) == "function" then
-    local ok, n = pcall(count)
-    for i = 1, ok and tonumber(n) or 0 do
-      local okInfo, name, token = pcall(info, i)
-      if okInfo and type(token) == "string" and token ~= "" then
-        out[#out + 1] = { token = token, name = type(name) == "string" and name or token }
+  local out, seen = {}, {}
+  local function add(token, name)
+    if not seen[token] then
+      seen[token] = true
+      out[#out + 1] = { token = token, name = type(name) == "string" and name or token }
+    end
+  end
+  local info = rawget(_G, "GetClassInfo")
+  if type(info) == "function" then
+    for id = 1, MAX_CLASS_ID do
+      local ok, name, token = pcall(info, id)
+      if ok and type(token) == "string" and token ~= "" then
+        add(token, name)
       end
     end
   end
-  if #out == 0 then
-    local names = rawget(_G, "LOCALIZED_CLASS_NAMES_MALE") or rawget(_G, "LOCALIZED_CLASS_NAMES") or {}
-    for _, token in ipairs(LB.CLASSES) do
-      out[#out + 1] =
-        { token = token, name = type(names[token]) == "string" and names[token] or ns.RefLogic.className(token) }
-    end
+  local names = rawget(_G, "LOCALIZED_CLASS_NAMES_MALE") or rawget(_G, "LOCALIZED_CLASS_NAMES") or {}
+  for _, token in ipairs(LB.CLASSES) do
+    add(token, type(names[token]) == "string" and names[token] or ns.RefLogic.className(token))
   end
   return out
 end

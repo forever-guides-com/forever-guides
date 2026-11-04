@@ -31,6 +31,7 @@ ns.AddLocale("enUS", {
   ["errcatch.session.ago.one"] = "1 start ago",
   ["errcatch.session.ago.other"] = "%d starts ago",
   ["errcatch.script"] = "Script",
+  ["errcatch.ops"] = "Last map operations of the addon:",
 })
 ns.AddLocale("deDE", {
   ["errcatch.heading"] = "Fehlerfänger",
@@ -58,6 +59,7 @@ ns.AddLocale("deDE", {
   ["errcatch.session.ago.one"] = "vor 1 Start",
   ["errcatch.session.ago.other"] = "vor %d Starts",
   ["errcatch.script"] = "Skript",
+  ["errcatch.ops"] = "Letzte Karten-Operationen des Addons:",
 })
 
 local EC = {}
@@ -106,12 +108,16 @@ function EC.Capture(kind, msg, stack, addon, source)
   if dedupe:isDuplicate(msg, source, now) or not flood:allow(now) then
     return nil
   end
+  local ops
+  if ns.MapOps and Logic.IsMapBlock(kind, msg, stack) then
+    ops = Logic.OpsText(ns.MapOps.Last())
+  end
   stack = Logic.CleanStack(stack)
   addon = addon or Logic.AddonOf(msg, stack)
   if not Logic.IsOwn(addon) and not flag("errorForeign") then
     return nil
   end
-  return (ns.Errors.add({ msg = msg, kind = kind, addon = addon, stack = stack, ctx = addon }))
+  return (ns.Errors.add({ msg = msg, kind = kind, addon = addon, stack = stack, ctx = addon, ops = ops }))
 end
 
 local function currentStack()
@@ -475,6 +481,7 @@ function EC.AddSettings(view)
       icon = "open",
       tooltip = "errcatch.openList",
       width = 220,
+      opens = true,
       onClick = function()
         ns.Main.Show("errors")
       end,

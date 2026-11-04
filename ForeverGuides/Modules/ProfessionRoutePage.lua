@@ -13,7 +13,6 @@ ns.ProfessionRoutePage = P
 local CONTROL_GAP = 12
 local DROPDOWN_W, FIELD_W, BUTTON_W = 220, 90, 170
 local BAR_H = 10
-local TRAINER_BUTTON_W = 70
 
 ns.AddLocale("enUS", {
   ["page.professionroute"] = "Profession route",
@@ -32,14 +31,16 @@ ns.AddLocale("enUS", {
   ["profroute.trainersHeading"] = "Trainers",
   ["profroute.state.current"] = "Current",
   ["profroute.state.done"] = "Done",
+  ["profroute.area.before"] = "Before the start skill",
+  ["profroute.area.after"] = "After the target skill",
   ["profroute.crafts"] = "%dx",
   ["profroute.perCraft"] = "%d per craft",
   ["profroute.src.trainer"] = "Trainer (%s): %s",
   ["profroute.src.trainerNone"] = "Trainer (%s)",
   ["profroute.src.item"] = "Recipe item",
   ["profroute.rankHead"] = "%s (up to %d)",
-  ["profroute.map"] = "Map",
-  ["profroute.mapTip"] = "Sets a waypoint.",
+  ["profroute.mapTip"] = "Shows the place on the map.",
+  ["profroute.markerTip"] = "Sets a waypoint with an arrow.",
   ["profroute.noSteps"] = "No steps in the data.",
   ["profroute.rank.apprentice"] = "Apprentice",
   ["profroute.rank.journeyman"] = "Journeyman",
@@ -65,14 +66,16 @@ ns.AddLocale("deDE", {
   ["profroute.trainersHeading"] = "Lehrer",
   ["profroute.state.current"] = "Aktuell",
   ["profroute.state.done"] = "Erledigt",
+  ["profroute.area.before"] = "Vor dem Start-Skill",
+  ["profroute.area.after"] = "Nach dem Ziel-Skill",
   ["profroute.crafts"] = "%dx",
   ["profroute.perCraft"] = "%d pro Herstellung",
   ["profroute.src.trainer"] = "Lehrer (%s): %s",
   ["profroute.src.trainerNone"] = "Lehrer (%s)",
   ["profroute.src.item"] = "Rezept-Item",
   ["profroute.rankHead"] = "%s (bis %d)",
-  ["profroute.map"] = "Karte",
-  ["profroute.mapTip"] = "Setzt einen Wegpunkt.",
+  ["profroute.mapTip"] = "Zeigt den Ort auf der Karte.",
+  ["profroute.markerTip"] = "Setzt einen Wegpunkt mit Pfeil.",
   ["profroute.noSteps"] = "Keine Schritte in den Daten.",
   ["profroute.rank.apprentice"] = "Lehrling",
   ["profroute.rank.journeyman"] = "Geselle",
@@ -139,6 +142,44 @@ end
 
 local LEFT_W = 64
 local SIDE = 12
+local CRAFTERS_SIDE = 22
+local HEAD_H = 26
+local HEAD_GAP = 8
+-- Light fills that carry one black text color, the same as the areas of the level list.
+local AREA_COLORS = { before = "sectionLearned", after = "sectionLocked" }
+-- Areas the user opened this session ("before" / "after"), closed by default.
+local opened = {}
+
+-- Header of a collapsed or opened area, a real button so the keyboard reaches it.
+local function newAreaHead(row)
+  local head = CreateFrame("Button", nil, row)
+  head:SetPoint("TOPLEFT")
+  head:SetPoint("BOTTOMRIGHT", 0, HEAD_GAP)
+  head.bg = head:CreateTexture(nil, "BACKGROUND")
+  head.bg:SetAllPoints()
+  local hover = head:CreateTexture(nil, "HIGHLIGHT")
+  hover:SetAllPoints()
+  hover:SetColorTexture(1, 1, 1, 0.3)
+  head.label = W.Text(head, { role = "h3", family = "heading", color = "sectionText" })
+  head.label:SetPoint("LEFT", 8, 0)
+  head.label:SetPoint("RIGHT", -8, 0)
+  head:SetScript(
+    "OnClick",
+    ns.Wrap("profroute-area", function()
+      if row.onToggle then
+        row.onToggle()
+      end
+    end)
+  )
+  head:SetScript("OnEnter", function(self)
+    ns.ShowTooltip(self, L["levels.area.tip"])
+  end)
+  head:SetScript("OnLeave", ns.HideTooltip)
+  ns.Focus.register(head, function(self)
+    self:Click()
+  end)
+  return head
+end
 
 local function newStepRow(parent)
   local row = CreateFrame("Button", nil, parent)
@@ -156,6 +197,9 @@ local function newStepRow(parent)
   row.sub = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
   row.chips = K.ChipRow(row)
   row.src = W.Text(row, { role = "micro", color = "textMuted", wrap = true })
+  row.head = newAreaHead(row)
+  -- Who in the guild can make the recipe of the step.
+  row.crafters = ns.CraftersView.Action(row, { size = CRAFTERS_SIDE, id = "profroute-crafters" })
   row:SetScript("OnEnter", function(self)
     if self.spell then
       W.Tooltip.Show(self, { spell = self.spell, title = self.recipe })
@@ -163,6 +207,9 @@ local function newStepRow(parent)
   end)
   row:SetScript("OnLeave", ns.HideTooltip)
   function row:fgLayout(width)
+    if self.isHead then
+      return K.scaledHeight(HEAD_H) + HEAD_GAP
+    end
     local textW = math.max(40, width - LEFT_W - SIDE * 2)
     self.range:ClearAllPoints()
     self.range:SetPoint("TOPLEFT", SIDE, -8)
@@ -170,10 +217,12 @@ local function newStepRow(parent)
     self.state:ClearAllPoints()
     self.state:SetPoint("TOPRIGHT", -SIDE, -8)
     self.state:SetWidth(80)
+    self.crafters:ClearAllPoints()
+    self.crafters:SetPoint("TOPRIGHT", -SIDE - 84, -6)
     local x, y = LEFT_W + SIDE, -8
     self.title:ClearAllPoints()
     self.title:SetPoint("TOPLEFT", x, y)
-    self.title:SetWidth(math.max(40, textW - 80))
+    self.title:SetWidth(math.max(40, textW - 80 - (self.crafters:IsShown() and CRAFTERS_SIDE + 6 or 0)))
     y = y - math.max(self.title:GetStringHeight(), 14) - 2
     local subH = 0
     if self.sub:GetText() and self.sub:GetText() ~= "" then
@@ -204,11 +253,28 @@ local COLORS = {
   done = { title = "textMuted", text = "textMuted", state = "textMuted" },
 }
 
+-- item.area ("before" | "after") paints the header of a collapsed area instead of a step.
 local function paintStep(row, item)
+  row.isHead = item.area ~= nil
+  row.head:SetShown(row.isHead)
+  for _, part in ipairs({ row.range, row.state, row.title, row.sub, row.chips, row.src }) do
+    part:SetShown(not row.isHead)
+  end
+  if row.isHead then
+    row.spell, row.recipe, row.onToggle = nil, nil, item.onToggle
+    row.crafters:SetSpell(nil)
+    row.bg:SetColorTexture(1, 1, 1, 0)
+    row.mark:SetColorTexture(1, 1, 1, 0)
+    row.head.bg:SetColorTexture(Theme.color(AREA_COLORS[item.area]))
+    row.head.label:SetText(item.text)
+    return
+  end
+  row.onToggle = nil
   local step, data, status = item.step, item.data, item.status
   local colors = COLORS[status]
   local recipe = spellName(step.spell) or ns.T(step.name)
   row.spell, row.recipe = step.spell, recipe
+  row.crafters:SetSpell(type(step.spell) == "number" and step.spell or nil)
   row.range:SetText(string.format("%d-%d", step.from or 0, step.to or 0))
   W.SetColor(row.range, colors.title)
   -- Without a recipe name the effect text is the title.
@@ -255,32 +321,25 @@ end
 
 local function newTrainerRow(parent)
   local row = CreateFrame("Frame", nil, parent)
+  row:EnableMouse(true)
   row.text = W.Text(row, { role = "ui", wrap = true })
-  row.map = W.Action(row, {
-    label = "act.map",
-    icon = "map",
-    variant = "ghost",
-    width = TRAINER_BUTTON_W,
-    height = 20,
-    tooltip = "profroute.map",
-    tooltipText = "profroute.mapTip",
-    onClick = function()
-      local t = row.trainer
-      if t then
-        local place = ns.ProfessionTrainersLogic.Place(t)
-        K.ShowOnMap(place.map, place.x, place.y, place.label)
-      end
+  row.actions = W.MapActionButtons(row, { mapTip = "profroute.mapTip", markerTip = "profroute.markerTip" })
+  -- Rank heads and trainers without a position do not hover.
+  K.RowHover(row, {
+    extraFrames = { row.actions.map, row.actions.marker },
+    isActive = function()
+      return row.trainer ~= nil
     end,
   })
   function row:fgLayout(width)
-    local hasMap = self.map:IsShown()
-    local textW = math.max(40, width - 8 - (hasMap and TRAINER_BUTTON_W + 8 or 0))
+    local hasPlace = self.actions:IsShown()
+    local textW = math.max(40, width - 8 - (hasPlace and self.actions:GetWidth() + 12 or 4))
     self.text:ClearAllPoints()
-    self.text:SetPoint("TOPLEFT", 8, -4)
+    self.text:SetPoint("TOPLEFT", 8, -6)
     self.text:SetWidth(textW)
-    self.map:ClearAllPoints()
-    self.map:SetPoint("TOPRIGHT", -4, -2)
-    return math.max(self.text:GetStringHeight() + 8, 24)
+    self.actions:ClearAllPoints()
+    self.actions:SetPoint("TOPRIGHT", -4, -2)
+    return math.max(self.text:GetStringHeight() + 12, 28)
   end
   return row
 end
@@ -292,7 +351,8 @@ local function paintTrainer(row, item)
     row.text:SetText(item.head)
     W.SetColor(row.text, "accent2")
     row.trainer = nil
-    row.map:Hide()
+    row.actions:SetPlace(nil)
+    row.paintHover()
     return
   end
   local t = item.trainer
@@ -308,7 +368,10 @@ local function paintTrainer(row, item)
   row.text:SetText(table.concat(parts, ", "))
   W.SetColor(row.text, "text")
   row.trainer = PL.HasPosition(t) and t or nil
-  row.map:SetShown(row.trainer ~= nil)
+  row.actions:SetPlace(row.trainer and function()
+    return PL.Place(t)
+  end or nil)
+  row.paintHover()
 end
 
 -- The trainers of every rank of a route: { { head } or { trainer } } rows, the trainers of the rank
@@ -336,7 +399,7 @@ local function build(container)
 
   ns.AddParagraph(view, "profroute.intro")
 
-  -- Controls: profession, target, start, shopping list button, wrapped to the width.
+  -- Controls: profession, start, target, shopping list button, wrapped to the width.
   local options = {}
   local controls = CreateFrame("Frame", nil, view.content)
   local dropdown = W.Dropdown(controls, {
@@ -365,21 +428,22 @@ local function build(container)
     box.edit = edit
     return box
   end
-  local target = field("profroute.target", "profroute.targetPh", "target")
   local from = field("profroute.from", "profroute.fromPh", "from")
+  local target = field("profroute.target", "profroute.targetPh", "target")
   local shop = W.Button(controls, {
     key = "profroute.shop",
     variant = "primary",
     width = BUTTON_W,
     tooltip = "profroute.shop",
     tooltipText = "profroute.shopTip",
+    opens = true,
     onClick = function()
       ns.ProfessionShopWindow.Open()
     end,
   })
   function controls:fgGridLayout(width)
     local x, y, rowH = 0, 0, 46
-    for _, item in ipairs({ dropdown, target, from, shop }) do
+    for _, item in ipairs({ dropdown, from, target, shop }) do
       local w = item:GetWidth()
       if x > 0 and x + w > width then
         x, y = 0, y + rowH + 8
@@ -486,9 +550,32 @@ local function build(container)
     end
     bar.frac = state.frac
     local rows = {}
-    for _, e in ipairs(R.Steps(data, skill or 0)) do
-      rows[#rows + 1] = { step = e.step, data = data, status = e.status }
+    local function addSteps(entries)
+      for _, e in ipairs(entries) do
+        rows[#rows + 1] = { step = e.step, data = data, status = e.status }
+      end
     end
+    -- Only a typed start or target hides steps, the automatic skill keeps every step in view.
+    local before, shown, after = R.Areas(R.Steps(data, skill or 0), S.Option("from"), S.Option("target"))
+    local function addArea(area, entries)
+      if #entries == 0 then
+        return
+      end
+      rows[#rows + 1] = {
+        area = area,
+        text = string.format("%s %s (%d)", opened[area] and "v" or ">", L["profroute.area." .. area], #entries),
+        onToggle = function()
+          opened[area] = not opened[area] or nil
+          refresh()
+        end,
+      }
+      if opened[area] then
+        addSteps(entries)
+      end
+    end
+    addArea("before", before)
+    addSteps(shown)
+    addArea("after", after)
     if #rows == 0 then
       hint:SetText(L["profroute.noSteps"])
       hint:SetShown(true)

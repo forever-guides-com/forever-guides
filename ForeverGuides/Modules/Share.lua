@@ -5,6 +5,7 @@
 local _, ns = ...
 local W, L = ns.W, ns.L
 local PN = ns.PlayerName
+local Consent = ns.Consent
 
 local Share = {}
 ns.Share = Share
@@ -34,7 +35,9 @@ ns.AddLocale("enUS", {
   ["share.whisperFirst"] = "First name",
   ["share.whisperSurname"] = "Surname",
   ["share.whisperNeedName"] = "Please enter first and last name, for example Isanja Wosande.",
+  ["share.whisperNeedName.retail"] = "Please enter the player name, for example Isanja.",
   ["share.whisperBadName"] = "First and last name need at least 2 letters each and no further parts, for example Isanja Wosande.",
+  ["share.whisperBadName.retail"] = "The name needs at least 2 letters, optionally followed by -Realm, for example Isanja-Realm.",
   ["share.whisperNotFound"] = "Player not found: %s. Check first and last name and online status.",
   ["share.preview"] = "Preview (exactly what is sent)",
   ["share.input"] = "Text (is split into chat messages)",
@@ -64,7 +67,9 @@ ns.AddLocale("deDE", {
   ["share.whisperFirst"] = "Vorname",
   ["share.whisperSurname"] = "Nachname",
   ["share.whisperNeedName"] = "Bitte Vor- und Nachnamen eingeben, zum Beispiel Isanja Wosande.",
+  ["share.whisperNeedName.retail"] = "Bitte den Spielernamen eingeben, zum Beispiel Isanja.",
   ["share.whisperBadName"] = "Vor- und Nachname brauchen je mindestens 2 Buchstaben und keine weiteren Teile, zum Beispiel Isanja Wosande.",
+  ["share.whisperBadName.retail"] = "Der Name braucht mindestens 2 Buchstaben, optional gefolgt von -Realm, zum Beispiel Isanja-Realm.",
   ["share.whisperNotFound"] = "Spieler nicht gefunden: %s. Prüfe Vor- und Nachname und Online-Status.",
   ["share.preview"] = "Vorschau (genau das wird gesendet)",
   ["share.input"] = "Text (wird in Chat-Nachrichten aufgeteilt)",
@@ -350,6 +355,12 @@ local function clickGated(chatType)
   return not (ok and inInstance)
 end
 
+-- A link of the add-on (note, drawing, build, list) is served to whoever opens it, so it needs the send
+-- consent of linkShare. Plain text and lines without a token are not affected.
+local function needsConsent(d)
+  return d.link ~= nil and not Consent.Allows("linkShare", "send", "chat")
+end
+
 local function paintSend(d)
   local job = d.job
   if job and job.gated then
@@ -357,7 +368,7 @@ local function paintSend(d)
   else
     W.SetText(d.go.label, "share.send")
   end
-  local ready = #d.msgs > 0 and (d.channel ~= "WHISPER" or firstName(d) ~= "")
+  local ready = #d.msgs > 0 and (d.channel ~= "WHISPER" or firstName(d) ~= "") and not needsConsent(d)
   if ready and not (job and not job.gated) then
     d.go:Enable()
   else
@@ -413,7 +424,7 @@ local function refresh(d)
   if d.status then
     W.SetText(d.warn, nil, d.status)
   elseif nameError then
-    W.SetText(d.warn, nameError == "missing" and "share.whisperNeedName" or "share.whisperBadName")
+    W.SetText(d.warn, PN.TextKey(nameError == "missing" and "share.whisperNeedName" or "share.whisperBadName"))
   elseif d.link and d.link.errText then
     W.SetText(d.warn, nil, d.link.errText)
   elseif d.link and d.link.err then
@@ -421,6 +432,10 @@ local function refresh(d)
   else
     W.SetText(d.warn, nil, total > #msgs and fmt("share.truncated", #msgs, total) or "")
   end
+  -- The hint takes the place of the warning line while the link may not go out.
+  local locked = needsConsent(d)
+  d.optin:Update(locked)
+  d.warn:SetShown(not locked)
   local whisper = d.channel == "WHISPER"
   if d.whisperRow ~= whisper then
     placeBody(d, whisper)
@@ -476,6 +491,9 @@ local function step(d, job)
 end
 
 local function send(d)
+  if needsConsent(d) then
+    return
+  end
   local job = d.job
   if job then
     -- Click-gated jobs advance by one message per click.
@@ -598,6 +616,22 @@ local function build()
   d.warn = W.Text(d, { role = "ui", color = "warning", wrap = true })
   d.warn:SetPoint("BOTTOMLEFT", 16, 56)
   d.warn:SetPoint("RIGHT", -16, 0)
+
+  -- Step one of the opt-in: the hint with its button; the dialog of the button asks for the consent.
+  d.optin = ns.OptInNotice.Banner(d, {
+    fn = "linkShare",
+    dir = "send",
+    aud = "chat",
+    textKey = "optin.send.linkShare",
+    onChanged = function()
+      if dlg == d and d:IsShown() then
+        refresh(d)
+      end
+    end,
+  })
+  d.optin:SetPoint("BOTTOMLEFT", 16, 52)
+  d.optin:SetPoint("BOTTOMRIGHT", -16, 52)
+  d.optin:Fit(DIALOG_W - 32)
 
   d.go = W.Button(d, {
     key = "share.send",

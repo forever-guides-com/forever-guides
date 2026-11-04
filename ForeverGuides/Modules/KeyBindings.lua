@@ -42,6 +42,8 @@ KB.list = {
   { name = "FOREVERGUIDES_WEAPONS", label = "binding.weapons", fn = "Weapons" },
   { name = "FOREVERGUIDES_TRAINERS", label = "binding.trainers", fn = "Trainers" },
   { name = "FOREVERGUIDES_SHARE", label = "binding.share", fn = "Share" },
+  { name = "FOREVERGUIDES_CHAT", label = "binding.chat", fn = "Chat" },
+  { name = "FOREVERGUIDES_CHAT_REPLY", label = "binding.chatReply", fn = "ChatReply" },
 }
 
 -- Errors land in the addon's error list instead of the game's error frame.
@@ -84,6 +86,17 @@ end)
 
 handler("Share", function()
   ns.Share.Open("", nil)
+end)
+
+-- Forever Chat: loads the sub-addon when it is on and toggles its window. While it is off a short note names
+-- the way to the switch (Settings, tab Addons) and nothing else happens.
+handler("Chat", function()
+  ns.ChatLauncher.Key()
+end)
+
+-- Answer to the last whisper in the Forever Chat window, the focus lands in its input line. Same rules as above.
+handler("ChatReply", function()
+  ns.ChatLauncher.Reply()
 end)
 
 -- Current keys of a binding as display text, nil when unbound.
@@ -146,6 +159,8 @@ ns.AddLocale("enUS", {
   ["binding.weapons"] = "Weapon masters",
   ["binding.trainers"] = "Class trainers",
   ["binding.share"] = "Share dialog",
+  ["binding.chat"] = "Forever Chat: open or close",
+  ["binding.chatReply"] = "Forever Chat: reply to last whisper",
 })
 ns.AddLocale("deDE", {
   ["binding.notes"] = "Notizen-Seite",
@@ -159,4 +174,6 @@ ns.AddLocale("deDE", {
   ["binding.weapons"] = "Waffenmeister",
   ["binding.trainers"] = "Klassenlehrer",
   ["binding.share"] = "Teilen-Dialog",
+  ["binding.chat"] = "Forever Chat: öffnen oder schließen",
+  ["binding.chatReply"] = "Forever Chat: Auf letztes Flüstern antworten",
 })

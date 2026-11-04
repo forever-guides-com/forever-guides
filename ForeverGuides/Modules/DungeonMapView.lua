@@ -746,6 +746,7 @@ function DMV.Create(parent)
     tooltip = "dmap.export",
     width = 110,
     height = CTRL_H,
+    opens = true,
     onClick = function()
       PD.Export(state.key)
     end,
@@ -756,6 +757,7 @@ function DMV.Create(parent)
     tooltip = "dmap.import",
     width = 110,
     height = CTRL_H,
+    opens = true,
     onClick = function()
       PD.Import(function()
         render()

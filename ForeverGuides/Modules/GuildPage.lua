@@ -14,8 +14,7 @@ local _, ns = ...
 local W, L, Theme, K, Store = ns.W, ns.L, ns.Theme, ns.PageKit, ns.Store
 local GL, GD, GE, Kit, GM = ns.GuildLogic, ns.GuildData, ns.GuildExt, ns.GuildKit, ns.GuildManagerButton
 local coloredName, className, classIcon, joinParts = Kit.ColoredName, Kit.ClassName, Kit.ClassIcon, Kit.JoinParts
-local columns, peerOf, ilvlText, jobsText, peerLines =
-  Kit.Columns, Kit.PeerOf, Kit.IlvlText, Kit.JobsText, Kit.PeerLines
+local columns, peerOf, peerLines = Kit.Columns, Kit.PeerOf, Kit.PeerLines
 local newDetail, newFlow, syncOptions, listHeight = Kit.NewDetail, Kit.NewFlow, Kit.SyncOptions, Kit.ListHeight
 
 local P = {}
@@ -24,6 +23,7 @@ ns.GuildPage = P
 local ROW_HEIGHT = Kit.ROW_HEIGHT
 local DROPDOWN_WIDTH = Kit.DROPDOWN_WIDTH
 local TOGGLE_WIDTH = 200
+local MAP_BUTTON_WIDTH = 110
 local SEARCH_HEIGHT = Kit.SEARCH_HEIGHT
 local MAX_ACTIONS = 6
 
@@ -39,6 +39,8 @@ ns.AddLocale("enUS", {
   ["guild.stats.classes"] = "Classes: %s",
   ["guild.search"] = "Search",
   ["guild.onlyOnline"] = "Online only",
+  ["guild.map"] = "Map",
+  ["guild.map.tip"] = "Members that share their position.",
   ["guild.rank"] = "Rank",
   ["guild.rank.all"] = "All ranks",
   ["guild.sort"] = "Sort by",
@@ -83,6 +85,9 @@ ns.AddLocale("enUS", {
   ["guild.peer.now"] = "just now",
   ["guild.peer.minutes"] = "%d min ago",
   ["guild.reading"] = "reading ...",
+  ["guild.unshared"] = "not shared",
+  ["guild.unshared.both"] = "iLvl, professions: %s",
+  ["guild.unshared.tip"] = "The member does not use the add-on or does not share item level and professions, or you do not receive them: tab Share.",
   ["guild.whisper"] = "Whisper",
   ["guild.seen.local"] = "Stored locally only",
   ["guild.set.heading"] = "Guild: item level and professions",
@@ -90,8 +95,16 @@ ns.AddLocale("enUS", {
   ["guild.set.inspect"] = "Read group item level",
   ["guild.set.inspectHint"] = "Inspects members in range, never in combat.",
   ["guild.set.share"] = "Share jobs, item level",
-  ["guild.set.shareHint"] = "Shares your professions and item level with your group and guild, only with players who have Forever Guides. No other data is sent.",
+  ["guild.set.shareHint"] = "Sending and receiving item level and professions is set in the tab Share. Off by default.",
   ["guild.set.shareGuild"] = "Also share with guild",
+  ["guild.set.shareOpen"] = "Go to Share",
+  ["guild.refresh"] = "Refresh",
+  ["guild.refresh.tip"] = "Announces your own data again. Needs Presence under Share.",
+  ["guild.refresh.sent"] = "Your data is announced.",
+  ["guild.refresh.consent"] = "Switch on Presence under Share first.",
+  ["guild.refresh.wait"] = "Announced a moment ago. Try again in a minute.",
+  ["guild.refresh.nothing"] = "Nothing to announce.",
+  ["guild.refresh.no-channel"] = "No group or guild to announce to.",
 })
 ns.AddLocale("deDE", {
   ["page.guild"] = "Gilde",
@@ -105,6 +118,8 @@ ns.AddLocale("deDE", {
   ["guild.stats.classes"] = "Klassen: %s",
   ["guild.search"] = "Suchen",
   ["guild.onlyOnline"] = "Nur online",
+  ["guild.map"] = "Karte",
+  ["guild.map.tip"] = "Mitglieder, die ihre Position teilen.",
   ["guild.rank"] = "Rang",
   ["guild.rank.all"] = "Alle Ränge",
   ["guild.sort"] = "Sortierung",
@@ -149,6 +164,9 @@ ns.AddLocale("deDE", {
   ["guild.peer.now"] = "gerade eben",
   ["guild.peer.minutes"] = "vor %d Min.",
   ["guild.reading"] = "wird gelesen",
+  ["guild.unshared"] = "nicht geteilt",
+  ["guild.unshared.both"] = "iLvl, Berufe: %s",
+  ["guild.unshared.tip"] = "Das Mitglied nutzt das Addon nicht oder teilt Itemlevel und Berufe nicht, oder du empfängst sie nicht: Tab Teilen.",
   ["guild.whisper"] = "Flüstern",
   ["guild.seen.local"] = "Nur lokal gespeichert",
   ["guild.set.heading"] = "Gilde: Itemlevel und Berufe",
@@ -156,8 +174,16 @@ ns.AddLocale("deDE", {
   ["guild.set.inspect"] = "Gruppen-Itemlevel lesen",
   ["guild.set.inspectHint"] = "Betrachtet Mitglieder in Reichweite, nie im Kampf.",
   ["guild.set.share"] = "Berufe, Itemlevel teilen",
-  ["guild.set.shareHint"] = "Teilt deine Berufe und dein Itemlevel mit deiner Gruppe und Gilde, nur mit Spielern, die Forever Guides haben. Es werden keine anderen Daten gesendet.",
+  ["guild.set.shareHint"] = "Itemlevel und Berufe senden und empfangen stellst du im Tab Teilen ein. Standard aus.",
   ["guild.set.shareGuild"] = "Auch mit Gilde teilen",
+  ["guild.set.shareOpen"] = "Zu Teilen",
+  ["guild.refresh"] = "Aktualisieren",
+  ["guild.refresh.tip"] = "Kündigt deine eigenen Daten erneut an. Braucht Anwesenheit unter Teilen.",
+  ["guild.refresh.sent"] = "Deine Daten sind angekündigt.",
+  ["guild.refresh.consent"] = "Schalte zuerst Anwesenheit unter Teilen ein.",
+  ["guild.refresh.wait"] = "Gerade erst angekündigt. Versuche es in einer Minute erneut.",
+  ["guild.refresh.nothing"] = "Nichts anzukündigen.",
+  ["guild.refresh.no-channel"] = "Keine Gruppe oder Gilde zum Ankündigen.",
 })
 
 -- Rows ----------------------------------------------------------------------------------------------
@@ -180,12 +206,7 @@ local function guildSub(m, rights, peer, extra)
   if on(cols, "zone") and m.zone ~= "" then
     parts[#parts + 1] = m.zone
   end
-  if on(cols, "ilvl") then
-    parts[#parts + 1] = string.format(L["guild.ilvl"], ilvlText(peer, m.name))
-  end
-  if on(cols, "jobs") then
-    parts[#parts + 1] = string.format(L["guild.detail.jobs"], jobsText(peer, m.name))
-  end
+  local unshared = Kit.PeerSubParts(parts, peer, m.name, on(cols, "ilvl"), on(cols, "jobs"))
   if on(cols, "note") then
     local note, officer = GL.VisibleNotes(m, rights)
     parts[#parts + 1] = note
@@ -197,7 +218,7 @@ local function guildSub(m, rights, peer, extra)
       parts[#parts + 1] = v
     end
   end
-  return joinParts(parts)
+  return joinParts(parts), unshared
 end
 
 -- details: the sections of add-ons (GuildExt), their lines follow the item level and professions.
@@ -244,6 +265,7 @@ local function memberActions(m, details, ctx)
       if #out < MAX_ACTIONS and type(a) == "table" and type(a.key) == "string" and type(a.onClick) == "function" then
         out[#out + 1] = {
           key = a.key,
+          opens = a.opens == true,
           onClick = function()
             a.onClick(m, ctx)
           end,
@@ -309,10 +331,16 @@ local function build(container)
   end
 
   -- The tab bar cannot grow, so it lives in a holder whose bar is replaced when an add-on adds a tab.
+  -- The bar breaks into rows at the page width, the holder takes its height.
   local tabs = CreateFrame("Frame", nil, view.content)
   tabs.fgId = "guild-tabs"
   function tabs:Select(id)
     self.bar:Select(id)
+  end
+  function tabs:fgGridLayout(width)
+    local h = self.bar:fgGridLayout(width)
+    self:SetHeight(h)
+    return h
   end
   local tabSignature
   -- Returns true when the bar was built anew.
@@ -339,6 +367,7 @@ local function build(container)
     end
     tabs.bar = W.Tabs(tabs, {
       tabs = list,
+      wrap = true,
       onSelect = function(id)
         state.tab = id
         refresh()
@@ -348,7 +377,7 @@ local function build(container)
     tabs.buttons = tabs.bar.buttons
     return true
   end
-  s:Add(tabs, { height = 28, gap = 12 })
+  s:Add(tabs, { gap = 12 })
   -- The detail card sits between the filters and the list.
   local detailGuild = newDetail(view.content, "guild")
 
@@ -403,6 +432,14 @@ local function build(container)
   add("guild", motd, { height = 18, gap = 6 })
   local levelsLine = add("guild", ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 2 }))
   local classesLine = add("guild", ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 10 }))
+  -- Hints for data of other add-on users that needs sharing; they follow the consent on their own, so
+  -- they are not part of the group that refresh() shows and hides.
+  local sharing = Kit.NewSharing(view.content, "guild", "guild", function()
+    view:Layout()
+  end)
+  for _, entry in ipairs(sharing.items) do
+    s:Add(entry.frame, entry.opts)
+  end
 
   local controls = newFlow(view.content)
   local search = W.EditBox(controls, {
@@ -462,6 +499,23 @@ local function build(container)
     { frame = rank, width = DROPDOWN_WIDTH, height = 46 },
     { frame = sort, width = DROPDOWN_WIDTH, height = 46 },
   }
+  -- The list of the guild members on the map (works without the map open, keyboard friendly).
+  if rawget(ns, "GuildMapList") then
+    local map = W.Action(controls, {
+      key = "guild.map",
+      icon = "map",
+      width = MAP_BUTTON_WIDTH,
+      height = 26,
+      tooltip = "gml.title",
+      tooltipText = "guild.map.tip",
+      opens = true,
+      onClick = function()
+        ns.GuildMapList.Open()
+      end,
+    })
+    map.fgId = "guild-map"
+    controls.items[#controls.items + 1] = { frame = map, width = MAP_BUTTON_WIDTH, height = 46, top = 18 }
+  end
   add("guild", controls, { gap = 8 })
   add("guild", ns.AddParagraph(view, "guild.cols", { role = "micro", color = "textMuted", gap = 2 }))
   local guildColumns =
@@ -472,18 +526,22 @@ local function build(container)
   local guildOpts = { gap = 12 }
   local guildList = K.NewList(view.content, {
     rowHeight = ROW_HEIGHT,
+    subRole = "ui",
     bind = function(m)
       local peer = peerOf(m.name, m.guid)
       local cols = columns("guild")
+      local sub, unshared = guildSub(m, state.rights, peer, extColumns)
+      local age = GL.PeerTip(peer, ns.U.now(), L)
       return {
         title = coloredName(m.name, m.class),
-        sub = guildSub(m, state.rights, peer, extColumns),
+        sub = sub,
         right = GL.ColumnOn(cols, "last")
             and (m.online and Theme.hexText("success", L["guild.last.online"]) or GL.LastOnlineText(m, L))
           or "",
         selected = state.sel == guildKey(m),
         iconPaint = classIcon(m.class),
-        tooltip = GL.PeerTip(peer, ns.U.now(), L),
+        -- Why the line says "not shared", then how old the data is.
+        tooltip = unshared and (age and L["guild.unshared.tip"] .. "\n" .. age or L["guild.unshared.tip"]) or age,
       }
     end,
     onClick = function(m)
@@ -560,6 +618,7 @@ local function build(container)
     hideExtTabs()
     local ready = snap.inGuild and snap.loaded
     showGroup("guild", ready)
+    sharing.Sync(ready)
     notice:SetShown(not ready)
     if not ready then
       notice:SetText(L[snap.inGuild and "guild.loading" or "guild.none"])
@@ -619,6 +678,7 @@ local function build(container)
     showGroup("guild", false)
     hideExtTabs()
     local ready = snap.inGuild and snap.loaded
+    sharing.Sync(false)
     notice:SetShown(not ready)
     if not ready then
       notice:SetText(L[snap.inGuild and "guild.loading" or "guild.none"])
@@ -702,8 +762,6 @@ function P.AddSettings(view)
   ns.AddHeading(view, "guild.set.heading")
   for _, item in ipairs({
     { "groupInspect", "guild.set.inspect", ns.GroupInspect.Switch, "guild-inspect", "guild.set.inspectHint" },
-    { "peerShare", "guild.set.share", ns.PeerComm.Sharing, "guild-share", "guild.set.shareHint" },
-    { "peerShareGuild", "guild.set.shareGuild", ns.PeerComm.SharingGuild, "guild-share-guild" },
     { "seenSave", "guild.set.seen", ns.SeenPlayers.Enabled, "guild-seen" },
   }) do
     local toggle = W.Toggle(view.content, {
@@ -719,6 +777,19 @@ function P.AddSettings(view)
       ns.AddParagraph(view, item[5], { role = "micro", color = "textMuted", gap = 6 })
     end
   end
+  -- Sending and receiving moved to the tab "Share".
+  ns.AddParagraph(view, "guild.set.shareHint", { role = "micro", color = "textMuted", gap = 4 })
+  local open = W.Action(view.content, {
+    key = "guild.set.shareOpen",
+    width = 180,
+    height = 26,
+    opens = true,
+    onClick = function()
+      ns.SettingsPage.Select("sharing")
+    end,
+  })
+  open.fgId = "guild-share-open"
+  s:Add(open, { height = 26, width = 180, gap = 6 })
   ns.DevTools.AddButtons(view, "guild")
 end
 

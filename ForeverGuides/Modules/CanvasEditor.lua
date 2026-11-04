@@ -5,7 +5,8 @@
 -- and every calculation live in CanvasLogic.lua, the property controls in CanvasEditorControls.lua.
 --
 --   CanvasEditor.Open({
---     title = "text",                       window title (default: the editor title)
+--     title = "text" | function(layoutName, layoutId) -> text,
+--                                           window title (default: the editor title); a function builds all of it
 --     layout = layout,                      the layout to edit (any table, repaired by CanvasLogic.Validate)
 --     types = { [type] = { label, new(), size = { w, h }, max, render(frame, element, ctx),
 --                          panel(parent, element, onChange), textColor(element) -> "rrggbb" } },
@@ -14,11 +15,19 @@
 --     sample = fn(token),                   sample values for the preview (optional)
 --     onApply(layout), onCancel(),          Apply (and Live) hand over a clean copy
 --     manager = {                           layouts of the host (optional, every function optional)
---       list() -> { { id, name } },         current() -> id,        select(id) -> layout copy | nil
+--       list() -> { { id, name, detail? } }, current() -> id,       select(id) -> layout copy | nil
 --       save(id, layout),                   create(name, layout) -> id | nil, reason
 --       rename(id, name) -> ok,             delete(id) -> ok,       canDelete(id) -> boolean
---       import(name, layout) -> id | nil, reason },
---     host = "xpbar" | "cursor",            names the display for export and import (default: by canvas kind)
+--       import(name, layout) -> id | nil, reason,
+--       new(name) -> id | nil, reason,      an empty layout under that name ("New"; without it "New" copies)
+--       labels = { layouts, deleteTitle, deleteAsk } },   locale keys that name the list and the delete question
+--     host = "xpbar" | "cursor" | "area",   names the display for export and import (default: by canvas kind)
+--     groups = boolean,                     the host's types include "group": the element list is a tree, elements
+--                                           can go into groups (panel, Ctrl+G, drag in the list)
+--     hostSection = function(parent) -> frame,   a section of the host in the side column, above the canvas
+--                                           fields (stable function: the editor builds the frame once). The frame
+--                                           has Refresh() (called whenever the editor repaints its side, and from
+--                                           CanvasEditor.RefreshHost) and sets its own height
 --     sim = table,                          simulation state the host owns; reaches every render as ctx.sim
 --     tools = { { id, label, icon, toggle, active?, onClick(active) } },
 --                                           toggle buttons in the view bar (at most CE.MAX_TOOLS); a click only
@@ -33,9 +42,11 @@
 -- (zoom 100 percent, CE.REAL_ZOOMS) and edits the hotspot in the canvas section.
 -- CanvasEditor.Redraw() redraws the preview without an undo step.
 -- With a manager the band under the title holds the list of all layouts (right, as wide as the
--- sidebar): a click or Enter switches, each row renames, duplicates and deletes, "New" adds a copy of
--- the working copy; Save and Save as new sit left in the band, Import adds a layout. A function the
--- host leaves out hides its control (the list needs list and select). Switching selects the layout
+-- sidebar): a click or Enter switches, each row renames, duplicates and deletes, "New" adds an empty
+-- layout (a copy of the working copy when the manager has no `new`) and "Duplicate" next to it copies the
+-- open layout; Save and Save as new sit left in the band, Import adds a layout. A function the
+-- host leaves out hides its control (the list needs list and select). A list entry with a `detail` text
+-- (one line, for example who uses the layout) makes the rows two lines high, the detail sits under the name. Switching selects the layout
 -- through the host and hands the host the new working copy with Live. The sidebar starts with the
 -- elements.
 --   CanvasEditor.Close() discards without a question, IsOpen(), Frame(), Layout() copy of the working
@@ -44,40 +55,41 @@
 -- panel(parent, element, onChange) returns a frame; the editor calls onChange() after the panel changed
 -- element.props. A frame with a Refresh(element) method is built once and reused for every element of
 -- the type, one without is built again for each selection (frames cannot be freed).
--- The size of the window is fixed, all positions are explicit.
+-- The window is resizable (grip at the bottom right, EditorSizeLogic.lua splits the size into view, side column and
+-- list rows); all positions are explicit and come from the current metrics G.
 local _, ns = ...
 local W, L, Theme, U, WS = ns.W, ns.L, ns.Theme, ns.U, ns.WindowStyle
 local CL, CR = ns.CanvasLogic, ns.CanvasRender
+local GL, GT = ns.GroupLogic, ns.GroupTree
 
 local CE = ns.CanvasEditor or {}
 ns.CanvasEditor = CE
 local Controls = CE.Controls
 
-local WIN_W, WIN_H, HEAD_H, PAD = 880, 600, 22, 8
-local ROW_H = 24
+local ES = ns.EditorSize
+local HEAD_H, PAD, ROW_H, FOOT_H = ES.HEAD_H, ES.PAD, ES.ROW_H, ES.FOOT_H
+local LAYOUT_HEAD_H, ELEMENTS_HEAD_H = ES.LAYOUT_HEAD_H, ES.ELEMENTS_HEAD_H
 -- The band under the title: tools, Export, Import and presets on the left, the layout list on the right.
-local LAYOUT_ROWS, LAYOUT_HEAD_H = 3, 22
-local BAND_Y, BAND_H = HEAD_H + 4, LAYOUT_HEAD_H + LAYOUT_ROWS * ROW_H
-local BODY_Y = BAND_Y + BAND_H + 6
-local FOOT_H = 40
-local BODY_H = WIN_H - BODY_Y - FOOT_H - 4
-local RIGHT_W = 300
-local LEFT_W = WIN_W - PAD * 3 - RIGHT_W
-local VIEWBAR_H = 46
-local VIEW_H = BODY_H - VIEWBAR_H - 6
-local ELEMENT_ROWS = 5
--- Height of the heading row of the Elements section (the Add button sits in it).
-local ELEMENTS_HEAD_H = 22
+-- The sizes that depend on the window (view, side column, rows): see EditorSizeLogic.lua, replaced by
+-- layoutFrames whenever the window changes its size.
+local G = ES.Metrics(ES.DEFAULT_W, ES.DEFAULT_H)
 -- Band controls: icon buttons, the gap between them, and Export and Import side by side in row 2.
 local TOOL_SIZE, TOOL_GAP = 24, 5
+-- Sizes of the group parts: indent per level, the fold arrow and the glyph of a group row, a dropdown row of the
+-- side panel, the time two presses on one element count as a pair (they select its group), the dash and its gap
+-- in a group frame on the canvas, the badge of a place number.
+local GK = { choiceH = 46, pair = 0.4, dash = 6, dashGap = 4, badge = 14 }
+-- Helpers of the group parts (keeps the number of locals of this file down).
+local grp = {}
 local XFER_W, XFER_GAP, ROW2_Y = 100, 6, TOOL_SIZE + 4
-local DROP_W = 160
+local DROP_W, MIN_DROP_W = 160, 100
 local BACKDROP_W = 110
-local CONTENT_W = RIGHT_W - 16
-local REMOVE_W = 176
--- Wrapped rows of a type panel are measured at this width.
-Controls.PANEL_WIDTH = CONTENT_W
-local HALF_W = (CONTENT_W - 8) / 2
+-- A heading row: the text sits level with the button of the row, at the edge of the list under it.
+local HEAD_DROP, HEAD_BUTTON_W = 2, 130
+-- The size grip in the bottom right corner of the window.
+local GRIP_SIZE = 14
+-- Wrapped rows of a type panel are measured at the width of the panel (G.contentW).
+Controls.PANEL_WIDTH = G.contentW
 local SCALE_MIN, SCALE_MAX, SCALE_STEP = 0.6, 2, 0.1
 local HANDLE_SIZE, HANDLE_HIT = 7, 7
 -- Canvas handles: a frame the mouse can grab, with the visible square inside.
@@ -102,7 +114,7 @@ CE.BACKDROPS = {
 CE.MAX_TOOLS = 4
 local CHECKER_CELL = 32
 CE.SNAPS = { 0, 1, 5, 10 }
-CE.WIDTH, CE.HEIGHT = WIN_W, WIN_H
+CE.WIDTH, CE.HEIGHT = ES.DEFAULT_W, ES.DEFAULT_H
 
 local HANDLES = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" }
 local POINT_TEXT = {
@@ -119,6 +131,8 @@ local POINT_TEXT = {
 
 ns.AddLocale("enUS", {
   ["canvas.title"] = "Layout editor",
+  ["canvas.grip"] = "Resize",
+  ["canvas.gripTip"] = "Drag to change the size of the window. Double-click or press Enter for the default size.",
   ["canvas.preset"] = "Template",
   ["canvas.presetPick"] = "Choose...",
   ["canvas.reset"] = "Reset to template",
@@ -152,6 +166,7 @@ ns.AddLocale("enUS", {
   ["canvas.removeElement"] = "Remove element",
   ["canvas.removeTip"] = "Removes this element from the layout. Ctrl+Z brings it back.",
   ["canvas.removeRowTip"] = "Removes this element. Ctrl+Z brings it back.",
+  ["canvas.dupElementTip"] = "Copies this element a little offset and selects the copy. Ctrl+D does the same, Ctrl+Z removes the copy.",
   ["canvas.renameElementTip"] = "Gives this element another name. F2 does the same for the selected element.",
   ["canvas.nameTip"] = "The name shown in the list. Leave it empty for the default name.",
   ["canvas.msg.removed"] = "Element removed. Ctrl+Z undoes it.",
@@ -199,7 +214,8 @@ ns.AddLocale("enUS", {
   ["canvas.liveTest"] = "Test at real cursor",
   ["canvas.liveTestTip"] = "Shows the layout at your real mouse cursor while the editor is open.",
   ["canvas.layouts"] = "Layouts",
-  ["canvas.newTip"] = "Creates a new layout as a copy of the one you are editing.",
+  ["canvas.newTip"] = "Creates a new, empty layout. Where a display has no empty start, it is a copy of the one you are editing.",
+  ["canvas.dupHeadTip"] = "Makes a copy of the layout you are editing under a new name and switches to it.",
   ["canvas.layoutOpenTip"] = "Click to switch to this layout. Unsaved changes are asked about first.",
   ["canvas.layoutCurrentTip"] = "This layout is open.",
   ["canvas.layoutDirtyTip"] = "This layout is open and has unsaved changes.",
@@ -225,6 +241,7 @@ ns.AddLocale("enUS", {
   ["canvas.err.limit"] = "There are too many layouts. Delete one first.",
   ["canvas.err.last"] = "The last layout cannot be deleted.",
   ["canvas.err.missing"] = "This layout does not exist any more.",
+  ["canvas.err.dup"] = "Another layout already has this name.",
   ["canvas.msg.saved"] = "Layout saved.",
   ["canvas.export.title"] = "Export layout",
   ["canvas.export.hint"] = "Copy with Ctrl+C, Import reads it back.",
@@ -245,11 +262,30 @@ ns.AddLocale("enUS", {
   ["canvas.import.err.version"] = "This layout comes from a newer version of the addon.",
   ["canvas.import.err.host"] = "This layout belongs to another display.",
   ["canvas.msg.imported"] = "Layout imported, %d value(s) repaired.",
+  ["canvas.group"] = "Group",
+  ["canvas.groupTip"] = "Puts this element into a group so you can move the group as a whole. It stays where it is on the canvas.",
+  ["canvas.group.none"] = "None (on the canvas)",
+  ["canvas.wrap"] = "Group around selection",
+  ["canvas.wrapTip"] = "Puts the selected element into a new group. Ctrl+G does the same.",
+  ["canvas.fold"] = "Show or hide the children",
+  ["canvas.foldOpen"] = "%s, children shown",
+  ["canvas.foldClosed"] = "%s, children hidden",
+  ["canvas.forwardTip"] = "Moves this element one step up in the list. In a group it takes the place before.",
+  ["canvas.backwardTip"] = "Moves this element one step down in the list. In a group it takes the place after.",
+  ["canvas.group.limit"] = "A group holds at most %d elements.",
+  ["canvas.group.level"] = "A group cannot go into another group.",
+  ["canvas.group.wrapGroup"] = "A group cannot be put into a group.",
+  ["canvas.group.wrapIn"] = "This element is in a group already. Take it out first.",
+  ["canvas.group.lockedPlace"] = "Arranged by the group. Move the element out of the group to set X and Y.",
+  ["canvas.group.lockedBox"] = "The size follows from the arrangement of the group. Set the group to Free to set width and height.",
+  ["canvas.group.arranged"] = "This element sits on a place in its group. Alt+arrow keys change the place, or set the group to Free to move it by hand.",
   ["canvas.help.title"] = "Keyboard",
-  ["canvas.help.keys"] = "Arrow keys move the element by 1 px, with Shift by 10 px.\nDelete removes it, F2 renames it, Ctrl+D duplicates it.\nCtrl+Z undoes, Ctrl+Y redoes.\nTab selects the next element, Shift+Tab the previous one.\nCtrl+Tab walks through the buttons, Enter presses one.\nThe mouse wheel zooms the preview, dragging the empty area moves a large one.",
+  ["canvas.help.keys"] = "Arrow keys move the element by 1 px, with Shift by 10 px.\nDelete removes it, F2 renames it, Ctrl+D duplicates it.\nCtrl+G puts the element in a new group, Ctrl+Shift+G dissolves the group.\nAlt+arrow keys change the place in a group.\nCtrl+Z undoes, Ctrl+Y redoes.\nTab selects the next element, Shift+Tab the previous one.\nCtrl+Tab walks through the buttons, Enter presses one.\nThe mouse wheel zooms the preview, dragging the empty area moves a large one.",
 })
 ns.AddLocale("deDE", {
   ["canvas.title"] = "Layout-Editor",
+  ["canvas.grip"] = "Größe ändern",
+  ["canvas.gripTip"] = "Ziehen ändert die Größe des Fensters. Doppelklick oder Enter stellt die Standardgröße wieder her.",
   ["canvas.preset"] = "Vorlage",
   ["canvas.presetPick"] = "Wählen...",
   ["canvas.reset"] = "Auf Vorlage zurücksetzen",
@@ -283,6 +319,7 @@ ns.AddLocale("deDE", {
   ["canvas.removeElement"] = "Element entfernen",
   ["canvas.removeTip"] = "Entfernt dieses Element aus dem Layout. Strg+Z holt es zurück.",
   ["canvas.removeRowTip"] = "Entfernt dieses Element. Strg+Z holt es zurück.",
+  ["canvas.dupElementTip"] = "Kopiert dieses Element leicht versetzt und wählt die Kopie. Strg+D macht dasselbe, Strg+Z entfernt die Kopie.",
   ["canvas.renameElementTip"] = "Gibt diesem Element einen anderen Namen. F2 macht das Gleiche für das gewählte Element.",
   ["canvas.nameTip"] = "Der Name in der Liste. Leer lassen für den Standardnamen.",
   ["canvas.msg.removed"] = "Element entfernt. Strg+Z macht es rückgängig.",
@@ -330,7 +367,8 @@ ns.AddLocale("deDE", {
   ["canvas.liveTest"] = "Am echten Cursor",
   ["canvas.liveTestTip"] = "Zeigt das Layout an deinem echten Mauszeiger, solange der Editor offen ist.",
   ["canvas.layouts"] = "Layouts",
-  ["canvas.newTip"] = "Legt ein neues Layout als Kopie des Layouts an, das du gerade bearbeitest.",
+  ["canvas.newTip"] = "Legt ein neues, leeres Layout an. Wo eine Anzeige keinen leeren Start hat, ist es eine Kopie des Layouts, das du gerade bearbeitest.",
+  ["canvas.dupHeadTip"] = "Macht eine Kopie des Layouts, das du gerade bearbeitest, unter einem neuen Namen und wechselt dorthin.",
   ["canvas.layoutOpenTip"] = "Klicken wechselt zu diesem Layout. Bei ungespeicherten Änderungen wird vorher gefragt.",
   ["canvas.layoutCurrentTip"] = "Dieses Layout ist geöffnet.",
   ["canvas.layoutDirtyTip"] = "Dieses Layout ist geöffnet und hat ungespeicherte Änderungen.",
@@ -356,6 +394,7 @@ ns.AddLocale("deDE", {
   ["canvas.err.limit"] = "Es gibt zu viele Layouts. Lösche zuerst eines.",
   ["canvas.err.last"] = "Das letzte Layout lässt sich nicht löschen.",
   ["canvas.err.missing"] = "Dieses Layout gibt es nicht mehr.",
+  ["canvas.err.dup"] = "Ein anderes Layout hat diesen Namen schon.",
   ["canvas.msg.saved"] = "Layout gespeichert.",
   ["canvas.export.title"] = "Layout exportieren",
   ["canvas.export.hint"] = "Mit Strg+C kopieren, Importieren liest es wieder ein.",
@@ -376,9 +415,38 @@ ns.AddLocale("deDE", {
   ["canvas.import.err.version"] = "Dieses Layout stammt aus einer neueren Version des Addons.",
   ["canvas.import.err.host"] = "Dieses Layout gehört zu einer anderen Anzeige.",
   ["canvas.msg.imported"] = "Layout importiert, %d Wert(e) repariert.",
+  ["canvas.group"] = "Gruppe",
+  ["canvas.groupTip"] = "Ordnet dieses Element einer Gruppe unter, damit du die Gruppe als Ganzes verschiebst. Es bleibt an seiner Stelle auf der Leinwand.",
+  ["canvas.group.none"] = "Keine (auf der Leinwand)",
+  ["canvas.wrap"] = "Gruppe um Auswahl",
+  ["canvas.wrapTip"] = "Steckt das gewählte Element in eine neue Gruppe. Strg+G macht dasselbe.",
+  ["canvas.fold"] = "Kinder zeigen oder verbergen",
+  ["canvas.foldOpen"] = "%s, Kinder sichtbar",
+  ["canvas.foldClosed"] = "%s, Kinder verborgen",
+  ["canvas.forwardTip"] = "Schiebt dieses Element in der Liste einen Schritt nach oben. In einer Gruppe rückt es einen Platz vor.",
+  ["canvas.backwardTip"] = "Schiebt dieses Element in der Liste einen Schritt nach unten. In einer Gruppe rückt es einen Platz zurück.",
+  ["canvas.group.limit"] = "Eine Gruppe fasst höchstens %d Elemente.",
+  ["canvas.group.level"] = "Eine Gruppe lässt sich nicht in eine andere Gruppe stecken.",
+  ["canvas.group.wrapGroup"] = "Eine Gruppe lässt sich nicht in eine Gruppe stecken.",
+  ["canvas.group.wrapIn"] = "Dieses Element ist schon in einer Gruppe. Hole es zuerst heraus.",
+  ["canvas.group.lockedPlace"] = "Wird von der Gruppe angeordnet. Ordne das Element außerhalb der Gruppe an, um X und Y zu setzen.",
+  ["canvas.group.lockedBox"] = "Die Größe ergibt sich aus der Anordnung der Gruppe. Stelle die Gruppe auf Frei, um Breite und Höhe zu setzen.",
+  ["canvas.group.arranged"] = "Dieses Element sitzt auf einem Platz in seiner Gruppe. Alt+Pfeiltasten ändern den Platz, oder stelle die Gruppe auf Frei, um es von Hand zu verschieben.",
   ["canvas.help.title"] = "Tastatur",
-  ["canvas.help.keys"] = "Pfeiltasten verschieben das Element um 1 px, mit Umschalt um 10 px.\nEntf löscht es, F2 benennt es um, Strg+D dupliziert es.\nStrg+Z macht rückgängig, Strg+Y stellt wieder her.\nTab wählt das nächste Element, Umschalt+Tab das vorige.\nStrg+Tab geht durch die Knöpfe, Enter drückt einen.\nDas Mausrad zoomt die Vorschau, Ziehen im leeren Bereich verschiebt eine große.",
+  ["canvas.help.keys"] = "Pfeiltasten verschieben das Element um 1 px, mit Umschalt um 10 px.\nEntf löscht es, F2 benennt es um, Strg+D dupliziert es.\nStrg+G hüllt das Element in eine neue Gruppe, Strg+Umschalt+G löst die Gruppe auf.\nAlt+Pfeiltasten ändern den Platz in einer Gruppe.\nStrg+Z macht rückgängig, Strg+Y stellt wieder her.\nTab wählt das nächste Element, Umschalt+Tab das vorige.\nStrg+Tab geht durch die Knöpfe, Enter drückt einen.\nDas Mausrad zoomt die Vorschau, Ziehen im leeren Bereich verschiebt eine große.",
 })
+ns.AddLocale(
+  "enUS",
+  ns.AreaTerms.Apply("enUS", {
+    ["canvas.err.inuse"] = "Other windows show this layout. Delete it on the {tracker} page, where you pick a replacement.",
+  })
+)
+ns.AddLocale(
+  "deDE",
+  ns.AreaTerms.Apply("deDE", {
+    ["canvas.err.inuse"] = "Andere Fenster zeigen dieses Layout. Lösche es auf der Seite {tracker}, dort wählst du ein Ersatzlayout.",
+  })
+)
 
 -- State ----------------------------------------------------------------------------------------
 
@@ -451,6 +519,22 @@ local function shift()
   return IsShiftKeyDown and IsShiftKeyDown() or false
 end
 
+-- Whether the host offers groups (CanvasEditor.Open option `groups`).
+local function groupsOn()
+  return S ~= nil and S.opts.groups == true
+end
+
+-- A child of an arranged group sits on a computed place: only its size is its own.
+function grp.arrangedChild(el)
+  local group = el and el.group ~= nil and CL.Find(S.work, el.group) or nil
+  return group ~= nil and GT.Arranged(group)
+end
+
+-- Whether the element has size handles: the box of an arranged group is computed.
+function grp.resizable(el)
+  return el.visible ~= false and not (el.type == GL.TYPE and GT.Arranged(el))
+end
+
 -- Values for the render functions: the host's context, with sample values unless "Real values" is on.
 local function drawCtx()
   local base = type(S.opts.ctx) == "table" and S.opts.ctx or {}
@@ -471,7 +555,7 @@ local function hasRealValues()
 end
 
 -- Forward declarations: the parts call each other.
-local redraw, refreshAll, changed, selectElement, paintOverlay, refreshManager, refreshViewBar
+local redraw, refreshAll, changed, undoStep, selectElement, paintOverlay, refreshManager, refreshViewBar, layoutFrames
 
 -- Preview --------------------------------------------------------------------------------------
 
@@ -507,7 +591,7 @@ local function bestZoom()
   local best = steps[1]
   for _, z in ipairs(steps) do
     local f = factorOf(z)
-    if (not cursor or z <= 1) and cv.w * f <= LEFT_W - 16 and cv.h * f <= VIEW_H - 16 then
+    if (not cursor or z <= 1) and cv.w * f <= G.leftW - 16 and cv.h * f <= G.viewH - 16 then
       best = z
     end
   end
@@ -519,10 +603,10 @@ end
 local function layoutPreview()
   local z, cv = S.zoom, S.work.canvas
   local sw, sh = cv.w * z, cv.h * z
-  S.panX = U.clamp(S.panX, 0, math.max(0, sw - LEFT_W))
-  S.panY = U.clamp(S.panY, 0, math.max(0, sh - VIEW_H))
-  local mx = sw <= LEFT_W and (LEFT_W - sw) / 2 or -S.panX
-  local my = sh <= VIEW_H and (VIEW_H - sh) / 2 or -S.panY
+  S.panX = U.clamp(S.panX, 0, math.max(0, sw - G.leftW))
+  S.panY = U.clamp(S.panY, 0, math.max(0, sh - G.viewH))
+  local mx = sw <= G.leftW and (G.leftW - sw) / 2 or -S.panX
+  local my = sh <= G.viewH and (G.viewH - sh) / 2 or -S.panY
   local pin = S.drag and S.drag.pin
   if pin and pin.symmetric then
     -- A symmetric canvas grows on both sides: its center stays where it is.
@@ -602,6 +686,45 @@ local function ring(name, layer, l, t, w, h, thick, r, g, b, a)
   box(name, layer, l + w - thick, t + thick, thick, h - 2 * thick, r, g, b, a)
 end
 
+-- A dashed frame of dash and gap in view units; a frame too large for that many textures is drawn solid.
+function grp.dashes(name, layer, l, t, w, h, thick, r, g, b, a)
+  local step = GK.dash + GK.dashGap
+  if (w + h) * 2 / step > 160 then
+    ring(name, layer, l, t, w, h, thick, r, g, b, a)
+    return
+  end
+  local x = 0
+  while x < w do
+    local len = math.min(GK.dash, w - x)
+    box(name, layer, l + x, t, len, thick, r, g, b, a)
+    box(name, layer, l + x, t + h - thick, len, thick, r, g, b, a)
+    x = x + step
+  end
+  local y = 0
+  while y < h do
+    local len = math.min(GK.dash, h - y)
+    box(name, layer, l, t + y, thick, len, r, g, b, a)
+    box(name, layer, l + w - thick, t + y, thick, len, r, g, b, a)
+    y = y + step
+  end
+end
+
+-- The number of a place on the canvas: a dark badge with the digits over it, from pools that grow on demand.
+function grp.badge(index, left, top)
+  box("badge", "ARTWORK", left, top, GK.badge, GK.badge, 0, 0, 0, 0.75)
+  ui.slotLabels = ui.slotLabels or {}
+  local label = ui.slotLabels[index]
+  if not label then
+    label = W.Text(ui.surface, { role = "micro", color = "text", justify = "CENTER", text = "" })
+    label:SetWidth(GK.badge)
+    ui.slotLabels[index] = label
+  end
+  label:ClearAllPoints()
+  label:SetPoint("TOPLEFT", ui.surface, "TOPLEFT", left, -top - 1)
+  W.SetText(label, nil, tostring(index))
+  label:Show()
+end
+
 local function handlePoint(name, l, t, w, h)
   local fx = name:find("LEFT") and 0 or (name:find("RIGHT") and 1 or 0.5)
   local fy = name:find("TOP") and 0 or (name:find("BOTTOM") and 1 or 0.5)
@@ -660,8 +783,8 @@ local function paintBackdrop()
   local n = 0
   if b.color2 then
     local r, g, bl = U.hex(b.color2)
-    for row = 0, math.ceil(VIEW_H / CHECKER_CELL) - 1 do
-      for col = 0, math.ceil(LEFT_W / CHECKER_CELL) - 1 do
+    for row = 0, math.ceil(G.viewH / CHECKER_CELL) - 1 do
+      for col = 0, math.ceil(G.leftW / CHECKER_CELL) - 1 do
         if (row + col) % 2 == 1 then
           n = n + 1
           local square = checker[n]
@@ -673,8 +796,8 @@ local function paintBackdrop()
           square:ClearAllPoints()
           square:SetPoint("TOPLEFT", ui.view, "TOPLEFT", col * CHECKER_CELL, -row * CHECKER_CELL)
           square:SetSize(
-            math.min(CHECKER_CELL, LEFT_W - col * CHECKER_CELL),
-            math.min(CHECKER_CELL, VIEW_H - row * CHECKER_CELL)
+            math.min(CHECKER_CELL, G.leftW - col * CHECKER_CELL),
+            math.min(CHECKER_CELL, G.viewH - row * CHECKER_CELL)
           )
           square:SetColorTexture(r, g, bl, 1)
           square:Show()
@@ -735,21 +858,47 @@ function paintOverlay()
   end
   finishPool("grid")
   -- Every visible element gets a thin outline: a transparent text still shows where it is.
-  for _, el in ipairs(S.work.elements) do
-    if el.visible ~= false and el.id ~= S.sel then
-      local l, t, w, h = CL.Rect(S.work, el, S.measure)
+  for _, e in ipairs(S.work.elements) do
+    if e.visible ~= false and e.id ~= S.sel and e.type ~= GL.TYPE then
+      local l, t, w, h = CL.AbsRect(S.work, e, S.measure)
       ring("bounds", "BORDER", ox + l * z, oy + t * z, w * z, h * z, 1, 1, 1, 1, 0.3)
     end
   end
   finishPool("bounds")
   local el = sel()
+  -- Groups show their frame, dashed; the group of the selection (or the selected group) stronger, with the
+  -- places of an arranged group numbered.
+  local active = el and (el.type == GL.TYPE and el or (el.group ~= nil and CL.Find(S.work, el.group))) or nil
+  local ar, ag, ab = Theme.rgb("accent2")
+  for _, e in ipairs(S.work.elements) do
+    if e.type == GL.TYPE and e.visible ~= false then
+      local l, t, w, h = CL.AbsRect(S.work, e, S.measure)
+      local on = e == active
+      grp.dashes("frame", "BORDER", ox + l * z, oy + t * z, w * z, h * z, on and 2 or 1, ar, ag, ab, on and 1 or 0.55)
+    end
+  end
+  finishPool("frame")
+  local labelsShown = 0
+  if active and GT.Arranged(active) then
+    for i, kid in ipairs(GL.Children(S.work, active.id)) do
+      local l, t, w, h = CL.AbsRect(S.work, kid, S.measure)
+      ring("cell", "ARTWORK", ox + l * z, oy + t * z, w * z, h * z, 1, ar, ag, ab, 0.9)
+      grp.badge(i, ox + l * z, oy + t * z)
+      labelsShown = i
+    end
+  end
+  finishPool("cell")
+  finishPool("badge")
+  for i = labelsShown + 1, #(ui.slotLabels or {}) do
+    ui.slotLabels[i]:Hide()
+  end
   if el then
-    local l, t, w, h = CL.Rect(S.work, el, S.measure)
+    local l, t, w, h = CL.AbsRect(S.work, el, S.measure)
     local sl, st, sw, sh = ox + l * z, oy + t * z, math.max(1, w * z), math.max(1, h * z)
     ring("select", "ARTWORK", sl - 1, st - 1, sw + 2, sh + 2, 1, 0, 0, 0, 0.9)
     local r, g, b = Theme.rgb("accent2")
     ring("select", "ARTWORK", sl, st, sw, sh, 2, r, g, b, 1)
-    if el.visible ~= false then
+    if grp.resizable(el) then
       for _, name in ipairs(HANDLES) do
         local px, py = handlePoint(name, sl, st, sw, sh)
         local half = HANDLE_SIZE / 2
@@ -760,6 +909,14 @@ function paintOverlay()
   end
   finishPool("select")
   finishPool("handle")
+  -- The place a dragged child lands on.
+  local d = S.drag
+  if d and d.slot and d.targetBox then
+    local b = d.targetBox
+    local r, g, bl = Theme.rgb("warning")
+    ring("drop", "OVERLAY", ox + b.l * z - 2, oy + b.t * z - 2, b.w * z + 4, b.h * z + 4, 2, r, g, bl, 1)
+  end
+  finishPool("drop")
   if S.guides then
     local r, g, b = Theme.rgb("warning")
     for _, line in ipairs(S.guides) do
@@ -773,12 +930,13 @@ function paintOverlay()
   finishPool("guide")
 end
 
--- The element under the point, and the handle when the point is on one of the selected element.
+-- The element under the point, and the handle when the point is on one of the selected element. Children are
+-- met before their group, so the group is picked by the part of its frame no child covers.
 local function hitTest(x, y)
   local z = S.zoom
   local el = sel()
-  if el and el.visible ~= false then
-    local l, t, w, h = CL.Rect(S.work, el, S.measure)
+  if el and grp.resizable(el) then
+    local l, t, w, h = CL.AbsRect(S.work, el, S.measure)
     for _, name in ipairs(HANDLES) do
       local px, py = handlePoint(name, l, t, w, h)
       if math.abs(x - px) <= HANDLE_HIT / z and math.abs(y - py) <= HANDLE_HIT / z then
@@ -786,15 +944,11 @@ local function hitTest(x, y)
       end
     end
   end
-  local list = CL.Sorted(S.work)
   local slack = 2 / z
-  for i = #list, 1, -1 do
-    local e = list[i]
-    if e.visible ~= false then
-      local l, t, w, h = CL.Rect(S.work, e, S.measure)
-      if x >= l - slack and x <= l + w + slack and y >= t - slack and y <= t + h + slack then
-        return e
-      end
+  for _, e in ipairs(GT.HitOrder(S.work)) do
+    local l, t, w, h = CL.AbsRect(S.work, e, S.measure)
+    if x >= l - slack and x <= l + w + slack and y >= t - slack and y <= t + h + slack then
+      return e
     end
   end
 end
@@ -802,42 +956,81 @@ end
 -- Dragging -------------------------------------------------------------------------------------
 
 local function beginDrag(el, handle, x, y)
-  local l, t, w, h = CL.Rect(S.work, el, S.measure)
+  local l, t, w, h = CL.AbsRect(S.work, el, S.measure)
   S.drag = { id = el.id, handle = handle, x = x, y = y, l = l, t = t, w = w, h = h, moved = false, orig = U.copy(el) }
+  local d = S.drag
+  -- A child of an arranged group is not moved but put on another place.
+  d.slot = handle == nil and grp.arrangedChild(el) or nil
+  if handle and (el.type == GL.TYPE or grp.arrangedChild(el)) then
+    -- Resizing a group keeps its children where they are on the screen; resizing a child moves its neighbors.
+    d.before = U.copy(S.work.elements)
+    d.kids = {}
+    for _, kid in ipairs(el.type == GL.TYPE and GL.Children(S.work, el.id) or {}) do
+      local kl, kt = CL.AbsRect(S.work, kid, S.measure)
+      d.kids[#d.kids + 1] = { id = kid.id, l = kl, t = kt }
+    end
+  end
 end
 
 local function snapped(v)
   return CL.Snap(v, snapStep())
 end
 
-local function moveTo(el, d, dx, dy)
+-- Left, top, right and bottom of what an element moves in, in canvas coordinates: the canvas, or the frame of
+-- the group it is a child of.
+function grp.bounds(el)
   local cv = S.work.canvas
-  local left = U.clamp(d.l + dx, 0, math.max(0, cv.w - d.w))
-  local top = U.clamp(d.t + dy, 0, math.max(0, cv.h - d.h))
-  CL.Place(S.work, el, left, top, S.measure)
+  local parent = el.group ~= nil and CL.Find(S.work, el.group) or nil
+  if parent and parent ~= el then
+    local l, t, w, h = CL.AbsRect(S.work, parent, S.measure)
+    return l, t, l + w, t + h
+  end
+  return 0, 0, cv.w, cv.h
+end
+
+local function moveTo(el, d, dx, dy)
+  local bl, bt, br, bb = grp.bounds(el)
+  local function inside(left, top)
+    return U.clamp(left, bl, math.max(bl, br - d.w)), U.clamp(top, bt, math.max(bt, bb - d.h))
+  end
+  local left, top = inside(d.l + dx, d.t + dy)
+  CL.Place(S.work, el, left - bl, top - bt, S.measure)
   local g = CL.GuideLines(S.work, el, math.max(0.5, CL.TOLERANCE / S.zoom), S.measure)
   left = g.dx ~= 0 and left + g.dx or snapped(left)
   top = g.dy ~= 0 and top + g.dy or snapped(top)
-  CL.Place(S.work, el, U.clamp(left, 0, math.max(0, cv.w - d.w)), U.clamp(top, 0, math.max(0, cv.h - d.h)), S.measure)
+  left, top = inside(left, top)
+  CL.Place(S.work, el, left - bl, top - bt, S.measure)
   S.guides = CL.GuideLines(S.work, el, 0, S.measure).lines
 end
 
 local function resizeTo(el, d, dx, dy)
-  local cv = S.work.canvas
+  local bl, bt, br, bb = grp.bounds(el)
   local left, top, right, bottom = d.l, d.t, d.l + d.w, d.t + d.h
   local h = d.handle
   if h:find("LEFT") then
-    left = U.clamp(snapped(d.l + dx), 0, right - MIN_ELEMENT)
+    left = U.clamp(snapped(d.l + dx), bl, right - MIN_ELEMENT)
   elseif h:find("RIGHT") then
-    right = U.clamp(snapped(d.l + d.w + dx), left + MIN_ELEMENT, cv.w)
+    right = U.clamp(snapped(d.l + d.w + dx), left + MIN_ELEMENT, br)
   end
   if h:find("TOP") then
-    top = U.clamp(snapped(d.t + dy), 0, bottom - MIN_ELEMENT)
+    top = U.clamp(snapped(d.t + dy), bt, bottom - MIN_ELEMENT)
   elseif h:find("BOTTOM") then
-    bottom = U.clamp(snapped(d.t + d.h + dy), top + MIN_ELEMENT, cv.h)
+    bottom = U.clamp(snapped(d.t + d.h + dy), top + MIN_ELEMENT, bb)
   end
   el.w, el.h = U.round(right - left, 0.5), U.round(bottom - top, 0.5)
-  CL.Place(S.work, el, left, top, S.measure)
+  CL.Place(S.work, el, left - bl, top - bt, S.measure)
+  if d.kids then
+    local gl, gt = CL.AbsRect(S.work, el, S.measure)
+    for _, k in ipairs(d.kids) do
+      local kid = CL.Find(S.work, k.id)
+      if kid then
+        CL.Place(S.work, kid, k.l - gl, k.t - gt, S.measure)
+      end
+    end
+    CL.Clamp(S.work, S.measure)
+  end
+  -- The places of an arranged group follow the size of its children.
+  GL.Normalize(S.work)
   S.guides = nil
 end
 
@@ -853,6 +1046,12 @@ local function dragTo(x, y)
     return
   end
   d.moved = true
+  if d.slot then
+    -- Nothing changes while the child is carried: the frame shows the place it lands on.
+    d.target, d.targetBox = GT.PlaceAt(S.work, el.group, x, y, S.measure)
+    paintOverlay()
+    return
+  end
   if d.handle then
     resizeTo(el, d, dx, dy)
   else
@@ -963,7 +1162,14 @@ end
 local function endDrag()
   local d = S.drag
   S.drag, S.guides = nil, nil
-  if d and d.moved then
+  if d and d.moved and d.slot then
+    local el = CL.Find(S.work, d.id)
+    if el and d.target and GL.Reorder(S.work, el, d.target) then
+      undoStep("group:slot")
+    else
+      paintOverlay()
+    end
+  elseif d and d.moved then
     changed(d.canvas and "canvas:size" or ("drag:" .. d.id))
   else
     paintOverlay()
@@ -979,7 +1185,9 @@ local function cancelDrag()
     S.work.canvas.w, S.work.canvas.h = d.w, d.h
   else
     local el, index = CL.Find(S.work, d.id)
-    if el then
+    if d.before then
+      S.work.elements = d.before
+    elseif el then
       S.work.elements[index] = d.orig
     end
   end
@@ -997,6 +1205,14 @@ local function onMouseDown(_, button)
   end
   local el, handle = hitTest(x, y)
   if el then
+    -- A second press on a child selects its group: the way to the group when children cover its frame.
+    local pair = S.press and S.press.id == el.id and now() - S.press.at <= GK.pair
+    if groupsOn() and not handle and el.group ~= nil and pair then
+      el = CL.Find(S.work, el.group) or el
+      S.press = nil
+    else
+      S.press = { id = el.id, at = now() }
+    end
     if S.sel ~= el.id then
       selectElement(el.id)
     end
@@ -1103,14 +1319,32 @@ local function send()
   ns.Safe("canvas-apply", S.opts.onApply, CL.Pack(S.work))
 end
 
+-- Brings the groups of the working copy in order: their props repaired, their children on their places.
+function grp.settle()
+  for _, el in ipairs(S.work.elements) do
+    if el.type == GL.TYPE then
+      el.props = GL.Clean(el.props)
+    end
+  end
+  GL.Normalize(S.work)
+end
+
 -- A change of the working copy: history, preview, panels and, with Live, the real window.
 function changed(key)
+  grp.settle()
   CL.Record(S.hist, S.work, key)
   redraw()
   refreshAll()
   if S.live then
     send()
   end
+end
+
+-- A change that is an undo step of its own, however fast the player repeats it (equal keys within a short time
+-- would be merged into one step).
+function undoStep(name)
+  S.seq = (S.seq or 0) + 1
+  changed(name .. ":" .. S.seq)
 end
 
 function selectElement(id)
@@ -1309,18 +1543,190 @@ function act.duplicate()
   changed("duplicate")
 end
 
-function act.nudge(dx, dy)
-  local el = sel()
-  if el then
-    CL.Move(el, dx, dy)
-    changed("nudge:" .. el.id)
+-- Reports a refused group operation.
+function grp.refuse(why)
+  if why == "limit" then
+    noteFail("canvas.group.limit", GL.MAX_CHILDREN)
+  elseif why == "level" then
+    noteFail("canvas.group.level")
   end
 end
 
+-- A new group around the selected element. It is free: the element stays exactly where it is, the arrangement is
+-- the next choice in the panel of the group.
+function act.wrap()
+  local el = sel()
+  if not (groupsOn() and el) then
+    return
+  end
+  if el.type == GL.TYPE then
+    noteFail("canvas.group.wrapGroup")
+    return
+  end
+  if el.group ~= nil then
+    noteFail("canvas.group.wrapIn")
+    return
+  end
+  local group, why = GL.Wrap(S.work, { el.id }, { mode = "free", measure = S.measure })
+  if not group then
+    if why == "limit" then
+      noteFail("canvas.addLimit", CL.MAX_ELEMENTS)
+    end
+    return
+  end
+  S.folded[group.id] = nil
+  S.sel = group.id
+  undoStep("group:wrap")
+end
+
+-- Puts element `id` (default: the selected one) into group `groupId`, or onto the canvas with nil. It stays where
+-- it is on the screen unless the group arranges its children.
+function act.moveToGroup(id, groupId)
+  local el = id == nil and sel() or CL.Find(S.work, id)
+  if not (groupsOn() and el) then
+    return
+  end
+  if groupId == nil then
+    if el.group ~= nil then
+      GL.MoveOut(S.work, { el.id })
+      undoStep("group:out")
+    end
+    return
+  end
+  if el.group == groupId then
+    return
+  end
+  local moved, why = GL.MoveInto(S.work, { el.id }, groupId, nil, S.measure)
+  if not moved then
+    grp.refuse(why)
+    return
+  end
+  S.folded[groupId] = nil
+  undoStep("group:in")
+end
+
+-- Dissolves group `id` (default: the group of the selection). The children stay where they are on the screen.
+function act.ungroup(id)
+  local el = id == nil and sel() or CL.Find(S.work, id)
+  if el and el.type ~= GL.TYPE and el.group ~= nil then
+    el = CL.Find(S.work, el.group)
+  end
+  if not (el and el.type == GL.TYPE) then
+    return
+  end
+  local first = GL.Children(S.work, el.id)[1]
+  GL.Ungroup(S.work, el)
+  if S.sel == el.id then
+    S.sel = first and first.id or nil
+  end
+  undoStep("group:ungroup")
+end
+
+-- Deletes a group with all its children after a question.
+function act.removeGroup(id)
+  local el = id == nil and sel() or CL.Find(S.work, id)
+  if not (el and el.type == GL.TYPE) then
+    return
+  end
+  local session, gid = S, el.id
+  ns.Dialogs.Confirm("group.removeAllTitle", "group.removeAllAsk", function()
+    if S ~= session or not CL.Find(S.work, gid) then
+      return
+    end
+    GL.Remove(S.work, gid, "all")
+    if S.sel and not CL.Find(S.work, S.sel) then
+      S.sel = nil
+    end
+    undoStep("group:removeAll")
+  end)
+end
+
+-- Opens or closes a group in the list (only the editor remembers it, the layout does not).
+function act.toggleFold(id)
+  local el = CL.Find(S.work, id)
+  if not (el and el.type == GL.TYPE) then
+    return
+  end
+  S.folded[id] = (not S.folded[id]) or nil
+  if S.folded[id] and S.sel and GT.GroupOf(S.work, S.sel) == id then
+    S.sel = id
+  end
+  refreshAll()
+  paintOverlay()
+end
+
+-- A row of the list let go before (or, with `after`, behind) the row of `anchorId`.
+function act.dropRow(id, anchorId, after)
+  if not groupsOn() then
+    return
+  end
+  local ok, why = GT.Drop(S.work, id, anchorId, after, S.folded, S.measure)
+  if not ok then
+    grp.refuse(why)
+    return
+  end
+  undoStep("group:drop")
+end
+
+function act.nudge(dx, dy)
+  local el = sel()
+  if not el then
+    return
+  end
+  if grp.arrangedChild(el) then
+    -- Its place is computed: say so once instead of ignoring the key without a word.
+    if not S.arrangedNote then
+      S.arrangedNote = true
+      ns.Notify(L["canvas.group.arranged"], "info")
+    end
+    return
+  end
+  CL.Move(el, dx, dy)
+  changed("nudge:" .. el.id)
+end
+
 function act.reorder(id, how)
+  local el = CL.Find(S.work, id)
+  if el and el.group ~= nil and groupsOn() then
+    if GL.Reorder(S.work, el, ({ front = "first", back = "last" })[how] or how) then
+      undoStep("group:order")
+    end
+    return
+  end
   if CL.Reorder(S.work, id, how) then
     changed("order")
   end
+end
+
+-- Alt and an arrow key: in a group one place earlier (up, left) or later (down, right), a grid moves a whole row
+-- with up and down; on the canvas up and down move the element in the z order. True when the key was used.
+function act.place(dir)
+  local el = sel()
+  if not el then
+    return false
+  end
+  local group = el.group ~= nil and CL.Find(S.work, el.group) or nil
+  if not group then
+    if dir == "UP" or dir == "DOWN" then
+      act.reorder(el.id, dir == "UP" and "up" or "down")
+      return true
+    end
+    return false
+  end
+  local kids = GL.Children(S.work, group.id)
+  local at = 1
+  for i, kid in ipairs(kids) do
+    if kid == el then
+      at = i
+    end
+  end
+  local p = GL.Clean(group.props)
+  local n = (p.mode == "grid" and (dir == "UP" or dir == "DOWN")) and p.cols or 1
+  local to = U.clamp(at + ((dir == "UP" or dir == "LEFT") and -n or n), 1, #kids)
+  if to ~= at and GL.Reorder(S.work, el, to) then
+    undoStep("group:place")
+  end
+  return true
 end
 
 function act.toggleVisible(id)
@@ -1512,7 +1918,8 @@ local function layoutList()
     if type(entry) == "table" and entry.id ~= nil then
       -- Names come from the host's storage: shown as plain text, never as escapes.
       local name = CL.CleanText(type(entry.name) == "string" and entry.name or tostring(entry.id), CL.MAX_LAYOUT_NAME)
-      out[#out + 1] = { id = entry.id, name = name }
+      local detail = type(entry.detail) == "string" and CL.CleanText(entry.detail, 120) or nil
+      out[#out + 1] = { id = entry.id, name = name, detail = detail ~= "" and detail or nil }
     end
   end
   return out
@@ -1536,8 +1943,14 @@ local function currentName()
 end
 
 local function updateTitle()
-  local title = type(S.opts.title) == "string" and S.opts.title ~= "" and S.opts.title or L["canvas.title"]
   local name = currentName()
+  -- A host may build the whole title from the layout name (it knows more, e.g. who else shows the layout).
+  if type(S.opts.title) == "function" then
+    local ok, text = ns.Safe("canvas-title", S.opts.title, name, S.layoutId)
+    W.SetText(frame.title, nil, ok and type(text) == "string" and text ~= "" and text or L["canvas.title"])
+    return
+  end
+  local title = type(S.opts.title) == "string" and S.opts.title ~= "" and S.opts.title or L["canvas.title"]
   W.SetText(frame.title, nil, name ~= "" and (title .. ": " .. name) or title)
 end
 
@@ -1735,15 +2148,23 @@ end
 
 -- A new layout from the working copy under `name`, opened at once. The layout it came from keeps its
 -- saved state.
-local function createFrom(name, session)
+-- `duplicate` asks the host for a real copy (its `duplicate`, which keeps the rules of the layout and names the
+-- copy itself) when it has one.
+local function createFrom(name, session, duplicate)
   name = CL.CleanText(name, CL.MAX_LAYOUT_NAME)
-  local ok, id, reason = mgrCall("create", name, CL.Pack(S.work))
+  local ok, id, reason
+  local hostCopies = duplicate and mgrFn("duplicate") ~= nil
+  if hostCopies then
+    ok, id, reason = mgrCall("duplicate", S.layoutId, nil, CL.Pack(S.work))
+  else
+    ok, id, reason = mgrCall("create", name, CL.Pack(S.work))
+  end
   if not (ok and id ~= nil) then
     explain(reason)
     return false
   end
   local copy = CL.Pack(S.work)
-  copy.id, copy.name = id, name
+  copy.id, copy.name = id, hostCopies and layoutName(id) or name
   if S == session then
     revertLive()
     switchNow(id, copy)
@@ -1763,6 +2184,47 @@ function act.saveAs()
   end)
 end
 
+-- "New" with an empty start: asks for a name (after a question about unsaved changes), the host makes the
+-- layout and the editor opens it.
+function act.newEmpty()
+  if not (S and mgrFn("new")) then
+    return
+  end
+  local session = S
+  local function ask()
+    askName("canvas.name.newTitle", "canvas.name.create", "", function(name)
+      if S ~= session then
+        return
+      end
+      local ok, id, reason = mgrCall("new", CL.CleanText(name, CL.MAX_LAYOUT_NAME))
+      if not (ok and id ~= nil) then
+        explain(reason)
+        return
+      end
+      revertLive()
+      switchNow(id, nil)
+    end)
+  end
+  if not isDirty() then
+    ask()
+    return
+  end
+  askUnsaved(function()
+    if S == session and saveNow() then
+      ask()
+    end
+  end, ask)
+end
+
+-- The "New" button: an empty layout where the host offers one, else a copy of the working copy.
+function act.newLayout()
+  if mgrFn("new") then
+    act.newEmpty()
+  else
+    act.saveAs()
+  end
+end
+
 -- Copies a layout: the working copy of the open one, any other one is opened first (it may ask about
 -- unsaved changes) because only the host's select hands out its contents.
 function act.dupLayout(id)
@@ -1775,7 +2237,7 @@ function act.dupLayout(id)
     end)
     return
   end
-  createFrom(string.format(L["canvas.copy"], currentName()), S)
+  createFrom(string.format(L["canvas.copy"], currentName()), S, true)
 end
 
 -- Renames layout `id` (default: the open one).
@@ -1818,7 +2280,8 @@ function act.deleteLayout(id)
     return
   end
   local session = S
-  ns.Dialogs.Confirm("canvas.deleteTitle", "canvas.deleteAsk", function()
+  local labels = type(S.mgr.labels) == "table" and S.mgr.labels or {}
+  ns.Dialogs.Confirm(labels.deleteTitle or "canvas.deleteTitle", labels.deleteAsk or "canvas.deleteAsk", function()
     if S ~= session then
       return
     end
@@ -1960,7 +2423,7 @@ local function insideWindow(f)
 end
 
 local function cycle(step)
-  local list = CL.Sorted(S.work)
+  local list = GT.Cycle(S.work)
   if #list == 0 then
     return
   end
@@ -2037,6 +2500,12 @@ local function handleKey(key)
       act.redo()
     elseif key == "D" then
       act.duplicate()
+    elseif key == "G" and groupsOn() then
+      if shift() then
+        act.ungroup()
+      else
+        act.wrap()
+      end
     elseif key == "TAB" then
       ns.Focus.move(shift() and -1 or 1)
     else
@@ -2047,6 +2516,9 @@ local function handleKey(key)
   local focus = ns.Focus.current
   if (key == "UP" or key == "DOWN") and focus and focus.fgLayoutRow and insideWindow(focus) then
     return moveLayoutFocus(key == "UP" and -1 or 1)
+  end
+  if IsAltKeyDown and IsAltKeyDown() and ARROWS[key] then
+    return act.place(key)
   end
   local arrow = ARROWS[key]
   if arrow then
@@ -2102,6 +2574,8 @@ end
 
 -- The panel of the host for the selected element. A panel with Refresh is built once per type function.
 local panelCache = setmetatable({}, { __mode = "k" })
+-- The frames hosts built for their section (option hostSection), one per builder.
+local hostCache = setmetatable({}, { __mode = "k" })
 
 local function onPanelChange()
   if S then
@@ -2125,6 +2599,8 @@ local function showTypePanel(el)
   end
   local panel = cached
   if panel then
+    -- The width first: a wrapped row measures its height at the width of the panel when it places itself.
+    panel:SetWidth(G.contentW)
     ns.Safe("canvas-panel-refresh", panel.Refresh, panel, el)
   else
     local ok, made = ns.Safe("canvas-panel", build, ui.holder, el, onPanelChange)
@@ -2141,7 +2617,7 @@ local function showTypePanel(el)
     panel:SetParent(ui.holder)
     panel:ClearAllPoints()
     panel:SetPoint("TOPLEFT", ui.holder, "TOPLEFT", 0, 0)
-    panel:SetWidth(CONTENT_W)
+    panel:SetWidth(G.contentW)
     panel:Show()
     ui.panel = panel
   end
@@ -2149,7 +2625,62 @@ local function showTypePanel(el)
   return finite(h) and h > 0 and h or 40
 end
 
+-- Height of a wrapped note at its width. The height it had is cleared first: a text with a height of its own is
+-- clipped to it and reports that height, so a longer text would stay cut off.
+local function wrappedHeight(fs, minHeight, pad)
+  fs:SetHeight(0)
+  return math.max(minHeight, math.ceil(fs:GetStringHeight() or 0) + pad)
+end
+
+-- Widths of the side column controls, from the current metrics (the column is as wide as the window gives it).
+local function applyWidths()
+  local c = G.contentW
+  Controls.PANEL_WIDTH = c
+  for _, f in ipairs({
+    ui.nothing,
+    ui.name,
+    ui.warn,
+    ui.desc,
+    ui.lockNote,
+    ui.headEl,
+    ui.bg,
+    ui.bgAlpha,
+    ui.borderColor,
+    ui.borderAlpha,
+    ui.elementsEmpty,
+  }) do
+    f:SetWidth(f == ui.elementsEmpty and G.sideW - 16 or c)
+  end
+  ui.holder:SetWidth(c)
+  ui.borderOn:SetSize(c, 22)
+  ui.symmetric:SetSize(c, 22)
+  ui.remove:SetSize(G.removeW, 24)
+  ui.dup:SetSize(G.dupW, 24)
+  ui.groupDd:SetWidth(c)
+  if ui.groupDd.button then
+    ui.groupDd.button:SetWidth(c)
+  end
+  ui.cw:SetWidth(G.halfW)
+  ui.ch:SetWidth(G.halfW)
+  ui.hotX:SetWidth(G.halfW)
+  ui.hotY:SetWidth(G.halfW)
+  for _, f in ipairs({ ui.fx, ui.fy, ui.fw, ui.fh }) do
+    f:SetWidth(G.fieldW)
+  end
+end
+
+-- The fields the group of the element decides, see GroupLogic.FieldLocks.
+local function fieldLocks(el)
+  if not groupsOn() then
+    return GL.FieldLocks(nil)
+  end
+  local parent = el.group ~= nil and CL.Find(S.work, el.group) or nil
+  local kids = el.type == GL.TYPE and #GL.Children(S.work, el.id) or 0
+  return GL.FieldLocks(el, parent, kids)
+end
+
 local function layoutSide()
+  applyWidths()
   local y = 0
   local content = ui.content
   local function put(f, h, x)
@@ -2164,26 +2695,43 @@ local function layoutSide()
   ui.nothing:SetShown(el == nil)
   -- Hidden first: the warning belongs to a selected element and must not stay behind at its old spot.
   ui.warn:Hide()
+  ui.lockNote:Hide()
   if el then
     W.SetText(ui.headEl, nil, string.format(L["canvas.selectedTitle"], titleOf(el)))
     put(ui.headEl, 22)
     put(ui.name, 32)
+    ui.dup:ClearAllPoints()
+    ui.dup:SetPoint("TOPLEFT", content, "TOPLEFT", G.removeW + 6, -y)
     put(ui.remove, 32)
     put(ui.anchorBox, 0)
+    local col2 = 84 + G.fieldW + 8
     ui.fx:ClearAllPoints()
     ui.fx:SetPoint("TOPLEFT", content, "TOPLEFT", 84, -y)
     ui.fy:ClearAllPoints()
-    ui.fy:SetPoint("TOPLEFT", content, "TOPLEFT", 84 + 100, -y)
+    ui.fy:SetPoint("TOPLEFT", content, "TOPLEFT", col2, -y)
     ui.fw:ClearAllPoints()
     ui.fw:SetPoint("TOPLEFT", content, "TOPLEFT", 84, -y - 32)
     ui.fh:ClearAllPoints()
-    ui.fh:SetPoint("TOPLEFT", content, "TOPLEFT", 84 + 100, -y - 32)
+    ui.fh:SetPoint("TOPLEFT", content, "TOPLEFT", col2, -y - 32)
     y = y + 82
+    local _, why = fieldLocks(el)
+    if why then
+      ui.lockNote:Show()
+      W.SetText(ui.lockNote, why == "place" and "canvas.group.lockedPlace" or "canvas.group.lockedBox")
+      local h = wrappedHeight(ui.lockNote, 14, 2)
+      ui.lockNote:SetHeight(h)
+      put(ui.lockNote, h + 8)
+    end
+    local inGroupable = groupsOn() and el.type ~= GL.TYPE
+    ui.groupDd:SetShown(inGroupable)
+    if inGroupable then
+      put(ui.groupDd, GK.choiceH)
+    end
     local _, description = tipOf(el)
     ui.desc:SetShown(description ~= nil)
     if description then
       W.SetText(ui.desc, nil, description)
-      local h = math.max(14, math.ceil(ui.desc:GetStringHeight() or 0) + 2)
+      local h = wrappedHeight(ui.desc, 14, 2)
       ui.desc:SetHeight(h)
       put(ui.desc, h + 8)
     end
@@ -2199,21 +2747,27 @@ local function layoutSide()
       ui.warn:Show()
       W.SetText(ui.warn, nil, string.format(L["canvas.contrast"], string.format("%.1f", ratio)))
       -- The wrapped text decides the height, so the next row never starts inside it.
-      local h = math.max(WARN_MIN_H, math.ceil(ui.warn:GetStringHeight() or 0) + 4)
+      local h = wrappedHeight(ui.warn, WARN_MIN_H, 4)
       ui.warn:SetHeight(h)
       put(ui.warn, h + 8)
     end
   else
-    local h = math.max(WARN_MIN_H, math.ceil(ui.nothing:GetStringHeight() or 0) + 4)
+    local h = wrappedHeight(ui.nothing, WARN_MIN_H, 4)
     ui.nothing:SetHeight(h)
     put(ui.nothing, h + 12)
     showTypePanel(nil)
     ui.holder:Hide()
   end
+  if ui.hostFrame then
+    ui.hostFrame:SetShown(true)
+    ui.hostFrame:SetWidth(G.contentW)
+    ns.Safe("canvas-host-refresh", ui.hostFrame.Refresh, ui.hostFrame)
+    put(ui.hostFrame, ui.hostFrame:GetHeight() + 12)
+  end
   put(ui.headCanvas, 22)
   put(ui.cw, 32)
   ui.ch:ClearAllPoints()
-  ui.ch:SetPoint("TOPLEFT", ui.cw, "TOPLEFT", HALF_W + 8, 0)
+  ui.ch:SetPoint("TOPLEFT", ui.cw, "TOPLEFT", G.halfW + 8, 0)
   put(ui.bg, 32)
   put(ui.bgAlpha, 48)
   put(ui.borderOn, 30)
@@ -2231,16 +2785,42 @@ local function layoutSide()
   if cursor then
     put(ui.hotX, 32)
     ui.hotY:ClearAllPoints()
-    ui.hotY:SetPoint("TOPLEFT", ui.hotX, "TOPLEFT", HALF_W + 8, 0)
+    ui.hotY:SetPoint("TOPLEFT", ui.hotX, "TOPLEFT", G.halfW + 8, 0)
     put(ui.symmetric, 30)
   end
   ui.props:SetContentHeight(y + 8)
+end
+
+-- Lets the section of the host (option hostSection) read its values again, for a change that happened outside the
+-- editor (a window dragged in the world). The side is laid out again when the section changed its height.
+function CE.RefreshHost()
+  if not (S and ui.hostFrame) then
+    return
+  end
+  local before = ui.hostFrame:GetHeight()
+  ns.Safe("canvas-host-refresh", ui.hostFrame.Refresh, ui.hostFrame)
+  if ui.hostFrame:GetHeight() ~= before then
+    layoutSide()
+  end
+end
+
+-- Lays the side panel out again without touching the layout or the history (a folded section opened or closed).
+-- False while no session is open.
+function CE.RelayoutSide()
+  if not S then
+    return false
+  end
+  layoutSide()
+  return true
 end
 
 local function refreshFields()
   local el = sel()
   if not el then
     return
+  end
+  if groupsOn() and el.type ~= GL.TYPE then
+    ui.groupDd:Refresh()
   end
   if ui.nameFor ~= el.id then
     if ui.name.edit:HasFocus() then
@@ -2249,10 +2829,12 @@ local function refreshFields()
     ui.nameFor = el.id
   end
   ui.name:Refresh()
-  ui.fx:Refresh()
-  ui.fy:Refresh()
-  ui.fw:Refresh()
-  ui.fh:Refresh()
+  local locks = fieldLocks(el)
+  for key, field in pairs({ x = ui.fx, y = ui.fy, w = ui.fw, h = ui.fh }) do
+    field:Refresh()
+    field.edit:SetEnabled(not locks[key])
+    field:SetAlpha(locks[key] and 0.5 or 1)
+  end
   for point, b in pairs(ui.anchors) do
     b:SetSelected(el.point == point)
   end
@@ -2260,12 +2842,15 @@ end
 ui = { refreshFields = refreshFields }
 
 local function refreshList()
-  local data = {}
+  -- A selected child is never hidden in a folded group.
+  local parent = S.sel and GT.GroupOf(S.work, S.sel)
+  if parent then
+    S.folded[parent] = nil
+  end
+  local data = GT.Rows(S.work, S.folded)
   ui.listIndex = {}
-  local sorted = CL.Sorted(S.work)
-  for i = #sorted, 1, -1 do
-    data[#data + 1] = sorted[i]
-    ui.listIndex[sorted[i].id] = #data
+  for i, row in ipairs(data) do
+    ui.listIndex[row.el.id] = i
   end
   ui.list:SetData(data)
   ui.elementsEmpty:SetShown(#data == 0)
@@ -2414,7 +2999,7 @@ local function placeBand()
     control:SetShown(shown)
     if shown then
       control:ClearAllPoints()
-      control:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -BAND_Y)
+      control:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -G.bandY)
       x = x + TOOL_SIZE + TOOL_GAP
     end
   end
@@ -2423,11 +3008,11 @@ local function placeBand()
   if canCreate then
     x = x + 3
     ui.mgrSaveAs:ClearAllPoints()
-    ui.mgrSaveAs:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -BAND_Y)
-    ui.mgrSaveAs:SetSize(ui.mgrSaveAs:Fit(PAD + LEFT_W - x), TOOL_SIZE)
+    ui.mgrSaveAs:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -G.bandY)
+    ui.mgrSaveAs:SetSize(ui.mgrSaveAs:Fit(PAD + G.leftW - x), TOOL_SIZE)
   end
   -- Row 2: Export and Import (text and icon, icon only when the width runs out), then preset and add.
-  local row2Y = BAND_Y + ROW2_Y
+  local row2Y = G.bandY + ROW2_Y
   local ex = PAD
   for _, button in ipairs({ ui.export, ui.importButton }) do
     button:ClearAllPoints()
@@ -2437,45 +3022,100 @@ local function placeBand()
     ex = ex + width + XFER_GAP
   end
   ex = ex + 8 - XFER_GAP
-  ui.preset:ClearAllPoints()
-  ui.preset:SetPoint("TOPLEFT", frame, "TOPLEFT", ex, -row2Y)
-  ui.add:ClearAllPoints()
-  ui.add:SetPoint("TOPLEFT", frame, "TOPLEFT", ex + DROP_W + 8, -row2Y)
-
-  local sx = PAD + LEFT_W + PAD
-  local layouts = mgrFn("list") ~= nil and mgrFn("select") ~= nil
-  ui.layoutHead:SetShown(layouts)
-  ui.layoutList:SetShown(layouts)
-  ui.layoutNew:SetShown(layouts and canCreate)
-  if layouts then
-    ui.layoutHead:ClearAllPoints()
-    ui.layoutHead:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(BAND_Y + 3))
-    ui.layoutNew:ClearAllPoints()
-    ui.layoutNew:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + RIGHT_W, -BAND_Y)
-    ui.layoutList:ClearAllPoints()
-    ui.layoutList:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(BAND_Y + LAYOUT_HEAD_H))
-    ui.layoutList:SetSize(RIGHT_W, LAYOUT_ROWS * ROW_H)
+  -- Preset and add share what is left of the row, at most DROP_W each: a narrow window never pushes them over the
+  -- side column.
+  local dropW = math.max(MIN_DROP_W, math.min(DROP_W, math.floor((PAD + G.leftW - ex - 8) / 2)))
+  for i, dropdown in ipairs({ ui.preset, ui.add }) do
+    dropdown:ClearAllPoints()
+    dropdown:SetPoint("TOPLEFT", frame, "TOPLEFT", ex + (i - 1) * (dropW + 8), -row2Y)
+    dropdown:SetWidth(dropW)
+    dropdown.button:SetWidth(dropW)
   end
 
-  local y = BODY_Y
+  local sx = PAD + G.leftW + PAD
+  local layouts = mgrFn("list") ~= nil and mgrFn("select") ~= nil
+  local canNew = layouts and (canCreate or mgrFn("new") ~= nil)
+  ui.layoutHead:SetShown(layouts)
+  ui.layoutList:SetShown(layouts)
+  ui.layoutNew:SetShown(canNew)
+  ui.layoutDup:SetShown(layouts and canCreate)
+  if layouts then
+    local labels = type(S.mgr.labels) == "table" and S.mgr.labels or {}
+    W.SetText(ui.layoutHead, labels.layouts or "canvas.layouts")
+    -- Heading on the left, Duplicate and New at the right edge. The buttons share what the heading leaves and
+    -- drop their text for the icon when it is too little.
+    local gap = 4
+    local room = G.sideW - math.ceil(ui.layoutHead:GetStringWidth()) - 8 - gap
+    local newW = ui.layoutNew:Fit(math.floor(room / 2))
+    local dupW = ui.layoutDup:Fit(math.max(room - newW - gap, 0))
+    local used = (canNew and newW or 0) + (canCreate and dupW + gap or 0)
+    ui.layoutHead:ClearAllPoints()
+    ui.layoutHead:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(G.bandY + HEAD_DROP))
+    ui.layoutHead:SetSize(math.max(G.sideW - used - 8, 20), 18)
+    ui.layoutNew:ClearAllPoints()
+    ui.layoutNew:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + G.sideW, -G.bandY)
+    ui.layoutNew:SetSize(newW, 22)
+    ui.layoutDup:ClearAllPoints()
+    ui.layoutDup:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + G.sideW - (canNew and newW + gap or 0), -G.bandY)
+    ui.layoutDup:SetSize(dupW, 22)
+    ui.layoutList:ClearAllPoints()
+    ui.layoutList:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(G.bandY + LAYOUT_HEAD_H))
+    ui.layoutList:SetSize(G.sideW, G.layoutListH)
+  end
+
+  local y = G.bodyY
   ui.elementsHead:ClearAllPoints()
-  ui.elementsHead:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(y + 3))
+  ui.elementsHead:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(y + HEAD_DROP))
+  ui.elementsHead:SetSize(G.sideW - HEAD_BUTTON_W - 8, 18)
   ui.elementsAdd:ClearAllPoints()
-  ui.elementsAdd:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + RIGHT_W, -y)
+  ui.elementsAdd:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + G.sideW, -y)
   ui.list:ClearAllPoints()
   ui.list:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(y + ELEMENTS_HEAD_H))
-  ui.list:SetSize(RIGHT_W, ELEMENT_ROWS * ROW_H)
-  y = y + ELEMENTS_HEAD_H + ELEMENT_ROWS * ROW_H + 6
+  ui.list:SetSize(G.sideW, G.elementRows * ROW_H)
+  y = y + ELEMENTS_HEAD_H + G.elementRows * ROW_H + 6
   ui.props:ClearAllPoints()
   ui.props:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -y)
-  ui.props:SetSize(RIGHT_W, BODY_H - (y - BODY_Y))
+  ui.props:SetSize(G.sideW, G.propsH)
+end
+
+-- The dropdowns and tools under the preview follow the bottom of the view.
+local function placeViewBar()
+  local by = G.bodyY + G.viewH + 6
+  local bx = PAD
+  for _, dropdown in ipairs({ ui.zoom, ui.snapDd }) do
+    dropdown:ClearAllPoints()
+    dropdown:SetPoint("TOPLEFT", ui.root, "TOPLEFT", bx, -by)
+    bx = bx + 90 + 8
+  end
+  ui.backdropDd:ClearAllPoints()
+  ui.backdropDd:SetPoint("TOPLEFT", ui.root, "TOPLEFT", bx, -by)
+  ui.toolX, ui.toolY = bx, by + W.DROPDOWN_FIELD_Y
+end
+
+-- Height of a layout row with a detail line at the font size of now.
+function grp.twoLineH()
+  return (ES.TwoLineRowH(Theme.fontSize("small")))
 end
 
 function refreshManager()
   ui.mgrSave:SetEnabled(isDirty())
+  local layouts = mgrFn("list") ~= nil and mgrFn("select") ~= nil
+  local list = layouts and layoutList() or {}
+  local two = false
+  for _, entry in ipairs(list) do
+    two = two or entry.detail ~= nil
+  end
+  ui.layoutTwoLine = two
+  local rowH = two and grp.twoLineH() or nil
+  if G.layoutRowH ~= rowH then
+    -- The band grows or shrinks with its rows: what lies under it moves with it.
+    layoutFrames(frame)
+    paintBackdrop()
+    redraw()
+  end
   placeBand()
   if ui.layoutList:IsShown() then
-    local list = layoutList()
+    ui.layoutList:SetRowHeight(rowH or ROW_H)
     ui.layoutList:SetData(list)
     -- Scrolls to the open layout when it changes, not on every refresh (the player may be scrolling).
     if ui.layoutRevealed ~= S.layoutId then
@@ -2548,7 +3188,9 @@ local function buildTop(f)
     end,
     set = function(value)
       local target = addTargets[value]
-      if target then
+      if target and target.wrap then
+        act.wrap()
+      elseif target then
         act.add(target.kind, target.variant)
       end
     end,
@@ -2560,6 +3202,11 @@ local function buildTop(f)
     end
     addTargets = {}
     addOptions[1] = { value = "_", key = "canvas.addPick" }
+    local picked = sel()
+    if groupsOn() and picked and picked.type ~= GL.TYPE and picked.group == nil then
+      addTargets._wrap = { wrap = true }
+      addOptions[#addOptions + 1] = { value = "_wrap", key = "canvas.wrap", tooltipKey = "canvas.wrapTip" }
+    end
     local kinds = {}
     for kind, def in pairs(S.opts.types) do
       local tip = type(def) == "table" and localized(def.desc) or nil
@@ -2605,8 +3252,8 @@ end
 
 local function buildView(f)
   local view = CreateFrame("Frame", nil, f)
-  view:SetSize(LEFT_W, VIEW_H)
-  view:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -BODY_Y)
+  view:SetSize(G.leftW, G.viewH)
+  view:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -G.bodyY)
   view:SetClipsChildren(true)
   W.Fill(view, "surface", 1)
   W.Border(view, "white", 0.25)
@@ -2634,7 +3281,7 @@ local function buildView(f)
   ui.marker:SetDrawLayer("ARTWORK", 2)
   ui.marker:Hide()
   ui.pools = {}
-  for _, name in ipairs({ "grid", "bounds", "select", "handle", "guide" }) do
+  for _, name in ipairs({ "grid", "bounds", "frame", "cell", "badge", "select", "handle", "drop", "guide" }) do
     ui.pools[name] = { n = 0 }
   end
 
@@ -2670,7 +3317,6 @@ local function buildView(f)
   end
 
   -- View bar below the preview.
-  local bx, by = PAD, BODY_Y + VIEW_H + 6
   -- The steps follow the kind of canvas: the list is refilled in place on every read.
   local zoomOptions = {}
   ui.zoom = placedDropdown(f, {
@@ -2690,8 +3336,6 @@ local function buildView(f)
       act.zoom(z)
     end,
   })
-  ui.zoom:SetPoint("TOPLEFT", f, "TOPLEFT", bx, -by)
-  bx = bx + 90 + 8
   local snapOptions = {}
   for _, s in ipairs(CE.SNAPS) do
     snapOptions[#snapOptions + 1] = s == 0 and { value = 0, key = "canvas.snapOff" }
@@ -2708,8 +3352,6 @@ local function buildView(f)
       act.snap(s)
     end,
   })
-  ui.snapDd:SetPoint("TOPLEFT", f, "TOPLEFT", bx, -by)
-  bx = bx + 90 + 8
 
   -- Backdrop of a stage and the simulation tools; both only show when the host asks for them.
   local backdropOptions = {}
@@ -2732,10 +3374,9 @@ local function buildView(f)
       act.backdrop(id)
     end,
   })
-  ui.backdropDd:SetPoint("TOPLEFT", f, "TOPLEFT", bx, -by)
   ui.backdropDd:Hide()
-  ui.toolX, ui.toolY = bx, by + W.DROPDOWN_FIELD_Y
   ui.tools = {}
+  placeViewBar()
 end
 
 -- A list row: show toggle, name (selects), forward, backward.
@@ -2750,6 +3391,25 @@ local function createRow(parent)
     end,
   })
   row.eye:SetPoint("LEFT", 0, 0)
+  -- A group row has an arrow that opens and closes it and the glyph of the group in front of the name.
+  row.fold = W.Action(row, {
+    icon = "chevron-down",
+    size = 22,
+    tooltip = "canvas.fold",
+    wrap = "canvas-fold-row",
+    onClick = function()
+      act.toggleFold(row.id)
+    end,
+  })
+  row.fold.fgName = function()
+    return string.format(L[row.open and "canvas.foldOpen" or "canvas.foldClosed"], row.fullName or "")
+  end
+  row.glyph = W.Glyph(row, "folder", 14, "accent2")
+  row.guide = row:CreateTexture(nil, "ARTWORK")
+  row.guide:SetWidth(2)
+  ns.Bind(row.guide, function(t)
+    t:SetColorTexture(Theme.color("accent2", 0.7))
+  end)
   -- Remove and rename sit at the right edge, next to the arrows; both have the size of the other icons.
   row.del = W.Action(row, {
     icon = "trash",
@@ -2775,6 +3435,7 @@ local function createRow(parent)
     icon = "chevron-down",
     size = 22,
     tooltip = "canvas.backward",
+    tooltipText = "canvas.backwardTip",
     onClick = function()
       act.reorder(row.id, "down")
     end,
@@ -2784,6 +3445,7 @@ local function createRow(parent)
     icon = "chevron-up",
     size = 22,
     tooltip = "canvas.forward",
+    tooltipText = "canvas.forwardTip",
     onClick = function()
       act.reorder(row.id, "up")
     end,
@@ -2796,12 +3458,29 @@ local function createRow(parent)
     width = 100,
     wrap = "canvas-row",
     onClick = function()
-      selectElement(row.id)
+      -- The click that ends a drag of the row is no selection.
+      if not row.fgDragged then
+        selectElement(row.id)
+      end
     end,
   })
   row.name:SetPoint("LEFT", row.eye, "RIGHT", 2, 0)
   row.name:SetPoint("RIGHT", row.up, "LEFT", -2, 0)
   row.name.label:SetJustifyH("LEFT")
+  -- The name is a button that takes the mouse, so it hands the drag of the row to the list.
+  row.name:RegisterForDrag("LeftButton")
+  row.name:SetScript("OnDragStart", function()
+    local start = row:GetScript("OnDragStart")
+    if start then
+      start(row)
+    end
+  end)
+  row.name:SetScript("OnDragStop", function()
+    local stop = row:GetScript("OnDragStop")
+    if stop then
+      stop(row)
+    end
+  end)
   -- The accessible name is the whole name, the row may show a cut one.
   row.name.fgName = function()
     return row.fullName
@@ -2829,6 +3508,7 @@ local function createLayoutRow(parent)
   row.mark:SetPoint("LEFT", 4, 0)
   row.flag = W.Text(row, { text = "*", role = "ui", color = "warning", justify = "RIGHT" })
   row.flag:SetWidth(LAYOUT_FLAG_W - 4)
+  row.detail = W.Text(row, { role = "small", color = "textMuted" })
   local function icon(name, tip, tipText, onClick)
     return W.Action(row, {
       icon = name,
@@ -2868,7 +3548,7 @@ local function createLayoutRow(parent)
   local function tip(self)
     local key = row.dirty and "canvas.layoutDirtyTip"
       or (row.current and "canvas.layoutCurrentTip" or "canvas.layoutOpenTip")
-    ns.ShowTooltip(self, row.fullName, L[key])
+    ns.ShowTooltip(self, row.fullName, L[key] .. (row.fullDetail and ("\n" .. row.fullDetail) or ""))
   end
   row.name:HookScript("OnEnter", tip)
   row.name:HookScript("OnLeave", ns.HideTooltip)
@@ -2877,13 +3557,18 @@ local function createLayoutRow(parent)
 end
 
 local function bindLayoutRow(row, entry)
-  row.id, row.fullName = entry.id, entry.name
+  row.id, row.fullName, row.fullDetail = entry.id, entry.name, entry.detail
   row.current = entry.id == S.layoutId
   -- Only the open layout can hold unsaved changes: a switch asks about them first.
   row.dirty = row.current and isDirty()
   row.mark:SetShown(row.current)
   W.SetText(row.name.label, nil, entry.name)
   row.name:SetSelected(row.current)
+  -- Two lines: the name line sits at the top and the detail under it; else the row is one centered line.
+  local two = ui.layoutTwoLine == true
+  local side, y = two and "TOPRIGHT" or "RIGHT", two and -1 or 0
+  row.mark:ClearAllPoints()
+  row.mark:SetPoint(two and "TOPLEFT" or "LEFT", 4, two and -5 or 0)
   local slots = 0
   for _, item in ipairs({
     { row.del, mgrFn("delete") ~= nil },
@@ -2894,7 +3579,7 @@ local function bindLayoutRow(row, entry)
     button:Hide()
     if offered then
       button:ClearAllPoints()
-      button:SetPoint("RIGHT", row, "RIGHT", -slots * (LAYOUT_ICON + 2), 0)
+      button:SetPoint(side, row, side, -slots * (LAYOUT_ICON + 2), y)
       slots = slots + 1
       -- A layout the host will not delete (the last one) shows no delete icon.
       button:SetShown(button ~= row.del or canDelete(entry.id))
@@ -2904,20 +3589,64 @@ local function bindLayoutRow(row, entry)
   -- The star of unsaved changes has its own slot, so a long name cannot push it out of sight.
   row.flag:SetShown(row.dirty)
   row.flag:ClearAllPoints()
-  row.flag:SetPoint("RIGHT", row, "RIGHT", -edge - 2, 0)
+  row.flag:SetPoint(side, row, side, -edge - 2, two and -5 or 0)
   row.name:ClearAllPoints()
-  row.name:SetPoint("LEFT", row, "LEFT", 22, 0)
-  row.name:SetPoint("RIGHT", row, "RIGHT", -edge - (row.dirty and LAYOUT_FLAG_W or 0), 0)
+  local right = -edge - (row.dirty and LAYOUT_FLAG_W or 0)
+  if two then
+    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 22, -1)
+    row.name:SetPoint("TOPRIGHT", row, "TOPRIGHT", right, -1)
+  else
+    row.name:SetPoint("LEFT", row, "LEFT", 22, 0)
+    row.name:SetPoint("RIGHT", row, "RIGHT", right, 0)
+  end
+  row.detail:ClearAllPoints()
+  row.detail:SetShown(two and entry.detail ~= nil)
+  if two and entry.detail then
+    W.SetText(row.detail, nil, entry.detail)
+    local _, line = ES.TwoLineRowH(Theme.fontSize("small"))
+    row.detail:SetPoint("TOPLEFT", row, "TOPLEFT", 24, -ES.TwoLineDetailY())
+    row.detail:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -ES.TwoLineDetailY())
+    -- One line at the height of the font: a longer text is cut, it never runs into the row below.
+    row.detail:SetHeight(line)
+    row.detail:SetWordWrap(false)
+    if row.detail.SetMaxLines then
+      row.detail:SetMaxLines(1)
+    end
+  end
 end
 
-local function bindRow(row, el)
-  row.id = el.id
+-- A row of the tree list: entry = { el, depth, isGroup, open, count } (GroupTree.Rows).
+local function bindRow(row, entry)
+  local el = entry.el
+  row.item, row.id, row.open = entry, el.id, entry.open
   local on = el.visible ~= false
   row.eye:SetIcon(on and "eye" or "eye-off")
-  W.SetText(row.name.label, nil, titleOf(el))
+  local title = titleOf(el)
+  row.fullName = title
+  W.SetText(row.name.label, nil, entry.isGroup and string.format("%s (%d)", title, entry.count) or title)
   row.tipTitle, row.tipText, row.tipLines = rowTip(el)
-  row.fullName = titleOf(el)
   row.name:SetSelected(el.id == S.sel)
+  -- Eye and the buttons on the right stay where they are; the arrow, the glyph and the name move in by level.
+  local foldLeft, nameLeft = GT.RowLeft(entry.depth, entry.isGroup)
+  row.fold:SetShown(entry.isGroup)
+  row.glyph:SetShown(entry.isGroup)
+  if entry.isGroup then
+    row.fold:SetIcon(entry.open and "chevron-down" or "chevron-right")
+    row.fold:ClearAllPoints()
+    row.fold:SetPoint("LEFT", row, "LEFT", foldLeft, 0)
+    row.glyph:ClearAllPoints()
+    row.glyph:SetPoint("LEFT", row, "LEFT", foldLeft + GT.FOLD, 0)
+  end
+  -- The line is a second cue besides the indent, it joins the children under the arrow of their group.
+  row.guide:SetShown(entry.depth > 0)
+  if entry.depth > 0 then
+    row.guide:ClearAllPoints()
+    row.guide:SetPoint("TOP", row, "TOPLEFT", GT.GuideX(entry.depth), 0)
+    row.guide:SetPoint("BOTTOM", row, "BOTTOMLEFT", GT.GuideX(entry.depth), 0)
+  end
+  row.name:ClearAllPoints()
+  row.name:SetPoint("LEFT", row, "LEFT", nameLeft, 0)
+  row.name:SetPoint("RIGHT", row.up, "LEFT", -2, 0)
 end
 
 local function numberField(parent, key, prop, lo, hi)
@@ -2934,7 +3663,7 @@ local function numberField(parent, key, prop, lo, hi)
     end,
     set = function(v)
       local el = sel()
-      if el then
+      if el and not fieldLocks(el)[prop] then
         el[prop] = v
         changed("field:" .. prop .. ":" .. el.id)
       end
@@ -2947,16 +3676,26 @@ end
 local function buildSide(f)
   -- placeBand sets every position and size (the layout list only shows with a manager).
   ui.layoutHead = W.Text(f, { key = "canvas.layouts", role = "ui", color = "accent2" })
-  ui.layoutHead:SetSize(RIGHT_W - 84, 18)
   ui.layoutNew = W.Action(f, {
     label = "act.new",
     icon = "plus",
     tooltip = "act.new",
     tooltipText = "canvas.newTip",
     height = 22,
-    width = 80,
+    width = HEAD_BUTTON_W - 20,
     onClick = function()
-      act.saveAs()
+      act.newLayout()
+    end,
+  })
+  ui.layoutDup = W.Action(f, {
+    label = "act.duplicate",
+    icon = "copy",
+    tooltip = "act.duplicate",
+    tooltipText = "canvas.dupHeadTip",
+    height = 22,
+    width = HEAD_BUTTON_W - 20,
+    onClick = function()
+      act.dupLayout()
     end,
   })
   ui.layoutRows = {}
@@ -2973,7 +3712,7 @@ local function buildSide(f)
     icon = "plus",
     tooltip = "canvas.add",
     height = 22,
-    width = 110,
+    width = HEAD_BUTTON_W,
     onClick = function()
       ui.add:Refresh()
       ui.add:Open(ui.elementsAdd)
@@ -2983,13 +3722,22 @@ local function buildSide(f)
     rowHeight = ROW_H,
     createRow = createRow,
     bindRow = bindRow,
+    canReorder = groupsOn,
+    indentOf = function(item, anchor, after)
+      return S and GT.DropIndent(S.work, item.el.id, anchor.el.id, after, S.folded)
+    end,
+    onReorder = function(item, anchor, after)
+      if S then
+        act.dropRow(item.el.id, anchor.el.id, after)
+      end
+    end,
   })
   ui.listIndex = {}
   -- A region of the list itself: the list is a frame above the window, so text of the window would lie behind it.
   ui.elementsEmpty =
     W.Text(ui.list, { key = "canvas.elementsEmpty", role = "ui", color = "textSecondary", wrap = true })
   ui.elementsEmpty:SetPoint("TOPLEFT", ui.list, "TOPLEFT", 8, -8)
-  ui.elementsEmpty:SetWidth(RIGHT_W - 16)
+  ui.elementsEmpty:SetWidth(G.sideW - 16)
 
   local props = W.ScrollArea(f)
   ui.props, ui.content = props, props.content
@@ -3001,7 +3749,7 @@ local function buildSide(f)
   end
 
   ui.nothing = W.Text(c, { key = "canvas.nothing", role = "ui", color = "textSecondary", wrap = true })
-  ui.nothing:SetWidth(CONTENT_W)
+  ui.nothing:SetWidth(G.contentW)
   ui.headEl = heading("canvas.selected")
   ui.name = Controls.Text(c, {
     label = "canvas.name",
@@ -3021,7 +3769,7 @@ local function buildSide(f)
       end
     end,
   })
-  ui.name:SetWidth(CONTENT_W)
+  ui.name:SetWidth(G.contentW)
   ui.name.edit:HookScript("OnEnter", function(self)
     ns.ShowTooltip(self, L["canvas.name"], L["canvas.nameTip"])
   end)
@@ -3033,10 +3781,22 @@ local function buildSide(f)
     tooltip = "canvas.removeElement",
     tooltipText = "canvas.removeTip",
     height = 24,
-    width = REMOVE_W,
+    width = G.removeW,
     wrap = "canvas-remove",
     onClick = function()
       act.remove()
+    end,
+  })
+  ui.dup = W.Action(c, {
+    key = "act.duplicate",
+    icon = "copy",
+    tooltip = "act.duplicate",
+    tooltipText = "canvas.dupElementTip",
+    height = 24,
+    width = G.dupW,
+    wrap = "canvas-duplicate",
+    onClick = function()
+      act.duplicate()
     end,
   })
 
@@ -3061,16 +3821,49 @@ local function buildSide(f)
   ui.fy = numberField(c, "y", "y", -CL.MAX_OFFSET, CL.MAX_OFFSET)
   ui.fw = numberField(c, "w", "w", 0, CL.MAX_SIZE)
   ui.fh = numberField(c, "h", "h", 1, CL.MAX_SIZE)
+  -- The group of the selected element: "None" or one of the groups. Rebuilt with every refresh.
+  local groupOptions = {}
+  ui.groupDd = W.Dropdown(c, {
+    key = "canvas.group",
+    options = groupOptions,
+    tooltip = "canvas.group",
+    tooltipText = "canvas.groupTip",
+    get = function()
+      local el = S and sel()
+      return el and el.group or "_none"
+    end,
+    set = function(value)
+      act.moveToGroup(nil, value ~= "_none" and value or nil)
+    end,
+  })
+  ui.groupDd:SetWidth(G.contentW)
+  local groupRefresh = ui.groupDd.Refresh
+  function ui.groupDd:Refresh()
+    for i = #groupOptions, 1, -1 do
+      groupOptions[i] = nil
+    end
+    groupOptions[1] = { value = "_none", key = "canvas.group.none" }
+    for _, el in ipairs(S.work.elements) do
+      if el.type == GL.TYPE then
+        groupOptions[#groupOptions + 1] = { value = el.id, text = titleOf(el) }
+      end
+    end
+    groupRefresh()
+  end
 
   ui.holder = CreateFrame("Frame", nil, c)
-  ui.holder:SetSize(CONTENT_W, 1)
+  ui.holder:SetSize(G.contentW, 1)
   ui.warn = W.Text(c, { role = "ui", color = "warning", wrap = true })
-  ui.warn:SetWidth(CONTENT_W)
+  ui.warn:SetWidth(G.contentW)
   -- What the type of the selected element is for; the height follows the wrapped text.
   ui.desc = W.Text(c, { role = "ui", color = "textMuted", wrap = true })
-  ui.desc:SetWidth(CONTENT_W)
-  ui.headEl:SetWidth(CONTENT_W)
-  ui.elementParts = { ui.headEl, ui.name, ui.remove, ui.anchorBox, ui.fx, ui.fy, ui.fw, ui.fh, ui.desc }
+  ui.desc:SetWidth(G.contentW)
+  -- Why X, Y, width or height of the selected element are off.
+  ui.lockNote = W.Text(c, { role = "small", color = "textMuted", wrap = true })
+  ui.lockNote:SetWidth(G.contentW)
+  ui.headEl:SetWidth(G.contentW)
+  ui.elementParts =
+    { ui.headEl, ui.name, ui.remove, ui.dup, ui.anchorBox, ui.fx, ui.fy, ui.fw, ui.fh, ui.desc, ui.groupDd }
 
   ui.headCanvas = heading("canvas.settings")
   local function canvasNumber(key, prop, lo, hi)
@@ -3089,7 +3882,7 @@ local function buildSide(f)
         changed("canvas:" .. prop)
       end,
     })
-    n:SetWidth(HALF_W)
+    n:SetWidth(G.halfW)
     return n
   end
   ui.cw = canvasNumber("canvas.cw", "w", CL.MIN_CANVAS, CL.MAX_CANVAS)
@@ -3106,7 +3899,7 @@ local function buildSide(f)
       changed("canvas:bg")
     end,
   })
-  ui.bg:SetWidth(CONTENT_W)
+  ui.bg:SetWidth(G.contentW)
   ui.bgAlpha = Controls.Slider(c, {
     label = "canvas.bgAlpha",
     min = 0,
@@ -3123,7 +3916,7 @@ local function buildSide(f)
       return v .. "%"
     end,
   })
-  ui.bgAlpha:SetWidth(CONTENT_W)
+  ui.bgAlpha:SetWidth(G.contentW)
   ui.borderOn = W.Checkbox(c, {
     key = "canvas.border",
     get = function()
@@ -3137,7 +3930,7 @@ local function buildSide(f)
       changed("canvas:border")
     end,
   })
-  ui.borderOn:SetSize(CONTENT_W, 22)
+  ui.borderOn:SetSize(G.contentW, 22)
   ui.borderColor = Controls.Color(c, {
     label = "canvas.borderColor",
     owner = f,
@@ -3151,7 +3944,7 @@ local function buildSide(f)
       changed("canvas:borderColor")
     end,
   })
-  ui.borderColor:SetWidth(CONTENT_W)
+  ui.borderColor:SetWidth(G.contentW)
   ui.borderAlpha = Controls.Slider(c, {
     label = "canvas.borderAlpha",
     min = 0,
@@ -3168,7 +3961,7 @@ local function buildSide(f)
       return v .. "%"
     end,
   })
-  ui.borderAlpha:SetWidth(CONTENT_W)
+  ui.borderAlpha:SetWidth(G.contentW)
 
   -- The hotspot of a cursor canvas: the point that sits on the mouse cursor (percent of the canvas).
   local function hotNumber(key, prop)
@@ -3189,7 +3982,7 @@ local function buildSide(f)
         changed("canvas:" .. prop)
       end,
     })
-    n:SetWidth(HALF_W)
+    n:SetWidth(G.halfW)
     return n
   end
   ui.hotX = hotNumber("canvas.hotX", "hotX")
@@ -3210,11 +4003,10 @@ local function buildSide(f)
       changed("canvas:symmetric")
     end,
   })
-  ui.symmetric:SetSize(CONTENT_W, 22)
+  ui.symmetric:SetSize(G.contentW, 22)
 end
 
 local function buildFooter(f)
-  local y = WIN_H - FOOT_H
   ui.live = W.Checkbox(f, {
     key = "canvas.live",
     tooltip = "canvas.live",
@@ -3230,7 +4022,7 @@ local function buildFooter(f)
     end,
   })
   ui.live:SetSize(70, 22)
-  ui.live:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -(y + 8))
+  ui.live:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, FOOT_H - 8 - 22)
   ui.help = W.InfoButton(f, "canvas.help.title", "canvas.help.keys")
   ui.help:SetPoint("LEFT", ui.live, "RIGHT", 8, 0)
   ui.grid = W.Checkbox(f, {
@@ -3284,7 +4076,8 @@ local function buildFooter(f)
       act.discard()
     end,
   })
-  ui.discard:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, 8)
+  -- Left of the size grip in the corner.
+  ui.discard:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(PAD + GRIP_SIZE + 4), 8)
   ui.apply = W.Action(f, {
     label = "act.apply",
     icon = "check",
@@ -3320,6 +4113,122 @@ local function savePosition(f)
   end
 end
 
+-- Solid surfaces under the toolbar band and the sidebar column: a translucent shell (skin, style) must
+-- not let the page behind the window show through the controls.
+local function buildSurfaces(f)
+  local function solid()
+    local tex = f:CreateTexture(nil, "BACKGROUND", nil, 3)
+    ns.Bind(tex, function(t)
+      t:SetColorTexture(Theme.color("surface", 1))
+    end)
+    return tex
+  end
+  f.bandFill, f.sideFill = solid(), solid()
+end
+
+-- Places the two surfaces for the current metrics: the band over the full width, the column to the right edge.
+local function placeSurfaces(f)
+  f.bandFill:ClearAllPoints()
+  f.bandFill:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -HEAD_H)
+  f.bandFill:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -HEAD_H)
+  f.bandFill:SetHeight(G.bodyY - 3 - HEAD_H)
+  f.sideFill:ClearAllPoints()
+  f.sideFill:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + G.leftW + PAD / 2, -(G.bodyY - 3))
+  f.sideFill:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -(G.bodyY - 3))
+  f.sideFill:SetHeight(G.bodyH + 6)
+end
+
+-- Size ------------------------------------------------------------------------------------------
+
+-- The screen in the units of the window (they change with the window scale), nil while the client has no geometry.
+local function screenSize(f)
+  local scale, w, h = f:GetScale(), UIParent:GetWidth(), UIParent:GetHeight()
+  if finite(scale) and scale > 0 and finite(w) and finite(h) then
+    return w / scale, h / scale
+  end
+end
+
+local function applyBounds(f, screenW, screenH)
+  local minW, minH, maxW, maxH = ES.Limits(screenW, screenH)
+  if f.SetResizeBounds then
+    f:SetResizeBounds(minW, minH, maxW, maxH)
+  elseif f.SetMinResize then
+    f:SetMinResize(minW, minH)
+  end
+end
+
+-- Moves the parts that do not depend on a session to the current metrics (they come from the size of the window).
+function layoutFrames(f)
+  G = ES.Metrics(f:GetWidth(), f:GetHeight(), ui.layoutTwoLine and grp.twoLineH() or nil)
+  f.fgMetrics = G
+  Controls.PANEL_WIDTH = G.contentW
+  ui.view:SetSize(G.leftW, G.viewH)
+  placeSurfaces(f)
+  placeViewBar()
+end
+
+-- The window changed its size: every part follows. The view and the lists keep their content, the preview keeps
+-- its zoom (the canvas is never rescaled by the window), the property panel measures its wrapped rows again.
+local function relayout(f)
+  local m = ES.Metrics(f:GetWidth(), f:GetHeight(), ui.layoutTwoLine and grp.twoLineH() or nil)
+  if f.fgMetrics and m.w == G.w and m.h == G.h then
+    return
+  end
+  layoutFrames(f)
+  if not S then
+    return
+  end
+  paintBackdrop()
+  refreshViewBar()
+  refreshManager()
+  refreshList()
+  redraw()
+  layoutSide()
+end
+
+-- The client reports every step of a drag: the parts are laid out after a short quiet time, so a held slider or
+-- a drag of the grip is never rebuilt at every pixel.
+local RESIZE_DELAY = 0.06
+
+local function scheduleRelayout(f)
+  if f.fgRelayoutPending then
+    return
+  end
+  f.fgRelayoutPending = true
+  C_Timer.After(RESIZE_DELAY, function()
+    f.fgRelayoutPending = false
+    if f:IsShown() then
+      ns.Safe("canvas-relayout", relayout, f)
+    end
+  end)
+end
+
+local function saveSize(f)
+  local db = frameDb()
+  db.w, db.h = f:GetWidth(), f:GetHeight()
+end
+
+-- Back to the default size (or the screen size on a small screen); the saved size is dropped.
+local function resetSize(f)
+  local sw, sh = screenSize(f)
+  local db = frameDb()
+  db.w, db.h = nil, nil
+  f:SetSize(ES.Clamp(ES.DEFAULT_W, ES.DEFAULT_H, sw, sh))
+  applyBounds(f, sw, sh)
+  relayout(f)
+end
+
+-- After a scale change the screen holds more or less of the window: bounds and size are checked again.
+local function fitSize(f)
+  local sw, sh = screenSize(f)
+  applyBounds(f, sw, sh)
+  local w, h = ES.Clamp(f:GetWidth(), f:GetHeight(), sw, sh)
+  if w ~= f:GetWidth() or h ~= f:GetHeight() then
+    f:SetSize(w, h)
+  end
+  relayout(f)
+end
+
 local function applyLook(f)
   local style = WS.Resolve("canvaseditor", frameDb().style)
   -- The chrome never fades: its controls sit over the page behind the window.
@@ -3335,6 +4244,7 @@ local function changeScale(f, delta)
   db.scale = U.clamp(math.floor(scaleOf(db) * 100 + delta * SCALE_STEP * 100 + 0.5) / 100, SCALE_MIN, SCALE_MAX)
   f:SetScale(db.scale)
   place(f)
+  fitSize(f)
   -- A cursor canvas keeps its true size on the screen while the window scale changes.
   if S and cursorMode() then
     S.zoom = factorOf(S.step)
@@ -3342,21 +4252,69 @@ local function changeScale(f, delta)
   end
 end
 
--- Solid surfaces under the toolbar band and the sidebar column: a translucent shell (skin, style) must
--- not let the page behind the window show through the controls.
-local function buildSurfaces(f)
-  local function solid(left, top, width, height)
-    local tex = f:CreateTexture(nil, "BACKGROUND", nil, 3)
-    tex:SetPoint("TOPLEFT", f, "TOPLEFT", left, -top)
-    tex:SetSize(width, height)
-    ns.Bind(tex, function(t)
-      t:SetColorTexture(Theme.color("surface", 1))
+-- The grip in the bottom right corner: a drag changes the size, a second click right after the first (or Enter on
+-- the keyboard focus) brings the default size back.
+local DOUBLE_CLICK = 0.4
+
+local function buildGrip(f)
+  local grip = CreateFrame("Button", nil, f)
+  grip:SetSize(GRIP_SIZE, GRIP_SIZE)
+  grip:SetPoint("BOTTOMRIGHT", -1, 1)
+  grip:SetFrameLevel(f:GetFrameLevel() + 10)
+  local texture = grip:CreateTexture(nil, "OVERLAY")
+  texture:SetAllPoints()
+  texture:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+  grip:SetScript(
+    "OnMouseDown",
+    ns.Wrap("canvas-grip-down", function(self, button)
+      if button ~= "LeftButton" then
+        return
+      end
+      -- The top left corner stays where it is: a window anchored at its center would grow on both sides.
+      savePosition(f)
+      place(f)
+      self.fgStartW, self.fgStartH = f:GetWidth(), f:GetHeight()
+      f:StartSizing("BOTTOMRIGHT")
     end)
-    return tex
+  )
+  grip:SetScript(
+    "OnMouseUp",
+    ns.Wrap("canvas-grip-up", function(self)
+      f:StopMovingOrSizing()
+      local sw, sh = screenSize(f)
+      local w, h = ES.Clamp(f:GetWidth(), f:GetHeight(), sw, sh)
+      if w ~= f:GetWidth() or h ~= f:GetHeight() then
+        f:SetSize(w, h)
+      end
+      ns.WindowShell.FitToScreen(f)
+      savePosition(f)
+      local moved = w ~= self.fgStartW or h ~= self.fgStartH
+      local at = now()
+      if not moved and self.fgClickAt and at - self.fgClickAt <= DOUBLE_CLICK then
+        self.fgClickAt = nil
+        resetSize(f)
+        return
+      end
+      -- A drag is no first click of a double click.
+      self.fgClickAt = not moved and at or nil
+      saveSize(f)
+      relayout(f)
+    end)
+  )
+  local function tip(self)
+    ns.ShowTooltip(self, L["canvas.grip"], L["canvas.gripTip"])
   end
-  f.bandFill = solid(0, HEAD_H, WIN_W, BODY_Y - 3 - HEAD_H)
-  local sx = PAD + LEFT_W + PAD / 2
-  f.sideFill = solid(sx, BODY_Y - 3, WIN_W - sx, BODY_H + 6)
+  grip:SetScript("OnEnter", tip)
+  grip:SetScript("OnLeave", ns.HideTooltip)
+  grip.fgNameKey = "canvas.grip"
+  function grip.fgName()
+    return L["canvas.grip"]
+  end
+  grip.fgOnFocus, grip.fgOnBlur = tip, ns.HideTooltip
+  ns.Focus.register(grip, function()
+    resetSize(f)
+  end)
+  ui.grip = grip
 end
 
 local function create()
@@ -3366,8 +4324,9 @@ local function create()
   f:SetToplevel(true)
   f:SetClampedToScreen(true)
   f:SetMovable(true)
+  f:SetResizable(true)
   f:EnableMouse(true)
-  f:SetSize(WIN_W, WIN_H)
+  f:SetSize(G.w, G.h)
   f.bg = f:CreateTexture(nil, "BACKGROUND")
   f.bg:SetAllPoints()
   f.shell = ns.WindowShell.Attach(f, { title = "canvas.title", titleHeight = HEAD_H, shadow = true })
@@ -3413,6 +4372,13 @@ local function create()
   buildView(f)
   buildSide(f)
   buildFooter(f)
+  buildGrip(f)
+  f:SetScript(
+    "OnSizeChanged",
+    ns.Wrap("canvas-size", function()
+      scheduleRelayout(f)
+    end)
+  )
   -- The preview stacks its surface and handles far above the window; the band dropdowns go above that
   -- (the popup lies in a higher strata). A frame keeps its children's levels, so each part gets its own.
   local level = ui.surface:GetFrameLevel() + 10
@@ -3493,6 +4459,8 @@ function CE.Open(opts)
     mgr = type(opts.manager) == "table" and opts.manager or nil,
     tools = {},
     toolOn = {},
+    -- Groups closed in the element list (ids): only the editor remembers them.
+    folded = {},
   }
   for _, def in ipairs(type(opts.tools) == "table" and opts.tools or {}) do
     if
@@ -3513,11 +4481,31 @@ function CE.Open(opts)
   end
   S.measure = CR.Measurer(ui.canvas)
   CR.Clear(ui.canvas)
+  -- The section of the host: built once per builder, hidden when this host has none.
+  if ui.hostFrame then
+    ui.hostFrame:Hide()
+    ui.hostFrame = nil
+  end
+  local builder = type(opts.hostSection) == "function" and opts.hostSection or nil
+  if builder then
+    local made = hostCache[builder]
+    if not made then
+      local ok, built = ns.Safe("canvas-host-section", builder, ui.content)
+      made = ok and type(built) == "table" and type(rawget(built, "Refresh")) == "function" and built or nil
+      hostCache[builder] = made
+    end
+    ui.hostFrame = made
+  end
   local _, current = mgrCall("current")
   S.layoutId = current ~= nil and current or work.id
   updateTitle()
   frame:SetScale(scaleOf(db))
-  -- The zoom needs the scale of the window (a cursor canvas shows the true size).
+  -- The size the player left it at, held inside the limits of this screen and scale.
+  local screenW, screenH = screenSize(frame)
+  frame:SetSize(ES.Saved(db, screenW, screenH))
+  applyBounds(frame, screenW, screenH)
+  layoutFrames(frame)
+  -- The zoom needs the scale of the window and the size of the view (a cursor canvas shows the true size).
   S.step = bestZoom()
   S.zoom = factorOf(S.step)
   local marker = stageOf() and stageOf().marker
@@ -3530,6 +4518,7 @@ function CE.Open(opts)
   end
   paintBackdrop()
   place(frame)
+  ns.WindowShell.FitToScreen(frame)
   frame:Show()
   frame:Raise()
   applyLook(frame)

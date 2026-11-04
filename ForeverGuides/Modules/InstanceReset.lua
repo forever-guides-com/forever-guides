@@ -88,9 +88,9 @@ local function patterns()
   return list
 end
 
--- Only an explicit false switches the report off.
+-- Opt-in: only an explicit true switches the report on.
 function R.Announce()
-  return not (ns.db and ns.db.settings and ns.db.settings.instanceResetAnnounce == false)
+  return ns.db ~= nil and ns.db.settings ~= nil and ns.db.settings.instanceResetAnnounce == true
 end
 
 -- Collecting window ------------------------------------------------------------------------------

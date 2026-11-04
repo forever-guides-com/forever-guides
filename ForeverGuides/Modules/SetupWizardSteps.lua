@@ -9,6 +9,7 @@ ns.AddLocale("enUS", {
   ["setup.notice"] = "New: setup with /fg setup",
   ["setup.noticeNew"] = "New setup steps: /fg setup new",
   ["setup.nothingNew"] = "No new steps.",
+  ["setup.escapeHint"] = "Controls blocked? Type /fg setup close in chat",
   ["setup.progress"] = "Step %d of %d",
   ["setup.back"] = "Back",
   ["setup.next"] = "Next",
@@ -21,7 +22,7 @@ ns.AddLocale("enUS", {
   ["setup.cancelTitle"] = "Cancel setup",
   ["setup.cancelText"] = "Cancel setup? Your changes stay.",
   ["setup.resetTitle"] = "Reset all",
-  ["setup.resetText"] = "Set all setup options to default?",
+  ["setup.resetText"] = "Set all options to default? Sharing is switched off.",
   ["setup.copy"] = "Copy",
   ["setup.open"] = "Open",
   ["setup.info.tutorials"] = "Tutorials: page in the left navigation (group Addon)",
@@ -31,12 +32,19 @@ ns.AddLocale("enUS", {
   ["setup.changeWhere"] = "Change later: Settings, tab in brackets.",
   ["setup.step.look"] = "Language and look",
   ["setup.step.look.text"] = "A few quick settings. Changes apply right away.\nSkip any time.",
+  ["setup.alphaLow"] = "Very transparent, text can be hard to read.",
   ["setup.step.addons"] = "Optional add-ons",
   ["setup.step.addons.text"] = "For all characters. Per character: Settings > Addons.",
   ["setup.step.windows"] = "Windows",
   ["setup.step.windows.text"] = "Game windows, addon and messages.",
-  ["setup.step.invitations"] = "Invites and data",
-  ["setup.step.invitations.text"] = "Who you invite, who may invite you and what you share.",
+  ["setup.step.invitations"] = "Invites",
+  ["setup.step.invitations.text"] = "Who you invite and who may invite you.",
+  ["setup.step.sharing"] = "Share with others",
+  ["setup.step.sharing.text"] = "Everything here is off until you switch it on.",
+  ["setup.sharing.privacy"] = "Where the data goes, how to withdraw.",
+  ["setup.sharing.more"] = "More info",
+  ["setup.sharing.all.text"] = "More audiences and all functions.",
+  ["setup.sharing.all"] = "All settings",
   ["setup.ctl.inviteGroup"] = "Group invite by whisper",
   ["setup.ctl.inviteWords"] = "Keywords for the group invite",
   ["setup.ctl.inviteWordsHint"] = "Default: only friends may ask (Settings).",
@@ -49,8 +57,6 @@ ns.AddLocale("enUS", {
   ["setup.ctl.acceptFriends"] = "Friends may invite me",
   ["setup.ctl.acceptGuild"] = "Guild members may invite me",
   ["setup.ctl.acceptGuildHint"] = "Friends and guild are accepted at once, never while queued.",
-  ["setup.ctl.peerShare"] = "Share jobs, item level",
-  ["setup.ctl.peerShareHint"] = "Only to add-on users in group and guild.",
   ["setup.step.map"] = "Map and waypoints",
   ["setup.step.map.text"] = "World map, gathering spots and waypoint arrow.",
   ["setup.step.loot"] = "Loot and selling",
@@ -105,6 +111,7 @@ ns.AddLocale("deDE", {
   ["setup.notice"] = "Neu: Einrichtung mit /fg setup",
   ["setup.noticeNew"] = "Neue Einrichtungsschritte: /fg setup neu",
   ["setup.nothingNew"] = "Keine neuen Schritte.",
+  ["setup.escapeHint"] = "Bedienung blockiert? Tippe /fg setup close im Chat",
   ["setup.progress"] = "Schritt %d von %d",
   ["setup.back"] = "Zurück",
   ["setup.next"] = "Weiter",
@@ -117,7 +124,7 @@ ns.AddLocale("deDE", {
   ["setup.cancelTitle"] = "Einrichtung abbrechen",
   ["setup.cancelText"] = "Einrichtung abbrechen? Änderungen bleiben.",
   ["setup.resetTitle"] = "Alles auf Standard",
-  ["setup.resetText"] = "Alle Optionen der Einrichtung auf Standard setzen?",
+  ["setup.resetText"] = "Alle Optionen auf Standard? Teilen wird ausgeschaltet.",
   ["setup.copy"] = "Kopieren",
   ["setup.open"] = "Öffnen",
   ["setup.info.tutorials"] = "Tutorials: Seite in der Navigation links (Gruppe Addon)",
@@ -127,12 +134,19 @@ ns.AddLocale("deDE", {
   ["setup.changeWhere"] = "Später ändern: Einstellungen, Reiter in Klammern.",
   ["setup.step.look"] = "Sprache und Aussehen",
   ["setup.step.look.text"] = "Ein paar schnelle Einstellungen. Änderungen wirken sofort.\nJederzeit überspringbar.",
+  ["setup.alphaLow"] = "Sehr durchsichtig, Text kann schwer lesbar sein.",
   ["setup.step.addons"] = "Optionale Addons",
   ["setup.step.addons.text"] = "Für alle Charaktere. Pro Charakter: Einstellungen > Addons.",
   ["setup.step.windows"] = "Fenster",
   ["setup.step.windows.text"] = "Spielfenster, Addon und Meldungen.",
-  ["setup.step.invitations"] = "Einladungen und Daten",
-  ["setup.step.invitations.text"] = "Wen du einlädst, wer dich einladen darf und was du teilst.",
+  ["setup.step.invitations"] = "Einladungen",
+  ["setup.step.invitations.text"] = "Wen du einlädst und wer dich einladen darf.",
+  ["setup.step.sharing"] = "Mit anderen teilen",
+  ["setup.step.sharing.text"] = "Alles hier ist aus, bis du es einschaltest.",
+  ["setup.sharing.privacy"] = "Wohin die Daten gehen, wie du widerrufst.",
+  ["setup.sharing.more"] = "Mehr dazu",
+  ["setup.sharing.all.text"] = "Weitere Zielgruppen und alle Funktionen.",
+  ["setup.sharing.all"] = "Alle Einstellungen",
   ["setup.ctl.inviteGroup"] = "Gruppe per Flüstern einladen",
   ["setup.ctl.inviteWords"] = "Stichwörter für die Gruppeneinladung",
   ["setup.ctl.inviteWordsHint"] = "Standard: nur Freunde dürfen fragen (Einstellungen).",
@@ -145,8 +159,6 @@ ns.AddLocale("deDE", {
   ["setup.ctl.acceptFriends"] = "Freunde dürfen mich einladen",
   ["setup.ctl.acceptGuild"] = "Gildenmitglieder dürfen mich einladen",
   ["setup.ctl.acceptGuildHint"] = "Freunde und Gilde sofort angenommen, nie in Warteschlangen.",
-  ["setup.ctl.peerShare"] = "Berufe, Itemlevel teilen",
-  ["setup.ctl.peerShareHint"] = "Nur an Addon-Nutzer in Gruppe und Gilde.",
   ["setup.step.map"] = "Karte und Wegpunkte",
   ["setup.step.map.text"] = "Weltkarte, Sammelpunkte und Wegpunkt-Pfeil.",
   ["setup.step.loot"] = "Beute und Verkaufen",
@@ -299,6 +311,7 @@ local function settingsLink(key, labelKey, hintKey, tab)
         icon = "open",
         tooltip = labelKey,
         width = width,
+        opens = true,
         onClick = function()
           ns.SettingsPage.Select(tab)
           ns.Main.Show("settings")
@@ -414,6 +427,7 @@ step("look", 10, {
     min = Theme.ALPHA_MIN,
     max = Theme.ALPHA_MAX,
     step = 5,
+    lowHintKey = "setup.alphaLow",
     format = function(v)
       return string.format("%d %%", v)
     end,
@@ -491,6 +505,7 @@ step("windows", 30, {
         icon = "gear",
         tooltip = "setup.ctl.frameMore",
         width = 180,
+        opens = true,
         onClick = function()
           ns.Main.Show("windows")
         end,
@@ -568,7 +583,28 @@ step("invitations", 70, {
   inviteWords("inviteGuildWords", "setup.ctl.inviteGuildWords"),
   toggle("settings.autoSocialAcceptFriends", "setup.ctl.acceptFriends"),
   toggle("settings.autoSocialAcceptGuild", "setup.ctl.acceptGuild", { hintKey = "setup.ctl.acceptGuildHint" }),
-  toggle("settings.peerShare", "setup.ctl.peerShare", { hintKey = "setup.ctl.peerShareHint" }),
+})
+
+-- Sharing: a row per function of the opt-in register that can show up (the first nine; the rest is in the
+-- Settings tab), send and receive for its first audience. Nothing is on until the player switches it on.
+local MAX_SHARING = 9
+local sharing = {}
+for _, def in ipairs(ns.Consent and ns.Consent.List() or {}) do
+  if #sharing < MAX_SHARING and not ns.Consent.IsHidden(def.id) then
+    sharing[#sharing + 1] = {
+      type = "consent",
+      key = "consent." .. def.id,
+      fn = def.id,
+      aud = def.audiences[1],
+      labelKey = def.labelKey,
+      hintKey = def.hintKey,
+    }
+  end
+end
+step("sharing", 75, sharing, {
+  tab = "sharing",
+  since = "0.5.0",
+  layout = { "title", "text", "privacy", "bulk", "controls", "allSettings" },
 })
 
 -- Closes every run: lists what was changed and where to change it later.

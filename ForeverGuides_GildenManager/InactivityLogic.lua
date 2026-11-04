@@ -11,7 +11,7 @@ gm.InactivityLogic = IL
 
 IL.MIN_DAYS = 1
 IL.MAX_DAYS = 365
-IL.DEFAULT_DAYS = 30
+IL.DEFAULT_DAYS = gm.GuildStore.DEFAULTS.inactiveDays
 
 -- A whole number inside the limits, the default for anything else.
 function IL.ClampDays(v)
@@ -22,8 +22,8 @@ function IL.ClampDays(v)
   return gm.FG.U.clamp(math.floor(v + 0.5), IL.MIN_DAYS, IL.MAX_DAYS)
 end
 
-function IL.Clean(db)
-  db.inactiveDays = IL.ClampDays(db.inactiveDays)
+function IL.Clean(guild)
+  guild.settings.inactiveDays = IL.ClampDays(guild.settings.inactiveDays)
 end
 
 -- Days since the member was last online, nil while online or unknown.

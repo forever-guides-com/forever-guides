@@ -392,6 +392,7 @@ local function build(container)
     height = 28,
     variant = "primary",
     width = 150,
+    opens = true,
     onClick = function()
       showNameDialog("new", nil, function(name, preset)
         local item, why = DR.create(name, preset.w, preset.h)
@@ -415,6 +416,7 @@ local function build(container)
     tooltip = "draw.import",
     height = 28,
     width = 120,
+    opens = true,
     onClick = function()
       showImport()
     end,
@@ -427,6 +429,7 @@ local function build(container)
     width = 150,
     tooltip = "draw.backup",
     tooltipText = "draw.backupTip",
+    opens = true,
     onClick = function()
       local strings, why = DR.exportBackup()
       if not strings then
@@ -588,13 +591,13 @@ local function build(container)
     if item then
       open(item)
     end
-  end, { variant = "primary", tooltip = "draw.page.open", tooltipText = "draw.page.openTip" })
+  end, { variant = "primary", tooltip = "draw.page.open", tooltipText = "draw.page.openTip", opens = true })
   actionButton("windowBtn", "draw.page.window", "act.open", "open", 170, function()
     local item = sel()
     if item then
       ns.DrawingWindow.Open(item.id)
     end
-  end, { tooltip = "draw.page.window", tooltipText = "draw.page.windowTip" })
+  end, { tooltip = "draw.page.window", tooltipText = "draw.page.windowTip", opens = true })
   actionButton("renameBtn", "draw.page.rename", "act.rename", "tag", 110, function()
     local item = sel()
     if item then

@@ -41,7 +41,7 @@ ns.AddLocale("enUS", {
   ["xpbar.set.autoPause"] = "Auto pause",
   ["xpbar.set.autoPauseTip"] = "Pauses the session while you are marked away: session time and XP per hour stand still.",
   ["xpbar.set.newSession"] = "New after break",
-  ["xpbar.set.newSessionTip"] = "New session at login after a long break: starts a new session when the last one ended more than 30 minutes ago.",
+  ["xpbar.set.newSessionTip"] = "New session at login after a long break: starts a new session when the last one ended more than 10 minutes ago. A reload or a short disconnect keeps it.",
   ["xpbar.set.combat"] = "Hide in combat",
   ["xpbar.set.maxLevel"] = "Show at max level",
   ["xpbar.set.maxLevelTip"] = "Keeps the bar on screen at the maximum level, where the experience no longer counts.",
@@ -80,7 +80,7 @@ ns.AddLocale("deDE", {
   ["xpbar.set.autoPause"] = "Auto-Pause",
   ["xpbar.set.autoPauseTip"] = "Pausiert die Sitzung, solange du als abwesend markiert bist: Sitzungszeit und EP pro Stunde stehen still.",
   ["xpbar.set.newSession"] = "Neu nach Pause",
-  ["xpbar.set.newSessionTip"] = "Neue Sitzung beim Anmelden nach langer Pause: startet eine neue Sitzung, wenn die letzte mehr als 30 Minuten zurückliegt.",
+  ["xpbar.set.newSessionTip"] = "Neue Sitzung beim Anmelden nach langer Pause: startet eine neue Sitzung, wenn die letzte mehr als 10 Minuten zurückliegt. Ein Neuladen oder eine kurze Trennung behält sie.",
   ["xpbar.set.combat"] = "Im Kampf ausblenden",
   ["xpbar.set.maxLevel"] = "Bei Maximalstufe",
   ["xpbar.set.maxLevelTip"] = "Lässt die Leiste auf der Maximalstufe sichtbar, wo die Erfahrung nicht mehr zählt.",
@@ -198,10 +198,11 @@ function S.Add(view, opts)
   view.stack:Add(
     W.Button(view.content, {
       key = "xpbar.set.edit",
-      width = 170,
+      width = 190,
+      opens = true,
       onClick = XW.Edit,
     }),
-    { height = 26, width = 170, gap = 8 }
+    { height = 26, width = 190, gap = 8 }
   )
 
   flag(view, "chatLevelUp", "xpbar.set.chat", "xpbar.set.chatTip")

@@ -11,7 +11,6 @@ ns.GuildManagerButton = B
 local ID = "guildmanager"
 local BUTTON_W = 200
 local BUTTON_H = 24
-local LABEL_PAD = 24
 
 ns.AddLocale("enUS", {
   ["guild.manager.enable"] = "Enable GuildManager",
@@ -79,13 +78,14 @@ function B.Build(parent)
   local function showTip(self)
     ns.ShowTooltip(self, L["guild.manager.tip.title"], L["guild.manager.tip"])
   end
-  local function button(key, id, onClick)
+  local function button(key, id, onClick, opens)
     local b = W.Button(row, {
       key = key,
       width = BUTTON_W,
       height = BUTTON_H,
       tooltip = "guild.manager.tip.title",
       tooltipText = "guild.manager.tip",
+      opens = opens,
       onClick = onClick,
     })
     b.fgId = id
@@ -97,7 +97,7 @@ function B.Build(parent)
   end)
   row.copy = button("guild.manager.copy", "guild-manager-copy", function()
     ns.Dialogs.Copy("pkg.copy.title", ns.Website, "pkg.copy.hint")
-  end)
+  end, true)
 
   -- A line of text, not a button: it only carries the tooltip.
   local note = CreateFrame("Frame", nil, row)
@@ -146,7 +146,7 @@ function B.Build(parent)
       b:ClearAllPoints()
       b:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, 0)
       -- Wider than the default when a large font needs the room.
-      b:SetWidth(math.min(math.max(BUTTON_W, math.ceil(b.label:GetStringWidth()) + LABEL_PAD), width))
+      b:SetWidth(math.min(math.max(BUTTON_W, b:FullWidth()), width))
     end
     self:SetHeight(h)
     return h

@@ -20,12 +20,14 @@
 --     The part is built on first need and shown or hidden to match the skin (or `want`), so a
 --     switch needs no rebuild. Returns the part while it is shown, nil when the skin is off or the
 --     client lacks the art: the caller keeps its flat look then.
---   Skins.BandRect(edge)         the top band of the metal frame of a shell (`edge` = shell.edge, the owner
+--   Skins.BandRect(edge)         the metal bar at the top of a shell (`edge` = shell.edge, the owner
 --                                of the "nine" part): { top, bottom, height } in frame units, top and bottom
---                                measured upwards from the top edge of the window. nil while the metal frame is
+--                                measured upwards from the top edge of the window (top 0, bottom -height). nil while the metal frame is
 --                                not in force (flat look, art missing), so a caller keeps its flat layout then.
+--   Skins.NineOf(edge)           the built metal frame of a shell (shown or not), nil when none was built
 --   Skins.StyleTitle(fontString, role, family[, maxSize])   title font for the skin in force, at most maxSize
 --   Skins.Close(button)          dresses a window close button (follows the skin on every refresh)
+--   Skins.CloseSize(band)        side of that button: the standard size, smaller inside the metal bar
 local _, ns = ...
 local Theme = ns.Theme
 
@@ -77,23 +79,21 @@ Skins.list = {
       titleMinSize = 12,
       -- Multiplied onto the stone, so light text keeps its contrast on every spot of it.
       rockTint = { 0.55, 0.5, 0.45 },
-      -- Title strip in the metal band (UI/WindowShell.lua): margin = gap to the window edge, textPad = the
-      -- title is at most band height minus this tall, main and window = the band height of the main window and
-      -- of every other window (the top pieces of the metal are stretched to it, whatever the art measures),
-      -- gap = the least space above and below a control in the band.
-      -- backdrop = the brightest dark of the band interior (measured in the client, the thin
-      -- bright rim of the metal carries no text): the title colors keep 4.5:1 on it (tests/test_skins.lua).
-      -- bleed = how far the band backdrop reaches under the metal past the window (side) and past the upper edge of
-      -- the band (top): the art leaves a clear sliver at the inner edge of the sides and below the top rim, the
-      -- backdrop closes it. Both stay below the thickness of the metal (side pieces 8 px and more, top rim about 9).
+      -- Title strip in the metal bar (UI/WindowShell.lua): margin = gap to the window edge, textPad = the title is at
+      -- most bar height minus this tall, metal = height of the visible metal bar of the top edge (measured in the
+      -- client: rim, streaks and lower rim, about 18 px; the tile around it is taller and carries clear padding), the
+      -- bar of every window is this tall at most, gap = the least space above and below a control in the bar.
+      -- backdrop = the dark metal of the bar interior (measured in the client): the title colors keep 4.5:1 on it
+      -- (tests/test_skins.lua) and it fills the clear sliver at the inner edge of the sides. bleed = how far that
+      -- fill reaches under the metal past the window (side) and past the upper edge of the bar (top). Both stay
+      -- below the thickness of the metal; top is 0: nothing of the fill lies above the metal.
       bar = {
         margin = 8,
-        textPad = 10,
-        main = 38,
-        window = 32,
-        gap = 4,
-        backdrop = "#42280d",
-        bleed = { side = 3, top = 8 },
+        textPad = 4,
+        metal = 18,
+        gap = 2,
+        backdrop = "#403b36",
+        bleed = { side = 3, top = 0 },
       },
     },
   },
@@ -167,13 +167,21 @@ local function buildRock(frame)
 end
 
 -- The metal frame surrounds the window: its pieces are measured after the layout and `nine` is
--- anchored outwards, so no piece covers content (the top band is as thick as metrics.bar says, the pieces of the
--- top are stretched to it, the title strip of the window lies below it). It is a child of the shell's edge overlay,
--- so it never changes an inner size.
+-- anchored outwards on the sides and the bottom, so no piece covers content. The top is the one bar of the window: the
+-- top anchor of `nine` lies at the upper edge of the window and the layout draws the rim of its top pieces right there
+-- (the tile carries clear padding above the rim, the layout lets the corners hang 16 px over the frame). The metal
+-- bar below the rim is the title bar of the window: Skins.bandHeight tall, nothing of the metal lies above the
+-- window or below the bar. The top pieces keep the size of their art, a stretch would move the rim. It is a child of
+-- the shell's edge overlay, so it never changes an inner size.
 -- nine.offset = how far the anchors of `nine` lie outside the window, nine.outset = how far the
--- outermost piece reaches (what the window needs to stay on screen), both { left, right, top, bottom }.
+-- outermost visible piece reaches (what the window needs to stay on screen), both { left, right, top, bottom }.
 Skins.NINE_OVERLAP = 1
--- The top is not listed: it is the band height of the window (Skins.bandHeight).
+-- A piece is as large as its art tile, and a tile carries clear padding around the rim it shows. The
+-- size of a tile therefore says little about the metal, so the anchor of a side never lies further out
+-- than this (the same as the fixed inset used when nothing can be measured): the window and the metal
+-- stay together whatever the tiles measure.
+Skins.NINE_MAX_OFFSET = 8
+-- The top is not listed: its anchor lies on the upper edge of the window.
 Skins.NINE_FALLBACK = { left = 8, right = 8, bottom = 8 }
 -- Typical reach of a layout piece past the frame (12 to 16 px), used only when nothing can be measured.
 local NINE_FALLBACK_REACH = 16
@@ -213,41 +221,36 @@ local function pieceReach(nine, name, side)
   return 0
 end
 
--- Band height of the window that owns `owner` (the edge overlay of a shell): `owner.bandSize` is "main" for the
--- main window, every other window gets "window".
-function Skins.bandHeight(owner)
-  local bar = Skins.list.forever.metrics.bar
-  return owner and owner.bandSize == "main" and bar.main or bar.window
-end
-
--- The top pieces take the band height, so the metal band is as high as the window wants, not as high as the
--- art is: the stretch is vertical only (the edge tiles sideways), so it leaves no seam and no extra piece.
-local TOP_PIECES = { "TopEdge", "TopLeftCorner", "TopRightCorner" }
-local function stretchTop(nine, height)
-  for _, name in ipairs(TOP_PIECES) do
-    local piece = nine[name]
-    if type(piece) == "table" and type(piece.SetHeight) == "function" then
-      pcall(piece.SetHeight, piece, height)
-    end
+-- Height of the metal bar of the window that owns `owner` (the edge overlay of a shell): the visible metal of the top
+-- edge, at most as tall as the title area of the window (`owner.stripHeight`) so the bar never covers content, and at
+-- most as tall as the art of the top edge (`tile`, when known).
+function Skins.bandHeight(owner, tile)
+  local height = Skins.list.forever.metrics.bar.metal
+  local strip = owner and owner.stripHeight
+  if type(strip) == "number" and strip > 0 then
+    height = math.min(height, strip)
   end
+  if type(tile) == "number" and tile > 0 then
+    height = math.min(height, tile)
+  end
+  return height
 end
 
--- Offset, outset and thickness of `nine` per side, nil when a piece cannot be measured. The thickness
--- of a side is its edge piece (the top and bottom bands also count the corners, which are as high
--- as the band); the reach comes from the layout's own offsets of the corner anchors. The top
--- is `topHeight` thick (the pieces are stretched to it afterwards), whatever the pieces measure.
-local function measureNine(nine, topHeight)
-  local top = pieceDim(nine, "TopEdge", "GetHeight")
+-- Offset and outset of `nine` per side, nil when a piece cannot be measured. The thickness of a side is its
+-- edge piece (the bottom band also counts the corners); the reach comes from the layout's own offsets of the corner
+-- anchors. The top anchor lies on the upper edge of the window whatever the pieces measure: the rim is drawn there and
+-- the hang of the corners over it is clear padding, so nothing visible lies above the window (outset.top = 0).
+local function measureNine(nine)
   local bottom = pieceDim(nine, "BottomEdge", "GetHeight")
   local left = pieceDim(nine, "LeftEdge", "GetWidth")
   local right = pieceDim(nine, "RightEdge", "GetWidth")
-  if not (top and bottom and left and right) then
+  if not (pieceDim(nine, "TopEdge", "GetHeight") and bottom and left and right) then
     return nil
   end
   for _, name in ipairs({ "BottomLeftCorner", "BottomRightCorner" }) do
     bottom = math.max(bottom, pieceDim(nine, name, "GetHeight") or 0)
   end
-  local thickness = { left = left, right = right, top = topHeight, bottom = bottom }
+  local thickness = { left = left, right = right, bottom = bottom }
   local corners = {
     left = { "TopLeftCorner", "BottomLeftCorner" },
     right = { "TopRightCorner", "BottomRightCorner" },
@@ -266,32 +269,75 @@ local function measureNine(nine, topHeight)
     end
     -- Without a readable anchor the pieces are taken to sit on the frame (reach 0).
     near, far = near or 0, far or 0
-    offset[side] = math.min(NINE_MAX, math.max(0, thickness[side] - near - Skins.NINE_OVERLAP))
-    outset[side] = math.min(NINE_MAX, math.max(0, offset[side] + far))
+    if side == "top" then
+      offset.top, outset.top = 0, 0
+    else
+      offset[side] = math.min(Skins.NINE_MAX_OFFSET, math.max(0, thickness[side] - near - Skins.NINE_OVERLAP))
+      outset[side] = math.min(NINE_MAX, math.max(0, offset[side] + far))
+    end
   end
-  return offset, outset, thickness
+  return offset, outset
+end
+
+local NINE_PIECES = {
+  "TopLeftCorner",
+  "TopRightCorner",
+  "BottomLeftCorner",
+  "BottomRightCorner",
+  "TopEdge",
+  "BottomEdge",
+  "LeftEdge",
+  "RightEdge",
+}
+
+-- The first atlas a layout needs that the client does not know, nil when all eight are there (or cannot be
+-- told). A missing atlas draws nothing, so a frame without one of its pieces would hang open.
+local function missingNineAtlas(nine, layout)
+  local layouts = rawget(_G, "NineSliceLayouts")
+  local spec = type(layouts) == "table" and layouts[layout] or nil
+  for _, name in ipairs(NINE_PIECES) do
+    local piece = nine[name]
+    local atlas = type(spec) == "table" and type(spec[name]) == "table" and spec[name].atlas or nil
+    if type(atlas) ~= "string" and type(piece) == "table" and type(piece.GetAtlas) == "function" then
+      local ok, got = pcall(piece.GetAtlas, piece)
+      atlas = ok and type(got) == "string" and got or nil
+    end
+    if type(atlas) == "string" and not atlasKnown(atlas) then
+      return atlas
+    end
+  end
+end
+
+-- A frame with the first layout of the list that applies and has all of its art, nil with the reason otherwise.
+-- One frame takes the layouts in turn (a later layout replaces the pieces of an earlier one).
+local function applyNineLayout(edge)
+  local util = rawget(_G, "NineSliceUtil")
+  if type(util) ~= "table" or type(util.ApplyLayoutByName) ~= "function" then
+    return nil, "no usable NineSlice layout"
+  end
+  local nine = CreateFrame("Frame", nil, edge)
+  nine:EnableMouse(false)
+  local why = "no usable NineSlice layout"
+  for _, layout in ipairs(Skins.ART.nineLayouts) do
+    local ok, err = pcall(util.ApplyLayoutByName, nine, layout)
+    local missing = ok and missingNineAtlas(nine, layout)
+    if ok and not missing then
+      nine.layoutName = layout
+      return nine
+    end
+    why = missing and ("atlas " .. missing .. " missing") or tostring(err)
+  end
+  nine:Hide()
+  return nil, why
 end
 
 local function buildNine(edge)
-  local nine = CreateFrame("Frame", nil, edge)
-  nine:EnableMouse(false)
-  local util = rawget(_G, "NineSliceUtil")
-  local applied = type(util) == "table" and type(util.ApplyLayoutByName) == "function"
-  if applied then
-    applied = false
-    for _, layout in ipairs(Skins.ART.nineLayouts) do
-      if pcall(util.ApplyLayoutByName, nine, layout) then
-        applied = true
-        break
-      end
-    end
+  local nine, why = applyNineLayout(edge)
+  if not nine then
+    error(why, 0)
   end
-  if not applied then
-    nine:Hide()
-    error("no usable NineSlice layout", 0)
-  end
-  local height = Skins.bandHeight(edge)
-  local ok, offset, outset, thickness = pcall(measureNine, nine, height)
+  local height = Skins.bandHeight(edge, pieceDim(nine, "TopEdge", "GetHeight"))
+  local ok, offset, outset = pcall(measureNine, nine)
   if not (ok and offset) then
     Skins.failures.nineMeasure = ok and "piece sizes unreadable" or tostring(offset)
     ns.Log.warn("metal frame not measured, fixed insets used: %s", Skins.failures.nineMeasure)
@@ -299,15 +345,11 @@ local function buildNine(edge)
     for side, value in pairs(Skins.NINE_FALLBACK) do
       offset[side], outset[side] = value, value + NINE_FALLBACK_REACH
     end
-    offset.top = height
-    outset.top = height + NINE_FALLBACK_REACH
+    offset.top, outset.top = 0, 0
   end
-  stretchTop(nine, height)
   nine.offset, nine.outset = offset, outset
-  -- The top band: from its upper edge (outset.top above the window) down to the seam with the window. Its
-  -- height is the band height of the window; without a measurement it hugs the window.
-  local rise = thickness and outset.top or height - Skins.NINE_OVERLAP
-  nine.band = { top = rise, bottom = rise - height, height = height }
+  -- The metal bar: from the upper edge of the window (the rim) down by the bar height, inside the window.
+  nine.band = { top = 0, bottom = -height, height = height }
   nine:SetPoint("TOPLEFT", edge, "TOPLEFT", -offset.left, offset.top)
   nine:SetPoint("BOTTOMRIGHT", edge, "BOTTOMRIGHT", offset.right, -offset.bottom)
   return nine
@@ -404,6 +446,13 @@ function Skins.BandRect(owner)
   return { top = band.top, bottom = band.bottom, height = band.height }
 end
 
+-- The built metal frame of an owner (the edge overlay of a shell), shown or not, nil when none was built. For the
+-- measurement report (Modules/FrameStatus.lua), read only.
+function Skins.NineOf(owner)
+  local own = parts[owner]
+  return own and own.nine or nil
+end
+
 -- Fonts ---------------------------------------------------------------------------------------
 
 -- maxSize caps the title (a title in the metal band must fit the band), never below the font floor.
@@ -423,9 +472,27 @@ function Skins.StyleTitle(fs, role, family, maxSize)
   Theme.applyFont(fs, role, family)
 end
 
--- Window close buttons: the art of the skin replaces the "x" glyph, flat keeps it.
+-- Side of the close button of a window: the standard size, in the metal bar (`band` = Skins.BandRect) at most the bar
+-- minus the gap above and below.
+function Skins.CloseSize(band)
+  local size = ns.W.CLOSE_SIZE
+  if not band then
+    return size
+  end
+  local bar = Skins.list.forever.metrics.bar
+  return math.min(size, math.max(12, band.height - 2 * bar.gap))
+end
+
+-- Window close buttons: the art of the skin replaces the "x" glyph, flat keeps it. Inside the metal bar the button
+-- is sized to the bar.
 function Skins.Close(button)
   ns.Bind(button, function()
+    local shell = ns.WindowShell.OfTitleBar(button:GetParent())
+    if shell then
+      Skins.Apply(shell.edge, "nine")
+      local side = Skins.CloseSize(Skins.BandRect(shell.edge))
+      button:SetSize(side, side)
+    end
     local art = Skins.Apply(button, "close")
     local mark = button.glyph or button.icon
     if mark then

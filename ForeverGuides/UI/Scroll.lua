@@ -322,7 +322,8 @@ end
 
 -- Virtual list. opts: rowHeight, createRow(parent) -> row, bindRow(row, item, index), onActivate(item),
 -- onReorder(item, anchor, after) enables drag and drop of rows (drop before
--- `anchor`, or behind it when `after`), canReorder() -> bool gates it.
+-- `anchor`, or behind it when `after`), canReorder() -> bool gates it, indentOf(item, anchor, after) -> px (optional)
+-- lets the line that marks the drop start that far from the left edge (nil or no option: the full width).
 function W.ScrollList(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   -- Same fix as the Dialogs.lua copy box: a frame nested inside a page's
@@ -435,7 +436,7 @@ function W.ScrollList(parent, opts)
     end
     return data[offset + shown], true
   end
-  local function showMarker(gap)
+  local function showMarker(gap, item)
     if not marker then
       marker = CreateFrame("Frame", nil, f)
       marker:SetFrameLevel(f:GetFrameLevel() + 10)
@@ -453,7 +454,13 @@ function W.ScrollList(parent, opts)
       y = math.max(y + 1, -f:GetHeight() + 2)
     end
     marker:ClearAllPoints()
-    marker:SetPoint("TOPLEFT", f, "TOPLEFT", 0, y)
+    local indent = 0
+    if opts.indentOf and item then
+      local anchor, after = dragTarget(gap)
+      local ok, px = pcall(opts.indentOf, item, anchor, after)
+      indent = ok and type(px) == "number" and px > 0 and math.min(px, f:GetWidth()) or 0
+    end
+    marker:SetPoint("TOPLEFT", f, "TOPLEFT", indent, y)
     marker:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, y)
     marker:Show()
   end
@@ -511,7 +518,7 @@ function W.ScrollList(parent, opts)
     local gap = gapAtCursor()
     local pos = gap and offset + gap
     if gap and at and pos ~= at - 1 and pos ~= at then
-      showMarker(gap)
+      showMarker(gap, drag.item)
     elseif marker then
       marker:Hide()
     end

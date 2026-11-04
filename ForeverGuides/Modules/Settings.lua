@@ -1,5 +1,5 @@
 -- Settings page in tabs: general, appearance, map, items, loot and inventory, selling, automation,
--- guild and contacts, add-ons, advanced. Every tab is a grid of cards (Modules/SettingsGrid.lua), one card per
+-- guild and contacts, share, add-ons, advanced. Every tab is a grid of cards (Modules/SettingsGrid.lua), one card per
 -- section. The sections of other modules are added through ns.SettingsPage.
 local _, ns = ...
 local W, Store, WS, Theme = ns.W, ns.Store, ns.WindowStyle, ns.Theme
@@ -256,14 +256,21 @@ local function feedbackSection(view)
   errors.fgId = "feedback-errors"
   s:Add(errors, { height = 24, gap = 6 })
   ns.AddParagraph(view, "settings.feedbackErrorsHint", { role = "micro", color = "textMuted" })
-  local function button(key, label, icon, onClick)
-    local b =
-      W.Action(view.content, { label = label, icon = icon, tooltip = key, width = 220, height = 28, onClick = onClick })
+  local function button(key, label, icon, onClick, opens)
+    local b = W.Action(view.content, {
+      label = label,
+      icon = icon,
+      tooltip = key,
+      width = 220,
+      height = 28,
+      opens = opens,
+      onClick = onClick,
+    })
     s:Add(b, { height = 28, width = 220 })
     return b
   end
   button("settings.feedbackTest", "act.test", "play", Toast.SendTest)
-  button("settings.feedbackHistory", "act.history", "history", Toast.OpenHistory)
+  button("settings.feedbackHistory", "act.history", "history", Toast.OpenHistory, true)
   local position
   position = button("settings.toastPosition", "act.move", "marker", function()
     Toast.SetEditing(not Toast.IsEditing())
@@ -282,7 +289,19 @@ end
 -- sections below call the Add functions of their modules, other modules append theirs with
 -- ns.SettingsPage.Add(build, tab).
 local PAD = 16
-local TAB_LIST = { "general", "window", "map", "items", "bags", "sell", "automation", "social", "addons", "advanced" }
+local TAB_LIST = {
+  "general",
+  "window",
+  "map",
+  "items",
+  "bags",
+  "sell",
+  "automation",
+  "social",
+  "sharing",
+  "addons",
+  "advanced",
+}
 local TABS = {}
 for _, id in ipairs(TAB_LIST) do
   TABS[id] = true
@@ -331,9 +350,17 @@ local function toggle(view, key, labelKey, after, tooltipText, invert)
   )
 end
 
-local function button(view, key, label, icon, onClick)
+local function button(view, key, label, icon, onClick, opens)
   view.stack:Add(
-    W.Action(view.content, { label = label, icon = icon, tooltip = key, width = 220, height = 28, onClick = onClick }),
+    W.Action(view.content, {
+      label = label,
+      icon = icon,
+      tooltip = key,
+      width = 220,
+      height = 28,
+      opens = opens,
+      onClick = onClick,
+    }),
     { height = 28, width = 220 }
   )
 end
@@ -347,6 +374,7 @@ local function setupSection(view)
       icon = "play",
       tooltip = "setup.start",
       width = 220,
+      opens = true,
       onClick = function()
         ns.SetupWizardUI.Open()
       end,
@@ -427,7 +455,7 @@ local function keysSection(view)
     if not ns.KeyBindings.OpenUI() then
       ns.Notify(ns.L["settings.keysFallback"], "info")
     end
-  end)
+  end, true)
   -- The keys can change in the game's own dialog: the list repaints whenever the page opens.
   local keyList = W.Text(view.content, { role = "micro", color = "textSecondary", wrap = true })
   view.stack:Add(keyList)
@@ -564,6 +592,56 @@ local function worldMapSection(view)
   toggle(view, "dungeonWorldMap", "dwm.set", function()
     ns.DungeonWorldMap.Apply()
   end)
+  for _, item in ipairs({
+    { "mapMarkersWorld", "mm.set.world" },
+    { "mapMarkersAddonMap", "mm.set.addon" },
+    { "mapMarkerDungeons", "mm.set.dungeons" },
+    { "mapMarkerRaids", "mm.set.raids" },
+  }) do
+    toggle(view, item[1], item[2], function()
+      ns.WorldMapInstancePins.Refresh()
+      ns.MapInstancePins.Refresh()
+    end)
+  end
+  toggle(view, "mapFlightWorld", "fp.set.world", function()
+    ns.WorldMapFlightPins.Refresh()
+  end)
+  toggle(view, "mapFlightAddonMap", "fp.set.addon", function()
+    ns.MapInstancePins.Refresh()
+  end)
+  toggle(view, "mapZoneArrowsWorld", "zb.set.world", function()
+    ns.WorldMapZoneArrows.Refresh()
+  end)
+  toggle(view, "mapZoneArrowsAddonMap", "zb.set.addon", function()
+    ns.MapInstancePins.Refresh()
+  end)
+  toggle(view, "mapZoneArrowsGuess", "zb.set.guess", function()
+    ns.ZoneCrossingLogic.Touch()
+  end, "zb.set.guessHint")
+  toggle(view, "zoneCrossRecord", "zcr.set.record", function()
+    ns.ZoneCrossingRecorder.Apply()
+  end, "zcr.set.recordHint")
+  toggle(view, "zoneCrossNotify", "zcr.set.notify")
+  view.stack:Add(
+    W.Slider(view.content, {
+      key = "fp.set.listCount",
+      min = ns.FlightPointsLogic.COUNT_MIN,
+      max = ns.FlightPointsLogic.COUNT_MAX,
+      step = 1,
+      get = ns.FlightPointList.Count,
+      set = function(v)
+        Store.set("settings.flightListCount", ns.FlightPointsLogic.ClampCount(v))
+        ns.WorldMapLinks.Apply()
+      end,
+      format = function(v)
+        return string.format("%d", math.floor(v + 0.5))
+      end,
+    }),
+    { height = 42, width = 320 }
+  )
+  toggle(view, "flightListOnlyKnown", "fp.set.onlyKnown", function()
+    ns.WorldMapLinks.Apply()
+  end)
 end
 
 local function flightSection(view)
@@ -593,7 +671,7 @@ local function advancedSection(view)
   ns.AddHeading(view, "settings.advanced")
   button(view, "settings.openTutorials", "act.tour", "play", function()
     ns.Router:navigate("tutorials")
-  end)
+  end, true)
 end
 
 -- The buttons an extension registers for the settings (slot "settings") under the head it sets.
@@ -630,6 +708,12 @@ local SECTIONS = {
     flightSection,
     function(view)
       ns.GatherSparklesSettings.Add(view)
+    end,
+    function(view)
+      ns.GatheringSettings.Add(view)
+    end,
+    function(view)
+      ns.FarmHudSettings.Add(view)
     end,
   },
   items = {
@@ -673,6 +757,11 @@ local SECTIONS = {
     end,
     function(view)
       ns.ContactsPage.AddSettings(view)
+    end,
+  },
+  sharing = {
+    function(view)
+      ns.ConsentSettings.Add(view)
     end,
   },
   addons = {

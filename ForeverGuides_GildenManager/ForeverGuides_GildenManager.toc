@@ -4,11 +4,12 @@
 ## Notes-deDE: Gildenwerkzeuge für Forever Guides: Main und Alt, eigene Notizen, Inaktivitätsliste und Gildenaktionen mit Vorschau.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 0.2.0
+## Version: 0.5.0
 ## Dependencies: ForeverGuides
 ## DefaultState: disabled
 ## LoadOnDemand: 1
 ## SavedVariables: ForeverGuidesGMDB
+## X-Forever-Guides-Addon: guildmanager
 ## X-Website: https://forever-guides.com
 ## X-Curse-Project-ID: 1734295
 ## X-Wago-ID: qGZAwdKd
@@ -16,10 +17,54 @@
 ## X-Category: Guild
 
 Core.lua
+LocaleCore.lua
+LocaleMembers.lua
+LocaleInactivity.lua
+LocaleActions.lua
+LocaleLog.lua
+LocaleHistory.lua
+LocaleSettings.lua
+LocaleRules.lua
+LocaleLists.lua
+LocaleShare.lua
+LocaleOverview.lua
+LocaleHelp.lua
+GuildStoreLogic.lua
 MembersLogic.lua
 InactivityLogic.lua
 ActionsLogic.lua
+GuildStore.lua
 Members.lua
 Inactivity.lua
+Caps.lua
+Backend.lua
+RunLogic.lua
 Actions.lua
+RulesLogic.lua
+RuleTemplates.lua
+PlanLogic.lua
+DatesLogic.lua
+HistoryLogic.lua
+RemindersLogic.lua
+BansLogic.lua
+LogLogic.lua
+ExportLogic.lua
+History.lua
+JoinDialog.lua
+SettingsLogic.lua
+ShareLogic.lua
+Share.lua
+ShareTab.lua
+SettingsPages.lua
+SettingsTab.lua
+RulesUiLogic.lua
+RulesKit.lua
 ActionLog.lua
+Export.lua
+Lists.lua
+PreviewList.lua
+RunPanel.lua
+RuleEditor.lua
+Overview.lua
+Tour.lua
+RulesTab.lua

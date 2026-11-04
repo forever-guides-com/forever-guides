@@ -1,9 +1,17 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-03.
 -- Spell catalog of MAGE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Spells = ns.Data.Spells or {}
 ns.Data.Spells.MAGE = {
+  {
+    fid=135812,
+    i="spell_fire_flamebolt",
+    id=11069,
+    k="talent",
+    l=1,
+    n={de="Beschleuniger",en="Accelerant"},
+  },
   {
     c={"DRUID","HUNTER","MAGE","PALADIN","PRIEST","ROGUE","SHAMAN","WARLOCK","WARRIOR"},
     fid=236544,
@@ -614,6 +622,15 @@ ns.Data.Spells.MAGE = {
     n={de="Verbrennung",en="Combustion"},
   },
   {
+    c={"DRUID","MAGE","PALADIN","PRIEST","ROGUE","SHAMAN","WARRIOR"},
+    fid=132366,
+    i="ability_warrior_warcry",
+    id=21563,
+    k="racial",
+    n={de="Befehlsgewalt",en="Command"},
+    rt={de="Volk Passiv",en="Racial Passive"},
+  },
+  {
     fid=8188276,
     id=1296017,
     k="other",
@@ -923,14 +940,6 @@ ns.Data.Spells.MAGE = {
     n={de="Magie dämpfen",en="Dampen Magic"},
     rk=5,
     sup=10173,
-  },
-  {
-    fid=135989,
-    i="spell_ice_magicdamage",
-    id=29438,
-    k="talent",
-    l=1,
-    n={de="Elementare Präzision",en="Elemental Precision"},
   },
   {
     fid=4226119,
@@ -1351,37 +1360,6 @@ ns.Data.Spells.MAGE = {
     n={de="Frostrüstung",en="Frost Armor"},
     rk=3,
     sup=7300,
-  },
-  {
-    fid=135845,
-    i="spell_ice_magicdamage",
-    id=1326053,
-    k="spell",
-    l=24,
-    n={de="Frostschlag",en="Frost Blast"},
-    rk=1,
-  },
-  {
-    b=1326053,
-    fid=135845,
-    i="spell_ice_magicdamage",
-    id=1326054,
-    k="spell",
-    l=36,
-    n={de="Frostschlag",en="Frost Blast"},
-    rk=2,
-    sup=1326053,
-  },
-  {
-    b=1326053,
-    fid=135845,
-    i="spell_ice_magicdamage",
-    id=1326055,
-    k="spell",
-    l=48,
-    n={de="Frostschlag",en="Frost Blast"},
-    rk=3,
-    sup=1326054,
   },
   {
     fid=135860,
@@ -1896,14 +1874,6 @@ ns.Data.Spells.MAGE = {
     n={de="Verbesserter Feuerzauberschutz",en="Improved Fire Ward"},
   },
   {
-    fid=135812,
-    i="spell_fire_flamebolt",
-    id=11069,
-    k="talent",
-    l=1,
-    n={de="Verbesserter Feuerball",en="Improved Fireball"},
-  },
-  {
     fid=135826,
     i="spell_fire_selfdestruct",
     id=11108,
@@ -1928,7 +1898,7 @@ ns.Data.Spells.MAGE = {
     n={de="Verbesserter Frostblitz",en="Improved Frostbolt"},
   },
   {
-    fid=135831,
+    fid=135827,
     i="spell_fire_windsofwoe",
     id=11095,
     k="talent",
@@ -2111,7 +2081,7 @@ ns.Data.Spells.MAGE = {
     fid=135845,
     i="spell_frost_frostbolt",
     id=11151,
-    k="talent",
+    k="passive",
     l=1,
     n={de="Stechendes Eis",en="Piercing Ice"},
   },
@@ -2219,6 +2189,14 @@ ns.Data.Spells.MAGE = {
     k="spell",
     l=40,
     n={en="Portal: Undercity"},
+  },
+  {
+    fid=135989,
+    i="spell_ice_magicdamage",
+    id=29438,
+    k="talent",
+    l=1,
+    n={de="Präzision",en="Precision"},
   },
   {
     fid=136031,

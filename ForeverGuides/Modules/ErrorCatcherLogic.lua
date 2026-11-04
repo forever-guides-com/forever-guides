@@ -114,6 +114,41 @@ function Logic.StateLine(s)
   )
 end
 
+-- Map operations -------------------------------------------------------------------------
+
+-- Protected calls that Blizzard's map and quest log make while they build pins and quest entries.
+Logic.MAP_FUNCTIONS = {
+  "SetPassThroughButtons",
+  "SetPropagateMouseClicks",
+  "SetPropagateMouseMotion",
+  "QuestLogPushQuest",
+  "SetAbandonQuest",
+  "AbandonQuest",
+}
+-- Blizzard files of the map, its data providers and the combined map and quest log window.
+local MAP_FILES = { "Blizzard_MapCanvas", "Blizzard_WorldMap", "Blizzard_QuestMap", "Blizzard_QuestLog" }
+
+-- Is this a blocked call of the map or the quest log? By the function the client names, else by the
+-- Blizzard file at the top of the Lua stack.
+function Logic.IsMapBlock(kind, msg, stack)
+  if kind ~= "blocked" then
+    return false
+  end
+  msg = tostring(msg or "")
+  for _, name in ipairs(Logic.MAP_FUNCTIONS) do
+    if msg:find(name, 1, true) then
+      return true
+    end
+  end
+  stack = tostring(stack or "")
+  for _, file in ipairs(MAP_FILES) do
+    if stack:find(file, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
 -- Duplicates -----------------------------------------------------------------------------
 
 -- The same message from a different source within the window is one error seen twice
@@ -227,6 +262,23 @@ local function stamp(t, format)
 end
 Logic.Stamp = stamp
 
+-- One line per operation of ns.MapOps (oldest first): time, GetTime, combat state, name, detail, repeats.
+function Logic.OpsText(list)
+  local out = {}
+  for _, op in ipairs(list or {}) do
+    out[#out + 1] = string.format(
+      "%s t=%.1f combat=%s %s%s%s",
+      stamp(op.time, "%H:%M:%S"),
+      op.at or 0,
+      op.combat and "yes" or "no",
+      op.name,
+      op.detail and (" " .. op.detail) or "",
+      op.n > 1 and (" x" .. op.n) or ""
+    )
+  end
+  return #out > 0 and table.concat(out, "\n") or "-"
+end
+
 function Logic.CurrentSession()
   return ns.db and ns.db.meta and ns.db.meta.sessions or 0
 end
@@ -271,6 +323,11 @@ function Logic.EntryText(e, L, current)
   if e.stack and e.stack ~= "" then
     out[#out + 1] = ""
     out[#out + 1] = e.stack
+  end
+  if e.ops and e.ops ~= "" then
+    out[#out + 1] = ""
+    out[#out + 1] = L["errcatch.ops"]
+    out[#out + 1] = e.ops
   end
   return table.concat(out, "\n")
 end

@@ -381,6 +381,7 @@ function WP.SetNative(map, x, y)
       return false
     end
   end
+  ns.MapOps.Record("SetUserWaypoint", map)
   return pcall(function()
     C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(map, x, y))
   end)
@@ -388,6 +389,7 @@ end
 
 function WP.ClearNative()
   if C_Map and C_Map.ClearUserWaypoint then
+    ns.MapOps.Record("ClearUserWaypoint")
     pcall(C_Map.ClearUserWaypoint)
   end
 end
@@ -395,8 +397,15 @@ end
 -- Id of the waypoint our pin stands for: only that pin is cleared again, never one the
 -- player placed by hand in the meantime.
 local nativeFor
+-- A sync that came up in combat waits for its end: the map rebuilds its waypoint pin on the event.
+local nativeWaiting
 
 local function syncNative(force)
+  if ns.InCombat() then
+    nativeWaiting = force and "force" or nativeWaiting or "sync"
+    return
+  end
+  nativeWaiting = nil
   local wp = WP.Active()
   if wp and WP.Settings().nativeMarker then
     if force or nativeFor ~= wp.id then
@@ -412,6 +421,12 @@ local function syncNative(force)
     nativeFor = nil
   end
 end
+
+ns.On("PLAYER_REGEN_ENABLED", function()
+  if nativeWaiting then
+    syncNative(nativeWaiting == "force")
+  end
+end)
 
 -- Arrival ------------------------------------------------------------------------------------------
 

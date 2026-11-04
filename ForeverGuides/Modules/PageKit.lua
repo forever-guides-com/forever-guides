@@ -85,6 +85,12 @@ function K.ShowOnMap(mapId, x, y, label)
     local pos = K.Coord(x, y)
     ns.Dialogs.Copy("kit.mapFallbackTitle", pos and (label .. " " .. pos) or label, "kit.mapFallbackHint")
   end
+  -- Neither the pin nor the map is touched in combat: from addon code the map's pin and quest providers
+  -- would run tainted. The position is offered as text instead.
+  if ns.InCombat() then
+    ns.MapOps.Record("show on map skipped", mapId)
+    return fallback()
+  end
   local hasInfo, info = false, nil
   if mapId and C_Map and C_Map.GetMapInfo then
     hasInfo, info = pcall(C_Map.GetMapInfo, mapId)
@@ -108,8 +114,10 @@ function K.ShowOnMap(mapId, x, y, label)
     return fallback()
   end
   if OpenWorldMap then
+    ns.MapOps.Record("OpenWorldMap", mapId)
     pcall(OpenWorldMap, mapId)
   elseif WorldMapFrame then
+    ns.MapOps.Record("WorldMapFrame:SetMapID", mapId)
     pcall(function()
       WorldMapFrame:Show()
       if WorldMapFrame.SetMapID then
@@ -150,6 +158,33 @@ function K.PlaceMarker(place)
   if place then
     ns.Waypoints.Command({ map = place.map, x = place.x, y = place.y, title = place.label })
   end
+end
+
+-- Hover frame of a list row: a faint background and a border inside the row, lit while the pointer
+-- is over the row or one of opts.extraFrames (its buttons), so moving onto a button keeps it lit.
+-- Hooks the scripts, an OnEnter tooltip of the row keeps working. opts.isActive() (default: always)
+-- tells whether the row hovers at all; call row.paintHover() after rebinding a row.
+K.ROW_HOVER_ALPHA = 0.06
+function K.RowHover(row, opts)
+  opts = opts or {}
+  row.bg = row:CreateTexture(nil, "BACKGROUND")
+  row.bg:SetAllPoints()
+  row.bg:SetColorTexture(1, 1, 1, 0)
+  row.border = W.Border(row, "accentDim", 1, 1)
+  row.border.show(false)
+  local function paintHover()
+    local on = (not opts.isActive or opts.isActive()) and row:IsMouseOver() == true
+    row.bg:SetColorTexture(1, 1, 1, on and K.ROW_HOVER_ALPHA or 0)
+    row.border.show(on)
+  end
+  row:HookScript("OnEnter", paintHover)
+  row:HookScript("OnLeave", paintHover)
+  for _, f in ipairs(opts.extraFrames or {}) do
+    f:HookScript("OnEnter", paintHover)
+    f:HookScript("OnLeave", paintHover)
+  end
+  row.paintHover = paintHover
+  return paintHover
 end
 
 function K.HasData(name)
@@ -239,7 +274,8 @@ local function scaledHeight(base)
 end
 K.scaledHeight = scaledHeight
 
--- Virtual two-line list. opts: rowHeight, bind(item) -> { title, sub, right,
+-- Virtual two-line list. opts: rowHeight, subRole (font role of the second line, default small),
+-- bind(item) -> { title, sub, right,
 -- selected, icon, iconPaint, wrapSub, actions, tooltip }, onClick(item).
 -- tooltip: literal string shown while the row is hovered. tooltipSpec: a W.Tooltip spec instead
 -- (link = "item:ID" shows the client's item tooltip, title is the fallback while it is not cached).
@@ -261,7 +297,8 @@ K.scaledHeight = scaledHeight
 -- does not also trigger the row's own onClick (child button consumes the
 -- click). Absent/empty reserves no space, same discipline as icon above.
 -- An action may also carry boxed (surface and edge, reads as a button), selected (a toggle that
--- is on), tooltipText (second tooltip line) and dim (dimmed and inert, the tooltip says
+-- is on), opens (the action opens a window of its own: "Opens a new window" joins the tooltip),
+-- tooltipText (second tooltip line) and dim (dimmed and inert, the tooltip says
 -- why; it stays focusable so the keyboard user can read the reason).
 -- badge: { text, color = Theme token } a small framed label at the top right instead of `right`
 -- (text and frame carry the same token, the text names the state so color is never the only cue).
@@ -302,7 +339,7 @@ function K.NewList(parent, opts)
       row.title = W.Text(row, { role = "ui" })
       row.title:SetPoint("TOPLEFT", 8, -5)
       row.title:SetPoint("RIGHT", row.right, "LEFT", -8, 0)
-      row.sub = W.Text(row, { role = "small", color = "textSecondary" })
+      row.sub = W.Text(row, { role = opts.subRole or "small", color = "textSecondary" })
       row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -2)
       row.actions = {}
       local prevAction
@@ -322,11 +359,14 @@ function K.NewList(parent, opts)
         b.tex:Hide()
         local function showTip()
           if b.tip then
-            ns.ShowTooltip(b, b.tip, b.tipText)
+            ns.ShowTooltip(b, b.tip, b.tipText, b.opens and { hint = L["action.opensWindow"] } or nil)
           end
         end
         b.fgName = function()
           return b.tip
+        end
+        b.fgDescription = function()
+          return b.opens and L["action.opensWindow"] or nil
         end
         b:HookScript("OnEnter", showTip)
         b:HookScript("OnLeave", ns.HideTooltip)
@@ -439,14 +479,14 @@ function K.NewList(parent, opts)
           end
           b:SetSize(size, size)
           b:SetAlpha(a.dim and 0.45 or 1)
-          b.tip, b.tipText = a.tooltip, a.tooltipText
+          b.tip, b.tipText, b.opens = a.tooltip, a.tooltipText, a.opens
           b.fn = not a.dim and a.onClick or nil
           b:Show()
           shown = shown + 1
           reserve = reserve + size + 4
         else
           b:Hide()
-          b.tip, b.tipText, b.fn = nil, nil, nil
+          b.tip, b.tipText, b.opens, b.fn = nil, nil, nil, nil
         end
       end
       row.sub:ClearAllPoints()

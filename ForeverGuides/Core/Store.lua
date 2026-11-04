@@ -6,7 +6,7 @@ local U = ns.U
 local Store = {}
 ns.Store = Store
 
-Store.SCHEMA = 4
+Store.SCHEMA = 6
 Store.CHAR_SCHEMA = 1
 
 Store.defaults = {
@@ -35,7 +35,7 @@ Store.defaults = {
     sidebarCollapsed = false,
     -- Account default of the optional sub-addons by manifest id (Core/SubAddons.lua); a character
     -- overrides it in ForeverGuidesCharDB.subaddons. The key must exist so the controls can bind.
-    subaddons = { guildmanager = false },
+    subaddons = { guildmanager = false, chat = false },
     -- settings.nav (navigation layout for all characters, Modules/NavLayoutLogic.lua) has no default on
     -- purpose: an absent key is the default menu.
     -- Accordion state per sidebar group (UI/Sidebar.lua). A group id missing here (older saves)
@@ -63,9 +63,55 @@ Store.defaults = {
     -- every area of the zone map drawn, false = only the areas the player explored).
     mapSymbols = true,
     mapNames = true,
+    mapPlayerMarker = true,
     mapSymbolScale = 70,
     mapReveal = true,
+    -- Ore and herb spots (Modules/GatheringMap.lua): on the Forever map (forever), on the Blizzard world
+    -- map (worldmap) and on the minimap (minimap). The display choice of both maps and the minimap
+    -- (Modules/GatheringFilter.lua): the professions (herbs, mining) and the items switched off (hidden,
+    -- { [itemId] = true }, an item the data adds later is on). A zone shows all of them unless the player
+    -- narrowed it on the page of the items (session choice, ns.GatherSelection). The minimap pins
+    -- (Modules/MinimapLayer.lua) have an edge mode ("clamp" pulls spots just beyond the edge onto it, "hide"
+    -- drops them), a pin size in px and an opacity in percent. Spots within minimapNear yards (0 = off) are
+    -- drawn as a circle (minimapRingSize px, line minimapRingWidth px) instead of the symbol.
+    gather = {
+      forever = true,
+      worldmap = true,
+      minimap = true,
+      minimapEdge = "clamp",
+      minimapSize = 12,
+      minimapAlpha = 100,
+      minimapNear = 60,
+      minimapRingSize = 18,
+      minimapRingWidth = 2,
+      herbs = true,
+      mining = true,
+      hidden = {},
+    },
+    -- Farm HUD (Modules/FarmHud.lua): the real minimap enlarged over the screen, on demand only (the switch is
+    -- not stored). scale = share of the smaller screen side, strata of the HUD, terrain variant (auto, ground,
+    -- alpha, none) with its alpha, zoom step while on (-1 keeps it), hiding in combat and in instances, own
+    -- compass and gather ring, factor on the pin sizes.
+    farmhud = {
+      scale = 1,
+      strata = "BACKGROUND",
+      terrain = "auto",
+      alpha = 0.3,
+      zoom = 0,
+      hideInCombat = false,
+      hideInInstance = true,
+      compass = true,
+      compassSize = 14,
+      compassColor = "white",
+      ring = false,
+      ringYards = 20,
+      pinScale = 1,
+    },
+    -- Blizzard world map: draw every area of a zone map as explored (Modules/WorldMapGather.lua).
+    worldMapReveal = true,
     shareChannel = "auto",
+    -- Hidden: "auto" detects the game client (Core/Client.lua), "forever" or "retail" forces one for tests.
+    clientOverride = "auto",
     -- Last whisper target of the share dialog, first name and surname apart.
     shareWhisper = { first = "", surname = "" },
     noteEditor = "normal",
@@ -100,6 +146,28 @@ Store.defaults = {
     worldMapPins = true,
     worldMapPanelOpen = false,
     worldMapPanelTab = "markers",
+    -- Instance entrance markers (Modules/MapMarkerLogic.lua): on the Blizzard world map, on the add-on map,
+    -- and which types show.
+    mapMarkersWorld = true,
+    mapMarkersAddonMap = true,
+    mapMarkerDungeons = true,
+    mapMarkerRaids = true,
+    -- Flight points (Modules/WorldMapFlightPins.lua, Modules/MapPage.lua): icons on the Blizzard world map,
+    -- dimming of undiscovered ones on the add-on map.
+    mapFlightWorld = true,
+    mapFlightAddonMap = true,
+    -- Zone transition arrows (Modules/WorldMapZoneArrows.lua, Modules/MapZoneArrows.lua): on the maps, the
+    -- estimated ones too (dashed, only between zones a path joins), and the recording of the crossings the
+    -- player walks (Modules/ZoneCrossingRecorder.lua, kept on this computer, nothing is sent) with a short
+    -- message for every new one.
+    mapZoneArrowsWorld = true,
+    mapZoneArrowsAddonMap = true,
+    mapZoneArrowsGuess = true,
+    zoneCrossRecord = true,
+    zoneCrossNotify = true,
+    -- List of the nearest flight points (Modules/FlightPointList.lua): length 3 to 10, only discovered points.
+    flightListCount = 5,
+    flightListOnlyKnown = false,
     -- Dungeon map in Blizzard's world map while inside a dungeon (Modules/DungeonWorldMap.lua).
     dungeonWorldMap = true,
     -- Ask when entering an instance with saved boss progress whether a new run begins (Modules/BossReset.lua).
@@ -150,7 +218,10 @@ Store.defaults = {
       layouts = {},
       alpha = 1,
       autoPause = false,
-      sessionResetOnLogin = false,
+      -- A session is the time since the last login: a new login after a break starts a new one.
+      sessionResetOnLogin = true,
+      -- Number of the last settings migration (Store.migrateXpSession); a fresh database starts at the latest.
+      migrated = 1,
       chatLevelUp = false,
       -- Where the level-up line goes once chatLevelUp is on: own chat window, group (party, raid or
       -- instance group), guild, say.
@@ -159,20 +230,26 @@ Store.defaults = {
       showAtMax = false,
     },
     -- Mouse cursor ring (Modules/Cursor.lua): the switch (off by default, then nothing runs), the frame layer,
-    -- the mouselook mode (hide, keep, center), five yes/no rules, the chosen layout and the saved layouts
-    -- (seeded from the presets on first use), all account wide.
+    -- the mouselook mode (hide, keep, center), `load` (when the ring is active, Modules/LoadLogic.lua, absent
+    -- for always), the chosen layout and the saved layouts (seeded from the presets on first use), all account
+    -- wide (a character may override the layout and the switch in ForeverGuidesCharDB.cursorRing). The five yes/no keys
+    -- of the first version are carried into `load` by Cursor.Apply.
     cursorRing = {
       enabled = false,
       strata = "TOOLTIP",
       mouselook = "hide",
-      combatOnly = false,
-      instanceOnly = false,
-      needsTarget = false,
-      hideMounted = false,
-      hideInVehicle = false,
       layoutId = "standard",
       layouts = {},
     },
+    -- Free areas (Modules/AreaWindow.lua): items = { [id] = { name, layoutId, load, startShown } } (load: when the
+    -- area is active, Modules/LoadLogic.lua, absent for always; the six yes/no keys of the first version are
+    -- carried into it by AreaLogic.MigrateLoad; startShown: optional start value of "shown" for a character
+    -- without an entry) and the layout each one shows, layouts = { [layoutId] = canvas layout }
+    -- (Modules/AreaLayouts.lua), account wide, one layout per window and both carry one name. model marks data
+    -- that went through the migration to that model. Where an area sits, whether it shows and whether it is
+    -- locked is per character, in ForeverGuidesCharDB.areas. newCharShown: whether a window shows on a
+    -- character that has no entry for it yet (Modules/CharScopeLogic.lua).
+    areas = { items = {}, layouts = {}, newCharShown = true },
     -- Gathering sparkles (Modules/GatherSparkles.lua): on, ore, herbs, quest objects, quest item glitter
     -- (graphics settings), locked nodes shown without the profession, icons of the game over objects,
     -- style (auto, original, particles), gap of the effect below the plate center (offsetY, plate
@@ -332,6 +409,14 @@ Store.defaults = {
     inviteAllow = "",
     inviteBlock = "",
     inviteSkipAway = false,
+    -- Seconds a sender is ignored after a request (0 = off) and the requests per minute over all senders
+    -- (0 = unlimited), Modules/InviteLogic.lua.
+    inviteSenderCooldown = 60,
+    inviteGlobalLimit = 0,
+    -- Look of the guild request (Modules/InvitePrompt.lua): "window" or "bar".
+    inviteBarStyle = "window",
+    -- Key that confirms the first open guild request, "" is off (Modules/InviteKey.lua).
+    inviteConfirmKey = "",
     -- Recently seen players (Modules/SeenPlayers.lua): keep the list, include players you target.
     seenSave = true,
     seenTargets = false,
@@ -341,8 +426,68 @@ Store.defaults = {
     -- Item level of group members through the inspect function (Modules/GroupInspect.lua) and the
     -- data exchange with other users of the add-on (Modules/PeerComm.lua): sending is opt-in.
     groupInspect = true,
+    -- Not written any more (the consent lives in Core/Consent.lua); Consent.Migrate reads them once and
+    -- old backups stay readable.
     peerShare = false,
     peerShareGuild = true,
+    -- Guild map (Modules/GuildMapComm.lua): hide the own position (sends one end message and then nothing),
+    -- and its accuracy: "exact", "grid" (5 percent of the map) or "zone" (no coordinates).
+    guildMapInvisible = false,
+    guildMapAccuracy = "exact",
+    -- Guild map display (Modules/WorldMapGuildLogic.lua reads them clamped, the minimap source reads the same):
+    -- show on the world map and the minimap, symbol size in percent (50 to 200) per map, class color, rank
+    -- marks, level and name labels, grouping of members that lie close together, level range, rank filter
+    -- (-1 all, else the lowest rank index that still shows, 0 is the guild master) and "online" per guild list.
+    guildMapShowWorld = true,
+    guildMapShowMini = true,
+    guildMapWorldSize = 100,
+    guildMapMiniSize = 100,
+    guildMapShowClass = true,
+    guildMapShowRank = false,
+    guildMapShowLevel = false,
+    guildMapShowName = false,
+    guildMapGroup = true,
+    guildMapMinLevel = 1,
+    guildMapMaxLevel = 100,
+    guildMapRankFilter = -1,
+    guildMapOnlineOnly = true,
+    -- Sender wish of the presence mark (Modules/Presence.lua): badge in chat only, none on nameplates.
+    -- The mark itself is the consent presenceMark, this key only sets a flag inside it.
+    presenceChatOnly = false,
+    -- Chat badge (Modules/ChatBadge.lua): show the logo of recognized players before their name in chat. On by
+    -- default, yet nothing shows (and nothing is read) until the player turns on the receive consent of
+    -- presenceMark (Consent has the final say), so a hidden second switch never keeps a logo away. Style
+    -- icon/text/both, height in pixels (0 = font size of the window, else 10 to 24), chat groups with a badge,
+    -- the own logo in chat, and "use it although another chat add-on is loaded".
+    chatBadge = true,
+    chatBadgeStyle = "icon",
+    chatBadgeSize = 0,
+    chatBadgeChannels = {
+      guild = true,
+      party = true,
+      raid = true,
+      instance = true,
+      whisper = false,
+      say = true,
+      channel = true,
+    },
+    chatBadgeSelf = false,
+    chatBadgeOtherAddons = false,
+    -- Guild and community logos (Modules/CrestMark.lua), the consent is crestMark: how many logos follow the add-on
+    -- logo in a chat line (0 to 8), show the own guild logo to others, and the ids of the own communities.
+    chatCrestCount = 3,
+    crestGuild = false,
+    crestCommunities = {},
+    -- Local recognition (Modules/CrestLocal.lua), off by default: guild and community logos also for players without
+    -- the add-on, from the guild roster, the communities and the guild last seen on a player. Reads only.
+    crestLocal = false,
+    -- Plate badge (Modules/PlateBadge.lua), off by default: the logo at the nameplate of recognized players (needs
+    -- the receive consent of presenceMark), pixel size 8 to 32, side of the name "left" or "right", and the own
+    -- logo at the own plate.
+    plateBadge = false,
+    plateBadgeSize = 16,
+    plateBadgeSide = "left",
+    plateBadgeSelf = false,
     -- Hidden columns of the guild page per tab, id = false hides it (Modules/GuildPage.lua).
     guildCols = { guild = {}, social = {} },
     -- Durability window (Modules/DurabilityView.lua): percent limits of the colors (below yellow
@@ -357,14 +502,58 @@ Store.defaults = {
     durabilityWarn = false,
     durabilityWarnPct = 25,
     -- Instance reset (Modules/InstanceReset.lua): one group chat line with the names after the player reset
-    -- instances. Only in groups, on by default.
-    instanceResetAnnounce = true,
+    -- instances. Only in groups, off by default (opt-in: the line is written in the player's name).
+    instanceResetAnnounce = false,
     -- Filter panel and side tab at the group finder (Modules/LfgBrowseFilter.lua, BlizzardLinks.lua).
     lfgPanel = true,
     -- The panel appears by itself when the group finder opens, on any of its tabs (Modules/LfgFilterPanel.lua).
     lfgPanelAuto = true,
     -- The panel sits flush at the window and Blizzard's side tabs move to its right edge (Modules/LfgPanelDock.lua).
     lfgPanelDock = true,
+    -- Chat and whisper history (Modules/ChatHistoryLimits.lua owns the limits and clamps this block
+    -- in Store.cleanChat; the defaults here must equal ChatHistoryLimits.Defaults). Switches, size
+    -- limits, chat types stored, whisper mode and the names never stored; restoreLines is a number or "window".
+    -- enabled is the opt-in master switch: off by default, nothing is recorded or restored while it is off.
+    chat = {
+      enabled = false,
+      clearOnLogout = false,
+      totalWindowLines = 5000,
+      totalWhisperLines = 20000,
+      maxBytes = 4194304,
+      maxChars = 512,
+      windowsEnabled = true,
+      windowLines = 250,
+      windowDays = 30,
+      windowTypes = {
+        say = true,
+        yell = true,
+        party = true,
+        raid = true,
+        guild = true,
+        officer = true,
+        channel = true,
+        emote = true,
+        system = false,
+      },
+      whispersEnabled = true,
+      contactLines = 250,
+      whisperDays = 90,
+      whisperNever = {},
+      whisperRestore = 50,
+      whisperMode = "tab",
+      autoClose = false,
+      autoCloseMinutes = 15,
+      inputEnabled = true,
+      inputLines = 250,
+      inputPersist = true,
+      inputSlash = false,
+      inputTarget = true,
+      inputSwitch = true,
+      inputPlain = true,
+      restoreEnabled = true,
+      restoreLines = "window",
+      restoreMarker = true,
+    },
   },
   frames = {
     main = { point = "CENTER", rel = "CENTER", x = 0, y = 0, w = 960, h = 620 },
@@ -425,6 +614,10 @@ Store.defaults = {
     noActivities = false,
     width = 0,
   },
+  -- Guild craft directory (Modules/CraftDirectoryLogic.lua, function crafting, receiving side): what other
+  -- guild members shared, one store per guild, repaired on first read (CraftDirectoryLogic.Clean). Never
+  -- holds anything of the own character; empty while receiving is off.
+  guildSync = { v = 1, guilds = {} },
   -- Named Legacy plans { name, ranks = { [perkKey] = rank }, updated } of the Legacy planner
   -- (Modules/LegacyPlan.lua), validated on read; the plan of a character is in the character table below.
   legacy = { v = 1, plans = {} },
@@ -451,6 +644,14 @@ Store.defaults = {
   flightTimes = {},
   -- Floors and rough area centres the player taught the dungeon map (Modules/DungeonAreaLogic.lua), cleaned on first read.
   dungeonAreas = { v = 1, items = {} },
+  -- Aura durations seen on readable auras, per spell id: { duration, base, seen }, at most 200 (Modules/AuraTrackLogic.lua),
+  -- repaired on first read.
+  auraDurations = { v = 1, seq = 0, items = {} },
+  -- Entrances the player set per instance slug and instances hidden from the map (Modules/MapMarkerLogic.lua).
+  mapMarkers = { v = 1, items = {}, hidden = {} },
+  -- Zone crossings per zone pair "a|b" on the world map: recorded while walking, set by hand, and the ids of
+  -- deleted ones (Modules/ZoneCrossingLogic.lua), validated on every read.
+  zoneCrossings = { v = 1, recorded = {}, items = {}, hidden = {} },
   -- Loot seen in game per boss (Modules/LootCapture.lua), validated on first read.
   lootCapture = { v = 1, sinceBuild = "", npcs = {}, objects = {} },
   -- Character overview (Modules/CharRoster.lua, RosterTodos.lua): own todo rows, row switches
@@ -459,6 +660,8 @@ Store.defaults = {
   rosterRows = {},
   rosterSort = "recent",
   rosterReset = { weekday = 3, hour = 7, min = 0 },
+  -- Whisper history per contact key (Modules/ChatHistoryLogic.lua), account wide, local only.
+  chatWhispers = { v = 1, contacts = {} },
   -- Last 50 whisper invites { t, name, kind, result, reason } (Modules/Invites.lua).
   inviteLog = {},
   -- Recently seen players { name, class, level, zone, src, t }, at most 300, local only (Modules/SeenPlayers.lua).
@@ -475,8 +678,11 @@ Store.defaults = {
   xpLearned = {},
   imports = {},
   chars = {},
+  -- characters (register of the characters of the account for "when active", [ "Name-Realm" ] = { name, realm,
+  -- class, seen }, at most 60, Modules/CharScopeLogic.lua) has no default: LoadState.Register creates it at login.
   errors = {},
   meta = { sessions = 0 },
+  -- consent (opt-in register, Core/Consent.lua) has no default: Consent.Migrate creates it before the defaults.
 }
 
 Store.charDefaults = {
@@ -487,8 +693,18 @@ Store.charDefaults = {
   subaddons = {},
   -- XP bar (Modules/XpTracker.lua): session (empty = none yet) and the played seconds at the start of each level.
   xp = { levelStart = {}, session = {} },
+  -- Free areas (Modules/AreaWindow.lua): [id] = { x, y, scale, shown, locked }, the account's areas live in
+  -- settings.areas. A layoutId an older version stored here is not read any more and not deleted.
+  areas = {},
+  -- cursorRing = { layoutId, enabled } (Modules/CharScopeLogic.lua) is absent until the player overrides the ring
+  -- for this character only; a missing field means "like the account".
+  -- flightKnown (flight points learned at flight masters, Modules/FlightKnown.lua) is absent until the first
+  -- flight map was read: no default, an absent key means "no data yet".
+  -- consent (Core/Consent.lua) is absent until this character overrides a flag of the account register.
   -- nav (navigation layout of this character) is absent until the user edits the menu for this
   -- character only; an empty table would count as an override that wins over the account layout.
+  -- Chat history per chat window id (Modules/ChatHistoryLogic.lua), the window layouts are per character.
+  chatWindows = { v = 1, windows = {} },
 }
 
 -- Migrations[n] upgrades a db from schema n-1 to n.
@@ -560,6 +776,23 @@ end
 Store.migrations[4] = function(db)
   if ns.MacroLibrary then
     ns.MacroLibrary.migrate(db)
+  end
+end
+
+-- Schema 5: the opt-in register is created by Consent.Migrate from Store.init (own marker). The report of
+-- instance resets in group chat was on by default and is a line written in the player's name, so it goes
+-- back to off once; switching it on again is a choice the player makes.
+Store.migrations[5] = function(db)
+  if type(db.settings) == "table" then
+    db.settings.instanceResetAnnounce = false
+  end
+end
+
+-- Schema 6: the display switch of the chat logo is on by default (it used to be a second, hidden "off" next to
+-- the receive consent). Existing profiles get it once; a later deliberate off stays.
+Store.migrations[6] = function(db)
+  if type(db.settings) == "table" then
+    db.settings.chatBadge = true
   end
 end
 
@@ -636,6 +869,35 @@ function Store.migrateHostSkin(account)
   s.hostSkin = HOST_SKIN_FROM[s.spellbookList]
 end
 
+-- sessionResetOnLogin used to default to false and now defaults to true. The old default is carried
+-- over once, marked by xpBar.migrated; a later deliberate false stays. Runs before the defaults are
+-- filled in (a database without the table gets the new defaults and the marker with them).
+function Store.migrateXpSession(account)
+  local s = account.settings
+  local bar = type(s) == "table" and s.xpBar
+  if type(bar) ~= "table" or bar.migrated ~= nil then
+    return
+  end
+  if bar.sessionResetOnLogin == false then
+    bar.sessionResetOnLogin = true
+  end
+  bar.migrated = 1
+end
+
+-- settings.inviteBarStyle was a number (1 bar, 2 card, 3 chat line); it is a word now ("window" or "bar"):
+-- every old number becomes the window (the new default: the number 1 was only the old default, not a choice).
+-- A word stays as it is, so it can run on every start.
+function Store.migrateInviteStyle(account)
+  local s = account.settings
+  if type(s) ~= "table" then
+    return
+  end
+  local old = s.inviteBarStyle
+  if type(old) == "number" then
+    s.inviteBarStyle = "window"
+  end
+end
+
 -- settings.fontScales must be a table of numbers: a damaged value is replaced by 1 (the default),
 -- keys of other versions stay. Runs before the defaults are filled in.
 function Store.cleanFontScales(account)
@@ -668,6 +930,25 @@ function Store.seedSellProtect(account)
   ns.SellLogic.SeedProtect(account.settings, ids)
 end
 
+-- Chat history: the settings are clamped to the limits and both stores validated in place, so a
+-- hand edited file cannot exceed a cap. Runs before the defaults are filled in; the modules are
+-- loaded by ADDON_LOADED.
+function Store.cleanChat(account, char)
+  local Limits, Logic = ns.ChatHistoryLimits, ns.ChatHistoryLogic
+  if not (Limits and Logic) then
+    return
+  end
+  if type(account.settings) == "table" and account.settings.chat ~= nil then
+    account.settings.chat = Limits.Normalize(account.settings.chat)
+  end
+  if account.chatWhispers ~= nil then
+    account.chatWhispers = Logic.CleanWhisperHistory(account.chatWhispers)
+  end
+  if char.chatWindows ~= nil then
+    char.chatWindows = Logic.CleanWindowHistory(char.chatWindows)
+  end
+end
+
 function Store.init(account, char)
   account = type(account) == "table" and account or {}
   char = type(char) == "table" and char or {}
@@ -677,7 +958,13 @@ function Store.init(account, char)
   Store.renameMapExplored(account)
   Store.migrateSocialAccept(account)
   Store.migrateHostSkin(account)
+  Store.migrateXpSession(account)
+  Store.migrateInviteStyle(account)
   Store.cleanFontScales(account)
+  if ns.Consent then
+    ns.Consent.Migrate(account)
+  end
+  Store.cleanChat(account, char)
   U.applyDefaults(account, Store.defaults)
   Store.seedSellProtect(account)
   if isNew then

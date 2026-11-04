@@ -304,6 +304,73 @@ W.AttachTooltip = attachTooltip
 -- Tab/Shift+Tab walk visible focusables of the main window in creation
 -- order, Enter/Space activates. The ring is one shared frame.
 
+-- A window pinned to the top strata (the setup wizard, or the main window raised there over a Blizzard
+-- view) hides everything that only sits in the same strata at a lower level. While one is shown, the
+-- overlays (confirm dialogs, dropdown lists, popup menus, the focus ring) are put above it by level.
+local TopLayer = {}
+ns.TopLayer = TopLayer
+
+local LEVEL_CAP, LAYER_STEP = 10000, 50
+-- Overlay order from the bottom: click blocker, list or menu, nested menu, dialog, focus ring.
+TopLayer.BLOCKER, TopLayer.LIST, TopLayer.SUB, TopLayer.DIALOG, TopLayer.RING = 1, 2, 3, 4, 5
+
+-- The wizard sets owner; the main window counts only while it sits in the top strata.
+local function pinnedWindows()
+  local list = {}
+  local owner = TopLayer.owner
+  if owner and owner:IsShown() then
+    list[#list + 1] = owner
+  end
+  local main = ns.Main and ns.Main.frame
+  if main and main ~= owner and main:IsShown() and main:GetFrameStrata() == "TOOLTIP" then
+    list[#list + 1] = main
+  end
+  return list
+end
+
+function TopLayer.Active()
+  return #pinnedWindows() > 0
+end
+
+-- Highest frame level in a frame and its children.
+local function treeTop(frame)
+  local top = frame:GetFrameLevel()
+  for _, child in ipairs({ frame:GetChildren() }) do
+    top = math.max(top, treeTop(child))
+  end
+  return top
+end
+
+local function collectOffsets(frame, rootLevel, out)
+  for _, child in ipairs({ frame:GetChildren() }) do
+    out[#out + 1] = { child, child:GetFrameLevel() - rootLevel }
+    collectOffsets(child, rootLevel, out)
+  end
+  return out
+end
+
+-- Puts an overlay frame (strata TOOLTIP) over every pinned window by frame level; layer orders overlays among
+-- themselves (the TopLayer constants). The levels are set explicitly: Raise alone does not
+-- keep a list above a window that is raised later. Children keep their offset. Returns whether it moved.
+function TopLayer.Over(frame, layer)
+  local windows = pinnedWindows()
+  if #windows == 0 then
+    return false
+  end
+  local base = 0
+  for _, window in ipairs(windows) do
+    base = math.max(base, treeTop(window))
+  end
+  local rootLevel = frame:GetFrameLevel()
+  local children = collectOffsets(frame, rootLevel, {})
+  local level = math.min(base + (layer or 1) * LAYER_STEP, LEVEL_CAP)
+  frame:SetFrameLevel(level)
+  for _, entry in ipairs(children) do
+    entry[1]:SetFrameLevel(math.min(level + entry[2], LEVEL_CAP))
+  end
+  return true
+end
+
 local Focus = { items = {}, current = nil }
 ns.Focus = Focus
 
@@ -350,6 +417,13 @@ local function revealInScroll(frame)
   end
 end
 
+-- The ring is drawn over whatever the focused control sits in, also over a top-pinned window.
+function Focus.Lift()
+  if ring and ring:IsShown() then
+    TopLayer.Over(ring, TopLayer.RING)
+  end
+end
+
 function Focus.set(frame)
   local previous = Focus.current
   if previous and previous ~= frame and previous.fgOnBlur then
@@ -361,6 +435,7 @@ function Focus.set(frame)
   r:SetPoint("TOPLEFT", frame, "TOPLEFT", -3, 3)
   r:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 3, -3)
   r:Show()
+  Focus.Lift()
   if frame.fgScrollIntoView then
     frame:fgScrollIntoView()
   else
@@ -418,6 +493,7 @@ end
 
 ns.AddLocale("enUS", {
   ["act.shortcut"] = "Shortcut: %s",
+  ["action.opensWindow"] = "Opens a new window",
   ["act.new"] = "New",
   ["act.add"] = "Add",
   ["act.remove"] = "Remove",
@@ -493,6 +569,7 @@ ns.AddLocale("enUS", {
 
 ns.AddLocale("deDE", {
   ["act.shortcut"] = "Tastenkürzel: %s",
+  ["action.opensWindow"] = "Öffnet ein neues Fenster",
   ["act.new"] = "Neu",
   ["act.add"] = "Hinzufügen",
   ["act.remove"] = "Entfernen",
@@ -576,6 +653,15 @@ local VARIANTS = {
     textHover = "bg",
     border = "actionHi",
     borderAlpha = 0.8,
+  },
+  confirm = {
+    bg = "confirm",
+    bgHover = "confirmHover",
+    text = "text",
+    textHover = "text",
+    border = "success",
+    borderAlpha = 0.8,
+    ring = true,
   },
   secondary = {
     bg = "surface2",
@@ -686,8 +772,14 @@ local function paintAction(b)
     bgName, bgAlpha, text = hover and "surface3" or "surface2", 1, "accent"
     edge, edgeAlpha = nil, nil
   end
+  -- A variant with a ring (v.ring) shows it in high contrast and colorblind mode: a cue that is not a color.
+  local wantRing = b.fgSelected == true or (v.ring == true and Theme.accessibleMode())
+  local ringOn = enabled and wantRing
+  if wantRing and not b.ring then
+    b.ring = W.Border(b, "accent2", 1, 2)
+  end
   if b.ring then
-    b.ring.show(b.fgSelected == true and enabled)
+    b.ring.show(ringOn)
   end
   if pressed then
     if v.bg then
@@ -719,6 +811,10 @@ local function paintAction(b)
   if b.glyph then
     W.SetColor(b.glyph, text)
   end
+  if b.opensMark then
+    b.opensMark:SetColorToken(text)
+    b.opensMark:SetAlpha(enabled and 1 or 0.5)
+  end
   if b.icon then
     if b.icon.SetColorToken then
       b.icon:SetColorToken(text)
@@ -749,12 +845,24 @@ local function placeContent(b)
     mark:ClearAllPoints()
     mark:SetPoint("CENTER", b, "CENTER", dx, dy)
   end
+  local markShown = b.opensMark ~= nil and b.fgOpens and labelShown
+  if b.opensMark then
+    b.opensMark:SetShown(markShown)
+    b.opensMark:ClearAllPoints()
+    b.opensMark:SetPoint("RIGHT", b, "RIGHT", -ACTION_PAD + dx, dy)
+  end
   if labelShown then
     local inset = mark and (ACTION_PAD + (b.fgIconPx or 0) + ACTION_GAP) or ACTION_PAD
+    local tail = ACTION_PAD + (markShown and b.fgOpensPx + ACTION_GAP or 0)
     b.label:ClearAllPoints()
     b.label:SetPoint("LEFT", b, "LEFT", inset + dx, dy)
-    b.label:SetPoint("RIGHT", b, "RIGHT", -ACTION_PAD + dx, dy)
+    b.label:SetPoint("RIGHT", b, "RIGHT", -tail + dx, dy)
   end
+end
+
+-- Width the "opens a new window" mark adds to a button that shows its label.
+local function opensExtra(b)
+  return b.opensMark and b.fgOpens and (b.fgOpensPx + ACTION_GAP) or 0
 end
 
 -- Width the button wants with its label shown (a button without a hideable label is as wide as
@@ -770,10 +878,10 @@ local function fullWidth(b)
     end
   end
   if b.label and b.fgIconPx then
-    return ACTION_PAD * 2 + b.fgIconPx + ACTION_GAP + text + ACTION_SLACK
+    return ACTION_PAD * 2 + b.fgIconPx + ACTION_GAP + text + ACTION_SLACK + opensExtra(b)
   end
   if b.label then
-    return text + 24
+    return text + 24 + opensExtra(b)
   end
   return b.fgSide
 end
@@ -806,6 +914,11 @@ end
 -- Fields: b.label, b.icon (Glyph frame or texture), b.glyph, b.border, b.fgNameKey (the
 -- accessible name), b:Fit(maxWidth), b:FullWidth(), b:SetSelected(on), b:SetIcon(name),
 -- b:SetVariant(name).
+-- opens: the button opens a window, dialog or page of its own (see docs/UI-FRAMEWORK.md). A button with
+-- a label gets the "open" icon at its right edge (b.opensMark, the button grows by its width, the mark
+-- is hidden together with a short label); every opens button adds "Opens a new window" to the tooltip
+-- and to the accessible description (b.fgDescription()). opens = false makes b:SetOpens(on) available for buttons whose action
+-- changes (the width stays as the owner set it).
 function W.Action(parent, opts)
   if opts.icon == "close" and ns.WindowShell and ns.WindowShell.IsTitleBar(parent) then
     -- The close button of a window shell has one size in every window.
@@ -839,6 +952,11 @@ function W.Action(parent, opts)
     b.icon:SetTexture(opts.texture)
     b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   end
+  b.fgOpens = opts.opens == true
+  if opts.opens ~= nil and (hasText or opts.label) and opts.icon ~= "open" then
+    b.fgOpensPx = math.max(12, iconPixels(height) - 2)
+    b.opensMark = W.Glyph(b, "open", b.fgOpensPx, v.text)
+  end
   if opts.glyph then
     b.glyph = W.Text(b, { text = opts.glyph, role = "h3", color = v.text, justify = "CENTER" })
   elseif hasText or opts.label then
@@ -852,7 +970,7 @@ function W.Action(parent, opts)
   end
   b.fgPlace = placeContent
   placeContent(b)
-  b:SetSize(opts.width or height, height)
+  b:SetSize((opts.width or height) + (hasText and opensExtra(b) or 0), height)
   b.Fit, b.FullWidth = fitAction, fullWidth
   -- Toggle state: filled, accent content and a 2 px ring instead of the resting edge.
   function b:SetSelected(on)
@@ -861,9 +979,6 @@ function W.Action(parent, opts)
       return
     end
     self.fgSelected = on
-    if on and not self.ring then
-      self.ring = W.Border(self, "accent2", 1, 2)
-    end
     paintAction(self)
   end
   -- Swaps the icon (a name of ns.UI_ICONS) of a button made with an icon.
@@ -874,6 +989,11 @@ function W.Action(parent, opts)
       self.icon:SetIcon(name)
     end
   end
+  -- Turns the "opens a new window" mark and tooltip line on or off (needs opens = false at creation).
+  function b:SetOpens(on)
+    self.fgOpens = on == true
+    placeContent(self)
+  end
   -- Switches the palette (pooled buttons that change between plain and boxed).
   function b:SetVariant(name)
     self.fgPalette = VARIANTS[name] or VARIANTS.secondary
@@ -883,6 +1003,10 @@ function W.Action(parent, opts)
   -- The accessible name as text (tests and audits read it).
   function b.fgName()
     return b.fgNameKey and L[b.fgNameKey] or nil
+  end
+  -- The accessible description: what the action does beyond its name.
+  function b.fgDescription()
+    return b.fgOpens and L["action.opensWindow"] or nil
   end
   if opts.icon and iconOnly and not b.fgNameKey and not opts.manual then
     ns.Log.warn("icon button %s has no tooltip, so no accessible name", opts.icon)
@@ -924,10 +1048,22 @@ function W.Action(parent, opts)
     b:SetScript("OnClick", ns.Wrap(opts.wrap or "action", opts.onClick))
   end
   local tip = opts.tooltip or (opts.label and not hasText and opts.label) or nil
-  if tip then
+  -- An opens button always has a tooltip, titled with its visible text when it names none.
+  if tip or opts.opens ~= nil then
     b:HookScript("OnEnter", function(self)
-      local extra = opts.shortcut and { hint = string.format(L["act.shortcut"], opts.shortcut) } or nil
-      ns.ShowTooltip(self, L[tip], opts.tooltipText and L[opts.tooltipText], extra)
+      if not tip and not self.fgOpens then
+        return
+      end
+      local hints = {}
+      if opts.shortcut then
+        hints[#hints + 1] = string.format(L["act.shortcut"], opts.shortcut)
+      end
+      if self.fgOpens then
+        hints[#hints + 1] = L["action.opensWindow"]
+      end
+      local extra = #hints > 0 and { hint = table.concat(hints, "\n") } or nil
+      local title = tip and L[tip] or (self.label and self.label:GetText()) or ""
+      ns.ShowTooltip(self, title, opts.tooltipText and L[opts.tooltipText], extra)
     end)
     b:HookScript("OnLeave", ns.HideTooltip)
   end
@@ -945,7 +1081,7 @@ function W.Action(parent, opts)
 end
 
 -- opts: key|text, variant (primary, secondary, ghost, gold), width, height, onClick, tooltip
--- (locale key), tooltipText (locale key). Thin adapter on W.Action.
+-- (locale key), tooltipText (locale key), opens. Thin adapter on W.Action.
 function W.Button(parent, opts)
   return W.Action(parent, {
     key = opts.key,
@@ -956,6 +1092,7 @@ function W.Button(parent, opts)
     onClick = opts.onClick,
     tooltip = opts.tooltip,
     tooltipText = opts.tooltipText,
+    opens = opts.opens,
     wrap = "button",
   })
 end
@@ -998,13 +1135,14 @@ function W.MapActionButtons(parent, opts)
   local size = opts.size or W.MAP_ACTION_SIZE
   local bar = CreateFrame("Frame", nil, parent)
   bar:SetSize(size * 2 + W.MAP_ACTION_GAP, size)
-  local function make(icon, action, titleKey, tipKey)
+  local function make(icon, action, titleKey, tipKey, opens)
     local b = W.Action(bar, {
       icon = icon,
       size = size,
       boxed = true,
       tooltip = titleKey,
       tooltipText = tipKey,
+      opens = opens,
       onClick = function()
         if bar.place then
           ns.PageKit[action](bar.place)
@@ -1012,12 +1150,12 @@ function W.MapActionButtons(parent, opts)
       end,
     })
     b.fgOnFocus = function()
-      ns.ShowTooltip(b, L[titleKey], L[tipKey])
+      ns.ShowTooltip(b, L[titleKey], L[tipKey], opens and { hint = L["action.opensWindow"] } or nil)
     end
     b.fgOnBlur = ns.HideTooltip
     return b
   end
-  bar.map = make("map", "PlaceOnMap", "kit.placeMap", opts.mapTip or "kit.placeMapTip")
+  bar.map = make("map", "PlaceOnMap", "kit.placeMap", opts.mapTip or "kit.placeMapTip", true)
   bar.map:SetPoint("LEFT")
   bar.marker = make("marker", "PlaceMarker", "kit.placeMarker", opts.markerTip or "kit.placeMarkerTip")
   bar.marker:SetPoint("LEFT", bar.map, "RIGHT", W.MAP_ACTION_GAP, 0)
@@ -1711,7 +1849,9 @@ end
 
 -- Tabs --------------------------------------------------------------------
 
--- opts: tabs = { { id, key } }, onSelect(id)
+-- opts: tabs = { { id, key } }, onSelect(id), wrap (the buttons break into rows: the owner calls
+-- f:fgGridLayout(width), which places them and answers the height; without wrap the bar is one row
+-- of 28 px and wider than a narrow page).
 function W.Tabs(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(28)
@@ -1749,6 +1889,28 @@ function W.Tabs(parent, opts)
     end)
     f.buttons[tab.id] = b
     prev = b
+  end
+  if opts.wrap then
+    f.order = {}
+    for _, tab in ipairs(opts.tabs) do
+      f.order[#f.order + 1] = f.buttons[tab.id]
+    end
+    function f:fgGridLayout(width)
+      local x, row = 0, 0
+      for _, b in ipairs(self.order) do
+        local w = math.min(width, math.ceil(b.label:GetStringWidth()) + 24)
+        if x > 0 and x + w > width then
+          x, row = 0, row + 1
+        end
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", self, "TOPLEFT", x, -row * 28)
+        b:SetWidth(w)
+        x = x + w + 4
+      end
+      local h = (row + 1) * 28
+      self:SetHeight(h)
+      return h
+    end
   end
   function f:Select(id)
     f.selected = id
@@ -1854,6 +2016,10 @@ function ns.Popups.close()
   return false
 end
 
+function ns.Popups.isOpen()
+  return popup ~= nil and popup:IsShown()
+end
+
 local function getPopup()
   if popup then
     return popup
@@ -1879,21 +2045,23 @@ end
 -- Distance from the top of a dropdown to its field: the label line plus a clear gap.
 W.DROPDOWN_FIELD_Y = 20
 
--- opts: key (label), options = { { value, key|text, quality } }, get(), set(v), width, tooltip and tooltipText
--- (locale keys). An option with a quality shows its text in the item color of that quality.
+-- opts: key (label), options = { { value, key|text, quality, tooltip|tooltipKey } }, get(), set(v), width, tooltip
+-- and tooltipText (locale keys). An option with a quality shows its text in the item color of that quality.
+-- compact: no label line, the frame is the 24 px field only (rows of a card); f.button:SetWidth resizes it.
 -- The frame has a height only: the owner gives it a width (SetWidth, or anchors on both sides) when it
 -- places the dropdown itself, otherwise its width is undefined and the client may draw nothing.
 -- f.button is the clickable button, f.arrow its chevron frame (a frame level change of the wrapper does not
 -- move them), f:Open([anchor]) opens the list.
 function W.Dropdown(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetHeight(46)
+  f:SetHeight(opts.compact and 24 or 46)
   local label = W.Text(f, { key = opts.key, role = "ui", color = "textMuted" })
   label:SetPoint("TOPLEFT")
+  label:SetShown(not opts.compact)
   f.label = label
   local b = CreateFrame("Button", nil, f)
   b:SetHeight(24)
-  b:SetPoint("TOPLEFT", 0, -W.DROPDOWN_FIELD_Y)
+  b:SetPoint("TOPLEFT", 0, opts.compact and 0 or -W.DROPDOWN_FIELD_Y)
   b:SetWidth(opts.width or 220)
   W.Fill(b, "surface2")
   W.Border(b, "white", 0.25)
@@ -1961,7 +2129,7 @@ function W.Dropdown(parent, opts)
       r:SetPoint("TOPLEFT", 1, -1 - (i - 1) * 22)
       r:SetPoint("TOPRIGHT", -1, -1 - (i - 1) * 22)
       r.text:SetText(optionText(o))
-      r.fgTip, r.fgTipTitle = o.tooltip, optionText(o)
+      r.fgTip, r.fgTipTitle = o.tooltipKey and L[o.tooltipKey] or o.tooltip, optionText(o)
       W.SetColor(r.text, o.value == opts.get() and "accent" or "text")
       r:SetScript(
         "OnClick",
@@ -1983,6 +2151,8 @@ function W.Dropdown(parent, opts)
     p:SetScale((anchor or b):GetEffectiveScale() / UIParent:GetEffectiveScale())
     blocker:Show()
     p:Show()
+    TopLayer.Over(blocker, TopLayer.BLOCKER)
+    TopLayer.Over(p, TopLayer.LIST)
     for i, o in ipairs(opts.options) do
       if o.value == opts.get() then
         Focus.set(p.rows[i])

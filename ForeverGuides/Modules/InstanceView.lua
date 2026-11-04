@@ -401,10 +401,22 @@ local BUTTON_H = 26
 -- Map button with the icon and the short label (W.Action). Without a place it stays focusable but
 -- dimmed and the tooltip says why (same rule as the dim list actions).
 local function newMapButton(parent, onClick)
-  local b = W.Action(parent, { label = "act.map", icon = "map", height = BUTTON_H, onClick = onClick, manual = true })
+  local b = W.Action(parent, {
+    label = "act.map",
+    icon = "map",
+    height = BUTTON_H,
+    opens = true,
+    onClick = onClick,
+    manual = true,
+  })
   b.fgNameKey = "instances.map"
   local function show()
-    ns.ShowTooltip(b, L["instances.map"], b.fgPlace and L["instances.map.tip"] or L["instances.map.none"])
+    ns.ShowTooltip(
+      b,
+      L["instances.map"],
+      b.fgPlace and L["instances.map.tip"] or L["instances.map.none"],
+      { hint = L["action.opensWindow"] }
+    )
   end
   b:HookScript("OnEnter", show)
   b:HookScript("OnLeave", ns.HideTooltip)

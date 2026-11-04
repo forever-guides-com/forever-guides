@@ -220,6 +220,15 @@ function T.Append(tooltip, itemId, data)
     end
     added = true
   end
+  -- Guild members that can make the item: only while receiving, only from stored data.
+  local crafters = ns.CraftersTooltip and ns.CraftersTooltip.Lines(itemId)
+  if crafters then
+    tooltip:AddLine(" ")
+    for _, text in ipairs(crafters) do
+      tooltip:AddLine(text, 0.8, 0.8, 0.8, false)
+    end
+    added = true
+  end
   local counted, stack = pcall(T.StackCountOf, tooltip, data)
   local prices = T.PriceLines(itemId, counted and tonumber(stack) or nil)
   if prices then

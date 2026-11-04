@@ -148,6 +148,7 @@ local function build(container)
       icon = "copy",
       tooltip = "errcatch.copyOne",
       width = 130,
+      opens = true,
       onClick = function()
         local e = selected()
         if e then
@@ -161,6 +162,7 @@ local function build(container)
       icon = "copy",
       tooltip = "help.copyErrors",
       width = 160,
+      opens = true,
       onClick = function()
         ns.Dialogs.Copy(
           "page.errors",

@@ -853,6 +853,7 @@ local function buildColumn(parent, view)
       height = 24,
       tooltip = "calcui.window",
       tooltipText = "calcui.windowTip",
+      opens = true,
       onClick = function()
         ns.CalcWindow.Open()
       end,

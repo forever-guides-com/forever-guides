@@ -1,9 +1,12 @@
 -- Settings card "Mouse cursor ring" (Modules/Cursor.lua) on the General tab: the switch, the layer, what the
--- ring does while the camera turns, the yes/no rules, the layout with its buttons and the editor. The page
--- of the ring (Modules/CursorPage.lua) builds the same controls. Every change goes through Store.set, the
--- ring follows through FG_SETTING_CHANGED.
+-- ring does while the camera turns, when the ring is active, the layout with its buttons and the editor, and the
+-- choices for this character only (a layout and on or off instead of the account's, with a note and a reset
+-- while one applies). The page of the ring (Modules/CursorPage.lua) builds the same controls. Every change goes
+-- through Store.set or Store.setChar, the ring follows through FG_SETTING_CHANGED.
 local _, ns = ...
-local W, Store, CU = ns.W, ns.Store, ns.CursorLogic
+local W, L, Store, CU, CS = ns.W, ns.L, ns.Store, ns.CursorLogic, ns.CharScopeLogic
+-- The controls table of the editor, taken at load (a host may replace ns.CanvasEditor later).
+local Controls = ns.CanvasEditor.Controls
 
 local S = {}
 ns.CursorSettings = S
@@ -17,14 +20,22 @@ ns.AddLocale("enUS", {
   ["cursor.set.strataTip"] = "Which layer of the screen the ring is drawn in. Tooltip is the top layer.",
   ["cursor.set.mouselook"] = "On camera turn",
   ["cursor.set.mouselookTip"] = "What the ring does while you turn the camera with the right mouse button.",
-  ["cursor.set.combat"] = "Only in combat",
-  ["cursor.set.instance"] = "Only in instances",
-  ["cursor.set.target"] = "Only with target",
-  ["cursor.set.mounted"] = "Hide when mounted",
-  ["cursor.set.vehicle"] = "Hide in vehicles",
+  ["cursor.set.load"] = "When active",
   ["cursor.set.layout"] = "Layout",
   ["cursor.set.edit"] = "Edit layout",
   ["cursor.set.reset"] = "Reset options",
+  ["cursor.char.heading"] = "For this character",
+  ["cursor.char.layout"] = "Layout for this character",
+  ["cursor.char.layoutTip"] = "Shows this layout on this character only. The layouts stay shared by the whole account.",
+  ["cursor.char.enabled"] = "Ring for this character",
+  ["cursor.char.enabledTip"] = "Switches the ring on or off on this character only. Like the account follows the switch above. The key binding and /fg cursor switch the value that applies.",
+  ["cursor.char.like"] = "Like the account (default)",
+  ["cursor.char.on"] = "On",
+  ["cursor.char.off"] = "Off",
+  ["cursor.char.overridden"] = "Overridden for this character.",
+  ["cursor.char.stale"] = "Overridden for this character. The layout chosen for it no longer exists, the account's layout applies.",
+  ["cursor.char.reset"] = "Reset",
+  ["cursor.char.resetTip"] = "Removes the layout and the switch of this character. The account's values apply again.",
   ["cursor.strata.BACKGROUND"] = "Background",
   ["cursor.strata.LOW"] = "Low",
   ["cursor.strata.MEDIUM"] = "Medium",
@@ -46,14 +57,22 @@ ns.AddLocale("deDE", {
   ["cursor.set.strataTip"] = "In welcher Ebene des Bildschirms der Ring gezeichnet wird. Tooltip ist die oberste Ebene.",
   ["cursor.set.mouselook"] = "Beim Kameradrehen",
   ["cursor.set.mouselookTip"] = "Was der Ring tut, solange du die Kamera mit der rechten Maustaste drehst.",
-  ["cursor.set.combat"] = "Nur im Kampf",
-  ["cursor.set.instance"] = "Nur in Instanzen",
-  ["cursor.set.target"] = "Nur mit Ziel",
-  ["cursor.set.mounted"] = "Beim Reiten aus",
-  ["cursor.set.vehicle"] = "In Fahrzeugen aus",
+  ["cursor.set.load"] = "Wann aktiv",
   ["cursor.set.layout"] = "Layout",
   ["cursor.set.edit"] = "Layout bearbeiten",
   ["cursor.set.reset"] = "Optionen zurücksetzen",
+  ["cursor.char.heading"] = "Für diesen Charakter",
+  ["cursor.char.layout"] = "Layout für diesen Charakter",
+  ["cursor.char.layoutTip"] = "Zeigt dieses Layout nur auf diesem Charakter. Die Layouts bleiben für den ganzen Account gemeinsam.",
+  ["cursor.char.enabled"] = "Ring für diesen Charakter",
+  ["cursor.char.enabledTip"] = "Schaltet den Ring nur auf diesem Charakter ein oder aus. Wie Account folgt dem Schalter oben. Die Tastenbelegung und /fg mauszeiger schalten den Wert, der gerade gilt.",
+  ["cursor.char.like"] = "Wie Account (Standard)",
+  ["cursor.char.on"] = "An",
+  ["cursor.char.off"] = "Aus",
+  ["cursor.char.overridden"] = "Für diesen Charakter überschrieben.",
+  ["cursor.char.stale"] = "Für diesen Charakter überschrieben. Das gewählte Layout gibt es nicht mehr, es gilt das Layout des Accounts.",
+  ["cursor.char.reset"] = "Zurücksetzen",
+  ["cursor.char.resetTip"] = "Entfernt Layout und Schalter dieses Charakters. Es gelten wieder die Werte des Accounts.",
   ["cursor.strata.BACKGROUND"] = "Hintergrund",
   ["cursor.strata.LOW"] = "Niedrig",
   ["cursor.strata.MEDIUM"] = "Mittel",
@@ -89,17 +108,13 @@ local function toggle(view, labelKey, tipKey, get, set)
   )
 end
 
--- A toggle on one flag of settings.cursorRing; the ring repairs the value through Config().
-local function flag(view, key, labelKey, tipKey)
-  toggle(view, labelKey, tipKey, function()
-    return ns.Cursor.Config()[key] == true
-  end, function(v)
-    Store.set("settings.cursorRing." .. key, v == true)
-  end)
-end
-
-local function choice(view, key, options, get, set)
-  local dropdown = keep(W.Dropdown(view.content, { key = key, width = 240, options = options, get = get, set = set }))
+local function choice(view, key, options, get, set, tip)
+  local dropdown = keep(
+    W.Dropdown(
+      view.content,
+      { key = key, width = 240, options = options, get = get, set = set, tooltip = tip and key, tooltipText = tip }
+    )
+  )
   view.stack:Add(dropdown, { height = 46, width = 240 })
 end
 
@@ -111,6 +126,78 @@ local function listOf(values, prefix)
   return out
 end
 
+-- The choices for this character: its own layout and on/off, and while one applies a note and the reset.
+local function addCharacter(view)
+  local C = ns.Cursor
+  ns.AddHeading(view, "cursor.char.heading", { role = "ui", gap = 4 })
+  local layoutOptions = { { value = "", key = "cursor.char.like" } }
+  choice(view, "cursor.char.layout", layoutOptions, function()
+    for i = #layoutOptions, 2, -1 do
+      layoutOptions[i] = nil
+    end
+    for _, entry in ipairs(C.Layouts()) do
+      layoutOptions[#layoutOptions + 1] = { value = entry.id, text = entry.name }
+    end
+    local cfg = C.Config()
+    return cfg.layoutSource == "char" and cfg.layoutId or ""
+  end, function(v)
+    C.SetLayoutOverride(v ~= "" and v or nil)
+  end, "cursor.char.layoutTip")
+  local enabledOptions = {
+    { value = "account", key = "cursor.char.like" },
+    { value = "on", key = "cursor.char.on" },
+    { value = "off", key = "cursor.char.off" },
+  }
+  choice(view, "cursor.char.enabled", enabledOptions, function()
+    local node = ns.charDB and ns.charDB.cursorRing
+    local v = CS.CleanEnabled(type(node) == "table" and node.enabled or nil)
+    return v == true and "on" or v == false and "off" or "account"
+  end, function(v)
+    if v == "on" then
+      C.SetEnabledOverride(true)
+    elseif v == "off" then
+      C.SetEnabledOverride(false)
+    else
+      C.SetEnabledOverride(nil)
+    end
+  end, "cursor.char.enabledTip")
+
+  -- The note and the reset button take room only while this character overrides something.
+  local note = CreateFrame("Frame", nil, view.content)
+  note.text = W.Text(note, { text = "", role = "small", color = "warning", wrap = true })
+  note.reset = W.Button(note, {
+    key = "cursor.char.reset",
+    width = 140,
+    tooltip = "cursor.char.reset",
+    tooltipText = "cursor.char.resetTip",
+    onClick = C.ResetOverride,
+  })
+  function note:fgGridLayout(width)
+    note.text:ClearAllPoints()
+    note.text:SetPoint("TOPLEFT", note, "TOPLEFT", 0, 0)
+    note.text:SetWidth(width)
+    local h = math.ceil(note.text:GetStringHeight()) + 6
+    note.reset:ClearAllPoints()
+    note.reset:SetPoint("TOPLEFT", note, "TOPLEFT", 0, -h)
+    note.reset:SetSize(math.min(note.reset:FullWidth(), width), 26)
+    note:SetHeight(h + 26)
+    return h + 26
+  end
+  local shownBefore
+  function note.Refresh()
+    local on = C.HasOverride()
+    W.SetText(note.text, nil, L[C.Config().layoutStale and "cursor.char.stale" or "cursor.char.overridden"])
+    note:SetShown(on)
+    if shownBefore ~= nil and shownBefore ~= on and type(view.Layout) == "function" then
+      view:Layout()
+    end
+    shownBefore = on
+  end
+  keep(note)
+  note.Refresh()
+  view.stack:Add(note, { gap = 10 })
+end
+
 -- Builds the controls into a page view. opts.page: the page has its own title and intro, so the heading and
 -- the hint of the card are left out.
 function S.Add(view, opts)
@@ -119,7 +206,9 @@ function S.Add(view, opts)
     ns.AddHeading(view, "cursor.set.heading")
     ns.AddParagraph(view, "cursor.set.hint", { role = "micro", color = "textMuted" })
   end
-  toggle(view, "cursor.set.enabled", "cursor.set.enabledTip", C.IsEnabled, C.SetEnabled)
+  toggle(view, "cursor.set.enabled", "cursor.set.enabledTip", function()
+    return C.Config().accountEnabled
+  end, C.SetAccountEnabled)
   choice(view, "cursor.set.strata", listOf(CU.STRATA, "cursor.strata."), function()
     return C.Config().strata
   end, function(v)
@@ -130,11 +219,23 @@ function S.Add(view, opts)
   end, function(v)
     Store.set("settings.cursorRing.mouselook", v)
   end)
-  flag(view, "combatOnly", "cursor.set.combat")
-  flag(view, "instanceOnly", "cursor.set.instance")
-  flag(view, "needsTarget", "cursor.set.target")
-  flag(view, "hideMounted", "cursor.set.mounted")
-  flag(view, "hideInVehicle", "cursor.set.vehicle")
+  ns.AddHeading(view, "cursor.set.load", { role = "ui", gap = 4 })
+  view.stack:Add(
+    keep(Controls.LoadPanel(view.content, {
+      get = function()
+        return C.Config().load
+      end,
+      set = function(load)
+        Store.set("settings.cursorRing.load", load)
+      end,
+      onResize = function()
+        if type(view.Layout) == "function" then
+          view:Layout()
+        end
+      end,
+    })),
+    { gap = 10 }
+  )
   -- The game's own swing bars double the swing timer element: say so where the ring is set up.
   local timers = ns.CursorTimers
   if type(timers) == "table" and type(timers.SwingHint) == "function" and timers.SwingHint() ~= nil then
@@ -150,24 +251,29 @@ function S.Add(view, opts)
     for _, entry in ipairs(C.Layouts()) do
       options[#options + 1] = { value = entry.id, text = entry.name }
     end
-    return C.Config().layoutId
-  end, C.SetLayout)
+    return C.Config().accountLayoutId
+  end, C.SetAccountLayout)
   view.stack:Add(
     ns.LayoutSet.BuildButtons(view.content, C.LayoutSet),
     { height = ns.LayoutSet.BUTTONS_H, width = ns.LayoutSet.BUTTONS_W, gap = 8 }
   )
   view.stack:Add(
-    W.Button(view.content, { key = "cursor.set.edit", width = 170, onClick = C.Edit }),
-    { height = 26, width = 170, gap = 8 }
+    W.Button(view.content, { key = "cursor.set.edit", width = 190, opens = true, onClick = C.Edit }),
+    { height = 26, width = 190, gap = 8 }
   )
   view.stack:Add(
     W.Button(view.content, { key = "cursor.set.reset", width = 240, onClick = C.ResetOptions }),
-    { height = 26, width = 240 }
+    { height = 26, width = 240, gap = 16 }
   )
+  addCharacter(view)
 end
 
-ns.On("FG_SETTING_CHANGED", function(_, path)
-  if type(path) == "string" and path:find("^settings%.cursorRing") then
+ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
+  if type(path) ~= "string" then
+    return
+  end
+  local mine = scope == "char" and path:find("^cursorRing") or path:find("^settings%.cursorRing")
+  if mine then
     for control in pairs(S.controls) do
       control.Refresh()
     end

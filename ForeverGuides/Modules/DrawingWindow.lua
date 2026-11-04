@@ -361,8 +361,8 @@ local function newFrame()
 
   -- Buttons from the right: close, pin, auto-hide, appearance, editor.
   local last
-  local function button(icon, tooltip, tooltipText, onClick)
-    local b = W.Action(f.bar, { icon = icon, size = 18, tooltip = tooltip, tooltipText = tooltipText })
+  local function button(icon, tooltip, tooltipText, onClick, opens)
+    local b = W.Action(f.bar, { icon = icon, size = 18, tooltip = tooltip, tooltipText = tooltipText, opens = opens })
     if last then
       b:SetPoint("RIGHT", last, "LEFT", -2, 0)
     else
@@ -385,12 +385,12 @@ local function newFrame()
   end)
   f.look = button("palette", "wstyle.title", nil, function()
     DW.OpenLookPanel(f)
-  end)
+  end, true)
   f.editor = button("pencil", "drawwin.editor", nil, function()
     if f.drawId then
       ns.DrawingEditor.Open(f.drawId)
     end
-  end)
+  end, true)
   f.title:ClearAllPoints()
   f.title:SetPoint("LEFT", 6, 0)
   f.title:SetPoint("RIGHT", f.editor, "LEFT", -4, 0)

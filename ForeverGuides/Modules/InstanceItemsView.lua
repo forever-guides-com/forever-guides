@@ -422,7 +422,14 @@ function IIV.Create(parent)
         f:SetView("all")
       end,
     },
-    { id = "loot", label = "act.open", icon = "open", tooltip = "instances.items.open", onClick = openLoot },
+    {
+      id = "loot",
+      label = "act.open",
+      icon = "open",
+      tooltip = "instances.items.open",
+      opens = true,
+      onClick = openLoot,
+    },
   })
   for _, id in ipairs(IL.VIEWS) do
     rings[id] = W.Border(f.toolbar:GetButton(id), "accent2", 1, 2)
@@ -443,6 +450,7 @@ function IIV.Create(parent)
     tooltip = "instances.items.open",
     width = 120,
     height = 26,
+    opens = true,
     onClick = openLoot,
   })
   f.hint = makeHint(f)

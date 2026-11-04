@@ -118,6 +118,10 @@ function Layer.open(spec)
   end
   watcher.wasDown = mouseDown()
   watcher:Show()
+  -- Over a pinned top window (setup wizard) the menus lift by level; a nested one lies above the first.
+  for i, f in ipairs(spec.frames) do
+    ns.TopLayer.Over(f, i == 1 and ns.TopLayer.LIST or ns.TopLayer.SUB)
+  end
 end
 
 -- Callbacks are copied before Hide(): hide handlers must not be able to
@@ -176,10 +180,14 @@ end
 
 -- Esc (the main window key handler calls ns.Popups.close) and Up/Down/Tab
 -- (ns.Focus.move) reach the open popup group through the existing entry points.
-local closeDropdown = ns.Popups.close
+local closeDropdown, dropdownOpen = ns.Popups.close, ns.Popups.isOpen
 function ns.Popups.close()
   local closed = Layer.escape()
   return closeDropdown() or closed
+end
+
+function ns.Popups.isOpen()
+  return Layer.current ~= nil or dropdownOpen()
 end
 
 local moveFocus = Focus.move

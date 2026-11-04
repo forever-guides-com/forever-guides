@@ -590,6 +590,7 @@ local function build(container)
       label = "act.import",
       icon = "import",
       tooltip = "notes.import",
+      opens = true,
       onClick = function()
         showImport()
       end,
@@ -600,6 +601,7 @@ local function build(container)
       icon = "save",
       tooltip = "notes.backup",
       tooltipText = "notes.backupTip",
+      opens = true,
       onClick = function()
         local all = N.list({ sort = "manual" })
         if #all == 0 then
@@ -902,6 +904,7 @@ local function build(container)
       label = "act.open",
       icon = "open",
       tooltip = "notes.act.open",
+      opens = true,
       onClick = function()
         if sel() then
           NW.Toggle(state.sel)
@@ -931,6 +934,7 @@ local function build(container)
       label = "act.edit",
       icon = "pencil",
       tooltip = "notes.act.edit",
+      opens = true,
       onClick = function()
         if sel() then
           NW.Open(state.sel, { edit = true })
@@ -942,6 +946,7 @@ local function build(container)
       label = "act.export",
       icon = "export",
       tooltip = "notes.act.exportString",
+      opens = true,
       onClick = function()
         local note = sel()
         local strings = note and N.exportStrings({ note })
@@ -957,6 +962,7 @@ local function build(container)
       label = "act.text",
       icon = "copy",
       tooltip = "notes.act.exportText",
+      opens = true,
       onClick = function()
         local note = sel()
         if note then
@@ -969,6 +975,7 @@ local function build(container)
       label = "act.share",
       icon = "share",
       tooltip = "notes.act.share",
+      opens = true,
       onClick = function()
         local note = sel()
         if note then

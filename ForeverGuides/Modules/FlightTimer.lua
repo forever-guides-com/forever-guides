@@ -334,6 +334,7 @@ local function buildPanel()
     tooltip = "flighttimer.barColor",
     variant = "ghost",
     height = 26,
+    opens = true,
     onClick = function()
       WS.OpenPalette(p.color, FTI.Config().barColor, function(hex)
         setConfig("barColor", WS.cleanHex(hex, ns.Store.defaults.settings.flightTimerWindow.barColor))
@@ -448,6 +449,7 @@ local function create()
     size = GEAR_HIT,
     iconSize = GEAR_SIZE,
     tooltip = "flighttimer.gear",
+    opens = true,
     onClick = function()
       FTI.OpenSettings()
     end,

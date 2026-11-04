@@ -554,6 +554,7 @@ function TE.Build(view)
       icon = "folder",
       tooltip = "talents.builds.title",
       tooltipText = "talents.builds.openTip",
+      opens = true,
       onClick = function()
         ns.TalentBuildList.Open()
       end,
@@ -564,6 +565,7 @@ function TE.Build(view)
       icon = "import",
       tooltip = "talents.editor.import",
       tooltipText = "talents.editor.importTip",
+      opens = true,
       onClick = function()
         ns.TalentDialogs.Import(importBuild)
       end,
@@ -581,6 +583,7 @@ function TE.Build(view)
       icon = "export",
       tooltip = "talents.editor.export",
       tooltipText = "talents.editor.exportTip",
+      opens = true,
       onClick = openExport,
     },
     {
@@ -588,6 +591,7 @@ function TE.Build(view)
       label = "act.share",
       icon = "share",
       tooltip = "talents.editor.share",
+      opens = true,
       onClick = shareBuild,
     },
     {

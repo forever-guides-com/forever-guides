@@ -1,7 +1,7 @@
 -- Experience arithmetic without WoW API: the size of a level (learned value, table value scaled by
 -- a calibration factor), walking XP across level borders, the values behind the bar placeholders,
 -- template rendering, durations, and the session math (gain across level-ups, active time, rate,
--- ETA, time per level, chat texts). The game side (events, quest log, SavedVariables) lives in
+-- ETA, time per level, chat texts, XP sources, the chat lines that report XP). The game side (events, quest log, SavedVariables) lives in
 -- Modules/XpTracker.lua. Positions are (level, xp) with xp inside that level.
 local _, ns = ...
 local L = ns.L
@@ -255,10 +255,17 @@ end
 
 -- Session --------------------------------------------------------------------------------------------------
 -- A session is a plain table: active (seconds up to `since`), since (clock at the last resume, nil
--- while paused), running, gained (XP), startedAt (wall clock), auto (paused by AFK).
+-- while paused), running, gained (XP), startedAt (wall clock), auto (paused by AFK), and the sums of
+-- the sources the events explain (XL.SOURCE_FIELDS).
+
+XL.SOURCE_FIELDS = { "kills", "kill_xp", "quest_xp", "explore_xp", "rested_gained", "group_xp" }
 
 function XL.SessionNew(now, wall)
-  return { active = 0, since = now, running = true, gained = 0, startedAt = wall, auto = false }
+  local s = { active = 0, since = now, running = true, gained = 0, startedAt = wall, auto = false }
+  for _, field in ipairs(XL.SOURCE_FIELDS) do
+    s[field] = 0
+  end
+  return s
 end
 
 function XL.ActiveSeconds(s, now)
@@ -326,14 +333,40 @@ function XL.Record(s, gain)
   return gain
 end
 
--- XP per hour: from XL.MIN_RATE_SECONDS active seconds on and with a gain, else nil.
-function XL.Rate(s, now)
+-- `amount` per hour: from XL.MIN_RATE_SECONDS active seconds on and with an amount, else nil.
+local function perHour(s, now, amount)
   local active = XL.ActiveSeconds(s, now)
-  local gained = nonNegative(s and s.gained)
-  if active < XL.MIN_RATE_SECONDS or gained <= 0 then
+  amount = nonNegative(amount)
+  if active < XL.MIN_RATE_SECONDS or amount <= 0 then
     return nil
   end
-  return gained / active * 3600
+  return amount / active * 3600
+end
+
+-- XP per hour.
+function XL.Rate(s, now)
+  return perHour(s, now, s and s.gained)
+end
+
+-- Counts what an event explains: src = { kind = "kill" | "quest" | "explore", xp, rested, group }.
+-- These sums describe the gain, the readings of XP alone add to `gained`. Returns the XP counted.
+function XL.RecordSource(s, src)
+  if not s.running or type(src) ~= "table" or not finite(src.xp) or src.xp <= 0 then
+    return 0
+  end
+  if src.kind == "kill" then
+    s.kills = nonNegative(s.kills) + 1
+    s.kill_xp = nonNegative(s.kill_xp) + src.xp
+    s.rested_gained = nonNegative(s.rested_gained) + nonNegative(src.rested)
+    s.group_xp = nonNegative(s.group_xp) + nonNegative(src.group)
+  elseif src.kind == "quest" then
+    s.quest_xp = nonNegative(s.quest_xp) + src.xp
+  elseif src.kind == "explore" then
+    s.explore_xp = nonNegative(s.explore_xp) + src.xp
+  else
+    return 0
+  end
+  return src.xp
 end
 
 -- Seconds until `xp` more are earned at `rate`; nil without a rate or an amount.
@@ -346,7 +379,7 @@ end
 
 -- The persistable form (no clock values that mean nothing after a reload).
 function XL.SessionSave(s, now, wall)
-  return {
+  local out = {
     active = XL.ActiveSeconds(s, now),
     gained = nonNegative(s.gained),
     running = s.running == true,
@@ -354,6 +387,10 @@ function XL.SessionSave(s, now, wall)
     startedAt = finite(s.startedAt) and s.startedAt or nil,
     savedAt = wall,
   }
+  for _, field in ipairs(XL.SOURCE_FIELDS) do
+    out[field] = nonNegative(s[field])
+  end
+  return out
 end
 
 -- A session from SavedVariables, nil when the table is not usable. Time offline is not counted.
@@ -362,7 +399,7 @@ function XL.SessionLoad(raw, now)
     return nil
   end
   local running = raw.running ~= false
-  return {
+  local s = {
     active = nonNegative(raw.active),
     since = running and now or nil,
     running = running,
@@ -370,6 +407,39 @@ function XL.SessionLoad(raw, now)
     startedAt = finite(raw.startedAt) and raw.startedAt or nil,
     auto = raw.auto == true,
   }
+  for _, field in ipairs(XL.SOURCE_FIELDS) do
+    s[field] = nonNegative(raw[field])
+  end
+  return s
+end
+
+-- The last reading (level, xp, max) the gain is measured from, saved so that a reload loses nothing.
+-- A reading older than BASE_MAX_AGE is not taken back: XP of a longer gap may belong to time the session
+-- did not count (offline, add-on off, another client), and counting it would inflate the rate.
+XL.BASE_MAX_AGE = 120
+
+-- { level, xp, max, savedAt } or nil for a reading that is not complete.
+function XL.BaseSave(last, wall)
+  if type(last) ~= "table" or not whole(last.level) or not finite(last.xp) or not validSize(last.max) then
+    return nil
+  end
+  if not finite(wall) then
+    return nil
+  end
+  return { level = last.level, xp = last.xp, max = last.max, savedAt = wall }
+end
+
+-- The reading { level, xp, max } of a saved base that is recent enough at `wall`, else nil.
+function XL.BaseLoad(raw, wall)
+  local saved = XL.BaseSave(raw, type(raw) == "table" and raw.savedAt or nil)
+  if not saved or not finite(wall) then
+    return nil
+  end
+  local age = wall - saved.savedAt
+  if age < 0 or age > XL.BASE_MAX_AGE then
+    return nil
+  end
+  return { level = saved.level, xp = saved.xp, max = saved.max }
 end
 
 -- Played time -------------------------------------------------------------------------------------------------
@@ -466,10 +536,158 @@ function XL.ChatLevelUp(level, levelSeconds, totalSeconds, public)
   return string.format(L["xpbar.chat.plain"], level)
 end
 
+-- XP chat lines --------------------------------------------------------------------------------------------------
+-- The client words its XP lines in format strings ("%s dies, you gain %d experience."). The patterns are
+-- built from the strings the client itself has, so every language reads the same way, and a string a
+-- client does not have is skipped.
+
+-- One capture per %s or %d, anchored. Second result: the argument number of each capture (the "2" of
+-- "%2$s", else the running count), third: "s" or "d" per capture. nil for no string or no placeholder.
+function XL.FormatPattern(format)
+  if type(format) ~= "string" then
+    return nil
+  end
+  local pattern, args, kinds = {}, {}, {}
+  local i = 1
+  while i <= #format do
+    if format:sub(i, i) == "%" then
+      local position, kind, after = format:match("^%%(%d+)%$([sd])()", i)
+      if not kind then
+        kind, after = format:match("^%%([sd])()", i)
+      end
+      if kind then
+        args[#args + 1] = tonumber(position) or #args + 1
+        kinds[#kinds + 1] = kind
+        pattern[#pattern + 1] = kind == "d" and "(%d+)" or "(.-)"
+        i = after
+      elseif format:sub(i, i + 1) == "%%" then
+        pattern[#pattern + 1] = "%%"
+        i = i + 2
+      else
+        return nil
+      end
+    else
+      pattern[#pattern + 1] = (format:sub(i, i):gsub("%p", "%%%0"))
+      i = i + 1
+    end
+  end
+  if #args == 0 then
+    return nil
+  end
+  return "^" .. table.concat(pattern) .. "$", args, kinds
+end
+
+-- Strings of the kill lines: the base names, each with a group and a raid variant. UNNAMED lines carry no
+-- creature (a quest turn-in), EXHAUSTION1 and 2 add a rested bonus, 4 and 5 a penalty. The variants come
+-- first: a %s of the plain string would swallow their tail.
+local GAIN_BASES = {
+  "FIRSTPERSON",
+  "FIRSTPERSON_UNNAMED",
+  "EXHAUSTION1",
+  "EXHAUSTION2",
+  "EXHAUSTION4",
+  "EXHAUSTION5",
+}
+local GAIN_VARIANTS = { "_GROUP", "_RAID", "" }
+
+-- The captures after the XP one, in the order of the arguments: { capture index, kind } each.
+local function extras(args, kinds, xpAt)
+  local out = {}
+  for at = 1, #args do
+    if args[at] > args[xpAt] then
+      out[#out + 1] = { at = at, kind = kinds[at] }
+    end
+  end
+  table.sort(out, function(a, b)
+    return args[a.at] < args[b.at]
+  end)
+  return out
+end
+
+local function compile(format, base, variant)
+  local pattern, args, kinds = XL.FormatPattern(format)
+  if not pattern then
+    return nil
+  end
+  -- The XP is the first number argument.
+  local xpAt
+  for at = 1, #args do
+    if kinds[at] == "d" and (not xpAt or args[at] < args[xpAt]) then
+      xpAt = at
+    end
+  end
+  if not xpAt then
+    return nil
+  end
+  local after = extras(args, kinds, xpAt)
+  local entry = { pattern = pattern, xpAt = xpAt, named = not base:find("UNNAMED", 1, true) }
+  if base:find("^EXHAUSTION[12]") and after[1] then
+    entry.restedAt = after[1].at
+  end
+  local last = after[#after]
+  if variant == "_GROUP" and last and last.kind == "d" and last.at ~= entry.restedAt then
+    entry.groupAt = last.at
+  end
+  return entry
+end
+
+-- A number out of a captured text ("+100", "1.250"): digits only, separators dropped.
+local function amountIn(text)
+  local run = text:match("%d[%d.,]*")
+  return run and tonumber((run:gsub("[.,]", ""))) or nil
+end
+
+-- The parsers of the client: { gain = {...}, explore = entry or nil }. `lookup(name)` gives a global string.
+function XL.ChatParsers(lookup)
+  local parsers = { gain = {} }
+  for _, base in ipairs(GAIN_BASES) do
+    for _, variant in ipairs(GAIN_VARIANTS) do
+      local entry = compile(lookup("COMBATLOG_XPGAIN_" .. base .. variant), base, variant)
+      if entry then
+        parsers.gain[#parsers.gain + 1] = entry
+      end
+    end
+  end
+  parsers.explore = compile(lookup("ERR_ZONE_EXPLORED_XP"), "EXPLORE", "")
+  return parsers
+end
+
+-- A CHAT_MSG_COMBAT_XP_GAIN line: { kind = "kill" | "nameless", xp, rested, group } or nil. Rested and
+-- group are 0 where the line has none.
+function XL.ParseGain(parsers, text)
+  if type(text) ~= "string" then
+    return nil
+  end
+  for _, entry in ipairs(parsers.gain) do
+    local found = { text:match(entry.pattern) }
+    local xp = found[1] ~= nil and amountIn(found[entry.xpAt]) or nil
+    if xp then
+      return {
+        kind = entry.named and "kill" or "nameless",
+        xp = xp,
+        rested = entry.restedAt and amountIn(found[entry.restedAt]) or 0,
+        group = entry.groupAt and amountIn(found[entry.groupAt]) or 0,
+      }
+    end
+  end
+  return nil
+end
+
+-- The XP of a discovery line (CHAT_MSG_SYSTEM), nil for any other text.
+function XL.ParseExplore(parsers, text)
+  local entry = parsers.explore
+  if type(text) ~= "string" or not entry then
+    return nil
+  end
+  local found = { text:match(entry.pattern) }
+  return found[1] ~= nil and amountIn(found[entry.xpAt]) or nil
+end
+
 -- Values ---------------------------------------------------------------------------------------------------------
 
 -- The values behind the placeholders. Input: level, xp, max, rested, doneXp, todoXp, atMax, sizes
--- (XL.Sizes), session, played, levelStart, now. Percentages across levels come from XL.Walk, the
+-- (XL.Sizes), session, played, levelStart, now. The sources come from the session: other_xp is what the
+-- readings gained beyond the XP the events explain (never below 0). Percentages across levels come from XL.Walk, the
 -- "_cur" ones are relative to the current level only. est[name] = true marks values built on an
 -- estimated level size. bar = fractions 0..1 for the layers (XP, completed quests, rested), each
 -- measured from the current XP and cut at the end of the level.
@@ -486,6 +704,13 @@ function XL.Compute(i)
   local s = i.session
   v.state = s and s.running == false and "paused" or "running"
   v.session_gain = s and nonNegative(s.gained) or 0
+  v.kills = s and nonNegative(s.kills) or 0
+  v.kill_xp = s and nonNegative(s.kill_xp) or 0
+  v.quest_xp = s and nonNegative(s.quest_xp) or 0
+  v.explore_xp = s and nonNegative(s.explore_xp) or 0
+  v.other_xp = math.max(0, v.session_gain - v.kill_xp - v.quest_xp - v.explore_xp)
+  v.xp_per_kill = v.kills > 0 and v.kill_xp / v.kills or nil
+  v.kills_per_hour = perHour(s, now, v.kills)
   v.session_time = XL.ActiveSeconds(s, now)
   v.xph = s and XL.Rate(s, now) or nil
   v.played = XL.PlayedNow(i.played, now)
@@ -500,6 +725,7 @@ function XL.Compute(i)
   v.pct = xp / max * 100
   v.remaining = max - xp
   v.remaining_pct = 100 - v.pct
+  v.mobs_to_level = v.xp_per_kill and v.xp_per_kill > 0 and math.ceil(v.remaining / v.xp_per_kill) or nil
   v.rested_pct_cur = v.rested / max * 100
   v.done_pct_cur = v.done / max * 100
   local here = level + xp / max
@@ -607,6 +833,16 @@ local PLACEHOLDERS = {
     return (guess and "~" or "") .. XL.Duration(eta)
   end,
   session_gain = count("session_gain"),
+  kill_xp = count("kill_xp"),
+  quest_xp = count("quest_xp"),
+  explore_xp = count("explore_xp"),
+  other_xp = count("other_xp"),
+  kills = count("kills"),
+  kills_per_hour = function(v, _, o)
+    return v.kills_per_hour and number(o, v.kills_per_hour, 1) or NONE
+  end,
+  xp_per_kill = count("xp_per_kill"),
+  mobs_to_level = count("mobs_to_level"),
   session_time = seconds("session_time"),
   level_time = seconds("level_time"),
   played = seconds("played"),
@@ -634,6 +870,7 @@ local XP_ONLY = {
   overflow = true,
   eta = true,
   eta_to = true,
+  mobs_to_level = true,
 }
 -- Placeholders that take an argument ({eta_to:30}).
 local WITH_ARG = { eta_to = true }

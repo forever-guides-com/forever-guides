@@ -11,7 +11,7 @@ local U, L, CU, A, E, S = ns.U, ns.L, ns.CursorLogic, ns.CursorAssets, ns.Cursor
 local T = {}
 ns.CursorTimers = T
 
-T.GCD_SPELL = 29515
+T.GCD_SPELL = ns.CooldownCore.GCD_SPELL
 T.PREVIEW = 0.62
 T.HANDS = { "mainhand", "offhand", "ranged" }
 T.STYLES = { "ring", "bar" }
@@ -301,6 +301,10 @@ local function freezeRing(st, progress)
   method(st.cd, "SetCooldown", now() - progress * STILL, STILL)
 end
 
+-- The guarded game access and the ring helpers other elements of the ring build on (CursorCooldowns).
+T.Guard = { finite = finite, hidden = hidden, readable = readable, now = now, api = api, try = try, method = method }
+T.FreezeRing, T.PreviewProgress, T.SideOf = freezeRing, previewProgress, sideOf
+
 -- Ring appearance of a Cooldown: texture of the nearest stroke, colour, direction, and the faint track.
 local function paintRing(frame, element, p, color)
   local st = widgetOf(frame)
@@ -326,8 +330,9 @@ end
 -- Event frames ----------------------------------------------------------------------------------------
 
 -- One event frame per type. Add(owner, st) registers on the first owner, Remove(owner) unregisters with the
--- last one; handler(st, event, ...) runs for every owner that is drawn.
-local function newHub(events, unitEvents, handler)
+-- last one; handler(st, event, ...) runs for every owner that is drawn. A unit event is a name (for the
+-- player) or { name, unit, ... }; `label` names the handler for the error catcher.
+local function newHub(events, unitEvents, handler, label)
   local hub, owners, count, frame = {}, {}, 0, nil
   function hub.Add(owner, st)
     if owners[owner] == nil then
@@ -341,7 +346,7 @@ local function newHub(events, unitEvents, handler)
       frame = CreateFrame("Frame")
       frame:SetScript(
         "OnEvent",
-        ns.Wrap("cursortimers-event", function(_, event, ...)
+        ns.Wrap(label or "cursortimers-event", function(_, event, ...)
           for _, st2 in pairs(owners) do
             handler(st2, event, ...)
           end
@@ -352,7 +357,11 @@ local function newHub(events, unitEvents, handler)
       pcall(frame.RegisterEvent, frame, event)
     end
     for _, event in ipairs(unitEvents) do
-      pcall(frame.RegisterUnitEvent, frame, event, "player")
+      if type(event) == "table" then
+        pcall(frame.RegisterUnitEvent, frame, unpack(event))
+      else
+        pcall(frame.RegisterUnitEvent, frame, event, "player")
+      end
     end
   end
   function hub.Remove(owner)
@@ -370,6 +379,8 @@ local function newHub(events, unitEvents, handler)
   end
   return hub
 end
+
+T.NewHub = newHub
 
 -- Global cooldown ---------------------------------------------------------------------------------------
 
@@ -893,11 +904,12 @@ local function shapeRow(state, add, shown)
   add(gallery, gallery:GetHeight(), shown)
 end
 
-local function thicknessRow(state, add, shown)
+local function thicknessRow(state, add, shown, tip)
   local C = controls()
   add(
     C.Slider(state.panel, {
       label = "cursor.panel.thickness",
+      tooltipText = tip,
       min = CU.RING_THICKNESS_MIN,
       max = CU.RING_THICKNESS_MAX,
       step = 1,
@@ -916,12 +928,13 @@ local function thicknessRow(state, add, shown)
   )
 end
 
--- Colour and opacity of the main colour, `label` names it.
-local function colorRow(state, add, label)
+-- Colour and opacity of the main colour, `label` names it, `tip` is the locale key of its tooltip text.
+local function colorRow(state, add, label, tip)
   local C = controls()
   add(
     C.ColorAlpha(state.panel, {
       label = label,
+      tooltipText = tip,
       owner = state.owner(),
       default = "ffffff",
       get = function()
@@ -972,6 +985,8 @@ local function choiceRow(state, add, label, key, list, prefix)
     C.HEIGHT.choice
   )
 end
+
+T.Rows = { thickness = thicknessRow, color = colorRow }
 
 function T.GcdPanel(parent, element, onChange)
   return newPanel(parent, "gcd", element, onChange, function(state, add)

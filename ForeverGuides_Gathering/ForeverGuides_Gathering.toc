@@ -1,0 +1,19 @@
+## Interface: 16001
+## Title: Forever Guides: Gathering data
+## Title-deDE: Forever Guides: Sammeldaten
+## Notes: Locations of ore and herb nodes. Loads by itself when a feature needs them.
+## Notes-deDE: Fundorte von Erzen und Kräutern. Wird von selbst geladen, sobald eine Funktion sie braucht.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.5.0
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+Meta.lua
+Nodes_mining.lua
+Nodes_herbalism.lua

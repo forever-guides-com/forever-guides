@@ -6,16 +6,18 @@
 --     height, else its own height counts). onShow runs on every refresh while the tab is open.
 --   RegisterDetail{ id, order, lines(member, ctx), actions(member, ctx) }
 --     lines: list of strings in the detail card of a guild member; actions: list of
---     { key = locale key, onClick = function(member, ctx) }, at most 6 buttons.
+--     { key = locale key, onClick = function(member, ctx), opens = true when it opens a window }, at most 6 buttons.
 --   RegisterColumn{ id, key, order, value(member) } text in the member list, switchable by the player.
 --   ctx: Roster() (GuildData snapshot, do not change it), Rights(), Selected(), Select(member), Refresh().
+--   OpenTab(id) (minor 2): opens the guild page on a registered tab, false for a tab that is not registered.
 -- A registration with the same id replaces the old one; a faulty spec is reported to the error
 -- catcher and answers false. A registration after the page was built (the add-on is loaded on
 -- demand) sends the message FG_GUILDEXT_CHANGED (kind, id), the page then updates itself.
 local _, ns = ...
 local GL = ns.GuildLogic
 
-local E = { version = 1 }
+-- minor 2: OpenTab. A change that only adds keeps the version; an add-on that needs more reads `minor`.
+local E = { version = 1, minor = 2 }
 ns.GuildExt = E
 
 local DEFAULT_ORDER = 100
@@ -140,6 +142,17 @@ function E.Entries(kind)
     return a.seq < b.seq
   end)
   return out
+end
+
+-- Opens the guild page on the tab of an add-on (a link from another page). The page picks the tab up
+-- from the path; nothing happens for an id nobody registered.
+function E.OpenTab(id)
+  for _, entry in ipairs(registry.tab) do
+    if entry.id == id then
+      return ns.Router:navigate("guild/" .. id)
+    end
+  end
+  return false
 end
 
 -- Own guild rights as the game answers them: the note rights of GuildData.Rights plus the rank

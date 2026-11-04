@@ -10,7 +10,7 @@ ns.GuildKit = Kit
 
 Kit.PAD = 12
 Kit.GAP = 8
-Kit.ROW_HEIGHT = 44
+Kit.ROW_HEIGHT = 48
 Kit.DROPDOWN_WIDTH = 170
 Kit.SEARCH_HEIGHT = 26
 local MAX_ROWS = 12
@@ -96,6 +96,73 @@ function Kit.JobsText(peer, name)
   return text
 end
 
+-- Item level and professions for the second line of a row, added to `parts`. Known values stand out in the
+-- accent color; unknown ones say why in a calm hint instead of "-" (nothing is asked of anyone). Returns true
+-- when a hint was added (the row tooltip then explains it).
+function Kit.PeerSubParts(parts, peer, name, showIlvl, showJobs)
+  local Theme = ns.Theme
+  local ilvl, jobs = Kit.IlvlText(peer, name), Kit.JobsText(peer, name)
+  local noIlvl, noJobs = showIlvl and ilvl == "-", showJobs and jobs == "-"
+  local function add(text, color)
+    parts[#parts + 1] = Theme.hexText(color, text)
+  end
+  if noIlvl and noJobs then
+    add(string.format(L["guild.unshared.both"], L["guild.unshared"]), "textMuted")
+    return true
+  end
+  if showIlvl then
+    add(string.format(L["guild.ilvl"], noIlvl and L["guild.unshared"] or ilvl), noIlvl and "textMuted" or "accent2")
+  end
+  if showJobs then
+    add(
+      string.format(L["guild.detail.jobs"], noJobs and L["guild.unshared"] or jobs),
+      noJobs and "textMuted" or "accent2"
+    )
+  end
+  return noIlvl == true or noJobs == true
+end
+
+-- The hints and the button above a list with data of other add-on users: one hint per function whose
+-- receiving is off (OptInNotice) and the button "Refresh", which announces the own data again (only
+-- shown while the presence function exists). items: { frame, opts } for the page stack, in order.
+-- Sync(wanted) follows the state; wanted = false hides all (a page without data to show).
+function Kit.NewSharing(parent, aud, id, onChanged)
+  local out = { items = {}, banners = {} }
+  for _, fn in ipairs({ "peerStats", "professions" }) do
+    local banner = ns.OptInNotice.Banner(parent, {
+      fn = fn,
+      dir = "receive",
+      aud = aud,
+      textKey = "optin.recv." .. fn,
+      onChanged = onChanged,
+    })
+    out.banners[#out.banners + 1] = banner
+    out.items[#out.items + 1] = { frame = banner, opts = { gap = 6 } }
+  end
+  local refresh = W.Action(parent, {
+    key = "guild.refresh",
+    width = 150,
+    height = 24,
+    tooltip = "guild.refresh",
+    tooltipText = "guild.refresh.tip",
+    onClick = function()
+      local ok, why = ns.PeerComm.Refresh(aud)
+      local key = ok and "guild.refresh.sent" or "guild.refresh." .. tostring(why)
+      ns.Notify(L[key] or L["guild.refresh.nothing"], ok and "info" or "warning")
+    end,
+  })
+  refresh.fgId = id .. "-refresh"
+  out.button = refresh
+  out.items[#out.items + 1] = { frame = refresh, opts = { height = 24, width = 150, gap = 8 } }
+  function out.Sync(wanted)
+    for _, banner in ipairs(out.banners) do
+      banner:Update(wanted)
+    end
+    refresh:SetShown(wanted ~= false and ns.Consent.IsAvailable("presenceMark"))
+  end
+  return out
+end
+
 -- Item level, professions and their age for the detail card.
 function Kit.PeerLines(lines, peer, name)
   lines[#lines + 1] = string.format(L["guild.detail.ilvl"], Kit.IlvlText(peer, name))
@@ -140,18 +207,19 @@ function Kit.NewDetail(parent, id)
     end,
   })
   card.close:SetPoint("LEFT", card.whisper, "RIGHT", GAP, 0)
-  -- Buttons of add-on sections above "Whisper" (placed in fgGridLayout); list = { { key, onClick } }.
+  -- Buttons of add-on sections above "Whisper" (placed in fgGridLayout); list = { { key, onClick, opens } }.
   card.actions = {}
   card.actionCount = 0
   function card:SetActions(list)
     for i, a in ipairs(list) do
       local b = self.actions[i]
       if not b then
-        b = W.Button(self, { key = a.key, width = ACTION_WIDTH, height = 24 })
+        b = W.Button(self, { key = a.key, width = ACTION_WIDTH, height = 24, opens = false })
         b.fgId = id .. "-action-" .. i
         self.actions[i] = b
       end
       W.SetText(b.label, a.key)
+      b:SetOpens(a.opens == true)
       b:SetScript("OnClick", ns.Wrap("guildext-action", a.onClick))
       b:Show()
     end

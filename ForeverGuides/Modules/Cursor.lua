@@ -1,32 +1,31 @@
 -- The mouse cursor ring (ns.Cursor): one frame that follows the cursor and draws the active canvas layout
 -- (Modules/CursorLogic.lua, CursorElements.lua, CanvasRender). One switch, settings.cursorRing.enabled:
--- while it is off there is no frame, no event and no OnUpdate. While on, the events below keep a small
--- state (combat, instance, target, mount, vehicle, mouselook) that the rules read; the frame only runs
--- OnUpdate while it is shown and the only call per frame is GetCursorPosition. The ring is a plain
--- frame without mouse and keyboard, so it works in combat.
--- Settings: ns.db.settings.cursorRing = { enabled, strata, mouselook, combatOnly, instanceOnly, needsTarget,
--- hideMounted, hideInVehicle, layoutId, layouts = { [id] = layout } }, all layouts account wide.
+-- while it is off there is no frame, no event and no OnUpdate. While on, the events below keep the mouselook
+-- state and the shared game state (ns.LoadState: combat, instance, group, mount, vehicle, target, class,
+-- specialization) feeds the "when active" conditions; the frame only runs OnUpdate while it is shown and the
+-- only call per frame is GetCursorPosition. The ring is a plain frame without mouse and keyboard, so it works
+-- in combat.
+-- Settings: ns.db.settings.cursorRing = { enabled, strata, mouselook, load, layoutId, layouts = { [id] =
+-- layout } }, all layouts account wide. One character may override the switch and the layout for itself:
+-- ns.charDB.cursorRing = { enabled = true | false, layoutId } (a missing field means like the account, a layout
+-- that is gone falls back to the account's, Modules/CharScopeLogic.lua).
 local _, ns = ...
-local L, CU, CR, E = ns.L, ns.CursorLogic, ns.CanvasRender, ns.CursorElements
+local L, CU, CR, E, LL, LS, CS =
+  ns.L, ns.CursorLogic, ns.CanvasRender, ns.CursorElements, ns.LoadLogic, ns.LoadState, ns.CharScopeLogic
 
 local C = {}
 ns.Cursor = C
 
 local EVENTS = {
-  "PLAYER_REGEN_DISABLED",
-  "PLAYER_REGEN_ENABLED",
-  "PLAYER_TARGET_CHANGED",
   "PLAYER_STARTED_LOOKING",
   "PLAYER_STOPPED_LOOKING",
-  "PLAYER_MOUNT_DISPLAY_CHANGED",
   "PLAYER_ENTERING_WORLD",
   "LOADING_SCREEN_ENABLED",
   "LOADING_SCREEN_DISABLED",
   "UI_SCALE_CHANGED",
   "DISPLAY_SIZE_CHANGED",
 }
-local UNIT_EVENTS = { "UNIT_ENTERED_VEHICLE", "UNIT_EXITED_VEHICLE" }
-C.EVENTS, C.UNIT_EVENTS = EVENTS, UNIT_EVENTS
+C.EVENTS = EVENTS
 
 -- The game's own pointer image, drawn at the hotspot in the editor when the client knows the file.
 local POINTER = "Interface\\Cursor\\Point"
@@ -65,6 +64,12 @@ local function rawSettings()
   return s.cursorRing
 end
 
+-- The override of this character, the table of ns.charDB (nil while there is none).
+local function charRing()
+  local node = ns.charDB and ns.charDB.cursorRing
+  return type(node) == "table" and node or nil
+end
+
 -- The layouts of the ring (Modules/LayoutSet.lua), seeded from the presets on first use.
 local LAYOUTS = ns.LayoutSet.New({
   id = "cursor",
@@ -75,20 +80,39 @@ local LAYOUTS = ns.LayoutSet.New({
   presets = function()
     return { ids = CU.PRESET_IDS, build = CU.Preset }
   end,
+  blank = CU.Blank,
+  override = {
+    get = function()
+      local node = charRing()
+      return node and node.layoutId or nil
+    end,
+    put = function(id)
+      ns.Store.setChar("cursorRing.layoutId", id)
+    end,
+  },
 })
 C.LayoutSet = LAYOUTS
 C.EnsureLayouts = LAYOUTS.EnsureLayouts
 C.Layouts = LAYOUTS.Layouts
 C.Layout = LAYOUTS.Layout
 C.SetLayout = LAYOUTS.SetLayout
+C.SetAccountLayout = LAYOUTS.SetAccountLayout
 C.Manager = LAYOUTS.Manager
 
--- The settings with every field valid; layoutId names a stored layout.
+-- The settings with every field valid, as they hold for this character: layoutId names a stored layout (the
+-- override of the character while it names one), enabled is the switch in effect. layoutSource and
+-- enabledSource say where each comes from ("char" or "account"), layoutStale that an override points at a
+-- layout that is gone, accountLayoutId and accountEnabled hold the account's own values.
 function C.Config()
   local raw = ns.db and ns.db.settings.cursorRing
   raw = type(raw) == "table" and raw or {}
   local cfg = CU.Clean(raw)
-  cfg.layouts, cfg.layoutId = LAYOUTS.State(raw)
+  local _
+  cfg.layouts, cfg.layoutId, cfg.layoutSource, cfg.layoutStale = LAYOUTS.State(raw)
+  _, cfg.accountLayoutId = LAYOUTS.AccountState(raw)
+  cfg.accountEnabled = cfg.enabled
+  local node = charRing()
+  cfg.enabled, cfg.enabledSource = CS.Enabled(cfg.enabled, node and node.enabled)
   return cfg
 end
 
@@ -100,9 +124,53 @@ function C.IsEnabled()
   return ns.db ~= nil and C.Config().enabled
 end
 
+-- Switches the ring where the switch in effect comes from: the override of this character while it has one,
+-- else the account.
 function C.SetEnabled(on)
   if ns.db and (on == true) ~= C.IsEnabled() then
+    if C.Config().enabledSource == "char" then
+      C.SetEnabledOverride(on == true)
+    else
+      set("enabled", on == true)
+    end
+  end
+end
+
+-- The account's own switch, whatever this character overrides.
+function C.SetAccountEnabled(on)
+  if ns.db and (on == true) ~= C.Config().accountEnabled then
     set("enabled", on == true)
+  end
+end
+
+-- This character's switch: true, false, or nil for like the account.
+function C.SetEnabledOverride(value)
+  local node = charRing()
+  if ns.charDB and (node and node.enabled) ~= CS.CleanEnabled(value) then
+    ns.Store.setChar("cursorRing.enabled", CS.CleanEnabled(value))
+  end
+end
+
+-- This character's layout: a layout id, or nil for like the account.
+function C.SetLayoutOverride(id)
+  return LAYOUTS.SetOverride(id)
+end
+
+-- Whether this character overrides anything of the ring (a layout, a dead layout included, or the switch).
+function C.HasOverride()
+  local node = charRing()
+  return node ~= nil
+    and ((type(node.layoutId) == "string" and node.layoutId ~= "") or CS.CleanEnabled(node.enabled) ~= nil)
+end
+
+-- Back to the account's values for this character.
+function C.ResetOverride()
+  local node = charRing()
+  if node and node.layoutId ~= nil then
+    ns.Store.setChar("cursorRing.layoutId", nil)
+  end
+  if node and node.enabled ~= nil then
+    ns.Store.setChar("cursorRing.enabled", nil)
   end
 end
 
@@ -121,8 +189,15 @@ end
 -- Back to the default options. The layouts and the on/off switch stay.
 function C.ResetOptions()
   local d = defaults()
-  for _, key in ipairs({ "strata", "mouselook", unpack(CU.RULES) }) do
+  for _, key in ipairs({ "strata", "mouselook" }) do
     set(key, d[key])
+  end
+  set("load", nil)
+  -- Keys of the first version that were not carried over yet would bring the old rules back.
+  for _, key in ipairs(LL.LEGACY) do
+    if rawSettings()[key] ~= nil then
+      set(key, nil)
+    end
   end
 end
 
@@ -161,7 +236,8 @@ local centred = false
 local confirmed = false
 local appliedLook = false
 local rules = CU.Clean({})
-local state = { combat = false, instance = false, target = false, mounted = false, vehicle = false, mouselook = false }
+-- The readings the conditions use: the game state of LoadState (copied by pull) and the mouselook of this host.
+local state = { mouselook = false }
 local look = CU.NewMouselook(now)
 local hotDX, hotDY = 0, 0
 local lastX, lastY, lastScale
@@ -170,12 +246,16 @@ local function invalidate()
   lastX, lastY, lastScale = nil, nil, nil
 end
 
+-- Takes the readings of the shared game state; one that is unknown there is unknown here.
+local function pull()
+  local shared = LS.Get()
+  for _, key in ipairs(LS.KEYS) do
+    state[key] = shared[key]
+  end
+end
+
 local function syncState()
-  state.combat = flag("InCombatLockdown")
-  state.instance = flag("IsInInstance")
-  state.target = flag("UnitExists", "target")
-  state.mounted = flag("IsMounted")
-  state.vehicle = flag("UnitInVehicle", "player")
+  pull()
   look.Resync(readMouselook())
   confirmed = false
 end
@@ -293,36 +373,36 @@ local function teardown()
   CR.Clear(frame)
 end
 
-local function onEvent(_, event, unit)
-  if event == "PLAYER_REGEN_DISABLED" then
-    state.combat = true
-  elseif event == "PLAYER_REGEN_ENABLED" then
-    state.combat = false
-  elseif event == "PLAYER_TARGET_CHANGED" then
-    state.target = flag("UnitExists", "target")
-  elseif event == "PLAYER_STARTED_LOOKING" then
+local function onEvent(_, event)
+  if event == "PLAYER_STARTED_LOOKING" then
     confirmed = false
     look.Start()
   elseif event == "PLAYER_STOPPED_LOOKING" then
     confirmed = false
     look.Stop()
-  elseif event == "PLAYER_MOUNT_DISPLAY_CHANGED" then
-    state.mounted = flag("IsMounted")
   elseif event == "PLAYER_ENTERING_WORLD" then
     syncState()
   elseif event == "LOADING_SCREEN_ENABLED" then
     loading = true
   elseif event == "LOADING_SCREEN_DISABLED" then
     loading = false
+    -- An event can be lost behind a loading screen: the shared state is read again.
+    LS.Resync()
     syncState()
     invalidate()
   elseif event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" then
     invalidate()
-  elseif event == "UNIT_ENTERED_VEHICLE" then
-    state.vehicle = unit == "player" or state.vehicle
-  elseif event == "UNIT_EXITED_VEHICLE" then
-    state.vehicle = unit ~= "player" and state.vehicle
   end
+  refresh()
+end
+
+-- A change of the shared game state: the conditions are read again.
+local function onLoadState(_, event)
+  if event == "PLAYER_REGEN_ENABLED" and frame and CR.Deferred(frame) then
+    -- A change of a group that waited for the end of the combat.
+    redraw()
+  end
+  pull()
   refresh()
 end
 
@@ -337,11 +417,9 @@ local function startEvents()
   for _, event in ipairs(EVENTS) do
     pcall(watcher.RegisterEvent, watcher, event)
   end
-  for _, event in ipairs(UNIT_EVENTS) do
-    pcall(watcher.RegisterUnitEvent, watcher, event, "player")
-  end
   running = true
   loading = false
+  LS.Subscribe(onLoadState)
   syncState()
 end
 
@@ -349,6 +427,7 @@ local function stopEvents()
   if watcher and running then
     watcher:UnregisterAllEvents()
   end
+  LS.Unsubscribe(onLoadState)
   running = false
 end
 
@@ -358,6 +437,8 @@ function C.Apply()
   if not ns.db then
     return
   end
+  -- The old yes/no keys move into `load` before anything reads them.
+  LL.Migrate(rawSettings())
   local cfg = C.Config()
   rules = cfg
   if cfg.enabled then
@@ -439,6 +520,7 @@ function C.Edit()
   ns.CursorSim.Reset()
   editor.Open({
     host = "cursor",
+    groups = true,
     title = L["cursor.edit.title"],
     layout = C.Layout(),
     types = E.Types(),
@@ -488,8 +570,15 @@ end
 
 -- Events -------------------------------------------------------------------------------------------------
 
-ns.On("FG_SETTING_CHANGED", function(_, path)
-  if type(path) == "string" and path:find("^settings%.cursorRing") then
+ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
+  if type(path) ~= "string" then
+    return
+  end
+  if scope == "char" then
+    if path:find("^cursorRing") then
+      C.Apply()
+    end
+  elseif path:find("^settings%.cursorRing") then
     C.Apply()
   end
 end)

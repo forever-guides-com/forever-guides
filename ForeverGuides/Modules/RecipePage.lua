@@ -405,6 +405,9 @@ local function newDetail(parent)
   d.finished.button:SetPoint("TOPLEFT", d.finished.qty, "TOPRIGHT", 6, 0)
   d.finished:SetHeight(ADD_H)
   d.finished:Hide()
+  -- Opens the list of the guild members that can make the recipe (CraftersView).
+  d.crafters = ns.CraftersView.Action(d, { key = "cv.button", id = "recipes-crafters" })
+  d.crafters:Hide()
   function d:Select(id)
     self.target = id
     self:ShowTarget()
@@ -491,8 +494,10 @@ local function paintDetail(d, r, ctx)
     end
     d.add:Hide()
     d.addHint:Hide()
+    d.crafters:SetSpell(nil)
     return
   end
+  d.crafters:SetSpell(r.s)
   d.slug = ctx.slug
   -- A new recipe starts with the item it makes picked, a repaint of the same recipe keeps the pick.
   if d.targetFor ~= r.s then
@@ -629,6 +634,12 @@ local function layoutDetail(d, width)
   text(d.notes, 4)
   text(d.known, 4)
   text(d.crafts, 8)
+  if d.crafters:IsShown() then
+    d.crafters:ClearAllPoints()
+    d.crafters:SetPoint("TOPLEFT", 0, -y)
+    d.crafters:SetWidth(math.min(width, d.crafters:Fit(width)))
+    y = y + d.crafters:GetHeight() + 8
+  end
   if #d.layout.reagents > 0 then
     d.reagentHead:ClearAllPoints()
     d.reagentHead:SetPoint("TOPLEFT", 0, -y)

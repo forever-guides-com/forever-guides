@@ -242,7 +242,7 @@ local function create()
       f:Hide()
     end)
   )
-  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title" })
+  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title", opens = true })
   f.look:SetPoint("RIGHT", f.close, "LEFT", -2, 0)
   f.look:SetScript(
     "OnClick",
@@ -250,7 +250,7 @@ local function create()
       CW.OpenLook()
     end)
   )
-  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "calcui.win.open" })
+  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "calcui.win.open", opens = true })
   f.open:SetPoint("RIGHT", f.look, "LEFT", -2, 0)
   f.open:SetScript(
     "OnClick",

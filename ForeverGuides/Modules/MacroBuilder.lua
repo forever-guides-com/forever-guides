@@ -374,6 +374,7 @@ function Builder.Build(P)
     width = 200,
     tooltip = "macros.build.pickItem",
     tooltipText = "macros.build.pickItem.tip",
+    opens = true,
     onClick = function()
       UI.OpenItemPicker({
         onPick = function(row)

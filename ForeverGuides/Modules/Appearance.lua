@@ -108,6 +108,7 @@ local function addAccentButton(view)
     icon = "palette",
     tooltip = "settings.accent",
     width = 220,
+    opens = true,
     onClick = function()
       local before, current = ns.db.settings.accent, hexOf("accent2")
       -- Cancelling the picker reports the old color: that restores the old setting.

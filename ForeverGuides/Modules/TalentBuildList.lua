@@ -348,6 +348,7 @@ function BL.Build(view, close)
       icon = "import",
       tooltip = "talents.builds.import",
       tooltipText = "talents.builds.importTip",
+      opens = true,
       onClick = importBuild,
     },
     {
@@ -356,6 +357,7 @@ function BL.Build(view, close)
       icon = "export",
       tooltip = "talents.builds.exportCurrent",
       tooltipText = "talents.builds.exportCurrentTip",
+      opens = true,
       onClick = function()
         TE.ExportCurrent()
       end,
@@ -408,6 +410,7 @@ function BL.Build(view, close)
             boxed = true,
             tooltip = L["talents.builds.share"],
             tooltipText = L["talents.builds.shareTip"],
+            opens = true,
             onClick = function()
               TB.Export(entry)
             end,

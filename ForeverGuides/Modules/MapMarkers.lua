@@ -442,6 +442,8 @@ end
 -- Attach -------------------------------------------------------------------------------------
 -- ctx = {
 --   canvas, toolbar, side        frames of the page (side = { content, stack })
+--   frame                        optional: the frame the coordinate readout sits on (the clipping
+--                                viewport of a magnified canvas), default the canvas
 --   view()                       the map view under the canvas (layout or island view) or nil
 --   maps()                       zone slug -> UiMapID of the whole layout
 --   zoneName(slug)               localized zone name
@@ -545,7 +547,7 @@ function MM.Attach(ctx)
   -- The position under the cursor as zone percent, only on a zone view (view.zone is set).
   cross.back = cross:CreateTexture(nil, "ARTWORK")
   cross.coords = W.Text(cross, { role = "micro", color = "text" })
-  cross.coords:SetPoint("BOTTOMLEFT", canvas, "BOTTOMLEFT", 8, 6)
+  cross.coords:SetPoint("BOTTOMLEFT", ctx.frame or canvas, "BOTTOMLEFT", 8, 6)
   cross.back:SetPoint("TOPLEFT", cross.coords, "TOPLEFT", -4, 3)
   cross.back:SetPoint("BOTTOMRIGHT", cross.coords, "BOTTOMRIGHT", 4, -3)
   ns.Bind(cross, function(self)
@@ -1029,6 +1031,7 @@ function MM.Attach(ctx)
       icon = "open",
       tooltip = "map.marker.window",
       width = 130,
+      opens = true,
       onClick = function()
         ns.WaypointList.Open()
       end,

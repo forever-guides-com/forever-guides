@@ -2,10 +2,24 @@
 -- name is "<first><surname separator><surname>" (a space), a realm is appended
 -- with "-". Everything that stores, compares, shows or sends a player name goes
 -- through here, so a name is never treated as one whitespace-free token.
+-- Retail has one token per player ("Name" or "Name-Realm"): PN.MultiWord() tells the two apart and
+-- only the whisper check, the unit readers and the text keys differ, see docs/CLIENTS.md.
 local _, ns = ...
 
 local PN = {}
 ns.PlayerName = PN
+
+-- True where a name is "<first> <surname>" (the Forever client, also when the client is unknown),
+-- false on Retail where a name is a single token.
+function PN.MultiWord()
+  local client = ns.Client
+  return not (client and client.IsRetail())
+end
+
+-- Locale key of a text that differs per client: the key itself for Forever, "<key>.retail" for Retail.
+function PN.TextKey(key)
+  return PN.MultiWord() and key or key .. ".retail"
+end
 
 -- Per part (first name, surname, realm), in characters.
 local MAX_PART = 24
@@ -85,8 +99,8 @@ end
 -- first part (so "Name-Realm" stays one first name with its realm).
 function PN.Split(full)
   full = PN.Clean(full)
-  if full == "" then
-    return ""
+  if full == "" or not PN.MultiWord() then
+    return full
   end
   local sep, realmSep = separators()
   local at = full:find(sep, 1, true)
@@ -100,22 +114,51 @@ function PN.Split(full)
   return first, surname
 end
 
+-- UnitName without secret values: the client hides names of some units (Retail 12), and a hidden string
+-- must not be compared, measured or stored. Returns nil for a hidden result.
+local function unitName(unit)
+  local ok, name, second = pcall(UnitName, unit)
+  if not ok then
+    return nil
+  end
+  local secret = rawget(_G, "issecretvalue")
+  if type(secret) == "function" then
+    for _, value in ipairs({ name, second or false }) do
+      local okS, hidden = pcall(secret, value)
+      if not okS or hidden then
+        return nil
+      end
+    end
+  end
+  return name, second
+end
+
 -- Own full name. Empty when the client does not know it yet.
 function PN.Self()
-  local ok, name, surname = pcall(UnitName, "player")
-  if not ok or type(name) ~= "string" then
+  local name, second = unitName("player")
+  if type(name) ~= "string" then
     return ""
   end
-  return PN.Join(name, type(surname) == "string" and surname or nil)
+  return PN.FromUnit(name, second)
+end
+
+-- Full name from the two results of UnitName: Forever returns name and surname, Retail name and realm
+-- (nil for the own realm).
+function PN.FromUnit(name, second)
+  second = type(second) == "string" and second or nil
+  if PN.MultiWord() then
+    return PN.Join(name, second)
+  end
+  return PN.ForWhisper(name, nil, second)
 end
 
 -- Full name of a unit token, nil when the unit has no name.
 function PN.Display(unit)
-  local ok, name, surname = pcall(UnitName, unit)
-  if not ok or type(name) ~= "string" or name == "" then
+  local name, second = unitName(unit)
+  if type(name) ~= "string" or name == "" then
     return nil
   end
-  return PN.Join(name, type(surname) == "string" and surname or nil)
+  return PN.FromUnit(name, second)
 end
 
 -- First name and surname of the current target when it is a player, else nil.
@@ -129,11 +172,11 @@ function PN.Target()
   if not (okE and okP and there and player) then
     return nil
   end
-  local ok, name, surname = pcall(UnitName, "target")
-  if not ok or type(name) ~= "string" or name == "" then
+  local name, second = unitName("target")
+  if type(name) ~= "string" or name == "" then
     return nil
   end
-  local first, rest = PN.Split(PN.Join(name, type(surname) == "string" and surname or nil))
+  local first, rest = PN.Split(PN.FromUnit(name, second))
   return first, rest
 end
 
@@ -144,7 +187,7 @@ function PN.Normalize(full)
   local _, realmSep = separators()
   if ok and type(realm) == "string" and realm ~= "" then
     local tail = realmSep .. realm
-    if #full > #tail and full:sub(-#tail) == tail then
+    if #full > #tail and full:sub(-#tail):lower() == tail:lower() then
       return full:sub(1, -#tail - 1)
     end
   end
@@ -209,6 +252,27 @@ local function plausiblePart(part)
   return letters:find("^[%a\128-\255]+$") ~= nil and charCount(letters) >= PN.MIN_LETTERS
 end
 
+-- Retail: one token "<name>" with an optional "-<realm>", at least two letters in the name.
+local function checkSingle(full, sep, realmSep)
+  if full == "" then
+    return false, "missing"
+  elseif full:find(sep, 1, true) then
+    return false, "extra"
+  end
+  local name, realm = full, nil
+  local at = full:find(realmSep, 1, true)
+  if at then
+    name, realm = full:sub(1, at - 1), full:sub(at + #realmSep)
+  end
+  if realm and not realm:find("^[%w\128-\255'%-]+$") then
+    return false, "invalid"
+  end
+  if not plausiblePart(name) then
+    return false, "invalid"
+  end
+  return true
+end
+
 -- Whether `full` can be the target of a whisper: exactly "<first> <surname>", each
 -- part with at least two letters, the surname with an optional "-<realm>" behind it.
 -- Returns true, or false and why: "missing" (one part only), "extra" (more than two
@@ -217,6 +281,9 @@ end
 function PN.CheckWhisper(full)
   full = PN.Clean(full)
   local sep, realmSep = separators()
+  if not PN.MultiWord() then
+    return checkSingle(full, sep, realmSep)
+  end
   local parts = {}
   local from = 1
   while true do

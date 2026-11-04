@@ -1,5 +1,5 @@
 -- Main and alt links and own notes per guild member, no game calls. The store is
--- gm.db.members[key] = { name, main, mainKey, note } with the roster key of the member (lower case
+-- guild.members[key] = { name, main, mainKey, note } with the roster key of the member (lower case
 -- name). Links stay flat: a main has no main, so a member with alts cannot become an alt itself.
 local _, gm = ...
 if not gm.ext then
@@ -10,7 +10,7 @@ local PN, U = gm.FG.PlayerName, gm.FG.U
 local ML = {}
 gm.MembersLogic = ML
 
-ML.MAX_NOTE = 120
+ML.MAX_NOTE = gm.GuildStore.MAX_NOTE
 
 local function text(v)
   return type(v) == "string" and v or ""
@@ -22,12 +22,22 @@ function ML.CleanNote(s)
   return PN.Cut(U.trim(s), ML.MAX_NOTE)
 end
 
+-- The four fields every entry has; an entry with anything else (dates, tags) carries data of its own.
+local BASE = { name = true, main = true, mainKey = true, note = true }
+
+-- Drops an entry that holds no link, no note and nothing else.
 local function keep(store, key)
   local e = store[key]
   if e and e.main == "" and e.note == "" then
+    for field in pairs(e) do
+      if not BASE[field] then
+        return
+      end
+    end
     store[key] = nil
   end
 end
+ML.Keep = keep
 
 local function touch(store, member)
   local e = store[member.key]
@@ -38,21 +48,29 @@ local function touch(store, member)
   e.name = member.name
   return e
 end
+-- The entry of member { key, name }, created empty when new.
+ML.Touch = touch
 
 -- Drops what SavedVariables left malformed, in place.
-function ML.Clean(db)
-  if type(db.members) ~= "table" then
-    db.members = {}
+function ML.Clean(guild)
+  if type(guild.members) ~= "table" then
+    guild.members = {}
   end
-  for key, e in pairs(db.members) do
+  for key, e in pairs(guild.members) do
     if type(key) ~= "string" or key == "" or type(e) ~= "table" then
-      db.members[key] = nil
+      guild.members[key] = nil
     else
       e.name = text(e.name) ~= "" and e.name or key
       e.main = PN.Normalize(text(e.main))
       e.mainKey = PN.Lower(e.main)
       e.note = ML.CleanNote(e.note)
-      keep(db.members, key)
+      if gm.HistoryLogic then
+        gm.HistoryLogic.CleanMember(e)
+      end
+      if gm.RemindersLogic then
+        gm.RemindersLogic.CleanMember(e)
+      end
+      keep(guild.members, key)
     end
   end
 end

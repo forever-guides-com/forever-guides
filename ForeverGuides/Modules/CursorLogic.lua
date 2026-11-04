@@ -1,9 +1,9 @@
 -- Rules and data of the mouse cursor ring (ns.CursorLogic), without WoW API: the defaults and the repair
 -- of settings.cursorRing, the props of the element types (schemas and repair, one registry so a new type
--- only adds an entry), the visibility rules, the hysteresis of mouselook with an injected clock, the
+-- only adds an entry), the visibility (the "when active" load and mouselook), the hysteresis of mouselook with an injected clock, the
 -- position math and the presets. Drawing lives in CursorElements.lua, the host in Cursor.lua.
 local _, ns = ...
-local U, L, CL, A = ns.U, ns.L, ns.CanvasLogic, ns.CursorAssets
+local U, L, CL, A, LL = ns.U, ns.L, ns.CanvasLogic, ns.CursorAssets, ns.LoadLogic
 
 local CU = {
   -- The game's frame layers, lowest first.
@@ -20,8 +20,6 @@ local CU = {
   -- What the ring does while the camera is turned with the mouse: disappear, stay at the cursor, or stand
   -- in the middle of the screen.
   MOUSELOOK = { "hide", "keep", "center" },
-  -- Yes/no rules, in the order the settings show them.
-  RULES = { "combatOnly", "instanceOnly", "needsTarget", "hideMounted", "hideInVehicle" },
   BLENDS = { "DISABLE", "ADD" },
   CROSS_STYLES = { "arms", "lines" },
   -- Mouselook counts as started only after this many seconds, so a quick right click does not flicker.
@@ -39,11 +37,6 @@ CU.DEFAULTS = {
   enabled = false,
   strata = "TOOLTIP",
   mouselook = "hide",
-  combatOnly = false,
-  instanceOnly = false,
-  needsTarget = false,
-  hideMounted = false,
-  hideInVehicle = false,
   layoutId = "standard",
   layouts = {},
 }
@@ -53,6 +46,7 @@ ns.AddLocale("enUS", {
   ["cursor.preset.crosshair"] = "Crosshair",
   ["cursor.preset.double"] = "Double ring",
   ["cursor.preset.dot"] = "Dot",
+  ["cursor.preset.blank"] = "Empty",
   ["cursor.el.ring"] = "Ring",
   ["cursor.el.ring2"] = "Inner ring",
   ["cursor.el.cross"] = "Crosshair",
@@ -63,6 +57,7 @@ ns.AddLocale("deDE", {
   ["cursor.preset.crosshair"] = "Fadenkreuz",
   ["cursor.preset.double"] = "Doppelring",
   ["cursor.preset.dot"] = "Punkt",
+  ["cursor.preset.blank"] = "Leer",
   ["cursor.el.ring"] = "Ring",
   ["cursor.el.ring2"] = "Innerer Ring",
   ["cursor.el.cross"] = "Fadenkreuz",
@@ -97,7 +92,9 @@ end
 
 -- Settings ---------------------------------------------------------------------------------------------
 
--- The settings of a raw table with every field valid (layoutId and layouts belong to the layout set).
+-- The settings of a raw table with every field valid (layoutId and layouts belong to the layout set). `load` is
+-- the "when active" condition (LoadLogic), absent for none; a table of the first version (five yes/no keys)
+-- reads as what its keys meant.
 function CU.Clean(raw)
   raw = type(raw) == "table" and raw or {}
   local d = CU.DEFAULTS
@@ -106,9 +103,7 @@ function CU.Clean(raw)
     strata = oneOf(raw.strata, CU.STRATA, d.strata),
     mouselook = oneOf(raw.mouselook, CU.MOUSELOOK, d.mouselook),
   }
-  for _, key in ipairs(CU.RULES) do
-    cfg[key] = type(raw[key]) == "boolean" and raw[key] or d[key]
-  end
+  cfg.load = LL.Of(raw)
   return cfg
 end
 
@@ -244,24 +239,12 @@ CU.Register("cross", {
 -- Visibility -------------------------------------------------------------------------------------------
 
 -- Whether the ring shows, and whether it stands in the middle of the screen instead of at the cursor.
--- rules: the settings (the five yes/no rules, `mouselook`); state: combat, instance, target, mounted,
--- vehicle, mouselook (booleans read from the game by the host).
+-- rules: the settings (`load`, `mouselook`); state: the readings of ns.LoadState (combat, instance, grouped,
+-- mounted, vehicle, target, class, spec) and mouselook (a boolean read from the game by the host).
 function CU.Visible(rules, state)
   rules = type(rules) == "table" and rules or {}
   state = type(state) == "table" and state or {}
-  if rules.combatOnly == true and state.combat ~= true then
-    return false, false
-  end
-  if rules.instanceOnly == true and state.instance ~= true then
-    return false, false
-  end
-  if rules.needsTarget == true and state.target ~= true then
-    return false, false
-  end
-  if rules.hideMounted == true and state.mounted == true then
-    return false, false
-  end
-  if rules.hideInVehicle == true and state.vehicle == true then
+  if not LL.Passes(rules.load, state) then
     return false, false
   end
   if state.mouselook == true then
@@ -384,6 +367,13 @@ local BUILDERS = {
 }
 
 CU.PRESET_IDS = { "standard", "crosshair", "double", "dot" }
+
+-- The layout "New" starts with: the canvas of a ring and no element. It is not one of the presets of the list.
+function CU.Blank()
+  local layout = build("blank", {})
+  layout.name = L["cursor.preset.blank"]
+  return layout
+end
 
 -- Adds a preset after the built-in ones: builder(el, build) returns a layout, el and build being the helpers
 -- above (el(id, kind, w, h, props), build(id, elements)). Its name is the key cursor.preset.<id>.

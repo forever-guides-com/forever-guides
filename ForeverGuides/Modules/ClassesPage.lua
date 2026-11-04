@@ -94,6 +94,7 @@ local function build(container)
       key = "classes.trainers",
       width = 80,
       height = 22,
+      opens = true,
       onClick = function()
         ns.Router:navigate("trainers/" .. class)
       end,
@@ -103,6 +104,7 @@ local function build(container)
       key = "classes.levels",
       width = 90,
       height = 22,
+      opens = true,
       onClick = function()
         ns.Router:navigate("levels/" .. class)
       end,
@@ -112,6 +114,7 @@ local function build(container)
       key = "classes.weapons",
       width = 80,
       height = 22,
+      opens = true,
       onClick = function()
         ns.Router:navigate("weapons/" .. class)
       end,

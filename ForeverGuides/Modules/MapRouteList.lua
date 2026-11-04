@@ -886,6 +886,7 @@ function MRL.Attach(ctx)
       icon = "copy",
       tooltip = "map.route.copy",
       width = 130,
+      opens = true,
       onClick = function()
         ns.Dialogs.Copy("map.route", MRL.Text(ctl.result, ctx.nameOf, ctx.share and ctx.share()))
       end,

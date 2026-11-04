@@ -10,9 +10,12 @@ ns.MapWorld = MW
 
 local ISLAND = "forever"
 local WORLD_FALLBACK_ID = 947
+MW.WORLD_ID = WORLD_FALLBACK_ID
 local DEFAULT_ASPECT = 0.6
 local MIN_FIT_ZONES = 3
 local ZONE_MARGIN = 0.1
+-- Share of a zone map below which a foreign outline only grazes it.
+local MIN_VISIBLE_AREA = 0.001
 local BOX_INSET = 0.05
 local MIN_SPAN = 60
 local PANEL = { w = 0.34, h = 0.36 }
@@ -296,11 +299,14 @@ function MW.Layout(data, rects, o)
     zones = {},
     polySrc = {},
     maps = {},
+    continentWidth = {},
   }
   -- Zone rectangles for PointToZone; zones on the schematic panel have none (see IslandView).
   for _, z in ipairs(data.zones or {}) do
     if rects[z.s] and not (o.panel and o.panel[z.c]) then
       layout.zones[z.s] = rects[z.s]
+      local cont = o.continentRects and o.continentRects[z.c]
+      layout.continentWidth[z.s] = cont and cont.right - cont.left or nil
       if z.poly then
         layout.polySrc[z.s] = { poly = z.poly, canvas = z.pc == "canvas", rect = rects[z.s] }
       end
@@ -458,11 +464,62 @@ function MW.ZoneToPoint(view, zoneId, x, y)
   return MW.Place(r, x, y)
 end
 
+local WHOLE_MAP = { left = 0, right = 1, top = 0, bottom = 1 }
+
+-- rect, given as fractions of the parent map, as fractions of the zone rectangle r.
+local function relativeTo(rect, r)
+  local w, h = r.right - r.left, r.bottom - r.top
+  return {
+    left = (rect.left - r.left) / w,
+    right = (rect.right - r.left) / w,
+    top = (rect.top - r.top) / h,
+    bottom = (rect.bottom - r.top) / h,
+  }
+end
+
+-- The outlines of the zones around the open one, as a view in zone coordinates (so MapPoly can
+-- index it), plus their slugs by visible area, largest first. The open zone is part of the view
+-- (NeighborAt needs its outline) but not of the list. Zones that barely reach into the zone map
+-- are left out.
+local function surroundings(parent, slug, r)
+  local around, list = { zones = {}, polySrc = {}, maps = {} }, {}
+  for other, src in pairs(parent.polySrc or {}) do
+    local zoneRect = parent.zones[other]
+    local base = zoneRect and (src.canvas and WHOLE_MAP or src.rect)
+    local rect = base and relativeTo(base, r)
+    local shape = rect and ns.MapPoly.Build(src.poly, false, rect)
+    local area = shape and ns.MapPoly.VisibleArea(shape) or 0
+    if shape and (other == slug or area >= MIN_VISIBLE_AREA) then
+      around.zones[other] = relativeTo(zoneRect, r)
+      around.polySrc[other] = { poly = src.poly, canvas = false, rect = rect }
+      around.maps[other] = parent.maps and parent.maps[other]
+      if other ~= slug then
+        list[#list + 1] = { slug = other, area = area }
+      end
+    end
+  end
+  table.sort(list, function(a, b)
+    if a.area ~= b.area then
+      return a.area > b.area
+    end
+    return a.slug < b.slug
+  end)
+  for i, e in ipairs(list) do
+    list[i] = e.slug
+  end
+  return around, list
+end
+
 -- One zone shown over the whole map, built from the view it is opened from (a layout or an
 -- island view). Same shape as a view: the zone's rectangle is 0..1, so PointToZone and
 -- ZoneToPoint give the zone position directly, and pos holds the places of the zone relative
--- to that rectangle. nil when the parent does not show the zone or the zone has no game map.
-function MW.ZoneView(parent, data, slug)
+-- to that rectangle. around is the view of the outlines of all zones that reach into the zone map
+-- (see surroundings), neighbors their slugs by area, unit the width of the continent in zone
+-- widths (the parent is the continent when it names no continent width). world is the rectangle of the
+-- zone on the world map (MW.WORLD_ID), the frame zone crossings are stored in: the parent's own when
+-- it is a world layout, else the one passed in, else nil. nil when the parent does not show the zone or
+-- the zone has no game map.
+function MW.ZoneView(parent, data, slug, worldRect)
   local r = parent and parent.zones and parent.zones[slug]
   local mapId = parent and parent.maps and parent.maps[slug]
   if not (r and mapId and r.right > r.left and r.bottom > r.top) then
@@ -479,6 +536,7 @@ function MW.ZoneView(parent, data, slug)
       }
     end
   end
+  local around, neighbors = surroundings(parent, slug, r)
   return {
     zone = slug,
     mapId = mapId,
@@ -486,7 +544,45 @@ function MW.ZoneView(parent, data, slug)
     maps = { [slug] = mapId },
     pos = pos,
     aspect = parent.aspect,
+    around = around,
+    neighbors = neighbors,
+    world = worldRect or (parent.world and r or nil),
+    unit = (parent.continentWidth and parent.continentWidth[slug] or 1) / (r.right - r.left),
   }
+end
+
+-- A view of the zones that have a game map and a rectangle on one parent map (a continent), to
+-- take zone views from. rectOf(uiMapId) gives the rectangle of a map on the parent, see MW.Rect.
+-- Zones with an outline over the whole canvas are left out, their outline has no game map.
+function MW.RectView(zones, rectOf)
+  local view = { zones = {}, polySrc = {}, maps = {} }
+  for _, z in ipairs(zones or {}) do
+    local rect = z.um and z.pc ~= "canvas" and rectOf(z.um)
+    if rect then
+      view.zones[z.s], view.maps[z.s] = rect, z.um
+      if z.poly then
+        view.polySrc[z.s] = { poly = z.poly, canvas = false, rect = rect }
+      end
+    end
+  end
+  return view
+end
+
+-- The zone around the open one at a point of the zone view (fractions of the zone map): the
+-- smallest outline that holds the point. nil where the open zone's own outline covers the point
+-- (or it has none, so its extent is unknown), over the sea and for a view without outlines.
+function MW.NeighborAt(zv, x, y)
+  local MP = ns.MapPoly
+  local idx = zv and zv.around and finite(x) and finite(y) and MP.Index(zv.around)
+  local own = idx and idx.shapes[zv.zone]
+  if not own or MP.Contains(own, x, y) then
+    return nil
+  end
+  for _, shape in ipairs(idx.order) do
+    if shape.slug ~= zv.zone and MP.Contains(shape, x, y) then
+      return shape.slug
+    end
+  end
 end
 
 -- WoW discovery --------------------------------------------------------------------
@@ -667,6 +763,23 @@ local function zoneRect(zoneId, contId, worldId, contRect)
   end
 end
 
+-- Rectangle of a zone map on the world map: direct, else composed from its rectangle on the parent map
+-- (inParent, asked for when not given) and the parent's on the world map. nil when the client reports none.
+function MW.WorldRect(mapId, inParent)
+  local rect = MW.Rect(call("GetMapRectOnMap", mapId, MW.WORLD_ID))
+  if rect then
+    return rect
+  end
+  local info = mapInfo(mapId)
+  local parent = info and info.parentMapID
+  if type(parent) ~= "number" or parent <= 0 or parent == MW.WORLD_ID then
+    return nil
+  end
+  inParent = inParent or MW.Rect(call("GetMapRectOnMap", mapId, parent))
+  local parentRect = inParent and MW.Rect(call("GetMapRectOnMap", parent, MW.WORLD_ID))
+  return parentRect and MW.Compose(inParent, parentRect) or nil
+end
+
 -- First art layer of a map: tile grid geometry plus the tile file ids.
 function MW.LoadArt(mapId)
   local layers = call("GetMapArtLayers", mapId)
@@ -820,9 +933,11 @@ function MW.LayoutWorld(data, world)
   if not (world and world.ok) then
     return nil
   end
-  return MW.Layout(
+  local layout = MW.Layout(
     data,
     world.rects,
     { panel = world.panel, continentRects = world.contRects, aspect = world.aspect, maps = world.maps }
   )
+  layout.world = true
+  return layout
 end

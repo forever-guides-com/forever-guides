@@ -371,6 +371,7 @@ function List.Build(P)
       icon = Kit.ICON.spell,
       tooltip = "macros.editor.addSpell",
       variant = "gold",
+      opens = true,
       onClick = function()
         UI.OpenSpellPicker({
           class = P.playerClass() or "ALL",
@@ -535,6 +536,7 @@ function List.Build(P)
       label = "act.export",
       icon = Kit.ICON.export,
       tooltip = "macros.editor.export",
+      opens = true,
       onClick = function()
         List.exportCurrent("string")
       end,
@@ -544,6 +546,7 @@ function List.Build(P)
       label = "act.text",
       icon = Kit.ICON.text,
       tooltip = "macros.editor.exportText",
+      opens = true,
       onClick = function()
         List.exportCurrent("text")
       end,

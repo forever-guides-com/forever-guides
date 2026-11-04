@@ -1288,6 +1288,7 @@ local function ensurePanel()
     height = MORE_HEIGHT,
     tooltip = "gs.more",
     tooltipText = "gs.more.tip",
+    opens = true,
     onClick = function()
       ns.Main.Show(ns.InspectLink.Target())
     end,

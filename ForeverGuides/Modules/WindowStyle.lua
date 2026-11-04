@@ -3,7 +3,7 @@
 -- for readability on a transparent window. Pure helpers plus one applier.
 --
 --   style = { bg = "rrggbb", alpha = 0..1, autoHide = bool, textShadow = "auto"|"on"|"off",
---             border = bool (nil counts as true) }
+--             border = bool (nil counts as true), solidBar = bool (the band fill of the shell stays full) }
 --   WS.Defaults(kind)            global defaults from the settings ("note" or "drawing")
 --   WS.Resolve(kind, per)        per-window overrides (bg, alpha, autoHide, textShadow, border; nil
 --                                 = inherit) over the global defaults, every field validated
@@ -37,7 +37,7 @@ WS.SHADOW_MODES = { "auto", "on", "off" }
 WS.SHADOW_BELOW = 0.45
 WS.FADE_TIME, WS.HIDE_DELAY = 0.12, 0.4
 -- Settings key prefix per window kind: <prefix>Bg, <prefix>Alpha, <prefix>AutoHide.
-WS.PREFIX = { note = "noteWindow", drawing = "drawingWindow", canvaseditor = "canvasEditorWindow" }
+WS.PREFIX = { note = "noteWindow", drawing = "drawingWindow", canvaseditor = "canvasEditorWindow", chat = "chatWindow" }
 WS.SHADOW_KEY = "windowTextShadow"
 -- "Always show the window frame" (default on): a shell border keeps this opacity at least.
 WS.BORDER_KEY = "windowBorderAlways"

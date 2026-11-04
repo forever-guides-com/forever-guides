@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-03.
 -- Spell catalog of HUNTER: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -523,6 +523,13 @@ ns.Data.Spells.HUNTER = {
     sup=3674,
   },
   {
+    fid=135726,
+    id=20572,
+    k="racial",
+    n={de="Kochendes Blut",en="Blood Fury"},
+    rt={de="Volk",en="Racial"},
+  },
+  {
     c={"HUNTER","ROGUE","WARRIOR"},
     fid=135493,
     id=264,
@@ -701,6 +708,14 @@ ns.Data.Spells.HUNTER = {
     l=1,
     n={de="Kobrareflexe",en="Cobra Reflexes"},
     rk=1,
+  },
+  {
+    fid=132366,
+    i="ability_warrior_warcry",
+    id=20576,
+    k="racial",
+    n={de="Befehlsgewalt",en="Command"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=135860,
@@ -1202,6 +1217,16 @@ ns.Data.Spells.HUNTER = {
   {
     fid=135826,
     i="spell_fire_selfdestruct",
+    id=13812,
+    k="spell",
+    l=34,
+    n={de="Sprengfalle",en="Explosive Trap"},
+    rk=1,
+  },
+  {
+    b=13812,
+    fid=135826,
+    i="spell_fire_selfdestruct",
     id=13813,
     k="spell",
     l=34,
@@ -1209,7 +1234,18 @@ ns.Data.Spells.HUNTER = {
     rk=1,
   },
   {
-    b=13813,
+    b=13812,
+    fid=135826,
+    i="spell_fire_selfdestruct",
+    id=14314,
+    k="spell",
+    l=44,
+    n={de="Sprengfalle",en="Explosive Trap"},
+    rk=2,
+    sup=13812,
+  },
+  {
+    b=13812,
     fid=135826,
     i="spell_fire_selfdestruct",
     id=14316,
@@ -1220,7 +1256,18 @@ ns.Data.Spells.HUNTER = {
     sup=13813,
   },
   {
-    b=13813,
+    b=13812,
+    fid=135826,
+    i="spell_fire_selfdestruct",
+    id=14315,
+    k="spell",
+    l=54,
+    n={de="Sprengfalle",en="Explosive Trap"},
+    rk=3,
+    sup=14314,
+  },
+  {
+    b=13812,
     fid=135826,
     i="spell_fire_selfdestruct",
     id=14317,
@@ -1229,37 +1276,6 @@ ns.Data.Spells.HUNTER = {
     n={de="Sprengfalle",en="Explosive Trap"},
     rk=3,
     sup=14316,
-  },
-  {
-    fid=135826,
-    i="spell_fire_selfdestruct",
-    id=13812,
-    k="spell",
-    l=34,
-    n={de="Sprengfalle",en="Explosive Trap Effect"},
-    rk=1,
-  },
-  {
-    b=13812,
-    fid=135826,
-    i="spell_fire_selfdestruct",
-    id=14314,
-    k="spell",
-    l=44,
-    n={de="Sprengfalle",en="Explosive Trap Effect"},
-    rk=2,
-    sup=13812,
-  },
-  {
-    b=13812,
-    fid=135826,
-    i="spell_fire_selfdestruct",
-    id=14315,
-    k="spell",
-    l=54,
-    n={de="Sprengfalle",en="Explosive Trap Effect"},
-    rk=3,
-    sup=14314,
   },
   {
     fid=132215,
@@ -1693,6 +1709,13 @@ ns.Data.Spells.HUNTER = {
     n={de="Belästigen",en="Harass"},
     rk=3,
     sup=23166,
+  },
+  {
+    fid=133125,
+    id=20573,
+    k="racial",
+    n={de="Zähigkeit",en="Hardiness"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=132327,
@@ -3186,6 +3209,15 @@ ns.Data.Spells.HUNTER = {
     n={de="Schattenwiderstand",en="Shadow Resistance"},
     rk=4,
     sup=24515,
+  },
+  {
+    fid=136082,
+    i="spell_nature_removecurse",
+    id=1299026,
+    k="racial",
+    l=1,
+    n={de="Fluch brechen",en="Shatter Curse"},
+    rt={de="Volksfähigkeit",en="Racial"},
   },
   {
     fid=132199,

@@ -223,6 +223,7 @@ local function buildPanel(name, h)
     height = 22,
     tooltip = "bar.more",
     tooltipText = "bar.moreTip",
+    opens = true,
     onClick = function()
       Handle.Close(name)
       if ns.Main and ns.Main.Show then

@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-03.
 -- Learn list of PALADIN.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -92,6 +92,14 @@ ns.Data.Abilities.PALADIN = {
     sp="paladin-holy",
   },
   {
+    i="spell_holy_sealoffury",
+    l=10,
+    n={de="Zorn der Gerechtigkeit",en="Righteous Fury"},
+    rk={10},
+    sid=25780,
+    sp="paladin-protection",
+  },
+  {
     i="spell_holy_resurrection",
     l=12,
     n={de="Erlösung",en="Redemption"},
@@ -114,14 +122,6 @@ ns.Data.Abilities.PALADIN = {
     rk={16,26,36,46,56},
     sid=7294,
     sp="paladin-retribution",
-  },
-  {
-    i="spell_holy_sealoffury",
-    l=16,
-    n={de="Zorn der Gerechtigkeit",en="Righteous Fury"},
-    rk={16},
-    sid=25780,
-    sp="paladin-protection",
   },
   {
     i="spell_holy_sealofvalor",
@@ -261,19 +261,20 @@ ns.Data.Abilities.PALADIN = {
     sp="paladin-holy",
   },
   {
-    i="spell_holy_prayerofhealing02",
-    l=40,
-    n={de="Segen des Lichts",en="Blessing of Light"},
-    rk={40,50,60},
-    sid=19977,
-    sp="paladin-holy",
-  },
-  {
     ft=true,
     i="spell_nature_lightningshield",
     l=40,
     n={en="Blessing of Sanctuary"},
     rk={40,50,60},
+    sp="paladin-protection",
+  },
+  {
+    ft=true,
+    i="spell_holy_blessingofprotection",
+    l=40,
+    n={de="Heiliger Schild",en="Holy Shield"},
+    rk={40,50,60},
+    sid=20925,
     sp="paladin-protection",
   },
   {
@@ -317,15 +318,6 @@ ns.Data.Abilities.PALADIN = {
     sp="paladin-holy",
   },
   {
-    ft=true,
-    i="spell_holy_blessingofprotection",
-    l=50,
-    n={de="Heiliger Schild",en="Holy Shield"},
-    rk={50,60},
-    sid=20925,
-    sp="paladin-protection",
-  },
-  {
     i="spell_holy_excorcism",
     l=50,
     n={de="Heiliger Zorn",en="Holy Wrath"},
@@ -356,14 +348,6 @@ ns.Data.Abilities.PALADIN = {
     rk={60},
     sid=25898,
     sp="paladin-protection",
-  },
-  {
-    i="spell_holy_greaterblessingoflight",
-    l=60,
-    n={de="Großer Segen des Lichts",en="Greater Blessing of Light"},
-    rk={60},
-    sid=25890,
-    sp="paladin-holy",
   },
   {
     i="spell_holy_greaterblessingofsalvation",

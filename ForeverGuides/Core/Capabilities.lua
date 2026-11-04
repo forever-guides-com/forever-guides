@@ -183,6 +183,12 @@ function ns.AddonRestricted(...)
   return false
 end
 
+-- Is the player in combat lockdown? False when the client has no such function.
+function ns.InCombat()
+  local fn = rawget(_G, "InCombatLockdown")
+  return type(fn) == "function" and fn() == true
+end
+
 -- May this addon call protected methods (Show, Hide, SetPoint, ...) on the frame right now? The
 -- silent flag keeps the check itself from raising ADDON_ACTION_BLOCKED. True when unknown.
 function ns.ProtectedAllowed(frame)

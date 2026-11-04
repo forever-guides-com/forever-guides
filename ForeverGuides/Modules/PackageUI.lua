@@ -1,18 +1,12 @@
--- Switching on and loading the add-ons next to this one (Professions, Recipes, GildenManager) from
+-- Switching on and loading the add-ons next to this one (Professions, Recipes, Gathering, GildenManager) from
 -- the place that needs them. U.Enable does the work, U.Banner builds the one line (state text plus
--- button) that pages, windows and the settings show instead of a dead end.
+-- button, layout by ActionBanner) that pages, windows and the settings show instead of a dead end.
 -- Never in combat: EnableAddOn and LoadAddOn are not called then, the button is dimmed.
 local _, ns = ...
 local W, L = ns.W, ns.L
 
 local U = {}
 ns.PackageUI = U
-
-local BUTTON_W = 190
-local BUTTON_H = 24
-local GAP = 8
--- From this width the button sits right of the text, narrower it goes below.
-local SIDE_MIN = 460
 
 ns.AddLocale("enUS", {
   ["pkg.missing"] = "Not installed",
@@ -181,37 +175,6 @@ local function describe(b, state)
   return text, "warning", state == "off" and "pkg.enable" or "pkg.load"
 end
 
--- Places text and button for the given width and returns the height. Also the Stack hook.
-local function fit(b, width)
-  width = math.max(1, width)
-  b.fitWidth = width
-  local text, button = b.text, b.button
-  text:ClearAllPoints()
-  button:ClearAllPoints()
-  if not button:IsShown() then
-    text:SetWidth(width)
-    text:SetPoint("TOPLEFT", 0, 0)
-    local h = math.max(text:GetStringHeight(), 1)
-    b:SetHeight(h)
-    return h
-  end
-  if width >= SIDE_MIN then
-    text:SetWidth(width - BUTTON_W - GAP)
-    local textH = text:GetStringHeight()
-    local h = math.max(textH, BUTTON_H)
-    text:SetPoint("TOPLEFT", 0, -math.floor((h - textH) / 2))
-    button:SetPoint("TOPRIGHT", 0, -math.floor((h - BUTTON_H) / 2))
-    b:SetHeight(h)
-    return h
-  end
-  text:SetWidth(width)
-  text:SetPoint("TOPLEFT", 0, 0)
-  button:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -GAP)
-  local h = text:GetStringHeight() + GAP + BUTTON_H
-  b:SetHeight(h)
-  return h
-end
-
 local function press(b)
   local name = b.pkg
   if U.State(name) == "missing" then
@@ -241,21 +204,16 @@ end
 -- old failure (the settings page calls it on open); Fit(width) -> height for hosts without a stack.
 -- In a Stack it needs nothing else (fgGridLayout).
 function U.Banner(parent, name, opts)
-  local b = CreateFrame("Frame", nil, parent)
-  b.pkg, b.opts, b.wanted = name, opts or {}, true
-  b.text = W.Text(b, { role = "ui", color = "warning", wrap = true })
-  b.button = W.Button(b, {
-    key = "pkg.enable",
-    width = BUTTON_W,
-    height = BUTTON_H,
+  local b
+  b = ns.ActionBanner.New(parent, {
+    buttonKey = "pkg.enable",
+    opens = false,
     onClick = function()
       press(b)
     end,
   })
+  b.pkg, b.opts, b.wanted = name, opts or {}, true
   b.button.fgId = "package-button-" .. name
-  b.fgGridLayout = fit
-  b.Fit = fit
-  b:SetHeight(BUTTON_H)
 
   function b:Update(wanted)
     if wanted ~= nil then
@@ -276,18 +234,15 @@ function U.Banner(parent, name, opts)
     self.button:SetShown(buttonKey ~= nil)
     if buttonKey then
       W.SetText(self.button.label, buttonKey)
+      self.button:SetOpens(buttonKey == "pkg.copy")
       if inCombat() and state ~= "missing" then
         self.button:Disable()
       else
         self.button:Enable()
       end
     end
-    if self.fitWidth then
-      local before = self:GetHeight()
-      fit(self, self.fitWidth)
-      if self.opts.onResize and self:GetHeight() ~= before then
-        self.opts.onResize()
-      end
+    if self:Refit() and self.opts.onResize then
+      self.opts.onResize()
     end
     return true
   end
@@ -298,11 +253,6 @@ function U.Banner(parent, name, opts)
     return self:Update()
   end
 
-  b:HookScript("OnSizeChanged", function(self, width)
-    if width and width > 0 and width ~= self.fitWidth and self:IsShown() then
-      fit(self, width)
-    end
-  end)
   banners[b] = true
   b:Update()
   return b

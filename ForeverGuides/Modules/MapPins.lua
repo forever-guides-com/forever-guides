@@ -182,9 +182,11 @@ end
 --   data()                      the travel data
 --   state                       { start, dest, selected, hover } place slugs
 --   filter()                    returns visible(node), false for a place the filters hide
+--   skip(node)                  optional: true leaves the place off the map, not even dimmed
 --   pos(node)                   x, -y in canvas pixels, nil when the view has no spot for it
 --   name(slug), tip(node)       tooltip title and text
 --   dim()                       dim the hidden places instead of dropping them
+--   faded(node)                 optional: true draws the symbol faded (not yet discovered flight point)
 --   zoomed()                    true inside a zone (every place gets a label then)
 --   symbols(), names()          optional: the switches of the page (nil = on)
 --   scale()                     optional: symbol size in percent (nil = 100)
@@ -251,9 +253,10 @@ function MP.Attach(ctx)
       dim = false
     end
     for _, n in ipairs(data.nodes) do
-      local visible = visibleFn(n)
+      local skipped = ctx.skip ~= nil and ctx.skip(n)
+      local visible = not skipped and visibleFn(n)
       local x, y
-      if visible or dim then
+      if visible or (dim and not skipped) then
         x, y = ctx.pos(n)
       end
       -- Beyond the visible part (plus the room a symbol and its name need) nothing is drawn.
@@ -295,7 +298,7 @@ function MP.Attach(ctx)
       local lift = (it.role == "hover" and 12) or (it.role and 8) or (it.dimmed and 1) or (isCity and 4) or 2
       dot:SetFrameLevel(level + lift)
       dot.filtered = it.dimmed
-      dot.badge:Set(n.k, n.f, size, n.est)
+      dot.badge:Set(n.k, n.f, size, n.est, ctx.faded ~= nil and ctx.faded(n))
       dot.badge:Select(not it.dimmed and st.selected == it.slug)
       dot.badge:Highlight(it.role == "hover" and GLOW_HOVER or (it.role == "selected" and GLOW_SELECTED or 0))
       paintDashed(dot, n.est == true and zoomed and not it.dimmed, dot.badge.token, size)

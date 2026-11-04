@@ -143,6 +143,71 @@ function MP.Contains(shape, x, y)
   return false
 end
 
+-- Keeps the part of the closed ring p (list of { x, y }) on the inner side of one edge of the unit
+-- square; axis picks x (1) or y (2), sign the side (1: above bound, -1: below).
+local function cutEdge(p, axis, bound, sign)
+  local out = {}
+  for i, a in ipairs(p) do
+    local b = p[i % #p + 1]
+    local da, db = sign * (a[axis] - bound), sign * (b[axis] - bound)
+    if da >= 0 then
+      out[#out + 1] = a
+    end
+    if (da >= 0) ~= (db >= 0) then
+      local t = da / (da - db)
+      out[#out + 1] = { a[1] + t * (b[1] - a[1]), a[2] + t * (b[2] - a[2]) }
+    end
+  end
+  return out
+end
+
+-- Area of the shape inside the unit square (the rings are taken as disjoint, like Build does).
+function MP.VisibleArea(shape)
+  local total = 0
+  for _, ring in ipairs(shape and shape.rings or {}) do
+    local pts = {}
+    for i = 1, ring.n do
+      pts[i] = { ring.p[2 * i - 1], ring.p[2 * i] }
+    end
+    for _, e in ipairs({ { 1, 0, 1 }, { 1, 1, -1 }, { 2, 0, 1 }, { 2, 1, -1 } }) do
+      pts = #pts > 0 and cutEdge(pts, e[1], e[2], e[3]) or pts
+    end
+    local twice = 0
+    for i, a in ipairs(pts) do
+      local b = pts[i % #pts + 1]
+      twice = twice + a[1] * b[2] - b[1] * a[2]
+    end
+    total = total + math.abs(twice) / 2
+  end
+  return total
+end
+
+-- The part of the segment inside the unit square (Liang-Barsky); nil when it lies outside.
+-- Returns x1, y1, x2, y2.
+function MP.ClipSegment(x1, y1, x2, y2)
+  local dx, dy = x2 - x1, y2 - y1
+  local t0, t1 = 0, 1
+  for _, e in ipairs({ { -dx, x1 }, { dx, 1 - x1 }, { -dy, y1 }, { dy, 1 - y1 } }) do
+    local p, q = e[1], e[2]
+    if p == 0 then
+      if q < 0 then
+        return nil
+      end
+    else
+      local t = q / p
+      if p < 0 then
+        t0 = math.max(t0, t)
+      else
+        t1 = math.min(t1, t)
+      end
+      if t0 > t1 then
+        return nil
+      end
+    end
+  end
+  return x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy
+end
+
 -- A point that lies inside the shape: the centroid of the largest ring, else the box centre; nil
 -- when neither hits.
 function MP.Anchor(shape)

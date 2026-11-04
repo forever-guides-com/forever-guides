@@ -281,7 +281,7 @@ local eventOwner = {}
 local stats = { hover = 0, down = 0, click = 0, moved = 0, last = "none" }
 -- Main window strata raised for a Blizzard view, restored when that view hides.
 local raised
-local restoreHooked = {}
+local watcher
 
 -- Global or dotted path to a frame, nil when any step is missing.
 local function resolve(path)
@@ -404,10 +404,29 @@ local function restoreStrata()
     pcall(raised.frame.SetFrameStrata, raised.frame, raised.strata)
     raised = nil
   end
+  if watcher then
+    watcher:Hide()
+  end
+end
+
+-- Our own frame polls whether the raising view is still shown: a hook on the Blizzard view (the world
+-- map among them) would run inside its code, and the view stays untouched.
+local function checkRaised()
+  if not (raised and shown(raised.window)) then
+    restoreStrata()
+  end
+end
+
+local function watchWindow()
+  if not watcher then
+    watcher = CreateFrame("Frame")
+    watcher:SetScript("OnUpdate", checkRaised)
+  end
+  watcher:Show()
 end
 
 -- Our window must not open behind the Blizzard view it was opened from: lift it
--- above that view's strata and give it back when the view hides.
+-- above that view's strata and give it back when the view hides. Only our own window changes.
 local function raiseMain(window)
   local frame = ns.Main and ns.Main.frame
   if not frame then
@@ -418,17 +437,16 @@ local function raiseMain(window)
   if not (windowRank and mainRank) or mainRank > windowRank then
     return
   end
-  raised = { frame = frame, strata = STRATA[mainRank] }
+  ns.MapOps.Record("raise main", nameOf(window))
+  raised = { frame = frame, strata = STRATA[mainRank], window = window }
   frame:SetFrameStrata(windowRank < OPEN_RANK and OPEN_STRATA or "TOOLTIP")
   pcall(frame.Raise, frame)
-  if not restoreHooked[window] then
-    restoreHooked[window] = true
-    pcall(window.HookScript, window, "OnHide", restoreStrata)
-  end
+  watchWindow()
 end
 
 -- Shared with the world map integration (WorldMapLinks.lua).
 B.RaiseMain = raiseMain
+B.CheckRaised = checkRaised
 B.LeaveFocusRing = leaveFocusRing
 
 local function openPage(link, window)

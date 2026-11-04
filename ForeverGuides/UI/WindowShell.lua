@@ -6,9 +6,8 @@
 --   local shell = Shell.Attach(frame, { title = "locale.key" | text = "literal",
 --     role = "ui", family = "heading", titleHeight = 22, shadow = true, shadowScale = 1,
 --     active = false, fade = "main" (the stone follows the main window opacity),
---     band = true | false (title strip in the metal band, default true; the main window sets it itself and
---     lays out its page header in the band, UI/MainFrame.lua),
---     bandSize = "main" (the higher band of the main window, default: the band of every other window) })
+--     band = true | false (title strip in the metal bar, default true; the main window sets it itself and
+--     lays out its page header under the bar, UI/MainFrame.lua) })
 --   shell.border      edge object (set(name, alpha), base, colorName) for WindowStyle.Apply
 --   shell.shadow      frame with the drop shadow, nil without shadow = true
 --   shell.titleBar    the title strip (parent of the buttons, drag target), height titleHeight. In the skin
@@ -17,12 +16,17 @@
 --                     anchor RIGHT to their leftmost button
 --   shell.barFill     the strip's fill texture, shell.bars = { barFill } for parts.bars
 --   shell.edge        the overlay frame of the edge, shell.divider the line under the strip
---   shell.band        the metal band the strip sits in (Skins.BandRect), nil while it sits in the window
---   shell.bandFill    texture of the window frame behind the band (color metrics.bar.backdrop), built when the
---                     band is first used, shown only while shell.band is set; below the metal and the strip. It
---                     reaches metrics.bar.bleed under the metal (sides and top), so no clear sliver of the art shows
+--   shell.band        the metal bar the strip sits in (Skins.BandRect), nil while it sits in the window
+--   shell.bandFill    texture of the window frame behind the bar (the dark of the metal, metrics.bar.backdrop), built
+--                     when the bar is first used, shown only while shell.band is set; below the metal and the strip.
+--                     It reaches metrics.bar.bleed under the metal on the sides, so no clear sliver of the art shows,
+--                     and never above or below the bar
 --   Shell.Style(frame, style, parts)   WindowStyle.Apply reports the window's style: a background
 --                            color of its own is kept, the opacity reaches the stone of the skin
+--   Shell.HeadHeight(frame)  height of the title area: the metal bar in the skin "forever", else titleHeight.
+--                            A window with a strip of its own (messenger) anchors its content under this and
+--                            gives `onHead = function(shell)` to Attach to re-anchor when the area changes.
+--   Shell.BarControlSize(frame, natural)   side of a button or logo in the title area, clear of the bar edges
 --   Shell.IsTitleBar(frame)  true for the title strip of a shell (its "x" button is dressed)
 --   Shell.MakeDraggable(frame, handle)   the handle moves the frame (Attach does it for the title strip:
 --                            every window moves by its title bar, a window with drag scripts of its own keeps them)
@@ -36,15 +40,15 @@
 -- Those parts are built when first needed and shown or hidden on every ns.RefreshUI, so a switch
 -- needs no rebuild. Every part has the flat look as its fallback (art missing or an error).
 --
--- Title strip in the metal band (skin "forever", windows with band = true): the strip itself moves, so
+-- Title strip in the metal bar (skin "forever", windows with band = true): the strip itself moves, so
 -- the title, the buttons and every drag, wheel and tooltip script of the window stay where they are
--- anchored (to the strip) and nothing is built twice. The strip spans the band (inset by
--- Skins.list.forever.metrics.bar.margin), its dark fill is hidden (shell.bandFill takes its place), the strip
--- and everything in it are lifted above the edge overlay (the metal would cover them otherwise), the title is
--- capped to the band.
--- The band is as high as metrics.bar says (main window 38, other windows 32 px), whatever the art measures: the metal
--- grows upwards over the window, so the window below keeps its layout and its anchors, the old strip area
--- stays empty stone. Flat undoes all of it.
+-- anchored (to the strip) and nothing is built twice. The strip spans the metal bar at the top of the window
+-- (inset by Skins.list.forever.metrics.bar.margin), its dark fill is hidden (shell.bandFill takes its place), the
+-- strip and everything in it are lifted above the edge overlay (the metal would cover them otherwise), the title is
+-- capped to the bar.
+-- The bar is the visible metal of the top edge (Skins.bandHeight, 18 px at most, never taller than the strip of the
+-- window): it lies inside the top of the window, so the window keeps its size and its anchors. A window whose own
+-- strip is taller than the bar keeps that remainder as plain stone under the bar. Flat undoes all of it.
 --   Shell.SetActive(frame)   makes `frame` the active window: its edge and title are lit, the
 --                            others are dimmed. Happens on OnShow and on every mouse down.
 --   Shell.Of(frame)          the shell of a frame, nil without one
@@ -91,6 +95,11 @@ end
 
 function Shell.IsTitleBar(frame)
   return titleBars[frame] ~= nil
+end
+
+-- The shell whose title strip `frame` is, nil for any other frame.
+function Shell.OfTitleBar(frame)
+  return titleBars[frame]
 end
 
 -- Edge ---------------------------------------------------------------------------------------
@@ -269,7 +278,8 @@ local function paintBandFill(shell)
     return
   end
   local style, WS = shell.style, ns.WindowStyle
-  fill:SetAlpha(style and WS and WS.Edge(style.alpha) or 1)
+  -- style.solidBar: the strip keeps full strength at any opacity (the setup window).
+  fill:SetAlpha(style and WS and not style.solidBar and WS.Edge(style.alpha) or 1)
 end
 
 local function restyleBandFill(shell, band)
@@ -325,6 +335,13 @@ local function restyleBar(shell)
   liftStrip(shell, band ~= nil)
   shell.titleCap = band and band.height - Skins.list.forever.metrics.bar.textPad or nil
   Skins.StyleTitle(shell.titleText, shell.role, shell.family, shell.titleCap)
+  if shell.onHead then
+    -- A window that anchors its content under the title area re-anchors it when that area changes.
+    local ok, err = pcall(shell.onHead, shell)
+    if not ok then
+      ns.Log.warn("title area callback failed: %s", tostring(err))
+    end
+  end
 end
 
 -- Metal frame, flat edge lines and the divider under the title strip.
@@ -338,6 +355,27 @@ local function restyleFrame(shell)
   end
   shell.divider:SetShown(nine == nil)
   paint(shell)
+end
+
+-- Height of the title area of a window: the metal bar while the bar is in use, else the strip (titleHeight). A
+-- window with a title strip of its own anchors its content under this, never under a fixed height.
+function Shell.HeadHeight(frame)
+  local shell = shells[frame]
+  if not shell then
+    return 0
+  end
+  return shell.band and shell.band.height or shell.stripHeight
+end
+
+-- Side of a control in the title area: `natural` in the strip, at most the bar minus the gap above and below it in the
+-- metal bar, so the control stands centered with clear space on both sides.
+function Shell.BarControlSize(frame, natural)
+  local shell = shells[frame]
+  if not (shell and shell.band) then
+    return natural
+  end
+  local bar = Skins.list.forever.metrics.bar
+  return math.min(natural, math.max(12, shell.band.height - 2 * bar.gap))
 end
 
 function Shell.Style(frame, style, parts)
@@ -623,6 +661,7 @@ function Shell.Attach(frame, opts)
   opts = opts or {}
   local shell = { frame = frame, fade = opts.fade, role = opts.role or "ui", family = opts.family or "heading" }
   shell.useBand = opts.band
+  shell.onHead = opts.onHead
   if shell.useBand == nil then
     shell.useBand = opts.fade ~= "main"
   end
@@ -653,7 +692,7 @@ function Shell.Attach(frame, opts)
 
   shell.border, shell.edge, shell.divider = buildEdge(frame, bar)
   -- Read by Skins.bandHeight when the metal frame is first built (the ns.Bind below runs after this line).
-  shell.edge.bandSize = opts.bandSize
+  shell.edge.stripHeight = shell.stripHeight
   -- On the title's own list, after the font of W.Text: the order of two owners is not defined.
   ns.Bind(shell.titleText, function(fs)
     Skins.StyleTitle(fs, shell.role, shell.family, shell.titleCap)

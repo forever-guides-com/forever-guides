@@ -1,0 +1,61 @@
+-- Texts of the teams (ChatTeams.lua): the reasons a change or a message is refused, and the hints the window shows
+-- next to them. Style: docs/TEXT-STIL.md.
+local _, chat = ...
+if not chat.hook then
+  return
+end
+
+chat.FG.AddLocale("enUS", {
+  ["chat.teams.reason.consent"] = "Team chats are off. Turn them on in the tab Share.",
+  ["chat.teams.reason.unavailable"] = "Teams are not ready yet. Try again in a moment.",
+  ["chat.teams.reason.notmember"] = "You are not a member of this team.",
+  ["chat.teams.reason.notadmin"] = "Only admins can do this.",
+  ["chat.teams.reason.empty"] = "There is nothing to send.",
+  ["chat.teams.reason.toolong"] = "The text is too long.",
+  ["chat.teams.reason.utf8"] = "The text has characters that cannot be sent.",
+  ["chat.teams.reason.text"] = "There is no text to send.",
+  ["chat.teams.reason.queuefull"] = "Too many messages are waiting. Try again in a moment.",
+  ["chat.teams.reason.restricted"] = "Too many messages wait for the end of the restriction.",
+  ["chat.teams.reason.full"] = "The limit of teams or members is reached.",
+  ["chat.teams.reason.name"] = "This name cannot be used.",
+  ["chat.teams.reason.icon"] = "This symbol cannot be used.",
+  ["chat.teams.reason.member"] = "This player cannot be invited or is in the team.",
+  ["chat.teams.reason.self"] = "That is you. Use Leave to go.",
+  ["chat.teams.reason.unknown"] = "Not found.",
+  ["chat.teams.reason.lastadmin"] = "A team needs at least one admin.",
+  ["chat.teams.reason.payload"] = "The change could not be sent.",
+  ["chat.teams.state.waiting"] = "Waiting for the end of combat",
+  ["chat.teams.state.queued"] = "Waiting",
+  ["chat.teams.state.partial"] = "Delivered to %d of %d",
+  ["chat.teams.state.complete"] = "Delivered to everyone",
+  ["chat.teams.state.nobody"] = "Nobody is online",
+  ["chat.teams.state.offline"] = "Not online",
+  ["chat.kind.team"] = "Team",
+})
+chat.FG.AddLocale("deDE", {
+  ["chat.teams.reason.consent"] = "Team-Chats sind aus. Im Reiter Teilen einschalten.",
+  ["chat.teams.reason.unavailable"] = "Teams sind noch nicht bereit. Gleich erneut versuchen.",
+  ["chat.teams.reason.notmember"] = "Du bist kein Mitglied dieses Teams.",
+  ["chat.teams.reason.notadmin"] = "Das dürfen nur Admins.",
+  ["chat.teams.reason.empty"] = "Es gibt nichts zu senden.",
+  ["chat.teams.reason.toolong"] = "Der Text ist zu lang.",
+  ["chat.teams.reason.utf8"] = "Der Text hat Zeichen, die sich nicht senden lassen.",
+  ["chat.teams.reason.text"] = "Es ist kein Text zum Senden da.",
+  ["chat.teams.reason.queuefull"] = "Zu viele Nachrichten warten. Gleich erneut versuchen.",
+  ["chat.teams.reason.restricted"] = "Zu viele Nachrichten warten auf das Ende der Einschränkung.",
+  ["chat.teams.reason.full"] = "Die Grenze für Teams oder Mitglieder ist erreicht.",
+  ["chat.teams.reason.name"] = "Dieser Name lässt sich nicht verwenden.",
+  ["chat.teams.reason.icon"] = "Dieses Symbol lässt sich nicht verwenden.",
+  ["chat.teams.reason.member"] = "Dieser Spieler lässt sich nicht einladen oder ist im Team.",
+  ["chat.teams.reason.self"] = "Das bist du. Zum Gehen nutze Verlassen.",
+  ["chat.teams.reason.unknown"] = "Nicht gefunden.",
+  ["chat.teams.reason.lastadmin"] = "Ein Team braucht mindestens einen Admin.",
+  ["chat.teams.reason.payload"] = "Die Änderung ließ sich nicht senden.",
+  ["chat.teams.state.waiting"] = "Wartet auf das Ende des Kampfes",
+  ["chat.teams.state.queued"] = "Wartet",
+  ["chat.teams.state.partial"] = "An %d von %d zugestellt",
+  ["chat.teams.state.complete"] = "An alle zugestellt",
+  ["chat.teams.state.nobody"] = "Niemand ist online",
+  ["chat.teams.state.offline"] = "Nicht online",
+  ["chat.kind.team"] = "Team",
+})

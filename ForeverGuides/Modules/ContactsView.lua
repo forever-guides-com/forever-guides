@@ -234,6 +234,14 @@ function CV.Build(host)
   end
 
   local info = add(ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 6 }))
+  local sharing = Kit.NewSharing(view.content, "group", "social", function()
+    if host.container:IsVisible() then
+      refresh()
+    end
+  end)
+  for _, entry in ipairs(sharing.items) do
+    add(entry.frame, entry.opts)
+  end
   local controls = Kit.NewFlow(view.content)
   local search = W.EditBox(controls, {
     placeholder = "guild.search",
@@ -362,6 +370,7 @@ function CV.Build(host)
 
   local function fill()
     local source = GD.Source()
+    sharing.Sync(source == nil)
     local rowsOf = source and source.seen() or seen().List()
     info:SetText(
       source and L[source.seenNote]

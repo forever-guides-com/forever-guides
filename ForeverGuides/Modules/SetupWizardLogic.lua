@@ -5,7 +5,7 @@
 --   SW.RegisterStep({ id, order, titleKey, textKey, since = "0.1.0", when = function() end,
 --     closing = true (summary step: shown again whenever another step is new),
 --     layout = { "title", "text", "controls", ... }, blocks = { name = ... },
---     controls = { { type = "toggle" | "dropdown" | "slider" | "custom", key = "settings.x",
+--     controls = { { type = "toggle" | "dropdown" | "slider" | "custom" | "consent", key = "settings.x",
 --     labelKey, hintKey, options = { { value, key|text } }, min, max, step, format(v), invert,
 --     build(view) (custom: adds its own widgets), when(), apply(value),
 --     action = true (custom: a button, not a setting: no change entry, no reset),
@@ -13,6 +13,9 @@
 --
 -- A control exists only while its key has a default in Store.defaults, so a step can be
 -- registered before the module that owns the key. A step without controls is an info step.
+-- A consent control (fn, aud) is no Store key: it reads and writes the send and receive flag of one
+-- sharing function through ns.Consent (account scope, by "wizard"), off by default, and exists only
+-- while the function is available.
 local _, ns = ...
 local U, Store = ns.U, ns.Store
 
@@ -20,7 +23,8 @@ local SW = { steps = {}, VERSION = 1 }
 ns.SetupWizard = SW
 
 local seq = 0
-local TYPES = { toggle = true, dropdown = true, slider = true, custom = true }
+local TYPES = { toggle = true, dropdown = true, slider = true, custom = true, consent = true }
+local DIRECTIONS = { send = true, receive = true }
 
 local function validControl(c)
   if type(c) ~= "table" or not TYPES[c.type] or type(c.key) ~= "string" or c.key == "" then
@@ -32,6 +36,8 @@ local function validControl(c)
     return type(c.options) == "table" and #c.options > 0
   elseif c.type == "custom" then
     return type(c.build) == "function"
+  elseif c.type == "consent" then
+    return type(c.fn) == "string" and c.fn ~= "" and type(c.aud) == "string" and c.aud ~= ""
   end
   return true
 end
@@ -91,6 +97,9 @@ function SW.DefaultOf(path)
 end
 
 function SW.ControlActive(c)
+  if c.type == "consent" then
+    return ns.Consent ~= nil and ns.Consent.IsAvailable(c.fn) and check(c.when)
+  end
   return SW.DefaultOf(c.key) ~= nil and check(c.when)
 end
 
@@ -214,8 +223,22 @@ end
 
 -- Values --------------------------------------------------------------------------------------
 
--- Shown value of a control: its stored value, else the default; toggles can be inverted.
-function SW.Get(c)
+-- The value a session compares: the stored value, for a consent control the letters of the flags that
+-- are on ("", "S", "R" or "SR").
+function SW.Raw(c)
+  if c.type == "consent" then
+    local Consent = ns.Consent
+    return (Consent.Allows(c.fn, "send", c.aud) and "S" or "") .. (Consent.Allows(c.fn, "receive", c.aud) and "R" or "")
+  end
+  return Store.get(c.key)
+end
+
+-- Shown value of a control: its stored value, else the default; toggles can be inverted. A consent
+-- control answers for one direction ("send" or "receive"), off when unknown.
+function SW.Get(c, dir)
+  if c.type == "consent" then
+    return DIRECTIONS[dir] == true and ns.Consent.Allows(c.fn, dir, c.aud) or false
+  end
   local v = Store.get(c.key)
   if v == nil then
     v = SW.DefaultOf(c.key)
@@ -236,8 +259,22 @@ local function runApply(c, value)
 end
 
 -- Stores a shown value (the wizard is the trust boundary: unknown options and non-numbers
--- are refused) and returns whether it was accepted.
-function SW.Put(c, value)
+-- are refused) and returns whether it was accepted. A consent control also needs the direction.
+function SW.Put(c, value, dir)
+  if c.type == "consent" then
+    local Consent = ns.Consent
+    if type(value) ~= "boolean" or not DIRECTIONS[dir] or not Consent then
+      return false
+    end
+    if not Consent.Set(c.fn, dir, c.aud, value, "wizard", "account") then
+      return false
+    end
+    -- The window shows the effective value: an own setting of this character would hide the choice.
+    if Consent.Allows(c.fn, dir, c.aud) ~= value then
+      Consent.Reset(c.fn, dir, c.aud, "wizard")
+    end
+    return true
+  end
   if c.type == "toggle" then
     value = value and true or false
     if c.invert then
@@ -265,13 +302,17 @@ function SW.Put(c, value)
   return true
 end
 
--- Every key any step touches goes back to its Store default, the other settings stay.
+-- Every key any step touches goes back to its Store default, the other settings stay. Sharing goes
+-- fully off: every function is withdrawn (by "wizard", written to the consent log).
 function SW.ResetToDefaults()
-  local count = 0
+  local count, consent = 0, false
   for _, step in ipairs(SW.Steps()) do
     for _, c in ipairs(step.controls) do
       local default = SW.DefaultOf(c.key)
-      if default ~= nil and not c.action then
+      if c.type == "consent" then
+        consent = true
+        count = count + 1
+      elseif default ~= nil and not c.action then
         default = U.copy(default)
         Store.set(c.key, default)
         runApply(c, default)
@@ -279,7 +320,127 @@ function SW.ResetToDefaults()
       end
     end
   end
+  if consent and ns.Consent then
+    ns.Consent.WithdrawAll("wizard")
+  end
   return count
+end
+
+-- Top guard ------------------------------------------------------------------------------------
+-- The window must be clickable at any time: it sits in the highest strata at a high level, and
+-- a guard puts back what the game or another add-on changed. Pure decisions, the UI applies them.
+
+SW.GUARD = { strata = "TOOLTIP", level = 9000, interval = 1, hintSeconds = 20 }
+
+-- The window background is an exact preview of the window opacity of the Settings (percent, 0 = invisible).
+-- Text, buttons, sliders and the title strip are no background and stay fully visible.
+function SW.BackgroundAlpha(percent)
+  local v = tonumber(percent)
+  if not v or v ~= v then
+    return 1
+  end
+  return math.max(0, math.min(1, v / 100))
+end
+
+-- Below this opacity (percent) the look step warns that text can be hard to read.
+SW.LOW_ALPHA = 20
+
+function SW.IsVeryTransparent(percent)
+  local v = tonumber(percent)
+  return v ~= nil and v == v and v < SW.LOW_ALPHA
+end
+
+-- Events that bring the window to the front again while it is open. Names the client does not
+-- know are skipped by the registration.
+SW.GUARD_EVENTS = {
+  "CINEMATIC_START",
+  "CINEMATIC_STOP",
+  "PLAY_MOVIE",
+  "STOP_MOVIE",
+  "LOADING_SCREEN_DISABLED",
+  "PLAYER_ENTERING_WORLD",
+  "UI_SCALE_CHANGED",
+  "DISPLAY_SIZE_CHANGED",
+  "PLAYER_REGEN_ENABLED",
+  "TUTORIAL_TRIGGER",
+  "SHOW_TUTORIAL",
+  "NPE_TUTORIAL_UPDATE",
+}
+
+local STRATA_RANK = {
+  BACKGROUND = 1,
+  LOW = 2,
+  MEDIUM = 3,
+  HIGH = 4,
+  DIALOG = 5,
+  FULLSCREEN = 6,
+  FULLSCREEN_DIALOG = 7,
+  TOOLTIP = 8,
+}
+
+-- What differs from the wanted state, in a fixed order. state: { strata, level (own baseline
+-- or minimum), wantLevel, mouse, alpha (of the whole frame, always full), uiShown }; a missing value is not
+-- judged. The background fill is no part of it: its opacity is the player's choice.
+-- Returns the list of fixes ("strata", "level", "mouse", "alpha") and whether UIParent is hidden
+-- (nothing the window can fix).
+function SW.GuardCheck(state)
+  local fixes = {}
+  if type(state.strata) == "string" and state.strata ~= SW.GUARD.strata then
+    fixes[#fixes + 1] = "strata"
+  end
+  if type(state.level) == "number" and state.level < (state.wantLevel or SW.GUARD.level) then
+    fixes[#fixes + 1] = "level"
+  end
+  if state.mouse == false then
+    fixes[#fixes + 1] = "mouse"
+  end
+  if type(state.alpha) == "number" and state.alpha < 1 then
+    fixes[#fixes + 1] = "alpha"
+  end
+  return fixes, state.uiShown == false
+end
+
+-- counts: { total = n, kinds = { [fix] = n } }; adds the fixes of one check.
+function SW.GuardRecord(counts, fixes)
+  counts.kinds = counts.kinds or {}
+  for _, fix in ipairs(fixes) do
+    counts.total = (counts.total or 0) + 1
+    counts.kinds[fix] = (counts.kinds[fix] or 0) + 1
+  end
+  return counts
+end
+
+function SW.GuardSummary(counts)
+  if not counts or (counts.total or 0) == 0 then
+    return "guard: no correction needed"
+  end
+  local names = {}
+  for _, fix in ipairs({ "strata", "level", "mouse", "alpha" }) do
+    if counts.kinds and counts.kinds[fix] then
+      names[#names + 1] = fix
+    end
+  end
+  return string.format("guard: corrected %d times: %s", counts.total, table.concat(names, ", "))
+end
+
+-- True when a frame at (strata, level) is drawn over the window at (wStrata, wLevel).
+function SW.IsAbove(strata, level, wStrata, wLevel)
+  local a, b = STRATA_RANK[strata], STRATA_RANK[wStrata]
+  if not (a and b and type(level) == "number" and type(wLevel) == "number") then
+    return false
+  end
+  return a > b or (a == b and level > wLevel)
+end
+
+-- True when a frame of w x h covers more than `share` of a screen of sw x sh.
+function SW.CoversScreen(w, h, sw, sh, share)
+  if not (type(w) == "number" and type(h) == "number" and type(sw) == "number" and type(sh) == "number") then
+    return false
+  end
+  if sw <= 0 or sh <= 0 then
+    return false
+  end
+  return (w * h) / (sw * sh) > (share or 0.8)
 end
 
 -- Session ----------------------------------------------------------------------------------------
@@ -303,7 +464,7 @@ function SW.Begin(opts)
   }, Session)
   for _, step in ipairs(steps) do
     for _, c in ipairs(SW.ActiveControls(step)) do
-      session.snapshot[c.key] = Store.get(c.key)
+      session.snapshot[c.key] = SW.Raw(c)
     end
   end
   return session
@@ -347,7 +508,7 @@ function Session:Changes()
   local list = {}
   for _, step in ipairs(self.steps) do
     for _, c in ipairs(SW.ActiveControls(step)) do
-      local old, new = self.snapshot[c.key], Store.get(c.key)
+      local old, new = self.snapshot[c.key], SW.Raw(c)
       if old ~= new and not c.action then
         list[#list + 1] = { control = c, old = old, new = new }
       end

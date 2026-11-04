@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-03.
 -- Spell catalog of GENERAL: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -79,6 +79,13 @@ ns.Data.Spells.GENERAL = {
     k="profession",
     n={de="Rüstungsschmied",en="Armorsmith"},
     rt={de="Fachmann",en="Artisan"},
+  },
+  {
+    fid=133046,
+    id=1259719,
+    k="racial",
+    n={de="Präzision des Handwerkers",en="Artisan's Precision"},
+    rt={de="Passive Volksfähigkeit",en="Racial Passive"},
   },
   {
     fid=466035,
@@ -178,13 +185,6 @@ ns.Data.Spells.GENERAL = {
     sup=1240966,
   },
   {
-    fid=135726,
-    id=20572,
-    k="racial",
-    n={de="Kochendes Blut",en="Blood Fury"},
-    rt={de="Volk",en="Racial"},
-  },
-  {
     fid=136192,
     id=1255241,
     k="profession",
@@ -271,13 +271,6 @@ ns.Data.Spells.GENERAL = {
     id=10656,
     k="profession",
     n={de="Drachenlederverarbeitung",en="Dragonscale Leatherworking"},
-  },
-  {
-    fid=462325,
-    id=1259719,
-    k="racial",
-    n={de="Zorn der Erde",en="Earth Fury"},
-    rt={de="Passive Volksfähigkeit",en="Racial Passive"},
   },
   {
     fid=4630367,
@@ -654,13 +647,6 @@ ns.Data.Spells.GENERAL = {
     n={de="Goblin-Ingenieur",en="Goblin Engineer"},
   },
   {
-    fid=133125,
-    id=20573,
-    k="racial",
-    n={de="Zähigkeit",en="Hardiness"},
-    rt={de="Volk Passiv",en="Racial Passive"},
-  },
-  {
     fid=136065,
     i="spell_nature_naturetouchgrow",
     id=2366,
@@ -945,7 +931,7 @@ ns.Data.Spells.GENERAL = {
     id=1259705,
     k="racial",
     l=1,
-    n={de="Leylinie erschließen",en="Read Leyline"},
+    n={de="Leylinie lesen",en="Read Leyline"},
     rt={de="Volksfähigkeit",en="Racial"},
   },
   {
@@ -963,13 +949,6 @@ ns.Data.Spells.GENERAL = {
     rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
-    fid=132393,
-    id=20574,
-    k="racial",
-    n={de="Wild",en="Savage"},
-    rt={de="Volk Passiv",en="Racial Passive"},
-  },
-  {
     fid=132089,
     i="ability_ambush",
     id=20580,
@@ -977,15 +956,6 @@ ns.Data.Spells.GENERAL = {
     l=1,
     n={de="Schattenmimik",en="Shadowmeld"},
     rt={de="Volk",en="Racial"},
-  },
-  {
-    fid=136082,
-    i="spell_nature_removecurse",
-    id=1299026,
-    k="racial",
-    l=1,
-    n={de="Fluch brechen",en="Shatter Curse"},
-    rt={de="Volksfähigkeit",en="Racial"},
   },
   {
     fid=134366,

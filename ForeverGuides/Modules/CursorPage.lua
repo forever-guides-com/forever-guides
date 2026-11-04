@@ -37,8 +37,11 @@ end
 -- The lines of the built pages, kept weakly: a setting changed anywhere repaints them.
 local lines = setmetatable({}, { __mode = "k" })
 
-ns.On("FG_SETTING_CHANGED", function(_, path)
-  if type(path) == "string" and path:find("^settings%.cursorRing") then
+ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
+  if type(path) ~= "string" then
+    return
+  end
+  if (scope == "char" and path:find("^cursorRing")) or path:find("^settings%.cursorRing") then
     for line in pairs(lines) do
       W.SetText(line, nil, P.LiveText())
     end

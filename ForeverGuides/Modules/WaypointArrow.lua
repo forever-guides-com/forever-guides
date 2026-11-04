@@ -510,6 +510,7 @@ local function create()
     size = GEAR_HIT,
     iconSize = GEAR_SIZE,
     tooltip = "wparrow.gear",
+    opens = true,
     onClick = function()
       WA.OpenLook()
     end,

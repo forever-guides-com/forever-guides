@@ -3,11 +3,26 @@
 -- Draw, the element types paint themselves (types[type].render). Child frames are reused: a frame
 -- of a removed element or of a changed type goes to a pool per type, so repeated calls create
 -- nothing new once the layout has settled.
+--
+-- A group (GroupLogic) is drawn as a frame of its own that holds its children: the children hang on the
+-- group frame and are placed inside its box. While the player is in combat, a change of the structure
+-- (which element hangs on which frame) waits until the combat ends (Deferred), the host draws again then.
+-- Closing up of the children (Reflow) only moves frames of ours.
 local _, ns = ...
 local U, CL = ns.U, ns.CanvasLogic
 
 local CR = {}
 ns.CanvasRender = CR
+
+-- Canvases that show a group whose places change while the game runs (it closes up or sorts), as a weak set.
+-- GroupRuntime watches them; `CR.onLive` (optional) is told when the set changes.
+CR.live = setmetatable({}, { __mode = "k" })
+
+-- A group has no look of its own: its frame only sets the box the children are placed in.
+local GROUP = "group"
+local GROUP_TYPE = {
+  render = function() end,
+}
 
 -- Width and height of the frame of an element that sizes itself (w = 0) until its type measures it.
 local AUTO = 1
@@ -29,12 +44,14 @@ local function number(v, default, lo, hi)
   return finite(v) and U.clamp(v, lo, hi) or default
 end
 
--- The drawing state kept on the canvas frame: items = { [id] = { frame, type, def } }, pool of
--- frames per type, the background and the four border lines.
+-- The drawing state kept on the canvas frame: items = { [id] = { frame, type, def, parent } }, pool of
+-- frames per type, the background and the four border lines. For groups: `sig` (what hangs on what, as drawn),
+-- `layout` (the layout of the last draw), `placed` (places Reflow set), `order` (last order of a group by
+-- remaining time), `deferred` (a draw waits for the end of combat).
 local function stateOf(canvas)
   local state = canvas.fgCanvas
   if not state then
-    state = { items = {}, pool = {}, edges = {} }
+    state = { items = {}, pool = {}, edges = {}, placed = {}, order = {} }
     canvas.fgCanvas = state
   end
   return state
@@ -48,7 +65,7 @@ end
 
 -- Background and border of the canvas from layout.canvas.
 local function drawCanvas(canvas, state, cv)
-  local def = CL.Kind(cv) == "cursor" and CL.CANVAS_CURSOR or CL.CANVAS
+  local def = CL.CanvasDefaults(CL.Kind(cv))
   local w = number(cv.w, def.w, CL.MIN_CANVAS, CL.MAX_CANVAS)
   local h = number(cv.h, def.h, CL.MIN_CANVAS, CL.MAX_CANVAS)
   canvas:SetSize(w, h)
@@ -110,15 +127,41 @@ local function release(state, id)
   pool[#pool + 1] = item.frame
 end
 
-local function acquire(canvas, state, id, kind, def)
+-- Whether the player is in combat or the game withholds aura values: no frame changes its parent then.
+local function restricted()
+  local AN = ns.AuraNative
+  if AN and AN.Restricted then
+    local ok, value = pcall(AN.Restricted)
+    return ok and value == true
+  end
+  local ok, value = pcall(InCombatLockdown)
+  return ok and value == true
+end
+
+-- The frame of an element: the one it had (when it still hangs on `parent`), else one of the pool of its type,
+-- else a new one. In combat a pooled frame is only taken when it already hangs on `parent`.
+local function acquire(state, id, kind, def, parent, locked)
   local item = state.items[id]
-  if item and item.type == kind then
+  if item and item.type == kind and item.frame:GetParent() == parent then
     item.def = def
     return item.frame
   end
   release(state, id)
   local pool = state.pool[kind]
-  local frame = pool and table.remove(pool) or CreateFrame("Frame", nil, canvas)
+  local frame
+  for i = pool and #pool or 0, 1, -1 do
+    if not locked or pool[i]:GetParent() == parent then
+      frame = table.remove(pool, i)
+      break
+    end
+  end
+  if frame then
+    if frame:GetParent() ~= parent then
+      frame:SetParent(parent)
+    end
+  else
+    frame = CreateFrame("Frame", nil, parent)
+  end
   state.items[id] = { frame = frame, type = kind, def = def }
   return frame
 end
@@ -132,63 +175,129 @@ end
 -- sources; release stops them. ctx goes to every render unchanged (nil becomes an empty table). An element with
 -- w = 0 gets a frame of 1 x h and its type sets the real width. Returns { [id] = element frame }
 -- of the drawn elements (visible ones only), read only.
+-- Elements of type "group" are drawn without an entry in `types`; their children (`group` = the id of the group)
+-- hang on the group frame, in the order of their slots, and the frame levels run on over the whole picture
+-- (group, its children, next element). A child of a group that is missing or hidden is not drawn.
+-- In combat a change of what hangs on what is not applied: the frames stay as they are, Deferred says so and the
+-- host draws again after the combat.
 function CR.Draw(canvas, layout, types, ctx)
   local state = stateOf(canvas)
   ctx = ctx or {}
   types = types or {}
   layout = type(layout) == "table" and layout or {}
   drawCanvas(canvas, state, type(layout.canvas) == "table" and layout.canvas or {})
-  local order = {}
+  local top, kids, byId = {}, {}, {}
   for i, el in ipairs(type(layout.elements) == "table" and layout.elements or {}) do
     if type(el) == "table" and type(el.id) == "string" and type(el.type) == "string" then
-      order[#order + 1] = { el = el, i = i, z = number(el.z, 0, -CL.MAX_Z, CL.MAX_Z) }
+      byId[el.id] = byId[el.id] or el
+      top[#top + 1] = { el = el, i = i, z = number(el.z, 0, -CL.MAX_Z, CL.MAX_Z) }
     end
   end
-  table.sort(order, function(a, b)
+  local roots = {}
+  for _, entry in ipairs(top) do
+    local group = type(entry.el.group) == "string" and byId[entry.el.group] or nil
+    if group and group ~= entry.el and group.type == GROUP then
+      kids[group.id] = kids[group.id] or {}
+      table.insert(kids[group.id], entry)
+      entry.slot = number(entry.el.slot, math.huge, -CL.MAX_Z, CL.MAX_Z)
+    else
+      roots[#roots + 1] = entry
+    end
+  end
+  table.sort(roots, function(a, b)
     if a.z ~= b.z then
       return a.z < b.z
     end
     return a.i < b.i
   end)
-  local base = canvas:GetFrameLevel() + 1
-  local frames, seen = {}, {}
-  for rank, entry in ipairs(order) do
-    local el = entry.el
-    local def = types[el.type]
-    if not seen[el.id] and type(def) == "table" and type(def.render) == "function" then
-      seen[el.id] = true
-      if el.visible ~= false then
-        local frame = acquire(canvas, state, el.id, el.type, def)
-        local point = CL.POINTS[1]
-        for _, p in ipairs(CL.POINTS) do
-          if p == el.point then
-            point = p
-          end
-        end
-        frame:ClearAllPoints()
-        frame:SetPoint(
-          point,
-          canvas,
-          point,
-          number(el.x, 0, -CL.MAX_OFFSET, CL.MAX_OFFSET),
-          number(el.y, 0, -CL.MAX_OFFSET, CL.MAX_OFFSET)
-        )
-        local w = number(el.w, 0, 0, CL.MAX_SIZE)
-        frame:SetSize(w > 0 and w or AUTO, number(el.h, 16, 1, CL.MAX_SIZE))
-        frame:SetFrameLevel(base + rank)
-        frame:Show()
-        ns.Safe("canvas.render." .. el.type, def.render, frame, el, ctx)
-        local item = state.items[el.id]
-        if not item.driven then
-          item.driven = true
-          if type(def.drive) == "function" then
-            ns.Safe("canvas.drive." .. el.type, def.drive, frame, el, ctx)
-          end
-        end
-        frames[el.id] = frame
-      else
-        release(state, el.id)
+  for _, list in pairs(kids) do
+    table.sort(list, function(a, b)
+      if a.slot ~= b.slot then
+        return a.slot < b.slot
       end
+      return a.i < b.i
+    end)
+  end
+  -- The plan: every element that is drawn or taken out, in drawing order, with its place in the tree.
+  local plan, seen, rank = {}, {}, 0
+  local function walk(entry, parent)
+    rank = rank + 1
+    local el = entry.el
+    local def = el.type == GROUP and (types[GROUP] or GROUP_TYPE) or types[el.type]
+    if seen[el.id] or type(def) ~= "table" or type(def.render) ~= "function" then
+      return
+    end
+    seen[el.id] = true
+    local item = { el = el, def = def, rank = rank, parent = parent, show = el.visible ~= false }
+    plan[#plan + 1] = item
+    if item.show and el.type == GROUP then
+      for _, kid in ipairs(kids[el.id] or {}) do
+        walk(kid, el.id)
+      end
+    end
+  end
+  for _, entry in ipairs(roots) do
+    walk(entry, nil)
+  end
+  local signature, grouped, dynamic = {}, false, false
+  for _, item in ipairs(plan) do
+    if item.show then
+      signature[#signature + 1] = item.el.id .. ":" .. item.el.type .. ":" .. (item.parent or "")
+      grouped = grouped or item.parent ~= nil or item.el.type == GROUP
+      if item.el.type == GROUP then
+        local p = ns.GroupLogic.Clean(item.el.props)
+        dynamic = dynamic or (p.mode ~= "free" and (p.collapse == "readable" or p.sort ~= "manual"))
+      end
+    end
+  end
+  signature = table.concat(signature, ";")
+  local locked = restricted()
+  local frames = {}
+  if locked and (grouped or state.grouped) and state.sig ~= nil and state.sig ~= signature then
+    -- Structure changes wait for the end of the combat.
+    state.deferred = true
+    for id, item in pairs(state.items) do
+      frames[id] = item.frame
+    end
+    return frames
+  end
+  state.deferred, state.sig, state.grouped, state.layout = false, signature, grouped, layout
+  state.placed = {}
+  local base = canvas:GetFrameLevel() + 1
+  for _, item in ipairs(plan) do
+    local el = item.el
+    if item.show then
+      local parentFrame = item.parent and frames[item.parent] or canvas
+      local frame = acquire(state, el.id, el.type, item.def, parentFrame, locked)
+      local point = CL.POINTS[1]
+      for _, p in ipairs(CL.POINTS) do
+        if p == el.point then
+          point = p
+        end
+      end
+      frame:ClearAllPoints()
+      frame:SetPoint(
+        point,
+        parentFrame,
+        point,
+        number(el.x, 0, -CL.MAX_OFFSET, CL.MAX_OFFSET),
+        number(el.y, 0, -CL.MAX_OFFSET, CL.MAX_OFFSET)
+      )
+      local w = number(el.w, 0, 0, CL.MAX_SIZE)
+      frame:SetSize(w > 0 and w or AUTO, number(el.h, 16, 1, CL.MAX_SIZE))
+      frame:SetFrameLevel(base + item.rank)
+      frame:Show()
+      ns.Safe("canvas.render." .. el.type, item.def.render, frame, el, ctx)
+      local entry = state.items[el.id]
+      if not entry.driven then
+        entry.driven = true
+        if type(item.def.drive) == "function" then
+          ns.Safe("canvas.drive." .. el.type, item.def.drive, frame, el, ctx)
+        end
+      end
+      frames[el.id] = frame
+    else
+      release(state, el.id)
     end
   end
   for id in pairs(state.items) do
@@ -196,7 +305,60 @@ function CR.Draw(canvas, layout, types, ctx)
       release(state, id)
     end
   end
+  local live = dynamic and not ctx.editor or nil
+  if (CR.live[canvas] == true) ~= (live == true) then
+    CR.live[canvas] = live
+    if CR.onLive then
+      ns.Safe("canvas.live", CR.onLive, canvas)
+    end
+  end
   return frames
+end
+
+-- Whether the last Draw waited for the end of the combat (the host draws again then).
+function CR.Deferred(canvas)
+  local state = canvas.fgCanvas
+  return state ~= nil and state.deferred == true
+end
+
+-- Applies the places GroupLogic.Reflow computes for the groups of the last drawn layout: the children that are
+-- there close up, a sorting by remaining time keeps the order it had when the fight began. inputs = { occupancy =
+-- { [id] = "yes" | "no" | nil }, readings = { [id] = { active, remaining } }, combat = boolean }. Only SetPoint on
+-- frames of ours, so it runs in combat. Returns the number of frames that moved.
+function CR.Reflow(canvas, layout, inputs)
+  local state = canvas.fgCanvas
+  if not state or type(layout) ~= "table" or type(layout.elements) ~= "table" then
+    return 0
+  end
+  inputs = type(inputs) == "table" and inputs or {}
+  local GL = ns.GroupLogic
+  local moved = 0
+  for _, group in ipairs(layout.elements) do
+    local holder = group.type == GROUP and state.items[group.id] or nil
+    if holder then
+      local frozen = inputs.combat and state.order[group.id] or nil
+      local result = GL.Reflow(layout, group.id, inputs.occupancy, inputs.readings, frozen)
+      if result then
+        if not inputs.combat then
+          state.order[group.id] = result.order
+        end
+        for id, at in pairs(result.pos) do
+          local item = state.items[id]
+          local el = CL.Find(layout, id)
+          if item and el and item.frame:GetParent() == holder.frame then
+            local last = state.placed[id] or { x = el.x, y = -el.y }
+            if math.abs(last.x - at.x) > 0.01 or math.abs(last.y - at.y) > 0.01 then
+              item.frame:ClearAllPoints()
+              item.frame:SetPoint("TOPLEFT", holder.frame, "TOPLEFT", at.x, -at.y)
+              state.placed[id] = { x = at.x, y = at.y }
+              moved = moved + 1
+            end
+          end
+        end
+      end
+    end
+  end
+  return moved
 end
 
 -- The frame an element was drawn into (nil when it is hidden or was not drawn).
@@ -224,6 +386,14 @@ function CR.Clear(canvas)
   end
   for id in pairs(state.items) do
     release(state, id)
+  end
+  state.sig, state.grouped, state.deferred, state.layout = nil, false, false, nil
+  state.placed, state.order = {}, {}
+  if CR.live[canvas] then
+    CR.live[canvas] = nil
+    if CR.onLive then
+      ns.Safe("canvas.live", CR.onLive, canvas)
+    end
   end
   if state.bg then
     state.bg:Hide()

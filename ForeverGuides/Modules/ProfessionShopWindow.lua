@@ -27,6 +27,7 @@ local COL_DEL, COL_TOTAL, COL_PRICE, COL_SOURCE, COL_PROG = 22, 64, 64, 88, 84
 local NAME_ROOM = 100 -- the least width the item name keeps when the window grows for the amounts
 local GAP = 4 -- empty space at the left of a slot
 local MAG = 12 -- the magnifier that says "a click searches"
+local WHO = 18 -- the button "who in the guild can make it"
 local INDENT = 12 -- per level of a material under a crafted item
 local STEP = 16
 -- The amount field must show four digits at any font size: width of a digit as a share of the font size
@@ -451,9 +452,12 @@ local function layoutCells(row, width)
   row.name:SetJustifyH(cols.name.justify)
   row.name.fgJustify = cols.name.justify
   if row.mag then
-    row.name:SetWidth(math.max(20, room - MAG - 4))
+    local who = row.who:IsShown() and WHO + 4 or 0
+    row.name:SetWidth(math.max(20, room - MAG - 4 - who))
     row.mag:ClearAllPoints()
     row.mag:SetPoint("LEFT", row.name, "RIGHT", 2, 0)
+    row.who:ClearAllPoints()
+    row.who:SetPoint("LEFT", row.mag, "RIGHT", 4, 0)
   else
     row.name:SetWidth(room)
   end
@@ -735,6 +739,9 @@ local function newRow(parent)
   newCells(row)
   -- A magnifier behind the name: a click on the row searches the item in the auction house.
   row.mag = W.Glyph(row, "search", MAG, "textMuted")
+  -- Crafters in the guild for an item that a recipe makes.
+  row.who = ns.CraftersView.Action(row, { size = WHO, id = "shoplist-crafters" })
+  row.who:Hide()
   -- Amount: less, the field, more. Remove sits at the right end.
   row.minus = W.Action(row, { icon = "minus", size = STEP, tooltip = "profshop.qtyDown" })
   row.plus = W.Action(row, { icon = "plus", size = STEP, tooltip = "profshop.qtyUp" })
@@ -899,6 +906,7 @@ local function paintHeader(row, item)
     row[key]:Hide()
   end
   row.craft:Hide()
+  row.who:SetSpell(nil)
   row.priceHit:Hide()
   row.headBg:Show()
   row.head:Show()
@@ -958,6 +966,7 @@ local function paintRow(row, item)
   row.source:SetText(L["profshop.group." .. line.source])
   W.SetColor(row.source, item.craftable and "accent2" or "textSecondary")
   row.craft:SetShown(item.craftable)
+  row.who:SetSpell(ns.CraftersView.SpellOfItem(line.id))
   -- Prices of the auction house carry a marker when they are old or come from the price add-on.
   local priceInfo = line.price and line.source == "auction" and S.PriceInfo(line.id) or nil
   row.price:SetText(money(line.price) .. S.PriceMark(priceInfo))
@@ -1226,7 +1235,7 @@ local function create()
       f:Hide()
     end)
   )
-  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title" })
+  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title", opens = true })
   f.look:SetPoint("RIGHT", f.close, "LEFT", -2, 0)
   f.look:SetScript(
     "OnClick",
@@ -1234,7 +1243,7 @@ local function create()
       SW.OpenLook()
     end)
   )
-  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "profshop.openPage" })
+  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "profshop.openPage", opens = true })
   f.open:SetPoint("RIGHT", f.look, "LEFT", -2, 0)
   f.open:SetScript(
     "OnClick",
@@ -1312,6 +1321,7 @@ local function create()
     label = "act.text",
     icon = "copy",
     tooltip = "profshop.copy",
+    opens = true,
     onClick = function()
       showCopy(false)
     end,

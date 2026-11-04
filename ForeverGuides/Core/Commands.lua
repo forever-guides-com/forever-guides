@@ -68,7 +68,7 @@ add({
   area = "general",
   public = false,
   names = { "diag" },
-  usage = "/fg diag",
+  usage = "/fg diag [chat | frame]",
   page = "help",
   control = "help.diagButton",
   exec = "diag",
@@ -101,7 +101,7 @@ add({
   example = { en = "/fg setup", de = "/fg einrichtung" },
   public = true,
   names = { "setup", "einrichtung", "install", "installer", "assistent" },
-  usage = "/fg setup [new]",
+  usage = "/fg setup [new | close | skip | diag]",
   page = "settings",
   control = "setup.start",
   exec = "setup",
@@ -227,6 +227,28 @@ add({
   exec = "mauszeiger",
 })
 add({
+  id = "farmhud",
+  area = "map",
+  example = { en = "/fg farmhud", de = "/fg farmhud" },
+  public = true,
+  names = { "farmhud", "farmmodus" },
+  usage = "/fg farmhud [an | aus]",
+  page = "settings",
+  control = "farmhud.set.enabled",
+  exec = "farmhud",
+})
+add({
+  id = "areas",
+  area = "tools",
+  example = { en = "/fg hudwindow new", de = "/fg hudfenster neu" },
+  public = true,
+  names = { "hudfenster", "hudwindow", "hudwindows", "tracker", "bereich", "area", "areas", "bereiche" },
+  usage = "/fg hudfenster [neu [Name] | bearbeiten <Name> | duplizieren <Name> | zeigen [Name] | verstecken [Name] | sperren [Name] | entsperren [Name] | löschen <Name> | liste | kopieren <von> <nach>]",
+  page = "areas",
+  control = "areas.set.new",
+  exec = "hudfenster liste",
+})
+add({
   id = "einkauf",
   area = "professions",
   example = { en = "/fg shopping", de = "/fg einkauf" },
@@ -282,6 +304,27 @@ add({
   exec = "autoquest list",
 })
 add({
+  id = "chathistory",
+  area = "guild",
+  example = { en = "/fg chathistory", de = "/fg chatverlauf" },
+  public = true,
+  names = { "chatverlauf", "chathistory" },
+  usage = "/fg chatverlauf [loeschen|clear]",
+  page = "settings",
+  control = "chathistory.set.heading",
+  exec = "chatverlauf",
+})
+add({
+  id = "chat",
+  area = "guild",
+  example = { en = "/fg chat", de = "/fg nachrichten" },
+  public = true,
+  names = { "chat", "nachrichten" },
+  usage = "/fg chat [toggle | open | close] (also /fgchat)",
+  page = "settings",
+  control = "subaddon.chat.title",
+})
+add({
   id = "fenster",
   area = "general",
   example = { en = "/fg windows list", de = "/fg fenster list" },
@@ -301,6 +344,26 @@ add({
   usage = "/fg flugtimer",
   page = "settings",
   control = "flighttimer.enable",
+})
+add({
+  id = "flightpoints",
+  area = "map",
+  example = { en = "/fg flights 8", de = "/fg flugpunkte 8" },
+  public = true,
+  names = { "flugpunkte", "flights" },
+  usage = "/fg flugpunkte [3-10]",
+  page = "settings",
+  control = "fp.set.listCount",
+})
+add({
+  id = "guildmap",
+  area = "guild",
+  example = { en = "/fg guildmap", de = "/fg gildenkarte" },
+  public = true,
+  names = { "gildenkarte", "guildmap" },
+  usage = "/fg gildenkarte",
+  page = "settings",
+  control = "guildmap.set.showWorld",
 })
 add({
   id = "route",
@@ -517,6 +580,17 @@ add({
   exec = "proftrainers",
 })
 add({
+  id = "gathering",
+  area = "professions",
+  example = { en = "/fg ore copper", de = "/fg erze kupfer" },
+  public = true,
+  names = { "erze", "kraeuter", "kräuter", "sammelpunkte", "gathering", "nodes", "farmen", "farm", "ore", "herbs" },
+  usage = "/fg ore [item]",
+  page = "gathering",
+  control = "page.gathering",
+  exec = "gathering",
+})
+add({
   id = "guild",
   area = "guild",
   example = { en = "/fg guild", de = "/fg gilde" },
@@ -624,6 +698,7 @@ C.PAGE_AREA = {
   professions = "professions",
   professionroute = "professions",
   proftrainers = "professions",
+  gathering = "professions",
   chars = "character",
   character = "character",
   inspect = "character",
@@ -637,6 +712,7 @@ C.PAGE_AREA = {
   durability = "tools",
   xpbar = "tools",
   cursor = "tools",
+  areas = "tools",
   macros = "tools",
 }
 for page, area in pairs(C.PAGE_AREA) do
@@ -686,6 +762,8 @@ C.bindings.FOREVERGUIDES_ROUTE = { page = "map", control = "map.rb.open" }
 C.bindings.FOREVERGUIDES_WEAPONS = { page = "weapons", control = "page.weapons" }
 C.bindings.FOREVERGUIDES_TRAINERS = { page = "trainers", control = "page.trainers" }
 C.bindings.FOREVERGUIDES_SHARE = { page = "notes", control = "notes.act.share" }
+C.bindings.FOREVERGUIDES_CHAT = { page = "settings", control = "subaddon.chat.title" }
+C.bindings.FOREVERGUIDES_CHAT_REPLY = { page = "settings", control = "subaddon.chat.title" }
 C.bindings.FOREVERGUIDES_WAYPOINT_NEXT = { page = "waypoints", control = "wp.next" }
 C.bindings.FOREVERGUIDES_WAYPOINT_ARROW = { page = "waypoints", control = "wp.set.arrow" }
 C.bindings.FOREVERGUIDES_WAYPOINT_HERE = { page = "waypoints", control = "wp.here" }
@@ -693,6 +771,7 @@ C.bindings.FOREVERGUIDES_CALC = { page = "calc", control = "page.calc" }
 C.bindings.FOREVERGUIDES_DURABILITY = { page = "durability", control = "page.durability" }
 C.bindings.FOREVERGUIDES_XPBAR = { page = "xpbar", control = "xpbar.set.show" }
 C.bindings.FOREVERGUIDES_CURSORRING = { page = "cursor", control = "cursor.set.enabled" }
+C.bindings.FOREVERGUIDES_FARMHUD = { page = "settings", control = "farmhud.set.enabled" }
 
 local EN = {}
 local DE = {}
@@ -733,6 +812,22 @@ desc(
   "Mauszeiger-Ring: schaltet den Ring um, der dem Zeiger folgt. Auch an, aus, edit, reset."
 )
 desc(
+  "farmhud",
+  "Farm HUD: enlarges the real minimap over the screen with your ore and herb pins, toggles it. Also on, off. Never in combat.",
+  "Farm-HUD: vergrößert die echte Minimap über den Bildschirm mit deinen Erz- und Kraut-Pins, schaltet um. Auch an, aus. Nie im Kampf."
+)
+desc(
+  "areas",
+  ns.AreaTerms.Fill(
+    "enUS",
+    "{tracker}: windows of your own for cooldowns and auras, filled from a library of layouts. new, edit, show, hide, lock, unlock, delete, list, layouts, layout (also layout new, layout edit), copy, share."
+  ),
+  ns.AreaTerms.Fill(
+    "deDE",
+    "{tracker}: eigene Fenster für Abklingzeiten und Auren, gefüllt aus einer Bibliothek von Layouts. neu, bearbeiten, zeigen, verstecken, sperren, entsperren, löschen, liste, layouts, layout (auch layout neu, layout bearbeiten), kopieren, teilen."
+  )
+)
+desc(
   "einkauf",
   "Shopping list window of the profession route, optional profession.",
   "Einkaufsliste der Berufsroute, optional Beruf."
@@ -759,9 +854,29 @@ desc(
 )
 desc("lfg", "Show/hide the filter panel at the group finder.", "Filter-Panel an der Gruppensuche ein-/ausblenden.")
 desc(
+  "chathistory",
+  "Chat history status: lines per window, whispers, size. clear deletes the history after asking.",
+  "Chat-Verlauf: Zeilen je Fenster, Flüstern, Größe. loeschen löscht den Verlauf nach Rückfrage."
+)
+desc(
+  "chat",
+  "Open, close or toggle Forever Chat (messenger), also /fgchat and /click FGChatToggleButton. Off by default, switch it on under Settings > Addons.",
+  "Forever Chat (Messenger) öffnen, schließen oder umschalten, auch /fgchat und /click FGChatToggleButton. Standardmäßig aus, Einschalten unter Einstellungen > Addons."
+)
+desc(
   "flighttimer",
   "Show/hide a 60 s example flight in the flight timer.",
   "Beispielflug (60 s) im Flug-Timer ein-/ausblenden."
+)
+desc(
+  "flightpoints",
+  "The nearest flight points with distance in chat, optional number (3-10).",
+  "Die nächsten Flugpunkte mit Entfernung im Chat, optional Anzahl (3-10)."
+)
+desc(
+  "guildmap",
+  "List of guild members on the map: zone, age, waypoint, whisper, invite. Toggles the window.",
+  "Liste der Gildenmitglieder auf der Karte: Zone, Alter, Wegpunkt, Flüstern, Einladen. Schaltet das Fenster um."
 )
 desc("route", "Open/close the route window.", "Routen-Fenster öffnen/schließen.")
 desc("share", "Share a note in chat, empty dialog without a title.", "Notiz im Chat teilen, ohne Titel leerer Dialog.")
@@ -781,7 +896,11 @@ desc(
   "Start a tour (default: first steps), else tutorials page.",
   "Tour starten (Standard: Erste Schritte), sonst Tutorials."
 )
-desc("setup", "Open the setup wizard, new: only new steps.", "Öffnet die Einrichtung, new: nur neue Schritte.")
+desc(
+  "setup",
+  "Open the setup wizard, new: only new steps, close/skip: close it without the mouse, diag: report.",
+  "Öffnet die Einrichtung, new: nur neue Schritte, close/skip: ohne Maus schließen, diag: Bericht."
+)
 desc("note", "Manage notes, without arguments the notes page.", "Notizen verwalten, ohne Angabe die Notizen-Seite.")
 desc(
   "draw",
@@ -818,6 +937,11 @@ desc(
   "proftrainers",
   "Profession trainers page with positions, optional profession.",
   "Berufslehrer mit Standorten, optional Beruf."
+)
+desc(
+  "gathering",
+  "Ores and herbs page with zones for the map, optional item.",
+  "Erze und Kräuter mit Gebieten für die Karte, optional Item."
 )
 desc("guild", "Open the guild page.", "Öffnet die Gildenseite.")
 desc("social", "Open the contacts: players you have met.", "Öffnet die Kontakte: Spieler, die du getroffen hast.")
@@ -866,8 +990,8 @@ DE["help.commandRun"] = "Ausführen"
 EN["help.commandRunTip"] = "Runs this command as if typed in chat."
 DE["help.commandRunTip"] = "Führt den Befehl aus, als hättest du ihn im Chat getippt."
 EN["help.bindings"] =
-  "Key bindings: Esc > Options > Key Bindings > AddOns > Forever Guides, none set by default.\nBindable: window, search, compact window, location screenshot, notes, drawings, talent editor, learn list, map, route window, weapon masters, class trainers, share, waypoints, calculator, durability window, experience bar, mouse cursor ring.\nEvery action also has a button in the window."
+  "Key bindings: Esc > Options > Key Bindings > AddOns > Forever Guides, none set by default.\nBindable: window, search, compact window, location screenshot, notes, drawings, talent editor, learn list, map, route window, weapon masters, class trainers, share, waypoints, calculator, durability window, experience bar, mouse cursor ring, farm HUD.\nEvery action also has a button in the window."
 DE["help.bindings"] =
-  "Tastenbelegung: Esc > Optionen > Tastaturbelegung > AddOns > Forever Guides, standardmäßig leer.\nBelegbar: Fenster, Suche, Kompaktfenster, Orts-Screenshot, Notizen, Zeichnungen, Talent-Editor, Lernliste, Karte, Routen-Fenster, Waffenmeister, Klassenlehrer, Teilen, Wegpunkte, Rechner, Haltbarkeits-Fenster, Erfahrungsleiste, Mauszeiger-Ring.\nJede Aktion gibt es auch als Knopf im Fenster."
+  "Tastenbelegung: Esc > Optionen > Tastaturbelegung > AddOns > Forever Guides, standardmäßig leer.\nBelegbar: Fenster, Suche, Kompaktfenster, Orts-Screenshot, Notizen, Zeichnungen, Talent-Editor, Lernliste, Karte, Routen-Fenster, Waffenmeister, Klassenlehrer, Teilen, Wegpunkte, Rechner, Haltbarkeits-Fenster, Erfahrungsleiste, Mauszeiger-Ring, Farm-HUD.\nJede Aktion gibt es auch als Knopf im Fenster."
 ns.AddLocale("enUS", EN)
 ns.AddLocale("deDE", DE)

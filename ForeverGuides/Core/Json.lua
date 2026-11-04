@@ -7,8 +7,10 @@ ns.Json = Json
 
 local ESCAPES = { ['"'] = '\\"', ["\\"] = "\\\\", ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t" }
 
+-- A "|" is written as the unicode escape 007c: text shown in an edit box would read it as the start of a colour,
+-- texture or link code.
 local function encodeString(s)
-  return '"' .. s:gsub('[%c"\\]', function(c)
+  return '"' .. s:gsub('[%c"\\|]', function(c)
     return ESCAPES[c] or string.format("\\u%04x", c:byte())
   end) .. '"'
 end

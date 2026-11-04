@@ -1,6 +1,6 @@
 -- Rules for the writing guild actions, no game calls: which action needs which right, the rank
 -- rules, the pause between two actions, the typed-name check and the local action log
--- (gm.db.log = list of { t, action, name, old, new }, oldest first, at most MAX_LOG entries).
+-- (guild.actions = list of { t, action, name, old, new }, oldest first, at most the setting maxActions).
 -- A check answers { ok = true } or { ok = false, reason = code }; the text of a code is the locale
 -- key "gm.why.<code>". A right that is missing or unknown always means no.
 local _, gm = ...
@@ -13,9 +13,8 @@ local AL = {}
 gm.ActionsLogic = AL
 
 AL.MAX_NOTE = 31
-AL.MAX_LOG = 200
 AL.MAX_TEXT = 60
--- Seconds between two writing actions.
+-- Seconds between two writing actions when no pause is given (the setting pauseSec is the pause in use).
 AL.GAP = 2
 -- Rank indexes of a guild run 0 (master) to 9.
 local MAX_RANK = 9
@@ -56,6 +55,16 @@ AL.REASONS = {
   "failed",
   "unchanged",
   "nameMismatch",
+  "gone",
+  "rankChanged",
+  "alreadyDone",
+  "needCount",
+  "ruleChanged",
+  "rosterStale",
+  "rankMismatch",
+  "unverified",
+  "expired",
+  "stopped",
 }
 
 local YES = { ok = true }
@@ -148,12 +157,12 @@ function AL.Lowest(ranks, count)
 end
 
 -- Seconds left until the next writing action may run, 0 when it may run now. A clock that went
--- back never blocks.
-function AL.Wait(last, now)
+-- back never blocks. pause: the pause in seconds (the setting), AL.GAP when missing.
+function AL.Wait(last, now, pause)
   if type(last) ~= "number" or type(now) ~= "number" or now < last then
     return 0
   end
-  return math.max(0, AL.GAP - (now - last))
+  return math.max(0, (type(pause) == "number" and pause or AL.GAP) - (now - last))
 end
 
 -- True when the typed text is the name of the member (case and own realm do not matter).
@@ -172,39 +181,55 @@ local function text(v)
   return type(v) == "string" and PN.Cut(v, AL.MAX_TEXT) or ""
 end
 
-local function trim(list)
-  while #list > AL.MAX_LOG do
-    table.remove(list, 1)
-  end
+-- Results a log entry may carry: the call went out (sent), the roster showed the change (verified) or
+-- did not (mismatch, unverified).
+AL.RESULTS = { sent = true, verified = true, unverified = true, mismatch = true }
+
+local function rankField(v)
+  return type(v) == "number" and v % 1 == 0 and v >= 0 and v <= MAX_RANK and v or nil
+end
+
+-- The optional fields of a run step (rule, result, ranks for the undo) next to the five basic ones.
+local function extras(e, out)
+  out.rule = text(e.rule) ~= "" and text(e.rule) or nil
+  out.result = AL.RESULTS[e.result] and e.result or nil
+  out.from, out.to = rankField(e.from), rankField(e.to)
+  out.undone = e.undone == true or nil
+  return out
 end
 
 -- Drops what SavedVariables left malformed, in place.
-function AL.Clean(db)
+function AL.Clean(guild)
   local clean = {}
-  for _, e in ipairs(type(db.log) == "table" and db.log or {}) do
+  for _, e in ipairs(type(guild.actions) == "table" and guild.actions or {}) do
     if type(e) == "table" and type(e.t) == "number" and e.t == e.t and AL.LOGGED[e.action] and text(e.name) ~= "" then
-      clean[#clean + 1] = { t = e.t, action = e.action, name = text(e.name), old = text(e.old), new = text(e.new) }
+      clean[#clean + 1] =
+        extras(e, { t = e.t, action = e.action, name = text(e.name), old = text(e.old), new = text(e.new) })
     end
   end
-  trim(clean)
-  db.log = clean
-  db.dryRun = db.dryRun == true
+  guild.actions = gm.GuildStore.Trim(clean, gm.GuildStore.Limit(guild, "maxActions"))
+  -- Anything but a real boolean falls back to the safe default (dry run on).
+  if type(guild.settings.dryRun) ~= "boolean" then
+    guild.settings.dryRun = gm.GuildStore.DEFAULTS.dryRun
+  end
 end
 
--- entry: { action, name, old, new }. False for an entry that is not worth a line.
-function AL.Record(db, entry, now)
+-- entry: { action, name, old, new, rule, result, from, to }. False for an entry that is not worth a
+-- line, else true and the stored entry (a later result may be written into it).
+function AL.Record(guild, entry, now)
   if type(entry) ~= "table" or not AL.LOGGED[entry.action] or text(entry.name) == "" then
     return false
   end
-  db.log[#db.log + 1] = {
+  local stored = extras(entry, {
     t = type(now) == "number" and now or 0,
     action = entry.action,
     name = text(entry.name),
     old = text(entry.old),
     new = text(entry.new),
-  }
-  trim(db.log)
-  return true
+  })
+  guild.actions[#guild.actions + 1] = stored
+  gm.GuildStore.Trim(guild.actions, gm.GuildStore.Limit(guild, "maxActions"))
+  return true, stored
 end
 
 -- Newest first. needle: part of the name, the old or new value or the label of the action (label(action)).

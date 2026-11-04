@@ -72,8 +72,12 @@ for i = 1, 13 do
   FT.DEFAULT[#FT.DEFAULT + 1] = "ContainerFrame" .. i
 end
 
--- Frames that must not be touched in combat, whatever IsProtected says.
-FT.PROTECTED = { PlayerSpellsFrame = true, ProfessionsFrame = true }
+-- Frames that must not be touched in combat, whatever IsProtected says. The world map builds its pins
+-- and quest entries from protected calls, which a change of ours (position, zoom) would taint.
+FT.PROTECTED = { PlayerSpellsFrame = true, ProfessionsFrame = true, WorldMapFrame = true }
+
+-- Windows whose hook work waits for the next frame, so it never runs inside the client's own call.
+FT.DEFERRED = { WorldMapFrame = true }
 
 -- Never handled: windows we hang on to ourselves, system dialogs, chat, action bars and unit frames.
 FT.EXCLUDED = {
@@ -802,10 +806,13 @@ end
 -- Export and import ---------------------------------------------------------------------------------
 
 -- Text of the window values: a head line, then one line per window
--- "Name|point|relative frame|relative point|x|y|zoom|opacity", empty fields for what is not set.
+-- "Name;point;relative frame;relative point;x;y;zoom;opacity", empty fields for what is not set.
 -- A window with its own opacity mode gets a ninth field (background or window); older lines have
 -- eight fields and stay valid. Plain text only, nothing of it is ever run.
-FT.EXPORT_HEAD = "FGWIN1"
+-- FGWIN1 separated the fields with "|", which an edit box shows as the start of a colour, texture or link code
+-- (it swallows the next letter, and "||" turns into one bar); it is still read, never written.
+FT.EXPORT_HEAD = "FGWIN2"
+local SEPARATORS = { FGWIN2 = ";", FGWIN1 = "|" }
 FT.IMPORT_MAX_LINES, FT.IMPORT_MAX_CHARS, FT.NAME_MAX = 400, 60000, 80
 
 -- The name of a window or of its maximized state ("WorldMapFrame:max").
@@ -861,7 +868,7 @@ function FT.Export(frames)
         scale and trimmed(scale, 2) or "",
         alpha and tostring(alpha) or "",
         mode,
-      }, "|")
+      }, SEPARATORS[FT.EXPORT_HEAD])
     end
   end
   return table.concat(lines, "\n")
@@ -872,9 +879,9 @@ local function field(s)
 end
 
 -- One line of an import: the entry { name, p, r, rp, x, y, scale, alpha, alphaMode } or nil.
-local function parseLine(line)
+local function parseLine(line, separator)
   local f = {}
-  for part in (line .. "|"):gmatch("([^|]*)|") do
+  for part in (line .. separator):gmatch("([^" .. separator .. "]*)" .. separator) do
     f[#f + 1] = field(part)
   end
   if (#f ~= 8 and #f ~= 9) or not FT.ValidName(f[1]) then
@@ -929,18 +936,19 @@ function FT.ParseImport(text)
   if type(text) ~= "string" or #text > FT.IMPORT_MAX_CHARS then
     return out
   end
-  local byName, seenHead, lines = {}, false, 0
+  local byName, separator, lines = {}, nil, 0
   for line in (text .. "\n"):gmatch("(.-)\r?\n") do
     line = field(line)
     if line ~= "" then
-      if not seenHead then
-        if line ~= FT.EXPORT_HEAD then
+      if not separator then
+        separator = SEPARATORS[line]
+        if not separator then
           return out
         end
-        seenHead, out.head = true, true
+        out.head = true
       else
         lines = lines + 1
-        local item = lines <= FT.IMPORT_MAX_LINES and parseLine(line) or nil
+        local item = lines <= FT.IMPORT_MAX_LINES and parseLine(line, separator) or nil
         if item then
           if byName[item.name] then
             out.entries[byName[item.name]] = item

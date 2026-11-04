@@ -13,9 +13,13 @@ IL.MAX_REPLY = 120
 IL.MAX_LEVEL = 80
 IL.GROUP_SIZE = 5
 IL.RAID_SIZE = 40
+-- Wait per sender in seconds (settings.inviteSenderCooldown, 0 = off) and the requests per minute over all
+-- senders (settings.inviteGlobalLimit, 0 = unlimited). SENDER_WINDOW is the default of the first.
 IL.SENDER_WINDOW = 60
+IL.SENDER_CHOICES = { 0, 15, 30, 60, 120, 300 }
 IL.GLOBAL_WINDOW = 60
-IL.GLOBAL_MAX = 5
+IL.GLOBAL_DEFAULT = 0
+IL.GLOBAL_CHOICES = { 0, 20, 60, 200 }
 IL.LOG_CAP = 50
 IL.MODES = { "everyone", "friends", "guild", "communities", "own", "list" }
 IL.SUGGESTED = "inv, invite"
@@ -143,6 +147,26 @@ end
 
 -- Rate limit ---------------------------------------------------------------------------------------
 
+local function cleanChoice(value, choices, default)
+  local n = tonumber(value)
+  for _, choice in ipairs(choices) do
+    if n == choice then
+      return choice
+    end
+  end
+  return default
+end
+
+-- A stored wait per sender: one of the choices, else the default.
+function IL.CleanCooldown(value)
+  return cleanChoice(value, IL.SENDER_CHOICES, IL.SENDER_WINDOW)
+end
+
+-- A stored limit over all senders: one of the choices, else unlimited.
+function IL.CleanGlobalLimit(value)
+  return cleanChoice(value, IL.GLOBAL_CHOICES, IL.GLOBAL_DEFAULT)
+end
+
 function IL.NewRate()
   return { senders = {}, stamps = {} }
 end
@@ -164,27 +188,43 @@ local function fresh(list, now, window)
   return keep
 end
 
--- One invite per sender and window, GLOBAL_MAX per window over all senders.
-function IL.RateCheck(rate, key, now)
+-- One request per sender and cooldown (0 = no wait), at most `limit` per GLOBAL_WINDOW over all senders (0 = no
+-- limit). Both default to the settings defaults when nil or invalid; the settings are cleaned by the caller.
+function IL.RateCheck(rate, key, now, cooldown, limit)
+  cooldown = tonumber(cooldown)
+  cooldown = cooldown and cooldown >= 0 and cooldown or IL.SENDER_WINDOW
+  limit = tonumber(limit)
+  limit = limit and limit >= 0 and limit or IL.GLOBAL_DEFAULT
   local last = rate.senders[key]
-  if last and now - last < IL.SENDER_WINDOW then
+  if cooldown > 0 and last and now - last < cooldown then
     return false, "rate-sender"
   end
-  if #fresh(rate.stamps, now, IL.GLOBAL_WINDOW) >= IL.GLOBAL_MAX then
+  if limit > 0 and #fresh(rate.stamps, now, IL.GLOBAL_WINDOW) >= limit then
     return false, "rate-global"
   end
   return true
 end
 
+-- Senders are kept as long as the longest choice, whatever the setting is now.
+local KEEP = IL.SENDER_CHOICES[#IL.SENDER_CHOICES]
+
+-- Notes a request that was taken. Also (re)starts the wait of the sender at `now`.
 function IL.RateRecord(rate, key, now)
   rate.stamps = fresh(rate.stamps, now, IL.GLOBAL_WINDOW)
   rate.stamps[#rate.stamps + 1] = now
   for sender, at in pairs(rate.senders) do
-    if now - at >= IL.SENDER_WINDOW then
+    if now - at >= KEEP then
       rate.senders[sender] = nil
     end
   end
   rate.senders[key] = now
+end
+
+-- Starts the wait of a sender again without counting a request (the player declined or closed the window).
+function IL.RateTouch(rate, key, now)
+  if key ~= "" then
+    rate.senders[key] = now
+  end
 end
 
 -- Reply ------------------------------------------------------------------------------------------------
@@ -322,7 +362,7 @@ function IL.Decide(input)
     end
   end
   if input.rate then
-    local ok, reason = IL.RateCheck(input.rate, key, input.now or 0)
+    local ok, reason = IL.RateCheck(input.rate, key, input.now or 0, input.cooldown, input.globalLimit)
     if not ok then
       return no(reason)
     end

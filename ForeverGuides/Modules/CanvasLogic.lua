@@ -8,6 +8,10 @@
 -- canvas to the same anchor of the element. Rectangles for the screen (Rect) use the canvas corner
 -- at the top left as origin and y grows DOWN. Element types are unknown here: `props` is passed
 -- through, unknown types stay in the layout (a newer version may have written them).
+--
+-- Groups (GroupLogic.lua) are ordinary elements of type "group"; a child names its group in `group` and
+-- its place among the siblings in `slot`, and its offsets are measured inside the box of the group
+-- (Rect), AbsRect gives the canvas position.
 local _, ns = ...
 local U, L = ns.U, ns.L
 
@@ -26,13 +30,20 @@ local CL = {
   TOLERANCE = 4,
   COPY_OFFSET = 10,
   CANVAS = { w = 240, h = 60, bg = "000000", bgAlpha = 0.6, borderAlpha = 1 },
-  -- Canvas kinds: "bar" is a window of its own (default), "cursor" a canvas around the mouse cursor.
-  KINDS = { "bar", "cursor" },
+  -- Canvas kinds: "bar" is a window of its own (default), "cursor" a canvas around the mouse cursor, "area" a
+  -- free window of cooldowns and auras (no hotspot, the defaults of a bar).
+  KINDS = { "bar", "cursor", "area" },
   CANVAS_CURSOR = { w = 256, h = 256, bg = "000000", bgAlpha = 0, borderAlpha = 1 },
+  CANVAS_AREA = { w = 240, h = 60, bg = "000000", bgAlpha = 0.6, borderAlpha = 1 },
   -- Hosts of the exchange format and the canvas kind each one accepts.
-  HOSTS = { xpbar = "bar", cursor = "cursor" },
+  HOSTS = { xpbar = "bar", cursor = "cursor", area = "area" },
   DEFAULT_HOST = "xpbar",
   HOT_DEFAULT = 0.5,
+  -- Highest envelope version Import reads. The envelope is 2 only for a layout with groups (Export), so older
+  -- versions refuse such a string instead of drawing the children in the wrong place.
+  MAX_ENVELOPE = 2,
+  -- `fmt` of the exchange data of a layout that needs a version with groups.
+  FORMAT = 2,
   -- Row by row, as the 3 x 3 grid of the editor shows them.
   POINTS = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" },
   ALIGN = { "left", "hcenter", "right", "top", "vcenter", "bottom" },
@@ -321,15 +332,31 @@ local function cleanElement(raw, used, problems, path)
   fix(raw, out, "w", num(raw.w, 0, 0, CL.MAX_SIZE), problems, path)
   fix(raw, out, "h", num(raw.h, 16, 1, CL.MAX_SIZE), problems, path)
   fix(raw, out, "z", num(raw.z, 0, -CL.MAX_Z, CL.MAX_Z), problems, path)
+  -- Group fields only exist on children; GroupLogic checks what they point at.
+  if raw.group ~= nil then
+    fix(raw, out, "group", cleanId(raw.group, nil), problems, path)
+  end
+  if raw.slot ~= nil then
+    fix(raw, out, "slot", finite(raw.slot) and U.clamp(raw.slot, -CL.MAX_Z, CL.MAX_Z) or nil, problems, path)
+  end
   out.visible = out.visible ~= false
   out.props = type(out.props) == "table" and out.props or {}
   return out
 end
 
--- Kind of a canvas or of a layout: "cursor", anything else counts as "bar".
+-- Kind of a canvas or of a layout: "cursor" or "area", anything else counts as "bar".
 function CL.Kind(layoutOrCanvas)
   local canvas = type(layoutOrCanvas) == "table" and (layoutOrCanvas.canvas or layoutOrCanvas) or nil
-  return type(canvas) == "table" and canvas.kind == "cursor" and "cursor" or "bar"
+  local kind = type(canvas) == "table" and canvas.kind or nil
+  return (kind == "cursor" or kind == "area") and kind or "bar"
+end
+
+-- Default canvas of a kind (size, background, border opacity).
+function CL.CanvasDefaults(kind)
+  if kind == "cursor" then
+    return CL.CANVAS_CURSOR
+  end
+  return kind == "area" and CL.CANVAS_AREA or CL.CANVAS
 end
 
 -- The canvas point that sits on the mouse cursor hotspot, in canvas pixels (origin top left, y down).
@@ -338,6 +365,14 @@ function CL.HotPoint(layout)
   local hx = finite(c.hotX) and c.hotX or CL.HOT_DEFAULT
   local hy = finite(c.hotY) and c.hotY or CL.HOT_DEFAULT
   return hx * c.w, hy * c.h
+end
+
+local validators = {}
+
+-- Adds fn(layout, problems): it runs at the end of every Validate on the repaired layout and may change it and
+-- append to the problem list (GroupLogic checks the group references there).
+function CL.OnValidate(fn)
+  validators[#validators + 1] = fn
 end
 
 -- Repairs any value into a usable layout and lists what had to change (keys such as
@@ -363,7 +398,7 @@ function CL.Validate(raw)
   local rawCanvas = type(src.canvas) == "table" and src.canvas or {}
   local cv = plain(rawCanvas) or {}
   local kind = CL.Kind(rawCanvas)
-  local def = kind == "cursor" and CL.CANVAS_CURSOR or CL.CANVAS
+  local def = CL.CanvasDefaults(kind)
   fix(rawCanvas, cv, "kind", kind, problems, "canvas.")
   fix(rawCanvas, cv, "w", num(rawCanvas.w, def.w, CL.MIN_CANVAS, CL.MAX_CANVAS), problems, "canvas.")
   fix(rawCanvas, cv, "h", num(rawCanvas.h, def.h, CL.MIN_CANVAS, CL.MAX_CANVAS), problems, "canvas.")
@@ -396,6 +431,9 @@ function CL.Validate(raw)
   elseif src.elements ~= nil then
     problems[#problems + 1] = "elements"
   end
+  for _, fn in ipairs(validators) do
+    ns.Safe("canvas.validate", fn, out, problems)
+  end
   return out, problems
 end
 
@@ -425,6 +463,16 @@ end
 
 function CL.Copy(layout)
   return U.copy(layout)
+end
+
+-- Whether a layout has a group or a child of one.
+function CL.HasGroups(layout)
+  for _, el in ipairs(type(layout) == "table" and type(layout.elements) == "table" and layout.elements or {}) do
+    if type(el) == "table" and (el.type == "group" or el.group ~= nil) then
+      return true
+    end
+  end
+  return false
 end
 
 -- Elements -------------------------------------------------------------------------------------
@@ -496,10 +544,19 @@ end
 -- Removes an element (table or id). Returns it and its index, nil when it was not there.
 function CL.RemoveElement(layout, ref)
   local el, index = CL.Find(layout, ref)
-  if el then
-    table.remove(layout.elements, index)
-    return el, index
+  if not el then
+    return nil
   end
+  local GL = ns.GroupLogic
+  if GL and el.type == GL.TYPE then
+    -- The children stay: they leave the group where they are.
+    return GL.Remove(layout, el, "dissolve")
+  end
+  table.remove(layout.elements, index)
+  if el.group and GL then
+    GL.Settle(layout)
+  end
+  return el, index
 end
 
 -- Names an element (table or id) with the cleaned `text`. Empty text gives the cleaned `default`, and
@@ -523,25 +580,64 @@ function CL.Rename(layout, ref, text, default)
   return true
 end
 
+-- The name of a copy of `name`: "<name> copy", then "<name> copy 2", "<name> copy 3" while the layout already has
+-- that name. A copy of a copy counts from the original name, so names do not pile up ("Ring copy copy").
+function CL.CopyName(layout, name)
+  local tail = L["canvas.copy"]:format("")
+  local base = name:match("^(.-)" .. tail:gsub("%p", "%%%0") .. "[ ]?%d*$")
+  if base == nil or base == "" then
+    base = name
+  end
+  local taken = {}
+  for _, el in ipairs(layout.elements) do
+    taken[el.name] = true
+  end
+  local n = 1
+  while true do
+    local suffix = n == 1 and tail or (tail .. " " .. n)
+    local candidate = cleanName(base, CL.MAX_NAME - #suffix) .. suffix
+    if not taken[candidate] then
+      return candidate
+    end
+    n = n + 1
+  end
+end
+
 -- Copy of an element on top and a few pixels down and to the right. Same results as AddElement.
 function CL.Duplicate(layout, ref, types)
   local el = CL.Find(layout, ref)
   if not el then
     return nil, "missing"
   end
+  local GL = ns.GroupLogic
+  if GL and el.type == GL.TYPE then
+    return GL.Duplicate(layout, el, types)
+  end
+  if el.group and GL and #GL.Children(layout, el.group) >= GL.MAX_CHILDREN then
+    return nil, "limit"
+  end
   local copy = plain(el)
   copy.id = nil
-  copy.name = cleanName(L["canvas.copy"]:format(el.name), CL.MAX_NAME)
+  copy.name = CL.CopyName(layout, el.name)
   copy.z = nil
   CL.Move(copy, CL.COPY_OFFSET, CL.COPY_OFFSET)
-  return CL.AddElement(layout, copy, types)
+  -- A child is copied into its group, right behind the original.
+  copy.slot = el.group and (el.slot or 0) + 0.5 or nil
+  local clean, why = CL.AddElement(layout, copy, types)
+  if clean and clean.group and GL then
+    GL.Settle(layout)
+  end
+  return clean, why
 end
 
--- Elements from back to front (z ascending, equal z keep their list order).
-function CL.Sorted(layout)
+-- Elements from back to front (z ascending, equal z keep their list order). `scope` narrows the list: nil is every
+-- element, false the ones on the canvas (no group), a group id its children.
+function CL.Sorted(layout, scope)
   local list = {}
   for i, el in ipairs(layout.elements) do
-    list[i] = { el = el, i = i }
+    if scope == nil or (scope == false and el.group == nil) or (scope and el.group == scope) then
+      list[#list + 1] = { el = el, i = i }
+    end
   end
   table.sort(list, function(a, b)
     if a.el.z ~= b.el.z then
@@ -556,13 +652,15 @@ function CL.Sorted(layout)
 end
 
 -- Moves an element in the z order: "up" or "down" one step (up = toward the front), "front" or
--- "back". Renumbers all z to 1..n. Returns true when the order changed.
+-- "back". Renumbers the z of the siblings (the elements of the same group, or the ones on the canvas) to 1..n.
+-- Returns true when the order changed. The order of the children of an arranged group is their slot
+-- (GroupLogic.Reorder).
 function CL.Reorder(layout, ref, action)
   local el = CL.Find(layout, ref)
   if not el then
     return false
   end
-  local list = CL.Sorted(layout)
+  local list = CL.Sorted(layout, el.group or false)
   local from
   for i, item in ipairs(list) do
     if item == el then
@@ -611,12 +709,41 @@ local function widthOf(el, measure)
   return el.w
 end
 
--- Left, top, width and height of an element on the canvas (origin top left, y down).
+-- Width and height of what an element is laid out in: the canvas, or the box of its group.
+local function containerOf(layout, el)
+  local c = layout.canvas
+  if el.group ~= nil then
+    local group = CL.Find(layout, el.group)
+    if group and group ~= el then
+      return { w = group.w, h = group.h }
+    end
+  end
+  return c
+end
+
+-- Left, top, width and height of an element in its container (origin top left, y down). The container is
+-- the canvas, or the box of the group of a child; AbsRect gives canvas coordinates.
 function CL.Rect(layout, el, measure)
   local fx, fy = CL.Fraction(el.point)
-  local c = layout.canvas
+  local c = containerOf(layout, el)
   local w = widthOf(el, measure)
   return fx * (c.w - w) + el.x, fy * (c.h - el.h) - el.y, w, el.h
+end
+
+-- Like Rect, measured from the top left corner of the canvas: the offset of every group around the element
+-- is added.
+function CL.AbsRect(layout, el, measure)
+  local left, top, w, h = CL.Rect(layout, el, measure)
+  local node = el
+  for _ = 1, 4 do
+    local parent = node.group ~= nil and CL.Find(layout, node.group) or nil
+    if not parent or parent == node then
+      break
+    end
+    local l, t = CL.Rect(layout, parent, measure)
+    left, top, node = left + l, top + t, parent
+  end
+  return left, top, w, h
 end
 
 -- Offset an element at `point` needs to have its top left corner at left, top.
@@ -625,9 +752,9 @@ local function offsetFor(c, point, w, h, left, top)
   return left - fx * (c.w - w), fy * (c.h - h) - top
 end
 
--- Puts the top left corner of an element at left, top (canvas coordinates).
+-- Puts the top left corner of an element at left, top (container coordinates, as Rect gives them).
 function CL.Place(layout, el, left, top, measure)
-  local x, y = offsetFor(layout.canvas, el.point, widthOf(el, measure), el.h, left, top)
+  local x, y = offsetFor(containerOf(layout, el), el.point, widthOf(el, measure), el.h, left, top)
   el.x = U.round(U.clamp(x, -CL.MAX_OFFSET, CL.MAX_OFFSET), STEP)
   el.y = U.round(U.clamp(y, -CL.MAX_OFFSET, CL.MAX_OFFSET), STEP)
 end
@@ -655,7 +782,7 @@ function CL.NearestAnchor(layout, el, measure)
   local left, top, w, h = CL.Rect(layout, el, measure)
   local best, bestDist
   for _, point in ipairs(CL.POINTS) do
-    local x, y = offsetFor(layout.canvas, point, w, h, left, top)
+    local x, y = offsetFor(containerOf(layout, el), point, w, h, left, top)
     local dist = x * x + y * y
     if not bestDist or dist < bestDist - 1e-9 then
       best, bestDist = point, dist
@@ -711,13 +838,22 @@ end
 function CL.GuideLines(layout, dragged, tolerance, measure)
   tolerance = finite(tolerance) and U.clamp(tolerance, 0, 64) or CL.TOLERANCE
   local c = layout.canvas
-  local left, top, w, h = CL.Rect(layout, dragged, measure)
+  local left, top, w, h = CL.AbsRect(layout, dragged, measure)
+  -- What moves with the dragged element is no target.
+  local moves = { [dragged.id] = true }
+  for _ = 1, 4 do
+    for _, el in ipairs(layout.elements) do
+      if el.group ~= nil and moves[el.group] then
+        moves[el.id] = true
+      end
+    end
+  end
   -- Targets per axis: { position, span start, span end }.
   local tx = { { 0, 0, c.h }, { c.w / 2, 0, c.h }, { c.w, 0, c.h } }
   local ty = { { 0, 0, c.w }, { c.h / 2, 0, c.w }, { c.h, 0, c.w } }
   for _, el in ipairs(layout.elements) do
-    if el ~= dragged and el.id ~= dragged.id and el.visible ~= false then
-      local l, t, ew, eh = CL.Rect(layout, el, measure)
+    if not moves[el.id] and el ~= dragged and el.visible ~= false then
+      local l, t, ew, eh = CL.AbsRect(layout, el, measure)
       for _, at in ipairs({ l, l + ew / 2, l + ew }) do
         tx[#tx + 1] = { at, t, t + eh }
       end
@@ -761,7 +897,7 @@ function CL.Align(layout, elements, mode, measure)
   local rects = {}
   local box = { l = math.huge, t = math.huge, r = -math.huge, b = -math.huge }
   for i, el in ipairs(elements) do
-    local l, t, w, h = CL.Rect(layout, el, measure)
+    local l, t, w, h = CL.AbsRect(layout, el, measure)
     rects[i] = { l = l, t = t, w = w, h = h }
     box.l, box.t = math.min(box.l, l), math.min(box.t, t)
     box.r, box.b = math.max(box.r, l + w), math.max(box.b, t + h)
@@ -787,7 +923,13 @@ function CL.Align(layout, elements, mode, measure)
       top = box.b - r.h
     end
     local x, y = el.x, el.y
-    CL.Place(layout, el, left, top, measure)
+    -- Place wants container coordinates: take the origin of the group away again.
+    local parent = el.group ~= nil and CL.Find(layout, el.group) or nil
+    local ol, ot = 0, 0
+    if parent and parent ~= el then
+      ol, ot = CL.AbsRect(layout, parent, measure)
+    end
+    CL.Place(layout, el, left - ol, top - ot, measure)
     if el.x ~= x or el.y ~= y then
       moved = moved + 1
     end
@@ -803,14 +945,19 @@ function CL.Clamp(layout, measure)
   c.w = num(c.w, CL.CANVAS.w, CL.MIN_CANVAS, CL.MAX_CANVAS)
   c.h = num(c.h, CL.CANVAS.h, CL.MIN_CANVAS, CL.MAX_CANVAS)
   for _, el in ipairs(layout.elements) do
-    el.w = math.min(el.w, c.w)
-    el.h = math.min(el.h, c.h)
+    -- A child stays inside the box of its group.
+    local box = containerOf(layout, el)
+    el.w = math.min(el.w, box.w)
+    el.h = math.min(el.h, box.h)
     local left, top, w, h = CL.Rect(layout, el, measure)
-    local newLeft = U.clamp(left, 0, math.max(0, c.w - w))
-    local newTop = U.clamp(top, 0, math.max(0, c.h - h))
+    local newLeft = U.clamp(left, 0, math.max(0, box.w - w))
+    local newTop = U.clamp(top, 0, math.max(0, box.h - h))
     if newLeft ~= left or newTop ~= top then
       CL.Place(layout, el, newLeft, newTop, measure)
     end
+  end
+  if ns.GroupLogic then
+    ns.GroupLogic.Normalize(layout)
   end
   return not equal(before, layout)
 end
@@ -908,16 +1055,23 @@ function CL.Unpack(data)
   return CL.Validate(data)
 end
 
--- Host of a layout for the exchange format: "cursor" for a cursor canvas, else "xpbar".
+-- Host of a layout for the exchange format: "cursor" for a cursor canvas, "area" for an area, else "xpbar".
 function CL.HostOf(layout)
-  return CL.Kind(layout) == "cursor" and "cursor" or CL.DEFAULT_HOST
+  local kind = CL.Kind(layout)
+  return kind == "bar" and CL.DEFAULT_HOST or kind
 end
 
 -- Exchange string of a layout (one token), or nil and "too-large" | the reason of Strings.encode. The
 -- envelope names the host (default: by the canvas kind) so another display can refuse it.
 function CL.Export(layout, host)
   local clean = CL.Pack(layout)
-  local s, why = ns.Strings.encode(CL.KIND, clean, nil, type(host) == "string" and host or CL.HostOf(clean))
+  -- Only a layout with groups needs a newer reader: the others stay exactly as before.
+  local groups = CL.HasGroups(clean)
+  if groups then
+    clean.fmt = CL.FORMAT
+  end
+  local s, why =
+    ns.Strings.encode(CL.KIND, clean, nil, type(host) == "string" and host or CL.HostOf(clean), groups and 2 or nil)
   if s and #s > ns.Strings.MAX_INPUT then
     return nil, "too-large"
   end
@@ -925,8 +1079,8 @@ function CL.Export(layout, host)
 end
 
 -- Layout from a pasted exchange string. Returns the layout and the repair list, or nil and
--- "empty" | "too-large" | "decode" | "json" | "shape" | "type" | "version" | "host". With `host` ("xpbar" or
--- "cursor") the string must come from that display: one without a host field counts as "xpbar", and the
+-- "empty" | "too-large" | "decode" | "json" | "shape" | "type" | "version" | "host". With `host` ("xpbar",
+-- "cursor" or "area") the string must come from that display: one without a host field counts as "xpbar", and the
 -- canvas must be of the kind the host draws.
 function CL.Import(text, host)
   local env, why = ns.Strings.decode(text)
@@ -936,10 +1090,13 @@ function CL.Import(text, host)
   if env.type ~= CL.KIND then
     return nil, "type"
   end
-  if env.v > ns.Strings.VERSION then
+  if env.v > CL.MAX_ENVELOPE then
     return nil, "version"
   end
   local layout, problems = CL.Unpack(env.data)
+  if layout then
+    layout.fmt = nil
+  end
   if layout and host ~= nil then
     local from = type(env.host) == "string" and env.host or CL.DEFAULT_HOST
     local kind = CL.HOSTS[host]

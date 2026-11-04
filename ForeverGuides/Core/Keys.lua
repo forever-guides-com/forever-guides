@@ -261,6 +261,8 @@ ns.AddLocale("enUS", {
   ["keys.desc.mapMarker"] = "Sets a marker at the mouse position in any map mode.",
   ["keys.name.windowScale"] = "Windows: change size",
   ["keys.desc.windowScale"] = "On the title bar of our windows: the mouse wheel changes the size.",
+  ["keys.name.windowGear"] = "Pinned windows: gear",
+  ["keys.desc.windowGear"] = "Hold these keys to reach the gear of a pinned window, else the mouse passes through.",
   ["keys.name.frameNativeDrag"] = "Game windows: default drag",
   ["keys.desc.frameNativeDrag"] = "Drag with this key moves a game window without saving its position.",
   ["keys.name.scaleSnap"] = "Game windows: snapped zoom",
@@ -292,6 +294,8 @@ ns.AddLocale("deDE", {
   ["keys.desc.mapMarker"] = "Setzt in jedem Kartenmodus einen Marker an der Mausposition.",
   ["keys.name.windowScale"] = "Fenster: Größe ändern",
   ["keys.desc.windowScale"] = "Auf der Titelleiste unserer Fenster ändert das Mausrad die Größe.",
+  ["keys.name.windowGear"] = "Angepinnt: Zahnrad zeigen",
+  ["keys.desc.windowGear"] = "Diese Tasten halten, um das Zahnrad eines angepinnten Fensters zu erreichen, sonst geht die Maus durch.",
   ["keys.name.frameNativeDrag"] = "Spielfenster: Standard-Ziehen",
   ["keys.desc.frameNativeDrag"] = "Ziehen mit dieser Taste verschiebt ein Spielfenster, ohne die Position zu speichern.",
   ["keys.name.scaleSnap"] = "Spielfenster: Zoom gerastet",
@@ -305,6 +309,7 @@ ns.AddLocale("deDE", {
 K.Register({ id = "sellSwap", area = "merchant", kind = "click", default = "ctrl" })
 K.Register({ id = "mapMarker", area = "map", kind = "leftclick", default = "alt" })
 K.Register({ id = "windowScale", area = "windows", kind = "wheel", default = "ctrl", allowNone = true })
+K.Register({ id = "windowGear", area = "windows", kind = "click", default = "ctrl+shift" })
 K.Register({ id = "frameNativeDrag", area = "windows", kind = "drag", default = "ctrl+shift" })
 K.Register({ id = "scaleSnap", area = "windows", kind = "drag", default = "shift", allowNone = true })
 K.Register({ id = "listToEdge", area = "lists", kind = "click", default = "shift" })

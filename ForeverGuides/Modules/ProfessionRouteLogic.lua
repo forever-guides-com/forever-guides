@@ -137,6 +137,28 @@ function R.Steps(data, skill)
   return out
 end
 
+-- Splits the entries of R.Steps by the skill range from..to into the steps before the range, the
+-- steps the range touches and the steps after it: before, shown, after (entry lists in route order).
+-- The same touch rule as R.Range, so a step 70-75 stays with a start of 74. Without from nothing
+-- lies before, without to nothing lies after.
+function R.Areas(entries, from, to)
+  from = R.Whole(from) or 0
+  to = R.Whole(to) or R.MAX_SKILL
+  local before, shown, after = {}, {}, {}
+  for _, e in ipairs(entries or {}) do
+    local a, b = tonumber(e.step.from) or 0, tonumber(e.step.to) or 0
+    local touched = math.min(b, to) > math.max(a, from) or (a == b and a >= from and a <= to)
+    if touched then
+      shown[#shown + 1] = e
+    elseif b <= from then
+      before[#before + 1] = e
+    else
+      after[#after + 1] = e
+    end
+  end
+  return before, shown, after
+end
+
 -- Index of the current step, nil without steps or when the route is finished.
 function R.CurrentIndex(data, skill)
   for _, e in ipairs(R.Steps(data, skill)) do

@@ -365,6 +365,7 @@ local function protectSection(view)
   local manage = W.Button(view.content, {
     key = "sell.set.protectManage",
     width = 220,
+    opens = true,
     onClick = ns.SellProtect.Open,
   })
   manage.fgId = "sell-protect"

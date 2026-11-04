@@ -27,6 +27,30 @@ ns.AddLocale("enUS", {
   ["invite.set.allow"] = "List, names comma separated",
   ["invite.set.block"] = "Blocked, names comma separated",
   ["invite.set.skipAway"] = "Not while AFK or busy",
+  ["invite.set.cooldown"] = "Wait per sender",
+  ["invite.set.cooldownTip"] = "Pause per sender, also after you decline",
+  ["invite.set.cooldownHint"] = "For this long the add-on ignores another invite request from the same person, also after you declined.",
+  ["invite.set.globalLimit"] = "At most requests per minute",
+  ["invite.set.globalLimitTip"] = "Limit over all senders",
+  ["invite.set.globalLimitHint"] = "Protection against spam, default: unlimited",
+  ["invite.cd.0"] = "Off",
+  ["invite.cd.15"] = "15 seconds",
+  ["invite.cd.30"] = "30 seconds",
+  ["invite.cd.60"] = "60 seconds",
+  ["invite.cd.120"] = "2 minutes",
+  ["invite.cd.300"] = "5 minutes",
+  ["invite.gl.0"] = "Unlimited",
+  ["invite.gl.20"] = "20",
+  ["invite.gl.60"] = "60",
+  ["invite.gl.200"] = "200",
+  ["invite.set.confirmKey"] = "Confirmation key for guild invites",
+  ["invite.set.confirmKeyHint"] = "The key invites the first open ginv player as long as an invite request is open.",
+  ["invite.set.confirmKeyTip"] = "The game only allows the invite on a real click or key press, not automatically.",
+  ["invite.set.style"] = "Look of the invite",
+  ["invite.set.preview"] = "Show preview",
+  ["invite.set.previewCombat"] = "Not possible in combat.",
+  ["invite.style.window"] = "Window (default)",
+  ["invite.style.bar"] = "Bar",
   ["invite.set.log"] = "Last invites",
   ["invite.set.logEmpty"] = "None yet",
   ["invite.mode.everyone"] = "Everyone",
@@ -55,6 +79,11 @@ ns.AddLocale("enUS", {
   ["invite.why.not-leader"] = "Not group leader",
   ["invite.why.rate-sender"] = "Too often",
   ["invite.why.rate-global"] = "Too many invites",
+  ["invite.why.ready"] = "Waiting for your click",
+  ["invite.why.queued"] = "Waiting in line",
+  ["invite.why.waiting"] = "Waiting for the combat to end",
+  ["invite.why.not-in-game"] = "Contact not in the game",
+  ["invite.why.other-client"] = "Other WoW version",
 })
 ns.AddLocale("deDE", {
   ["invite.set.heading"] = "Gruppe und Gilde",
@@ -75,6 +104,30 @@ ns.AddLocale("deDE", {
   ["invite.set.allow"] = "Liste, Namen mit Komma getrennt",
   ["invite.set.block"] = "Gesperrt, Namen mit Komma getrennt",
   ["invite.set.skipAway"] = "Nicht bei AFK oder Beschäftigt",
+  ["invite.set.cooldown"] = "Wartezeit je Absender",
+  ["invite.set.cooldownTip"] = "Pause je Absender, auch nach dem Ablehnen",
+  ["invite.set.cooldownHint"] = "So lange ignoriert das Addon eine erneute Einladungsanfrage derselben Person, auch nachdem du abgelehnt hast.",
+  ["invite.set.globalLimit"] = "Höchstens Anfragen je Minute",
+  ["invite.set.globalLimitTip"] = "Grenze über alle Absender",
+  ["invite.set.globalLimitHint"] = "Schutz vor Spam, Standard: unbegrenzt",
+  ["invite.cd.0"] = "Aus",
+  ["invite.cd.15"] = "15 Sekunden",
+  ["invite.cd.30"] = "30 Sekunden",
+  ["invite.cd.60"] = "60 Sekunden",
+  ["invite.cd.120"] = "2 Minuten",
+  ["invite.cd.300"] = "5 Minuten",
+  ["invite.gl.0"] = "Unbegrenzt",
+  ["invite.gl.20"] = "20",
+  ["invite.gl.60"] = "60",
+  ["invite.gl.200"] = "200",
+  ["invite.set.confirmKey"] = "Bestätigungstaste für Gildeneinladungen",
+  ["invite.set.confirmKeyHint"] = "Die Taste lädt den ersten offenen ginv-Spieler ein, solange eine Einladung offen ist.",
+  ["invite.set.confirmKeyTip"] = "Das Spiel erlaubt die Einladung nur auf einen echten Klick oder Tastendruck, nicht automatisch.",
+  ["invite.set.style"] = "Darstellung der Einladung",
+  ["invite.set.preview"] = "Vorschau zeigen",
+  ["invite.set.previewCombat"] = "Im Kampf nicht möglich.",
+  ["invite.style.window"] = "Fenster (Standard)",
+  ["invite.style.bar"] = "Leiste",
   ["invite.set.log"] = "Letzte Einladungen",
   ["invite.set.logEmpty"] = "Noch keine",
   ["invite.mode.everyone"] = "Jeder",
@@ -103,6 +156,11 @@ ns.AddLocale("deDE", {
   ["invite.why.not-leader"] = "Kein Gruppenleiter",
   ["invite.why.rate-sender"] = "Zu oft",
   ["invite.why.rate-global"] = "Zu viele Einladungen",
+  ["invite.why.ready"] = "Wartet auf deinen Klick",
+  ["invite.why.queued"] = "Wartet in der Schlange",
+  ["invite.why.waiting"] = "Wartet auf das Kampfende",
+  ["invite.why.not-in-game"] = "Kontakt nicht im Spiel",
+  ["invite.why.other-client"] = "Andere WoW-Version",
 })
 
 local SHOWN_LOG = 8
@@ -130,6 +188,11 @@ S.REASONS = {
   "not-leader",
   "rate-sender",
   "rate-global",
+  "ready",
+  "queued",
+  "waiting",
+  "not-in-game",
+  "other-client",
 }
 
 local function cleanWords(text)
@@ -316,6 +379,67 @@ function S.Add(view)
   s:Add(right, { gap = 6 })
   local guildFrames = section(view, "guild")
 
+  local keyOptions = {}
+  for _, key in ipairs(ns.InvitePromptLogic.KEYS) do
+    keyOptions[#keyOptions + 1] = { value = key, key = key == "" and "invite.key.off" or ("invite.key." .. key) }
+  end
+  local keyChoice = W.Dropdown(view.content, {
+    key = "invite.set.confirmKey",
+    tooltip = "invite.set.confirmKey",
+    tooltipText = "invite.set.confirmKeyTip",
+    options = keyOptions,
+    width = 240,
+    get = function()
+      return ns.InvitePromptLogic.CleanKey(ns.db.settings.inviteConfirmKey)
+    end,
+    set = function(v)
+      Store.set("settings.inviteConfirmKey", ns.InvitePromptLogic.CleanKey(v))
+    end,
+  })
+  keyChoice.fgId = "invite-confirmKey"
+  s:Add(keyChoice, { height = 46, width = 240 })
+  local keyHint =
+    W.Text(view.content, { key = "invite.set.confirmKeyHint", role = "micro", color = "textMuted", wrap = true })
+  s:Add(keyHint, { gap = 4 })
+  local keyTaken = W.Text(view.content, { text = "", role = "micro", color = "warning", wrap = true })
+  s:Add(keyTaken, { gap = 6 })
+  guildFrames[#guildFrames + 1] = keyChoice
+  guildFrames[#guildFrames + 1] = keyHint
+  guildFrames[#guildFrames + 1] = keyTaken
+
+  -- The look of the request and a demo of it: players without the developer add-on see it here.
+  local styleOptions = {}
+  for _, style in ipairs(ns.InvitePromptLogic.STYLES) do
+    styleOptions[#styleOptions + 1] = { value = style, key = "invite.style." .. style }
+  end
+  local styleChoice = W.Dropdown(view.content, {
+    key = "invite.set.style",
+    options = styleOptions,
+    width = 240,
+    get = function()
+      return ns.InvitePromptLogic.CleanStyle(ns.db.settings.inviteBarStyle)
+    end,
+    set = function(v)
+      Store.set("settings.inviteBarStyle", ns.InvitePromptLogic.CleanStyle(v))
+    end,
+  })
+  styleChoice.fgId = "invite-style"
+  s:Add(styleChoice, { height = 46, width = 240, gap = 4 })
+  local preview = W.Button(view.content, {
+    key = "invite.set.preview",
+    width = 150,
+    height = 24,
+    onClick = function()
+      local prompt = ns.InvitePrompt
+      local shown = prompt.ShowDemo({ prompt.Style() })
+      if not shown or shown == 0 then
+        ns.Notify(ns.L["invite.set.previewCombat"], "info")
+      end
+    end,
+  })
+  preview.fgId = "invite-preview"
+  s:Add(preview, { height = 24, width = 150, gap = 10 })
+
   ns.AddHeading(view, "invite.set.shared", { role = "ui" })
   textField(view, {
     label = "invite.set.allow",
@@ -343,6 +467,48 @@ function S.Add(view)
   away.fgId = "invite-skipAway"
   s:Add(away, { height = 24, gap = 6 })
 
+  -- Wait per sender and the limit over all senders (Modules/InviteLogic.lua).
+  local function choice(spec)
+    local options = {}
+    for _, value in ipairs(spec.values) do
+      options[#options + 1] = { value = value, key = spec.prefix .. value }
+    end
+    local dropdown = W.Dropdown(view.content, {
+      key = spec.label,
+      tooltip = spec.label,
+      tooltipText = spec.label .. "Tip",
+      options = options,
+      width = 240,
+      get = function()
+        return spec.clean(ns.db.settings[spec.setting])
+      end,
+      set = function(v)
+        Store.set("settings." .. spec.setting, spec.clean(v))
+      end,
+    })
+    dropdown.fgId = spec.id
+    s:Add(dropdown, { height = 46, width = 240, gap = 4 })
+    s:Add(W.Text(view.content, { key = spec.label .. "Hint", role = "micro", color = "textMuted", wrap = true }), {
+      gap = 6,
+    })
+  end
+  choice({
+    label = "invite.set.cooldown",
+    id = "invite-cooldown",
+    setting = "inviteSenderCooldown",
+    values = IL.SENDER_CHOICES,
+    prefix = "invite.cd.",
+    clean = IL.CleanCooldown,
+  })
+  choice({
+    label = "invite.set.globalLimit",
+    id = "invite-globalLimit",
+    setting = "inviteGlobalLimit",
+    values = IL.GLOBAL_CHOICES,
+    prefix = "invite.gl.",
+    clean = IL.CleanGlobalLimit,
+  })
+
   ns.AddHeading(view, "invite.set.log", { role = "ui" })
   local log = W.Text(view.content, { role = "micro", color = "textSecondary", wrap = true })
   s:Add(log)
@@ -355,6 +521,7 @@ function S.Add(view)
       frame:SetAlpha(can and 1 or DIM)
     end
     W.SetText(log, nil, S.LogText())
+    W.SetText(keyTaken, nil, ns.InviteKey.TakenText() or "")
   end
   -- The page repaints the guild note and the log whenever it is shown again.
   function right:Refresh()
@@ -363,6 +530,13 @@ function S.Add(view)
   paint()
   current = { paint = paint, view = view, log = log }
 end
+
+ns.On("FG_SETTING_CHANGED", function(_, path)
+  if path == "settings.inviteConfirmKey" and current then
+    current.paint()
+    current.view.stack:Layout()
+  end
+end)
 
 -- A new log line while the page is open.
 ns.On("FG_INVITE_LOG", function()

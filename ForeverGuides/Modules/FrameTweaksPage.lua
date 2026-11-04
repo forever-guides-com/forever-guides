@@ -666,6 +666,7 @@ local function build(container)
       label = "act.export",
       icon = "export",
       tooltip = "win.export",
+      opens = true,
       onClick = function()
         P.ShowExport()
       end,
@@ -675,6 +676,7 @@ local function build(container)
       label = "act.import",
       icon = "import",
       tooltip = "win.import",
+      opens = true,
       onClick = function()
         P.ShowImport()
       end,

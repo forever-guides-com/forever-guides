@@ -502,6 +502,7 @@ local function routeAction(slug)
     boxed = true,
     tooltip = L["search.act.route"],
     tooltipText = string.format(L["search.act.routeTip"], R.Name(slug)),
+    opens = true,
     onClick = function()
       ns.Router:navigate("professionroute/" .. slug)
     end,
@@ -514,9 +515,24 @@ local function shopAction(slug)
     boxed = true,
     tooltip = L["search.act.shop"],
     tooltipText = string.format(L["search.act.shopTip"], R.Name(slug)),
+    opens = true,
     onClick = function()
       Shop.SetOption("slug", slug)
       ns.ProfessionShopWindow.Open()
+    end,
+  }
+end
+
+-- Who in the guild can make the recipe (the window asks nothing before the player opened it).
+local function craftersAction(spell)
+  return {
+    icon = "search",
+    boxed = true,
+    tooltip = L["cv.button"],
+    tooltipText = L["cv.button.tip"],
+    opens = true,
+    onClick = function()
+      ns.CraftersView.Open(spell)
     end,
   }
 end
@@ -571,6 +587,10 @@ function SP.Row(hit)
     if type(d.id) == "number" then
       actions[#actions + 1] = auctionAction(hit)
     end
+    local spell = ns.CraftersView.SpellOfItem(d.id)
+    if spell then
+      actions[#actions + 1] = craftersAction(spell)
+    end
     local tooltip
     if type(d.id) == "number" then
       -- The client's own item tooltip; the name and professions stand in while it is not cached.
@@ -583,7 +603,12 @@ function SP.Row(hit)
     return { icon = d.icon and ns.ResolveIcon(ICON_DIR .. d.icon) or nil, actions = actions, tooltipSpec = tooltip }
   elseif hit.kind == "recipe" then
     local slug = hit.path and hit.path:match("^professions/([^/]+)")
-    return { icon = slug and recipeIcon(slug, hit.data) or nil, actions = slug and { routeAction(slug) } or {} }
+    local actions = slug and { routeAction(slug) } or {}
+    local spell = tonumber(hit.path and hit.path:match("^professions/[^/]+/(%d+)$"))
+    if spell then
+      actions[#actions + 1] = craftersAction(spell)
+    end
+    return { icon = slug and recipeIcon(slug, hit.data) or nil, actions = actions }
   elseif hit.kind == "professionTrainer" and d then
     return {
       actions = {
@@ -592,6 +617,7 @@ function SP.Row(hit)
           boxed = true,
           tooltip = L["search.act.map"],
           tooltipText = L["search.act.mapTip"],
+          opens = true,
           onClick = function()
             local place = trainerPlace(d)
             if place then

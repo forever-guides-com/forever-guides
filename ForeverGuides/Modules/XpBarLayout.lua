@@ -55,6 +55,8 @@ ns.AddLocale("enUS", {
   ["xpbar.tpl.xph"] = "XP per hour: {xph}",
   ["xpbar.tpl.rested"] = "Rested: {rested} ({rested_pct}%)",
   ["xpbar.tpl.todo"] = "Quests done {done}, open {todo} {overflow}",
+  ["xpbar.tpl.sources"] = "Kills {kill_xp}, quests {quest_xp}, discovery {explore_xp}, other {other_xp}",
+  ["xpbar.tpl.kills"] = "{kills} kills ({kills_per_hour}/h), {xp_per_kill} XP each, {mobs_to_level} to level",
   ["xpbar.el.levelTime"] = "Time on level",
   ["xpbar.el.sessionTime"] = "Session time",
   ["xpbar.el.level"] = "Level",
@@ -66,6 +68,8 @@ ns.AddLocale("enUS", {
   ["xpbar.el.xph"] = "XP per hour",
   ["xpbar.el.rested"] = "Rested",
   ["xpbar.el.todo"] = "Open quests",
+  ["xpbar.el.sources"] = "XP sources",
+  ["xpbar.el.kills"] = "Kills",
   ["xpbar.panel.orient"] = "Direction",
   ["xpbar.panel.orient.horizontal"] = "Horizontal",
   ["xpbar.panel.orient.vertical"] = "Vertical",
@@ -127,6 +131,8 @@ ns.AddLocale("deDE", {
   ["xpbar.tpl.xph"] = "EP pro Stunde: {xph}",
   ["xpbar.tpl.rested"] = "Ausgeruht: {rested} ({rested_pct}%)",
   ["xpbar.tpl.todo"] = "Quests fertig {done}, offen {todo} {overflow}",
+  ["xpbar.tpl.sources"] = "Monster {kill_xp}, Quests {quest_xp}, Entdeckung {explore_xp}, Sonstiges {other_xp}",
+  ["xpbar.tpl.kills"] = "{kills} Monster ({kills_per_hour}/Std), je {xp_per_kill} EP, noch {mobs_to_level} bis zur Stufe",
   ["xpbar.el.levelTime"] = "Zeit der Stufe",
   ["xpbar.el.sessionTime"] = "Sitzungszeit",
   ["xpbar.el.level"] = "Stufe",
@@ -138,6 +144,8 @@ ns.AddLocale("deDE", {
   ["xpbar.el.xph"] = "EP pro Stunde",
   ["xpbar.el.rested"] = "Ausgeruht",
   ["xpbar.el.todo"] = "Offene Quests",
+  ["xpbar.el.sources"] = "EP-Quellen",
+  ["xpbar.el.kills"] = "Monster",
   ["xpbar.panel.orient"] = "Richtung",
   ["xpbar.panel.orient.horizontal"] = "Waagerecht",
   ["xpbar.panel.orient.vertical"] = "Senkrecht",
@@ -859,6 +867,16 @@ end
 -- Values and context --------------------------------------------------------------------------------
 
 -- A level in the middle of the table with a running session: every placeholder has a value.
+-- A session of 45 minutes with kills, a quest and a discovery behind its gain.
+local function sampleSession(max)
+  local gained = math.floor(max * 0.4)
+  local s = XL.SessionNew(0, 0)
+  s.active, s.gained = 2700, gained
+  s.kills, s.kill_xp = 24, math.floor(gained * 0.7)
+  s.quest_xp, s.explore_xp = math.floor(gained * 0.2), math.floor(gained * 0.05)
+  return s
+end
+
 function XB.SampleValues()
   local level = XB.SAMPLE_LEVEL
   local max = ns.XpTable.need[level] or 100000
@@ -870,7 +888,7 @@ function XB.SampleValues()
     doneXp = math.floor(max * 0.18),
     todoXp = math.floor(max * 0.1),
     sizes = XL.Sizes(nil, level, max),
-    session = { active = 2700, since = 0, running = true, gained = math.floor(max * 0.4), startedAt = 0, auto = false },
+    session = sampleSession(max),
     played = { total = 7200, at = 0 },
     levelStart = { [level] = 1800 },
     now = 0,
@@ -971,7 +989,7 @@ local BUILDERS = {
     })
   end,
   detailed = function()
-    return build("detailed", 580, 98, {
+    return build("detailed", 580, 130, {
       el("bar", "bar", "TOPLEFT", 6, -38, 568, 22, { spark = true }),
       text("levelTime", "levelTime", "TOPLEFT", 6, -4, 280),
       text("sessionTime", "sessionTime", "TOPRIGHT", -6, -4, 280, RIGHT),
@@ -983,6 +1001,8 @@ local BUILDERS = {
       text("eta", "eta", "TOPLEFT", 6, -64, 292),
       text("rested", "rested", "TOPRIGHT", -6, -64, 260, RIGHT),
       text("todo", "todo", "TOPLEFT", 6, -80, 0),
+      text("sources", "sources", "TOPLEFT", 6, -96, 0),
+      text("kills", "kills", "TOPLEFT", 6, -112, 0),
     })
   end,
 }

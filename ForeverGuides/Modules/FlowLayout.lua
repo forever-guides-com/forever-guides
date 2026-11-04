@@ -30,7 +30,7 @@ end
 -- runs out. defs = list of { id, key (locale key) or text (literal), onClick, width (minimum
 -- width, default 60), variant, tooltip + tooltipText (locale keys), icon (name of ns.UI_ICONS),
 -- label (short locale key shown next to the icon unless the setting "buttonLabels" is off or the
--- row is too narrow, then the icon stands alone and the tooltip names it), shortcut, shown, enabled (boolean or
+-- row is too narrow, then the icon stands alone and the tooltip names it), shortcut, opens (see W.Action), shown, enabled (boolean or
 -- function returning one), fgId }. opts: gap (8), rowGap (6), height (28, grows with the font
 -- scale). A button wider than the row shrinks to the row, its label is cut with an ellipsis.
 -- Returns the row frame:
@@ -68,6 +68,7 @@ function FL.ButtonRow(parent, defs, opts)
       tooltip = d.tooltip,
       tooltipText = d.tooltipText,
       shortcut = d.shortcut,
+      opens = d.opens,
       onClick = d.onClick,
       wrap = "button",
     })

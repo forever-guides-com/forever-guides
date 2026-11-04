@@ -1,7 +1,8 @@
--- Magnifier of the world view on the map page (100 to 400 percent): the canvas grows inside a
--- clipping viewport and slides under it, so pins, labels, route and zone hit tests keep working
--- in canvas pixels. This file owns the zoom state, the mouse wheel, the drag to pan and the
--- "-" / percent / "+" bar. MapPage.lua hands in the frames and the few things only it knows.
+-- Magnifier of the world view and of the zone view on the map page (100 to 400 percent): the canvas
+-- grows inside a clipping viewport and slides under it, so pins, labels, route and zone hit tests keep
+-- working in canvas pixels. Every view has its own zoom state. This file owns the zoom states, the mouse
+-- wheel, the drag to pan, the keys and the "-" / percent / "+" bar. MapPage.lua hands in the frames and
+-- the few things only it knows.
 local _, ns = ...
 local W, MM = ns.W, ns.MapMarkers
 
@@ -12,6 +13,9 @@ MG.MIN, MG.MAX, MG.STEP = 100, 400, 25
 MG.DRAG_PX = 4 -- cursor travel that turns a press into a drag, a plain click stays a click
 MG.BUTTON, MG.VALUE_W, MG.INSET = 24, 48, 6
 MG.REPAINT_SECONDS = 0.05
+MG.PAN_STEP = 0.1 -- share of the viewport one arrow key moves the map
+-- The views that zoom, each with a state of its own.
+MG.VIEWS = { "world", "zone" }
 
 ns.AddLocale("enUS", {
   ["map.mag.in"] = "Zoom in",
@@ -48,6 +52,20 @@ function MG.New()
   return { percent = MG.MIN, x = 0, y = 0 }
 end
 
+-- Back to 100 percent in place, so everything that holds the state sees it.
+function MG.ResetState(state)
+  state.percent, state.x, state.y = MG.MIN, 0, 0
+end
+
+-- One state per view: { world = state, zone = state }.
+function MG.NewViews()
+  local views = {}
+  for _, key in ipairs(MG.VIEWS) do
+    views[key] = MG.New()
+  end
+  return views
+end
+
 -- Zooms to `percent` and keeps the map point under the anchor (fractions of the viewport) fixed.
 function MG.Zoom(state, percent, ax, ay)
   local old = state.percent / 100
@@ -65,22 +83,35 @@ end
 
 -- ctx = {
 --   viewport, canvas       the clipping frame and the (bigger) map frame inside it
---   active()               true while the world view is shown (the only view that zooms)
+--   view()                 the view that is shown, "world" or "zone" (nil: nothing zooms, like the
+--                          schematic island view)
 --   dragAllowed()          false while a click on the map means something else (marker mode)
 --   changed()              lays the page out again after a zoom step
 --   moved()                repaints what depends on the visible part (pins) while the map is dragged
 -- }
--- Returns the controller: state, Active, Percent, Place, Window, Reset, In, Out, Wheel, WasDrag, bar.
+-- Returns the controller: state (of the shown view), Active, Percent, Place, Window, Reset, ResetView,
+-- In, Out, Wheel, Key, WasDrag, bar.
 function MG.Attach(ctx)
   local viewport, canvas = ctx.viewport, ctx.canvas
-  local state = MG.New()
-  local ctl = { state = state }
+  local views = MG.NewViews()
+  local state = views.world
+  local ctl = { state = state, views = views }
   if viewport.SetClipsChildren then
     viewport:SetClipsChildren(true)
   end
 
+  -- Takes the state of the shown view; answers its name, nil while no view zooms.
+  local function sync()
+    local key = ctx.view()
+    if key and views[key] then
+      state = views[key]
+      ctl.state = state
+      return key
+    end
+  end
+
   function ctl.Active()
-    return ctx.active() == true
+    return sync() ~= nil
   end
 
   function ctl.Percent()
@@ -104,16 +135,34 @@ function MG.Attach(ctx)
   end
 
   function ctl.In()
+    sync()
     change(state.percent + MG.STEP)
   end
 
   function ctl.Out()
+    sync()
     change(state.percent - MG.STEP)
   end
 
-  -- Back to 100 percent without a layout (page shown again, other view).
+  -- 100 percent in the shown view only; the caller lays the page out.
+  function ctl.ResetShown()
+    if sync() then
+      MG.ResetState(state)
+    end
+  end
+
+  -- Back to 100 percent without a layout, in every view (page shown again, other tab).
   function ctl.Reset()
-    state.percent, state.x, state.y = MG.MIN, 0, 0
+    for _, key in ipairs(MG.VIEWS) do
+      MG.ResetState(views[key])
+    end
+  end
+
+  -- The same for one view (another zone opened).
+  function ctl.ResetView(key)
+    if views[key] then
+      MG.ResetState(views[key])
+    end
   end
 
   bar.out = W.Action(bar, {
@@ -131,7 +180,7 @@ function MG.Attach(ctx)
     tooltip = "map.mag.reset",
     tooltipText = "map.mag.tip",
     onClick = function()
-      ctl.Reset()
+      ctl.ResetShown()
       ctx.changed()
     end,
   })
@@ -199,6 +248,50 @@ function MG.Attach(ctx)
     ns.Safe("map-wheel", ctl.Wheel, delta)
   end)
 
+  -- Keys of the shown view: + and - zoom, the arrows move the map, 0 puts it back. True when the key
+  -- did something, so the caller keeps it from the game; a key that would change nothing stays free.
+  function ctl.Key(key)
+    if not ctl.Active() then
+      return false
+    end
+    if key == "=" or key == "+" or key == "NUMPADPLUS" then
+      if state.percent >= MG.MAX then
+        return false
+      end
+      ctl.In()
+      return true
+    elseif key == "-" or key == "NUMPADMINUS" then
+      if state.percent <= MG.MIN then
+        return false
+      end
+      ctl.Out()
+      return true
+    elseif state.percent <= MG.MIN then
+      return false
+    elseif key == "0" or key == "NUMPAD0" then
+      ctl.ResetShown()
+      ctx.changed()
+      return true
+    end
+    local dx, dy = 0, 0
+    if key == "LEFT" then
+      dx = MG.PAN_STEP
+    elseif key == "RIGHT" then
+      dx = -MG.PAN_STEP
+    elseif key == "UP" then
+      dy = MG.PAN_STEP
+    elseif key == "DOWN" then
+      dy = -MG.PAN_STEP
+    else
+      return false
+    end
+    local vw, vh = viewport:GetWidth(), viewport:GetHeight()
+    MG.PanTo(state, state.x + dx, state.y + dy)
+    ctl.Place(vw, vh)
+    ctx.moved()
+    return true
+  end
+
   -- True after a press that moved the map; the click that ends it is not a click on the map.
   function ctl.WasDrag()
     return ctl.dragged == true
@@ -213,7 +306,7 @@ function MG.Attach(ctx)
       return
     end
     local cx, cy = GetCursorPosition()
-    ctl.drag = { cx = cx, cy = cy, x = state.x, y = state.y }
+    ctl.drag = { cx = cx, cy = cy, x = state.x, y = state.y, view = sync() }
   end)
 
   local function endDrag()
@@ -232,6 +325,10 @@ function MG.Attach(ctx)
     end
     if IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then
       endDrag()
+      return
+    end
+    if sync() ~= d.view then
+      ctl.drag = nil
       return
     end
     local cx, cy = GetCursorPosition()

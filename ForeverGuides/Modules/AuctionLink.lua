@@ -538,6 +538,7 @@ local function buildPanel(host, level)
     tooltip = "auctionlink.details",
     tooltipText = "auctionlink.detailsTip",
     height = W.CLOSE_SIZE,
+    opens = true,
     onClick = function()
       SW.Open()
     end,
@@ -585,6 +586,7 @@ local function buildPanel(host, level)
     icon = "open",
     tooltip = "auctionlink.open",
     width = PANEL_W - 2 * PAD,
+    opens = true,
     onClick = function()
       openRoutePage(host)
     end,
@@ -630,6 +632,7 @@ local function buildPanel(host, level)
     label = "act.text",
     icon = "copy",
     tooltip = "profshop.copy",
+    opens = true,
     onClick = function()
       SW.ShowCopy(false, S.Plan())
     end,

@@ -562,6 +562,7 @@ local function streamBanner(view)
     width = PROMO_BUTTON_W,
     tooltip = "bar.channel",
     tooltipText = "channel.promo.tip",
+    opens = true,
     onClick = function()
       ns.Dialogs.Copy("bar.channel", channel.address, "help.copyHint")
     end,
@@ -624,6 +625,7 @@ local function communityCard(view)
     width = COMMUNITY_BUTTON_W,
     tooltip = "community.dialog",
     tooltipText = "community.tip",
+    opens = true,
     onClick = function()
       ns.Dialogs.Copy("community.dialog", community.address, "help.copyHint")
     end,
@@ -694,6 +696,7 @@ local function build(container)
         key = page.title,
         variant = "secondary",
         height = 32,
+        opens = true,
         onClick = function()
           ns.Router:navigate(id)
         end,

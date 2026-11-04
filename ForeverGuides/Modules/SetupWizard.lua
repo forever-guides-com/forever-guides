@@ -1,6 +1,8 @@
 -- Setup wizard window: one step at a time, every control writes to the Store at once.
--- Opens by itself on a fresh install (2 s after entering the world, never in combat), by
--- /fg setup and by the buttons in Settings and Help. Logic: Modules/SetupWizardLogic.lua.
+-- Opens by itself on a fresh install (5 s after entering the world, never in combat), by
+-- /fg setup and by the buttons in Settings and Help. The window sits in the highest strata and a
+-- guard keeps it there, /fg setup close and /fg setup skip close it without the mouse.
+-- Logic: Modules/SetupWizardLogic.lua.
 local _, ns = ...
 local W, Theme, L, SW = ns.W, ns.Theme, ns.L, ns.SetupWizard
 
@@ -8,9 +10,11 @@ local UI = {}
 ns.SetupWizardUI = UI
 
 UI.WIDTH, UI.MIN_HEIGHT, UI.MAX_HEIGHT = 540, 380, 640
-UI.OPEN_DELAY = 2
+UI.OPEN_DELAY = 5
 
 local TITLE_H, PROGRESS_H, FOOT_H, PAD = 40, 40, 56, 16
+-- Room the "Step n of m" text keeps at the left of the progress line, the hint uses the rest.
+local PROGRESS_W = 130
 -- Left edge of the label of a toggle, where its hint text lines up.
 local HINT_INDENT = 76
 
@@ -20,6 +24,12 @@ local LOGO_SIZE, ROW_BUTTON_W, ROW_MIN_H = 64, 100, 26
 local frame, body, session
 local views = {}
 local keysReady = false
+-- Guard state: the corrections made, whether UIParent was hidden at the last check, the level the
+-- window was raised to, the event frame and the ticker that exist while the window is open.
+local guardCounts, uiHidden, baseLevel = {}, false, SW.GUARD.level
+local watcher, ticker
+local startGuard, stopGuard
+local hintToken = 0
 
 local function inCombat()
   return type(InCombatLockdown) == "function" and InCombatLockdown() == true
@@ -63,6 +73,15 @@ local function valueText(c, stored)
       on = not on
     end
     return L[on and "common.on" or "common.off"]
+  elseif c.type == "consent" then
+    -- stored: the letters of the flags that are on, see SW.Raw.
+    local parts = {}
+    for _, dir in ipairs({ "send", "receive" }) do
+      if tostring(stored):find(dir == "send" and "S" or "R", 1, true) then
+        parts[#parts + 1] = L["consent.flag." .. dir .. "." .. c.aud]
+      end
+    end
+    return #parts > 0 and table.concat(parts, ", ") or L["common.off"]
   elseif c.type == "dropdown" then
     for _, o in ipairs(c.options) do
       if o.value == stored then
@@ -99,6 +118,8 @@ end
 
 -- Step views -------------------------------------------------------------------------------------
 
+local addConsent
+
 local function addControl(view, c)
   local content, stack = view.area.content, view.stack
   local function get()
@@ -110,6 +131,8 @@ local function addControl(view, c)
   local widget
   if c.type == "custom" then
     widget = c.build({ stack = stack, content = content })
+  elseif c.type == "consent" then
+    widget = addConsent(view, c)
   elseif c.type == "toggle" then
     widget =
       W.Toggle(content, { key = c.labelKey, get = get, set = set, tooltip = c.labelKey, tooltipText = c.hintKey })
@@ -131,7 +154,21 @@ local function addControl(view, c)
       format = c.format,
       applyOn = c.applyOn,
     })
-    stack:Add(widget, { height = 42, width = 320, gap = 10 })
+    stack:Add(widget, { height = 42, width = 320, gap = c.lowHintKey and 2 or 10 })
+    if c.lowHintKey then
+      -- Shown only while the value is very low (the opacity slider): a very transparent window is hard to read.
+      local hint = W.Text(content, { key = c.lowHintKey, role = "micro", color = "warning", wrap = true })
+      hint.fgId = "setup-low-hint"
+      function hint:Refresh()
+        local low = SW.IsVeryTransparent(get())
+        if low ~= self:IsShown() then
+          self:SetShown(low)
+          view.relayout = true
+        end
+      end
+      stack:Add(hint, { gap = 10 })
+      view.widgets[#view.widgets + 1] = hint
+    end
   else
     widget = W.Dropdown(content, { key = c.labelKey, width = 240, options = c.options, get = get, set = set })
     stack:Add(widget, { height = 46, width = 240, gap = c.hintKey and 0 or 8 })
@@ -147,15 +184,22 @@ end
 
 -- Text on the left, one button on the right; grows with the wrapped text. tooltipKey names the button when its
 -- label alone does not say what it acts on.
--- extra (optional): { variant = button variant, link = address shown under the text }.
+-- extra (optional): { variant = button variant, link = address shown under the text, width = button width,
+-- opens = the button opens a window or page, see W.Action }.
 local function addRow(view, textOpts, buttonKey, onClick, tooltipKey, extra)
   extra = extra or {}
   local row = CreateFrame("Frame", nil, view.area.content)
-  local buttonWidth = math.floor(ROW_BUTTON_W * factor() + 0.5)
-  local button = W.Button(
-    row,
-    { key = buttonKey, width = buttonWidth, onClick = onClick, tooltip = tooltipKey, variant = extra.variant }
-  )
+  local buttonWidth = math.floor((extra.width or ROW_BUTTON_W) * factor() + 0.5)
+  local button = W.Button(row, {
+    key = buttonKey,
+    width = buttonWidth,
+    onClick = onClick,
+    tooltip = tooltipKey,
+    variant = extra.variant,
+    opens = extra.opens,
+  })
+  -- A button with the "opens" mark is wider than asked for: the text makes room for it.
+  buttonWidth = math.max(buttonWidth, math.ceil(button:GetWidth()))
   button:SetPoint("TOPRIGHT")
   textOpts.role, textOpts.color, textOpts.wrap = "ui", "text", true
   row.text = W.Text(row, textOpts)
@@ -178,6 +222,124 @@ local function addRow(view, textOpts, buttonKey, onClick, tooltipKey, extra)
   end
   view.stack:Add(row, { gap = 4 })
   view.rows[#view.rows + 1] = row
+  return row
+end
+
+-- A sharing function: its name and audience on the left, a switch each for sending and receiving on
+-- the right (below the name when the window is too narrow for both). Writes through SW.Put.
+local SWITCH_W, NAME_MIN_W, COL_GAP = 160, 100, 8
+
+-- The columns of a consent row at `width`: name and audience first, then the switch column of sending, then
+-- that of receiving (x = left edge, w = column width). Too narrow for name and switches side by side:
+-- the switches sit below the name, half the width each. The bulk buttons use the same columns.
+local function consentColumns(width)
+  local k = factor()
+  local w, nameMin = math.floor(SWITCH_W * k + 0.5), math.floor(NAME_MIN_W * k + 0.5)
+  local nameW = width - 2 * w - 2 * COL_GAP
+  if nameW >= nameMin then
+    return { beside = true, nameW = nameW, w = w, x = { nameW + COL_GAP, nameW + 2 * COL_GAP + w } }
+  end
+  local each = math.floor((width - COL_GAP) / 2)
+  return { beside = false, nameW = width, w = each, x = { 0, each + COL_GAP } }
+end
+
+function addConsent(view, c)
+  local row = CreateFrame("Frame", nil, view.area.content)
+  row.fgId = "wizard-consent-" .. c.fn
+  local name = W.Text(row, { key = c.labelKey, role = "ui", color = "text", wrap = true })
+  local audience = W.Text(row, { key = "consent.aud." .. c.aud, role = "micro", color = "textMuted", wrap = true })
+  row.switches = {}
+  for _, dir in ipairs({ "send", "receive" }) do
+    local switch = W.Toggle(row, {
+      key = "consent." .. dir,
+      get = function()
+        return SW.Get(c, dir)
+      end,
+      set = function(value)
+        SW.Put(c, value, dir)
+      end,
+      tooltip = "consent.flag." .. dir .. "." .. c.aud,
+      tooltipText = c.hintKey,
+    })
+    switch.fgId = "wizard-consent-" .. c.fn .. "-" .. dir
+    row.switches[#row.switches + 1] = switch
+  end
+  function row:Refresh()
+    for _, switch in ipairs(self.switches) do
+      switch.Refresh()
+    end
+  end
+  function row:fgGridLayout(width)
+    local cols = consentColumns(width)
+    local beside, nameW = cols.beside, cols.nameW
+    name:ClearAllPoints()
+    name:SetPoint("TOPLEFT", 0, 0)
+    name:SetWidth(nameW)
+    audience:ClearAllPoints()
+    audience:SetPoint("TOPLEFT", name, "BOTTOMLEFT", 0, -1)
+    audience:SetWidth(nameW)
+    local textH = name:GetStringHeight() + audience:GetStringHeight() + 1
+    local top = beside and 0 or -(textH + 4)
+    for i, switch in ipairs(self.switches) do
+      switch:ClearAllPoints()
+      switch:SetPoint("TOPLEFT", cols.x[i], top)
+      switch:SetSize(cols.w, 24)
+    end
+    local h = math.max(ROW_MIN_H, beside and textH or textH + 4 + 24)
+    row:SetHeight(h)
+    return h
+  end
+  view.stack:Add(row, { gap = 8 })
+  return row
+end
+
+-- "All on" and "all off" of sending and receiving, each pair over the switch column of its direction (the
+-- columns of the consent rows). Too narrow for the columns: the pairs stack, each under its heading. "On" asks
+-- first, "off" acts at once; only the functions shown in the step are touched (the same writes as the switches).
+local DIRS = { "send", "receive" }
+
+local function addBulk(view, step)
+  local row = CreateFrame("Frame", nil, view.area.content)
+  row.fgId = "wizard-bulk"
+  row.heads, row.groups = {}, {}
+  for i, dir in ipairs(DIRS) do
+    row.heads[i] = W.Text(row, { key = "consent." .. dir, role = "micro", color = "textMuted" })
+    row.groups[i] = ns.ConsentSettings.BulkButtons(row, dir, function(value)
+      local targets = {}
+      for _, c in ipairs(SW.ActiveControls(step)) do
+        if c.type == "consent" then
+          targets[#targets + 1] = c
+        end
+      end
+      ns.ConsentSettings.BulkSwitch(targets, dir, value, function(c, v)
+        SW.Put(c, v, dir)
+      end)
+    end, 28, true)
+  end
+  function row:fgGridLayout(width)
+    local cols = consentColumns(width)
+    local headH = math.ceil(math.max(self.heads[1]:GetStringHeight(), self.heads[2]:GetStringHeight()))
+    local y, groupH = 0, 0
+    for i = 1, #DIRS do
+      local head, group = self.heads[i], self.groups[i]
+      local x, w = cols.beside and cols.x[i] or 0, cols.beside and cols.w or width
+      head:ClearAllPoints()
+      head:SetPoint("TOPLEFT", self, "TOPLEFT", x, -y)
+      group:ClearAllPoints()
+      group:SetPoint("TOPLEFT", self, "TOPLEFT", x, -(y + headH + 2))
+      group:SetWidth(w)
+      local h = group:fgGridLayout(w)
+      if cols.beside then
+        groupH = math.max(groupH, h)
+      else
+        y = y + headH + 2 + h + 6
+      end
+    end
+    local total = cols.beside and headH + 2 + groupH or y - 6
+    self:SetHeight(total)
+    return total
+  end
+  view.stack:Add(row, { gap = 8 })
   return row
 end
 
@@ -225,13 +387,28 @@ local BLOCKS = {
       local shown = (url:gsub("^https?://", ""))
       addRow(view, { text = link.name .. ": " .. shown }, "setup.copy", function()
         ns.Dialogs.Copy(link.title, link.url(), "help.copyHint")
-      end)
+      end, nil, { opens = true })
     end
   end,
   controls = function(view, step)
     for _, c in ipairs(SW.ActiveControls(step)) do
       addControl(view, c)
     end
+  end,
+  -- The privacy info of the Settings tab "Share" in the copy dialog.
+  privacy = function(view)
+    addRow(view, { key = "setup.sharing.privacy" }, "setup.sharing.more", function()
+      ns.Dialogs.Copy("consent.privacy", ns.ConsentSettings.PrivacyText(), "consent.privacy.hint")
+    end, "consent.privacy", { width = 120, opens = true })
+  end,
+  -- Send and receive of all functions of the step at once, over the switch columns.
+  bulk = addBulk,
+  -- The rest of the functions and the other audiences live in the Settings tab "Share".
+  allSettings = function(view)
+    addRow(view, { key = "setup.sharing.all.text" }, "setup.sharing.all", function()
+      ns.SettingsPage.Select("sharing")
+      ns.Main.Show("settings")
+    end, nil, { width = 150, opens = true })
   end,
   summary = function(view)
     view.summary = W.Text(view.area.content, { role = "text", color = "text", wrap = true })
@@ -261,14 +438,14 @@ local BLOCKS = {
     for _, invite in ipairs(invites) do
       addRow(view, { key = invite.text }, "setup.copy", function()
         ns.Dialogs.Copy(invite.title, invite.address, "help.copyHint")
-      end, invite.title, { variant = invite.variant, link = invite.shown })
+      end, invite.title, { variant = invite.variant, link = invite.shown, opens = true })
     end
   end,
   info = function(view)
     for _, info in ipairs({ { "tutorials", "setup.info.tutorials" }, { "help", "setup.info.help" } }) do
       addRow(view, { key = info[2] }, "setup.open", function()
         ns.Main.Show(info[1])
-      end)
+      end, nil, { opens = true })
     end
   end,
 }
@@ -288,6 +465,7 @@ local function newView(step)
   return view
 end
 
+-- True when a control appeared or went away, so the step needs a new layout.
 local function refreshView(view)
   for _, widget in ipairs(view.widgets) do
     if widget.Refresh then
@@ -297,6 +475,9 @@ local function refreshView(view)
   if view.summary then
     view.summary:SetText(summaryText())
   end
+  local changed = view.relayout == true
+  view.relayout = false
+  return changed
 end
 
 local function layoutView(view)
@@ -315,6 +496,7 @@ local function fit()
     return
   end
   frame:SetWidth(frameWidth())
+  frame.hint:SetPoint("TOPLEFT", PAD + math.floor(PROGRESS_W * factor() + 0.5), -(TITLE_H + 8))
   layoutView(view)
   local screen = UIParent:GetHeight()
   local limit = UI.MAX_HEIGHT
@@ -418,6 +600,30 @@ function UI.Skip()
       UI.Close()
     end
   end)
+end
+
+-- The way out without the mouse and without a dialog (/fg setup close, /fg setup skip). Skip
+-- applies the defaults only on a first run, like the Skip button. Returns whether a window was open.
+function UI.CloseNow()
+  if not (session and UI.IsOpen()) then
+    return false
+  end
+  session:Cancel()
+  UI.Close()
+  return true
+end
+
+function UI.SkipNow()
+  if not (session and UI.IsOpen()) then
+    return false
+  end
+  if session.firstRun then
+    session:Skip()
+  else
+    session:Cancel()
+  end
+  UI.Close()
+  return true
 end
 
 function UI.ResetAll()
@@ -534,14 +740,121 @@ local function setupKeys()
   end)
 end
 
+-- Guard ----------------------------------------------------------------------------------------
+
+-- A dialog or dropdown list of the wizard is open: the window does not rise over it.
+local function coverOpen()
+  if next(ns.Dialogs.open) ~= nil then
+    return true
+  end
+  return ns.Popups.isOpen()
+end
+
+-- The background is an exact preview of the window opacity of the Settings (0 = invisible). Only the background
+-- fades: the frame itself, its text, buttons and the title strip stay at full alpha. The edge line and the
+-- drop shadow stay (border = true), the text carries its own shadow (Theme.applyFont).
+local function applyLook()
+  if not frame then
+    return
+  end
+  local alpha = SW.BackgroundAlpha(Theme.mainAlpha() * 100)
+  frame.fgBack:SetAlpha(alpha)
+  local shell = ns.WindowShell.Of(frame)
+  ns.WindowStyle.Apply(frame, {
+    bg = ns.WindowStyle.FALLBACK.bg,
+    alpha = alpha,
+    autoHide = false,
+    textShadow = "off",
+    border = true,
+    solidBar = true,
+  }, { border = shell.border, shadow = shell.shadow })
+end
+
+-- Puts back what the game or another add-on changed (strata, level, mouse, alpha) and counts it.
+-- raise: also bring the window to the front (opening, events); the ticker only corrects.
+function UI.Front(raise)
+  if not frame or not frame:IsShown() or inCombat() then
+    return
+  end
+  local fixes, hidden = SW.GuardCheck({
+    strata = frame:GetFrameStrata(),
+    level = frame:GetFrameLevel(),
+    wantLevel = baseLevel,
+    mouse = frame:IsMouseEnabled(),
+    alpha = frame:GetAlpha(),
+    uiShown = UIParent:IsShown(),
+  })
+  uiHidden = hidden
+  local lifted = false
+  for _, fix in ipairs(fixes) do
+    if fix == "strata" then
+      frame:SetFrameStrata(SW.GUARD.strata)
+      lifted = true
+    elseif fix == "level" then
+      lifted = true
+    elseif fix == "mouse" then
+      frame:EnableMouse(true)
+    elseif fix == "alpha" then
+      frame:SetAlpha(1)
+    end
+  end
+  SW.GuardRecord(guardCounts, fixes)
+  if (raise or lifted) and not coverOpen() then
+    frame:Raise()
+    baseLevel = frame:GetFrameLevel()
+    ns.Focus.Lift()
+  end
+end
+
+function UI.GuardInfo()
+  return { counts = guardCounts, uiHidden = uiHidden, frame = frame, session = session ~= nil }
+end
+
+startGuard = function()
+  if not watcher then
+    watcher = CreateFrame("Frame")
+    watcher:SetScript("OnEvent", function()
+      ns.Safe("setup-guard-event", UI.Front, true)
+    end)
+  end
+  for _, event in ipairs(SW.GUARD_EVENTS) do
+    pcall(watcher.RegisterEvent, watcher, event)
+  end
+  local timer = rawget(_G, "C_Timer")
+  if not ticker and type(timer) == "table" and type(timer.NewTicker) == "function" then
+    ticker = timer.NewTicker(SW.GUARD.interval, function()
+      ns.Safe("setup-guard", UI.Front, false)
+    end)
+  end
+end
+
+stopGuard = function()
+  if watcher then
+    for _, event in ipairs(SW.GUARD_EVENTS) do
+      pcall(watcher.UnregisterEvent, watcher, event)
+    end
+  end
+  if ticker then
+    ticker:Cancel()
+    ticker = nil
+  end
+end
+
 -- Construction ---------------------------------------------------------------------------------
 
 local function build()
   frame = CreateFrame("Frame", "ForeverGuidesSetupWizard", UIParent)
   frame:SetSize(UI.WIDTH, UI.MIN_HEIGHT)
   frame:SetPoint("CENTER")
-  frame:SetFrameStrata("DIALOG")
-  frame:SetToplevel(true)
+  -- Strata and level come before the first child: SetFrameLevel moves only the frame itself, the
+  -- children created below lie above it. Dialogs, dropdown lists and the focus ring lift over it (ns.TopLayer).
+  -- No Toplevel: a click would raise the window over the focus ring and the confirm dialog.
+  frame:SetFrameStrata(SW.GUARD.strata)
+  pcall(frame.SetFrameLevel, frame, SW.GUARD.level)
+  if frame.SetFixedFrameStrata then
+    frame:SetFixedFrameStrata(true)
+  end
+  ns.TopLayer.owner = frame
   frame:SetClampedToScreen(true)
   frame:EnableMouse(true)
   frame:SetMovable(true)
@@ -561,6 +874,11 @@ local function build()
   frame.progress = W.Text(frame, { role = "ui", color = "textSecondary" })
   frame.progress:SetPoint("TOPLEFT", PAD, -(TITLE_H + 8))
   ns.Bind(frame.progress, paintProgress)
+  -- Shown for the first seconds of an automatic start: the way out when the mouse is blocked.
+  frame.hint = W.Text(frame, { key = "setup.escapeHint", role = "ui", color = "textSecondary", justify = "RIGHT" })
+  frame.hint:SetPoint("TOPLEFT", PAD + PROGRESS_W, -(TITLE_H + 8))
+  frame.hint:SetPoint("TOPRIGHT", -PAD, -(TITLE_H + 8))
+  frame.hint:Hide()
   local track = frame:CreateTexture(nil, "ARTWORK")
   track:SetPoint("TOPLEFT", PAD, -(TITLE_H + PROGRESS_H - 14))
   track:SetPoint("TOPRIGHT", -PAD, -(TITLE_H + PROGRESS_H - 14))
@@ -590,11 +908,16 @@ local function build()
   frame.back = button("setup.back", 90, UI.Back)
   frame.back:SetPoint("RIGHT", frame.next, "LEFT", -8, 0)
 
+  applyLook()
   frame:SetScript("OnShow", function()
     frame:SetScale(Theme.windowScale())
+    applyLook()
+    UI.Front(true)
+    startGuard()
   end)
   -- Closed any other way than Done, Skip or Cancel counts as cancelled.
   frame:SetScript("OnHide", function()
+    stopGuard()
     local open = session
     session = nil
     if open and not open.closed then
@@ -604,7 +927,8 @@ local function build()
   frame:Hide()
 end
 
--- opts.onlyNew: only the steps this user has not seen yet. Returns whether the window opened.
+-- opts.onlyNew: only the steps this user has not seen yet; opts.auto: started by the addon, the window
+-- shows the way out for the first seconds. Returns whether the window opened.
 function UI.Open(opts)
   if not ns.db then
     return false
@@ -622,12 +946,23 @@ function UI.Open(opts)
     build()
   end
   session = fresh
+  guardCounts, uiHidden, baseLevel = {}, false, SW.GUARD.level
   for _, view in pairs(views) do
     view.area:Hide()
   end
+  hintToken = hintToken + 1
+  frame.hint:SetShown(opts ~= nil and opts.auto == true)
   frame:Show()
   setupKeys()
   render()
+  if opts and opts.auto then
+    local token = hintToken
+    C_Timer.After(SW.GUARD.hintSeconds, function()
+      if token == hintToken and frame then
+        frame.hint:Hide()
+      end
+    end)
+  end
   return true
 end
 
@@ -635,6 +970,7 @@ end
 
 ns.On("FG_UI_REFRESHED", function()
   if UI.IsOpen() and session then
+    applyLook()
     fit()
     paintProgress()
   end
@@ -646,12 +982,24 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
   end
   if path == "settings.scale" then
     frame:SetScale(Theme.windowScale())
+  elseif path == "settings.mainAlpha" then
+    applyLook()
   end
   local view = currentView()
+  if view and refreshView(view) then
+    fit()
+  end
+end)
+
+-- A consent changed elsewhere while the window is open: the switches follow.
+local function onConsentChanged()
+  local view = UI.IsOpen() and session and currentView()
   if view then
     refreshView(view)
   end
-end)
+end
+ns.On("FG_CONSENT_CHANGED", onConsentChanged)
+ns.On("FG_CONSENT_WITHDRAWN", onConsentChanged)
 
 -- Automatic start ------------------------------------------------------------------------------
 
@@ -670,7 +1018,9 @@ local function run()
   waiting, handled = false, true
   SW.Baseline()
   if SW.ShouldAutoOpen() then
-    UI.Open()
+    if UI.Open({ auto = true }) then
+      ns.Log.info("setup: opened automatically, strata=%s level=%s", frame:GetFrameStrata(), frame:GetFrameLevel())
+    end
   elseif SW.NoticeDue() then
     -- New steps are reached with "new", which skips everything this user has seen.
     local text = #SW.Pending() > 0 and L["setup.noticeNew"] or L["setup.notice"]

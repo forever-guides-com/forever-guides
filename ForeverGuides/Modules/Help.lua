@@ -12,7 +12,7 @@ ns.AddLocale("enUS", {
   ["help.errorsLink"] = "Full list: errors page.",
   ["help.copyHint"] = "Selected and ready, press Ctrl+C to copy.",
   ["help.credits"] = "Created by Wosande",
-  ["help.aboutPrivacy"] = "The addon makes no internet connections. Data only leaves the game via a share button: by chat and invisible addon message to the player you share with (notes, drawings). Nothing else is sent.",
+  ["help.aboutPrivacy"] = "The addon makes no internet connections and has no server. Nothing goes to other addon users until you switch it on per function under Settings > Share. Then the data travels through the chat servers of Blizzard to addon users in your group, guild or chat, and everyone in that channel can read it. Switching off works at once, copies others stored stay with them. The setup (/fg setup) asks about it in the step Share with others, everything there starts off. Share buttons for notes and drawings send only after your click.",
   ["tour.help.title"] = "Help & feedback",
   ["tour.help.intro.title"] = "Help",
   ["tour.help.intro.text"] = "First steps, shortcuts, diagnostics and feedback.",
@@ -26,7 +26,7 @@ ns.AddLocale("deDE", {
   ["help.errorsLink"] = "Komplette Liste: Fehlerseite.",
   ["help.copyHint"] = "Markiert und bereit, Strg+C zum Kopieren drücken.",
   ["help.credits"] = "Erstellt von Wosande",
-  ["help.aboutPrivacy"] = "Das Addon baut keine Internetverbindungen auf. Daten verlassen das Spiel nur über eine Teilen-Schaltfläche: per Chat und unsichtbarer Addon-Nachricht an den Spieler, mit dem du teilst (Notizen, Zeichnungen). Sonst wird nichts gesendet.",
+  ["help.aboutPrivacy"] = "Das Addon baut keine Internetverbindungen auf und hat keinen Server. An andere Addon-Nutzer geht nichts, bevor du es pro Funktion unter Einstellungen > Teilen einschaltest. Dann laufen die Daten über die Chat-Server von Blizzard an Addon-Nutzer in deiner Gruppe, Gilde oder im Chat, und alle in diesem Kanal können sie mitlesen. Ausschalten wirkt sofort, Kopien, die andere gespeichert haben, bleiben bei ihnen. Die Einrichtung (/fg setup) fragt im Schritt Mit anderen teilen danach, dort steht alles auf Aus. Teilen-Schaltflächen für Notizen und Zeichnungen senden nur nach deinem Klick.",
   ["tour.help.title"] = "Hilfe & Feedback",
   ["tour.help.intro.title"] = "Hilfe",
   ["tour.help.intro.text"] = "Erste Schritte, Tastenkürzel, Diagnose und Feedback.",
@@ -73,6 +73,7 @@ local function openFeedback(context)
       key = "help.feedbackCreate",
       variant = "primary",
       width = 180,
+      opens = true,
       onClick = function()
         local c = ns.ClientInfo()
         local report = table.concat({
@@ -115,6 +116,7 @@ local function creditsBlock(parent)
     width = 160,
     height = CREDIT_BUTTON_H,
     tooltip = "help.websiteButton",
+    opens = true,
     onClick = function()
       ns.Dialogs.Copy("help.websiteButton", WEBSITE, "help.copyHint")
     end,
@@ -209,6 +211,7 @@ local function build(container)
       icon = "play",
       tooltip = "setup.start",
       width = 200,
+      opens = true,
       onClick = function()
         ns.SetupWizardUI.Open()
       end,
@@ -234,6 +237,7 @@ local function build(container)
           {
             icon = "copy",
             tooltip = L["cmdhelp.copy"],
+            opens = true,
             onClick = function()
               ns.Dialogs.Copy("help.section.commands", ns.Commands.example(c), "help.copyHint")
             end,
@@ -266,6 +270,7 @@ local function build(container)
     W.Button(view.content, {
       key = "help.diagButton",
       width = 200,
+      opens = true,
       onClick = function()
         ns.Dialogs.Copy("help.section.diag", ns.DiagReport(), "help.diagCopyHint")
       end,
@@ -292,6 +297,7 @@ local function build(container)
     W.Button(view.content, {
       key = "help.section.errors",
       width = 200,
+      opens = true,
       onClick = function()
         ns.Router:navigate("errors")
       end,
@@ -306,6 +312,7 @@ local function build(container)
     W.Button(view.content, {
       key = "help.feedbackButton",
       width = 200,
+      opens = true,
       onClick = function()
         openFeedback()
       end,
@@ -318,6 +325,7 @@ local function build(container)
     W.Button(view.content, {
       key = "help.feedbackWebButton",
       width = 260,
+      opens = true,
       onClick = function()
         ns.Dialogs.Copy("help.feedbackWebButton", feedbackUrl())
       end,
@@ -330,6 +338,7 @@ local function build(container)
     W.Button(view.content, {
       key = "community.button",
       width = 200,
+      opens = true,
       onClick = function()
         ns.Dialogs.Copy("community.dialog", ns.Community.address, "help.copyHint")
       end,
@@ -346,6 +355,7 @@ local function build(container)
     W.Button(view.content, {
       key = "help.websiteButton",
       width = 200,
+      opens = true,
       onClick = function()
         ns.Dialogs.Copy("help.websiteButton", WEBSITE)
       end,
@@ -362,7 +372,7 @@ local function build(container)
     if m and ns.Data.Trainers then
       status = status .. "\n" .. tostring(ns.Data.Trainers.basis or "")
     end
-    dataText:SetText(status .. "\n" .. string.format(L["help.version"], ns.version))
+    dataText:SetText(status .. "\n" .. string.format(L["help.version"], ns.version) .. "\n" .. ns.Client.Line())
     view:Layout()
     local id = params and params[1]
     if id == "data" then

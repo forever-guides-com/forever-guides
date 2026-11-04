@@ -31,6 +31,9 @@ function ns.DiagReport()
     tostring(c.locale),
     ns.GetActiveLocale()
   )
+  if ns.Client then
+    line(out, "%s", ns.Client.DiagLine())
+  end
   if UIParent then
     line(
       out,
@@ -199,6 +202,14 @@ function ns.DiagReport()
   if ns.Cursor then
     local okCursor, text = pcall(ns.Cursor.DiagLine)
     out[#out + 1] = okCursor and text or "cursor ring: ?"
+  end
+  if ns.LogoStatus then
+    local okLogo, text = pcall(ns.LogoStatus.Text)
+    out[#out + 1] = okLogo and text or "logo chain: ?"
+  end
+  if ns.FrameStatus then
+    local okFrame, text = pcall(ns.FrameStatus.Summary)
+    out[#out + 1] = okFrame and text or "window frame: ?"
   end
   return table.concat(out, "\n")
 end

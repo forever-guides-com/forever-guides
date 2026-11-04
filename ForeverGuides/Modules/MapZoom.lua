@@ -1,7 +1,8 @@
 -- Zone zoom of the map page. A click on a zone of the world view opens the zone's own map
 -- (MW.ZoneView): same canvas, same height, the zone's art over the whole map, places and markers
 -- in zone coordinates. This file owns the state (which zone), the hover highlight of the world
--- view, the path bar and the keys that lead back. MapPage.lua hands in the canvas and the few
+-- view and of the areas around an open zone (their name, outline and a click that opens them),
+-- the path bar with its list of those areas and the keys that lead back. MapPage.lua hands in the canvas and the few
 -- things only it knows through the Attach context.
 local _, ns = ...
 local W, L, Theme, MW, MM, MP = ns.W, ns.L, ns.Theme, ns.MapWorld, ns.MapMarkers, ns.MapPoly
@@ -17,6 +18,8 @@ MZ.OUTLINE_THICKNESS = 2
 MZ.FOCUS_SECONDS = 4
 
 local BUTTON_W, BUTTON_H = 72, 24
+local NEAR_W = 150
+local NEAR_LIST_W = 240
 local FLAT_PAD = 24
 local FOCUS_SIZE, FOCUS_CORE = 32, 10
 local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
@@ -26,6 +29,9 @@ ns.AddLocale("enUS", {
   ["map.zoom.back"] = "Back",
   ["map.zoom.backTip"] = "Back to the world map.\nRight click, Backspace or Esc works too.",
   ["map.zoom.open"] = "Click to open the map of this area.",
+  ["map.zoom.levels"] = "Levels %d-%d",
+  ["map.zoom.near"] = "Nearby areas",
+  ["map.zoom.nearTip"] = "Opens the map of an area around this one.\nA click on the area in the map works too.",
   ["map.zoom.noMap"] = "There is no map of its own for this area.",
   ["map.zoom.places"] = "Places: %d",
   ["map.zoom.markers"] = "Markers: %d",
@@ -41,6 +47,9 @@ ns.AddLocale("deDE", {
   ["map.zoom.back"] = "Zurück",
   ["map.zoom.backTip"] = "Zurück zur Weltkarte.\nRechtsklick, Backspace oder Esc geht auch.",
   ["map.zoom.open"] = "Klicke, um die Karte dieses Gebiets zu öffnen.",
+  ["map.zoom.levels"] = "Stufen %d-%d",
+  ["map.zoom.near"] = "Nachbargebiete",
+  ["map.zoom.nearTip"] = "Öffnet die Karte eines Gebiets rund um dieses.\nEin Klick auf das Gebiet in der Karte geht auch.",
   ["map.zoom.noMap"] = "Für dieses Gebiet gibt es keine eigene Karte.",
   ["map.zoom.places"] = "Orte: %d",
   ["map.zoom.markers"] = "Marker: %d",
@@ -56,12 +65,17 @@ ns.AddLocale("deDE", {
 --   base()                  the view the zoom starts from (layout or island view) or nil
 --   data()                  the travel data
 --   zoneName(slug)          localized zone name
+--   levels(slug)            lmin, lmax of the zone, nil for zones without a level range
 --   placeCount(slug)        number of places in the zone
 --   markerCount(mapId)      number of markers on the game map
 --   markers                 the MapMarkers controller (name field, marker mode)
 --   changed()               lays the page out again after the zone changed
 --   over()                  optional: true while the cursor is over the visible map (a magnified
 --                           canvas reaches beyond its clipping frame)
+--   frame                   optional: the frame the path bar sits on (the clipping viewport of a
+--                           magnified canvas), default the canvas
+--   zoomKey(key)            optional: true when the key zoomed or moved the open zone (ctl.Key
+--                           asks for it while the pointer is on the map)
 -- }
 -- Returns the controller: Enter, Leave, Reset, Click, View, Art, Zone, Paint, Focus, bar, hover.
 function MZ.Attach(ctx)
@@ -75,9 +89,10 @@ function MZ.Attach(ctx)
     end
   end
 
-  -- Hover highlight (world view) ---------------------------------------------------------
-  -- A zone with an outline gets its outline as a line loop from a pool of its own, set once per
-  -- zone change; a zone without one keeps the filled rectangle.
+  -- Hover highlight ----------------------------------------------------------------------
+  -- World view: a zone with an outline gets its outline as a line loop from a pool of its own, set
+  -- once per zone or canvas size change; a zone without one keeps the filled rectangle. Open zone:
+  -- the areas around it get their outline only.
   local hover = CreateFrame("Frame", nil, canvas)
   hover:SetFrameLevel(canvas:GetFrameLevel() + 1)
   hover.fill = hover:CreateTexture(nil, "ARTWORK")
@@ -104,11 +119,8 @@ function MZ.Attach(ctx)
     linesUsed = 0
   end
 
-  local function unit(v)
-    return math.min(1, math.max(0, v))
-  end
-
-  -- Draws the closed rings as lines over the canvas; true when the zone has an outline.
+  -- Draws the closed rings as lines over the canvas, cut off at its edge instead of pulled onto it
+  -- (outlines may reach past the map); true when a line is visible.
   local function drawOutline(shape, cw, ch)
     hideOutline()
     if not (shape and hover.CreateLine) then
@@ -119,34 +131,58 @@ function MZ.Attach(ctx)
       local n = #flat / 2
       for i = 1, n do
         local j = i % n + 1
-        local line = hoverLines[linesUsed + 1]
-        if not line then
-          line = hover:CreateLine(nil, "ARTWORK")
-          line:SetThickness(MZ.OUTLINE_THICKNESS)
-          hoverLines[linesUsed + 1] = line
+        local x1, y1, x2, y2 = MP.ClipSegment(flat[2 * i - 1], flat[2 * i], flat[2 * j - 1], flat[2 * j])
+        if x1 then
+          local line = hoverLines[linesUsed + 1]
+          if not line then
+            line = hover:CreateLine(nil, "ARTWORK")
+            line:SetThickness(MZ.OUTLINE_THICKNESS)
+            hoverLines[linesUsed + 1] = line
+          end
+          linesUsed = linesUsed + 1
+          line:SetColorTexture(hoverColor(hover.noMap, 0.95))
+          line:SetStartPoint("TOPLEFT", canvas, x1 * cw, -y1 * ch)
+          line:SetEndPoint("TOPLEFT", canvas, x2 * cw, -y2 * ch)
+          line:Show()
         end
-        linesUsed = linesUsed + 1
-        line:SetColorTexture(hoverColor(hover.noMap, 0.95))
-        line:SetStartPoint("TOPLEFT", canvas, unit(flat[2 * i - 1]) * cw, -unit(flat[2 * i]) * ch)
-        line:SetEndPoint("TOPLEFT", canvas, unit(flat[2 * j - 1]) * cw, -unit(flat[2 * j]) * ch)
-        line:Show()
       end
     end
     return linesUsed > 0
   end
 
-  local function showHover(slug, base)
-    local r = base.zones[slug]
+  -- Tooltip text of a zone under the cursor: the world view counts places and markers, the areas
+  -- around an open zone give their level range.
+  local function tipText(slug, mapId, around)
+    local lines = {}
+    if around then
+      local lmin, lmax = ctx.levels(slug)
+      if lmin then
+        lines[#lines + 1] = string.format(L["map.zoom.levels"], lmin, lmax or lmin)
+      end
+    else
+      lines[#lines + 1] = string.format(L["map.zoom.places"], ctx.placeCount(slug))
+      lines[#lines + 1] = string.format(L["map.zoom.markers"], mapId and ctx.markerCount(mapId) or 0)
+    end
+    lines[#lines + 1] = Theme.hexText("textMuted", mapId and L["map.zoom.open"] or L["map.zoom.noMap"])
+    return table.concat(lines, "\n")
+  end
+
+  -- view: the world view or the surroundings of the open zone (around), both hold the zone's
+  -- rectangle, map and outline.
+  local function showHover(slug, view, around)
+    local r = view.zones[slug]
     local cw, ch = canvas:GetWidth(), canvas:GetHeight()
-    local mapId = base.maps and base.maps[slug]
-    if ctl.hoverZone ~= slug then
+    local mapId = view.maps and view.maps[slug]
+    -- The lines are placed in pixels, so a new canvas size draws them again.
+    if ctl.hoverZone ~= slug or ctl.hoverW ~= cw or ctl.hoverH ~= ch then
       hover.noMap = mapId == nil
       hover.fill:SetColorTexture(hoverColor(hover.noMap, hover.noMap and 0.18 or 0.28))
-      ctl.outlined = drawOutline(MP.Shape(base, slug), cw, ch)
-      hover.fill:SetShown(not ctl.outlined)
+      ctl.outlined = drawOutline(MP.Shape(view, slug), cw, ch)
+      hover.fill:SetShown(not (ctl.outlined or around))
+      ctl.hoverW, ctl.hoverH = cw, ch
     end
     hover:ClearAllPoints()
-    if ctl.outlined then
+    if ctl.outlined or around then
       hover:SetAllPoints(canvas)
     else
       hover:SetPoint("TOPLEFT", canvas, "TOPLEFT", r.left * cw, -r.top * ch)
@@ -154,12 +190,7 @@ function MZ.Attach(ctx)
     end
     hover:Show()
     if ctl.hoverZone ~= slug or not (GameTooltip and GameTooltip:IsShown()) then
-      local lines = {
-        string.format(L["map.zoom.places"], ctx.placeCount(slug)),
-        string.format(L["map.zoom.markers"], mapId and ctx.markerCount(mapId) or 0),
-        Theme.hexText("textMuted", mapId and L["map.zoom.open"] or L["map.zoom.noMap"]),
-      }
-      ns.ShowTooltip(hover, ctx.zoneName(slug) or slug, table.concat(lines, "\n"), { anchor = "ANCHOR_CURSOR" })
+      ns.ShowTooltip(hover, ctx.zoneName(slug) or slug, tipText(slug, mapId, around), { anchor = "ANCHOR_CURSOR" })
       ctl.tipShown = true
     end
     ctl.hoverZone = slug
@@ -174,8 +205,9 @@ function MZ.Attach(ctx)
     end
   end
 
-  -- The zone under the cursor of a view, nil when the cursor is off the map.
-  local function zoneAtCursor(view)
+  -- The cursor as a point of the canvas (fractions), nil when it is off the map or on the path bar
+  -- (which lies over the top of the map).
+  local function cursorPoint()
     local nx, ny = MM.CursorFraction(canvas)
     local over
     if ctx.over then
@@ -183,19 +215,37 @@ function MZ.Attach(ctx)
     else
       over = canvas:IsMouseOver()
     end
-    if not (view and nx and over) then
+    if not (nx and over) or (ctl.zv and ctl.bar:IsMouseOver()) then
       return nil
     end
-    return (MW.PointToZone(view, nx, ny))
+    return nx, ny
+  end
+
+  -- The zone under the cursor of a view, nil when the cursor is off the map.
+  local function zoneAtCursor(view)
+    local nx, ny = cursorPoint()
+    return view and nx and (MW.PointToZone(view, nx, ny)) or nil
+  end
+
+  -- The area around the open zone under the cursor, nil over the zone itself.
+  local function neighborAtCursor()
+    local nx, ny = cursorPoint()
+    return nx and MW.NeighborAt(ctl.zv, nx, ny) or nil
   end
 
   -- One test per tick, never a rebuild: the frame moves and the tooltip changes only when the
   -- zone under the cursor changes.
   function ctl.UpdateHover()
-    local base = not ctl.zv and ctx.base()
-    local slug = base and zoneAtCursor(base)
+    local zv = ctl.zv
+    local view = zv and zv.around or ctx.base()
+    local slug
+    if zv then
+      slug = neighborAtCursor()
+    else
+      slug = view and zoneAtCursor(view)
+    end
     if slug then
-      showHover(slug, base)
+      showHover(slug, view, zv ~= nil)
     else
       clearHover()
     end
@@ -327,8 +377,8 @@ function MZ.Attach(ctx)
 
   -- Path bar and flat surface -------------------------------------------------------------
   local bar = CreateFrame("Frame", nil, canvas)
-  bar:SetPoint("TOPLEFT", canvas, "TOPLEFT")
-  bar:SetPoint("TOPRIGHT", canvas, "TOPRIGHT")
+  bar:SetPoint("TOPLEFT", ctx.frame or canvas, "TOPLEFT")
+  bar:SetPoint("TOPRIGHT", ctx.frame or canvas, "TOPRIGHT")
   bar:SetHeight(MZ.BAR_H)
   bar:SetFrameLevel(canvas:GetFrameLevel() + 200)
   bar.fill = bar:CreateTexture(nil, "BACKGROUND")
@@ -363,9 +413,34 @@ function MZ.Attach(ctx)
   bar.world:SetPoint("LEFT", bar.back, "RIGHT", 4, 0)
   bar.sep = W.Text(bar, { text = ">", role = "ui", color = "textMuted" })
   bar.sep:SetPoint("LEFT", bar.world, "RIGHT", 4, 0)
+  -- The list of the areas around the open zone for those who do not point: a button that opens
+  -- the list of an invisible dropdown (the options are refilled whenever a zone opens).
+  local nearOptions = {}
+  local nearList = W.Dropdown(bar, {
+    options = nearOptions,
+    width = NEAR_LIST_W,
+    get = function() end,
+    set = function(slug)
+      ctl.Enter(slug)
+    end,
+  })
+  nearList:Hide()
+  bar.near = W.Action(bar, {
+    key = "map.zoom.near",
+    icon = "chevron-down",
+    variant = "ghost",
+    width = NEAR_W,
+    height = BUTTON_H,
+    tooltip = "map.zoom.near",
+    tooltipText = "map.zoom.nearTip",
+    onClick = function()
+      nearList:Open(bar.near)
+    end,
+  })
+  bar.near:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
   bar.name = W.Text(bar, { role = "ui", color = "text" })
   bar.name:SetPoint("LEFT", bar.sep, "RIGHT", 6, 0)
-  bar.name:SetPoint("RIGHT", bar, "RIGHT", -8, 0)
+  bar.name:SetPoint("RIGHT", bar.near, "LEFT", -8, 0)
   bar:Hide()
   ctl.bar = bar
 
@@ -382,6 +457,24 @@ function MZ.Attach(ctx)
     W.Text(flat, { key = "map.zoom.noArtHint", role = "ui", color = "textMuted", justify = "CENTER", wrap = true })
   flat:Hide()
   ctl.flat = flat
+
+  local function fillNearOptions(zv)
+    for i = #nearOptions, 1, -1 do
+      nearOptions[i] = nil
+    end
+    for _, slug in ipairs(zv.neighbors) do
+      -- Only areas with a map of their own can be opened.
+      if zv.around.maps[slug] then
+        local name = ctx.zoneName(slug) or slug
+        local lmin, lmax = ctx.levels(slug)
+        nearOptions[#nearOptions + 1] = {
+          value = slug,
+          text = lmin and string.format("%s (%d-%d)", name, lmin, lmax or lmin) or name,
+        }
+      end
+    end
+    bar.near:SetShown(#nearOptions > 0)
+  end
 
   -- Shows or hides the bar, the flat surface and the keys for the current state; MapPage calls
   -- it after every canvas size change.
@@ -421,6 +514,7 @@ function MZ.Attach(ctx)
     clearHover()
     ctl.ClearFocus()
     ctl.zv, ctl.art = zv, MW.LoadArt(zv.mapId)
+    fillNearOptions(zv)
     ctl.Paint()
     ctx.changed()
     return true
@@ -432,6 +526,7 @@ function MZ.Attach(ctx)
       return false
     end
     ctx.markers.Cancel()
+    clearHover()
     ctl.ClearFocus()
     ctl.zv, ctl.art = nil, nil
     ctl.Paint()
@@ -452,17 +547,22 @@ function MZ.Attach(ctx)
 
   -- Clicks ----------------------------------------------------------------------------------
   -- A click on free space of the canvas that was no marker click: right goes back, left opens
-  -- the zone under the cursor when it has a map. Returns true when it did something.
+  -- the zone under the cursor when it has a map (in an open zone: the area around it). Returns
+  -- true when it did something.
   function ctl.Click(button)
     ctl.ClearFocus()
     if button == "RightButton" then
       return ctl.Leave()
     end
-    if button ~= "LeftButton" or ctl.zv then
+    if button ~= "LeftButton" then
       return false
     end
-    local base = ctx.base()
-    local slug = zoneAtCursor(base)
+    local slug
+    if ctl.zv then
+      slug = neighborAtCursor()
+    else
+      slug = zoneAtCursor(ctx.base())
+    end
     return slug ~= nil and ctl.Enter(slug)
   end
 
@@ -502,6 +602,13 @@ function MZ.Attach(ctx)
         and ctl.Leave()
     elseif key == "ESCAPE" then
       return escFree() and ctl.Leave()
+    elseif ctx.zoomKey then
+      -- Zoom keys only with the pointer on the map and no text field focused, like Backspace.
+      local over = canvas:IsMouseOver()
+      if ctx.over then
+        over = ctx.over()
+      end
+      return over == true and not (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus()) and ctx.zoomKey(key) == true
     end
     return false
   end

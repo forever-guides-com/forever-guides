@@ -80,6 +80,22 @@ local function prune(all)
   end
 end
 
+-- Source per value (entry.from): the entry source says who wrote last, this says who delivered each
+-- value, so that deleting what other add-on users sent leaves what the game measured. Entries from
+-- before this table get it from their entry source.
+local FIELDS = { "ilvl", "professions" }
+local function fieldSources(e)
+  if type(e.from) ~= "table" then
+    e.from = {}
+    for _, field in ipairs(FIELDS) do
+      if e[field] ~= nil then
+        e.from[field] = e.source
+      end
+    end
+  end
+  return e.from
+end
+
 -- info: name (or guid), guid, ilvl, professions, race, source ("game", "inspect", "addon", "manual").
 -- Fields that are nil keep their stored value. Returns the entry, nil for no name and no guid.
 function P.Set(info)
@@ -97,12 +113,16 @@ function P.Set(info)
   if type(info.name) == "string" and info.name ~= "" then
     e.name = PN.Normalize(info.name)
   end
+  local from = fieldSources(e)
+  local source = GL.PEER_SOURCES[info.source] and info.source or "game"
   local ilvl = tonumber(info.ilvl)
   if ilvl and ilvl > 0 and ilvl <= MAX_ILVL then
     e.ilvl = math.floor(ilvl + 0.5)
+    from.ilvl = source
   end
   if type(info.professions) == "table" then
     e.professions = GL.CleanProfessions(info.professions)
+    from.professions = source
   end
   if type(info.race) == "string" and info.race ~= "" then
     e.race = info.race
@@ -123,6 +143,34 @@ function P.Receive(sender, payload)
   end
   local jobs = type(payload.professions) == "table" and #payload.professions > 0 and payload.professions or nil
   return P.Set({ name = sender, ilvl = payload.ilvl, professions = jobs, source = "addon" }) ~= nil
+end
+
+-- Forgets the values one source delivered, for example when the player stops receiving from other
+-- users of the add-on. fields ("ilvl", "professions") limits it to those values; values from other
+-- sources stay, an entry that has neither left goes completely. Returns the number of entries touched.
+function P.PurgeSource(source, fields)
+  if type(source) ~= "string" then
+    return 0
+  end
+  local all, count = list(), 0
+  for k, e in pairs(all) do
+    if type(e) == "table" then
+      local from, touched = fieldSources(e), false
+      for _, field in ipairs(fields or FIELDS) do
+        if (field == "ilvl" or field == "professions") and from[field] == source then
+          e[field], from[field], touched = nil, nil, true
+        end
+      end
+      if touched then
+        count = count + 1
+        if e.ilvl == nil and (e.professions == nil or #e.professions == 0) then
+          all[k] = nil
+        end
+      end
+    end
+  end
+  indexFor = nil
+  return count
 end
 
 function P.Clear()

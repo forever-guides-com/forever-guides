@@ -344,6 +344,7 @@ function IO.Build(P)
       icon = "copy",
       tooltip = "macros.io.copyWindow",
       variant = "primary",
+      opens = true,
       onClick = function()
         IO.exportSelection()
       end,

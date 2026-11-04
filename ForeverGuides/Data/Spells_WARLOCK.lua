@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-03.
 -- Spell catalog of WARLOCK: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -163,6 +163,14 @@ ns.Data.Spells.WARLOCK = {
     id=9078,
     k="weapon",
     n={de="Stoff",en="Cloth"},
+  },
+  {
+    fid=132366,
+    i="ability_warrior_warcry",
+    id=20575,
+    k="racial",
+    n={de="Befehlsgewalt",en="Command"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=135807,

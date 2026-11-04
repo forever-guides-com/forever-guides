@@ -54,7 +54,18 @@ register("reset", function()
   ns.Main.ResetGeometry()
   ns.Notify(L["slash.reset"], "success")
 end)
-register("diag", function()
+register("diag", function(rest)
+  local arg = U.trim(rest or ""):lower()
+  -- "/fg diag chat": only the lines of the logo chain, in the chat window.
+  if arg == "chat" and ns.LogoStatus then
+    ns.LogoStatus.Print()
+    return
+  end
+  -- "/fg diag frame": the measurement of the metal window frame, in the copy window.
+  if arg == "frame" and ns.FrameStatus then
+    ns.FrameStatus.Show()
+    return
+  end
   ns.Dialogs.Copy("help.section.diag", ns.DiagReport(), "help.diagCopyHint")
 end)
 register("errors", function()
@@ -65,9 +76,22 @@ register("tour", function(rest)
     ns.Main.Show("tutorials")
   end
 end)
+-- Umlaut and ASCII spelling: the command line is not always typed with umlauts.
+local SETUP_WORDS = {
+  close = { close = true, schliessen = true, ["schließen"] = true },
+  skip = { skip = true, ueberspringen = true, ["überspringen"] = true },
+}
 register("setup", function(rest)
   local arg = rest:lower()
-  ns.SetupWizardUI.Open({ onlyNew = arg == "new" or arg == "neu" })
+  if SETUP_WORDS.close[arg] then
+    ns.SetupWizardUI.CloseNow()
+  elseif SETUP_WORDS.skip[arg] then
+    ns.SetupWizardUI.SkipNow()
+  elseif arg == "diag" then
+    ns.SetupWizardDiag.Show()
+  else
+    ns.SetupWizardUI.Open({ onlyNew = arg == "new" or arg == "neu" })
+  end
 end)
 register("note", function(rest)
   ns.NoteWindow.Slash(rest)
@@ -117,6 +141,12 @@ end)
 register("cursor", function(rest)
   ns.Cursor.Slash(rest)
 end)
+register("farmhud", function(rest)
+  ns.FarmHud.Slash(rest)
+end)
+register("areas", function(rest)
+  ns.Areas.Slash(rest)
+end)
 register("einkauf", function(rest)
   ns.ProfessionShopWindow.Slash(rest)
 end)
@@ -136,11 +166,25 @@ end)
 register("autoquest", function(rest)
   ns.AutoQuest.Slash(rest)
 end)
+register("chathistory", function(rest)
+  ns.ChatHistory.Slash(rest)
+end)
+register("chat", function(rest)
+  if ns.ChatLauncher.Command(rest) == nil then
+    ns.Notify.chat(L["chatlaunch.usage.fg"])
+  end
+end)
 register("fenster", function(rest)
   ns.FrameTweaks.Slash(rest)
 end)
 register("flighttimer", function()
   ns.FlightTimer.TogglePreview()
+end)
+register("flightpoints", function(rest)
+  ns.FlightPointList.Slash(rest)
+end)
+register("guildmap", function()
+  ns.GuildMapList.Slash()
 end)
 register("route", function()
   ns.RouteBuilder.Toggle()
@@ -266,6 +310,10 @@ end)
 register("proftrainers", function(rest)
   local slug = ns.ProfessionRouteLogic.SlugFromText(rest)
   ns.Main.Show(slug and "proftrainers/" .. slug or "proftrainers")
+end)
+register("gathering", function(rest)
+  local item = ns.U.trim((tostring(rest or ""):gsub("/", " ")))
+  ns.Main.Show(item ~= "" and "gathering/" .. item or "gathering")
 end)
 register("guild", function(rest)
   if not areaHelp(rest, "guild") then

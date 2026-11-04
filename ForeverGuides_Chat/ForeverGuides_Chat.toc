@@ -1,0 +1,74 @@
+## Interface: 16001
+## Title: Forever Guides: Forever Chat
+## Notes: Messenger window for chat and whispers. Off by default, everything stays on this PC. Work in progress.
+## Notes-deDE: Messenger-Fenster für Chat und Flüstern. Standardmäßig aus, alles bleibt auf diesem PC. In Arbeit.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.5.0
+## Dependencies: ForeverGuides
+## DefaultState: disabled
+## LoadOnDemand: 1
+## SavedVariables: ForeverGuidesChatDB
+## X-Forever-Guides-Addon: chat
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Chat
+
+Core.lua
+LocaleCore.lua
+LocaleWindow.lua
+LocaleInput.lua
+LocaleHooks.lua
+LocaleSettings2.lua
+LocaleExtras.lua
+LocaleOpen.lua
+LocaleTeams.lua
+LocaleTeamsUI.lua
+LocaleArchive.lua
+ChatConversations.lua
+ChatUnread.lua
+ChatArchiveLogic.lua
+ChatArchive.lua
+ChatIconLogic.lua
+ChatOpenLogic.lua
+ChatSearch.lua
+ChatIngestLogic.lua
+ChatIngest.lua
+ChatSendLogic.lua
+ChatQueue.lua
+ChatSend.lua
+ChatSettingsLogic.lua
+ChatListLogic.lua
+ChatThreadLogic.lua
+ChatInputLogic.lua
+ChatMenuLogic.lua
+ChatHooksLogic.lua
+ChatFiltersLogic.lua
+ChatPeerLogic.lua
+ChatTeamsLogic.lua
+ChatTeamsPacerLogic.lua
+ChatTeamsUILogic.lua
+ChatIconPickerLogic.lua
+ChatList.lua
+ChatThread.lua
+ChatInput.lua
+ChatMenu.lua
+ChatSettings.lua
+ChatArchiveUI.lua
+ChatPeer.lua
+ChatTeams.lua
+ChatIconPicker.lua
+ChatTeamsView.lua
+ChatTeamForm.lua
+ChatTeamPanel.lua
+ChatNew.lua
+ChatMini.lua
+ChatWindow.lua
+ChatHooks.lua
+ChatFilters.lua
+ChatAutoOpen.lua
+ChatButton.lua
+ChatMinimap.lua
+ChatLaunch.lua

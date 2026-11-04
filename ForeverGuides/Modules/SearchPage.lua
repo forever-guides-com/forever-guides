@@ -320,6 +320,7 @@ local function build(container)
     tooltip = "search.web",
     width = 260,
     height = 26,
+    opens = true,
     onClick = function()
       if webQuery then
         local lang = ns.GetActiveLocale() == "deDE" and "de" or "en"

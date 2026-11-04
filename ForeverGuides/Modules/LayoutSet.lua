@@ -8,12 +8,18 @@
 --     get = function() -> table,            the settings table, repaired and created when missing
 --     defaults = table | function,          holds the default layoutId (used when nothing is stored)
 --     presets = function() -> { ids = { id, ... }, build = function(id) -> layout | nil },
---     maxLayouts = 30,                      onChange = function(),   keys = { ... } (see KEYS) })
+--     maxLayouts = 30,                      onChange = function(),   keys = { ... } (see KEYS),
+--     blank = function() -> layout,         the layout the editor's "New" starts with, empty (optional)
+--     override = { get = function() -> id | nil, put = function(id | nil) } })   (optional, see below)
+-- A host may let one character show another layout than the account (`override`, stored per character by the
+-- host): State and Layout answer for the character, the manager and SetLayout switch where the value in effect
+-- comes from (the override while it names an existing layout, else the account), AccountState and
+-- SetAccountLayout always speak for the account and the buttons of a settings page act on that choice.
 -- Every management function returns the new id or true, or nil and the reason ("name", "limit",
 -- "missing", "last", "preset"). None of them changes the chosen layout except SetLayout and the
 -- manager. Changes go through Store.set, so a window follows through FG_SETTING_CHANGED.
 local _, ns = ...
-local W, L, U, CL = ns.W, ns.L, ns.U, ns.CanvasLogic
+local W, L, U, CL, CS = ns.W, ns.L, ns.U, ns.CanvasLogic, ns.CharScopeLogic
 
 local LS = { MAX_LAYOUTS = 30 }
 ns.LayoutSet = LS
@@ -122,9 +128,9 @@ function LS.New(o)
     end
   end
 
-  -- The stored layouts and the chosen id of a settings table (default: the one `get` returns): the id
-  -- names a stored layout, the first one (else the default id) when it does not.
-  function set.State(raw)
+  -- The stored layouts and the id the account chose in a settings table (default: the one `get` returns): the
+  -- id names a stored layout, the first one (else the default id) when it does not.
+  function set.AccountState(raw)
     raw = raw == nil and o.get() or raw
     raw = type(raw) == "table" and raw or {}
     local layouts = type(raw.layouts) == "table" and raw.layouts or {}
@@ -132,6 +138,25 @@ function LS.New(o)
       return layouts, raw.layoutId
     end
     return layouts, firstLayout(layouts) or defaults().layoutId
+  end
+
+  -- The override of this character as stored, nil without a host that has one.
+  local function overrideId()
+    return o.override and o.override.get() or nil
+  end
+
+  -- The stored layouts and the id this character shows: the override while it names a stored layout, else
+  -- what AccountState says. Also returns where the id comes from ("char" or "account") and whether an
+  -- override exists that points at a layout that is gone.
+  function set.State(raw)
+    local layouts, accountId = set.AccountState(raw)
+    local id, source, stale = CS.Layout(accountId, overrideId(), function(v)
+      return type(layouts[v]) == "table"
+    end)
+    if id then
+      return layouts, id, source, stale
+    end
+    return layouts, accountId, "account", stale
   end
 
   local function stored()
@@ -203,12 +228,36 @@ function LS.New(o)
     return cache.layout
   end
 
-  function set.SetLayout(id)
+  -- The account chooses layout `id`.
+  function set.SetAccountLayout(id)
     if type(stored()[id]) == "table" then
       put("layoutId", id)
       return true
     end
     return false
+  end
+
+  -- This character shows layout `id` (nil: like the account). Needs a host with an override.
+  function set.SetOverride(id)
+    if not o.override or (id ~= nil and type(stored()[id]) ~= "table") then
+      return false
+    end
+    o.override.put(id)
+    return true
+  end
+
+  -- The display shows layout `id` from now on, at the place the value in effect comes from: the override of
+  -- this character while it names a stored layout, else the account (a dead override is dropped on the way).
+  function set.SetLayout(id)
+    local _, _, source, stale = set.State()
+    if source == "char" then
+      return set.SetOverride(id)
+    end
+    local ok = set.SetAccountLayout(id)
+    if ok and stale then
+      o.override.put(nil)
+    end
+    return ok
   end
 
   -- Stores an edited layout under `id` (default: the chosen one).
@@ -240,6 +289,10 @@ function LS.New(o)
       return nil, "limit"
     end
     clean.id = CL.UniqueId("layout", stored())
+    -- A dead override of this character must not take over the new layout that is given its id.
+    if overrideId() == clean.id then
+      o.override.put(nil)
+    end
     put("layouts." .. clean.id, clean)
     return clean.id
   end
@@ -280,7 +333,7 @@ function LS.New(o)
   -- The last layout stays. The chosen one falls back to the first of the others before it goes.
   function set.DeleteLayout(id)
     set.EnsureLayouts()
-    local layouts, current = set.State()
+    local layouts, current = set.AccountState()
     if type(layouts[id]) ~= "table" then
       return nil, "missing"
     end
@@ -314,6 +367,7 @@ function LS.New(o)
   --   select(id) -> copy of that layout, the display shows it from now on, or nil, "missing"
   --   save(id, layout) -> true, or nil, "missing"          canDelete(id) -> bool
   --   create(name, layout) / import(name, layout) -> new id (now the current layout), or nil, reason
+  --   new(name) -> new id of an empty layout (now the current layout), or nil, reason; only with `blank`
   --   rename(id, name) -> true, or nil, reason             delete(id) -> true, or nil, reason
   function set.Manager()
     local function refuse(ok, reason)
@@ -366,6 +420,11 @@ function LS.New(o)
       return true
     end
     m.create, m.import = add, add
+    if type(o.blank) == "function" then
+      function m.new(name)
+        return add(name, o.blank())
+      end
+    end
     function m.rename(id, name)
       return refuse(set.RenameLayout(id, name))
     end
@@ -462,7 +521,7 @@ function LS.BuildButtons(parent, set, opts)
   row:SetSize(LS.BUTTONS_W, LS.BUTTONS_H)
   local keys = set.keys
   local function chosen()
-    local _, id = set.State()
+    local _, id = set.AccountState()
     for _, entry in ipairs(set.Layouts()) do
       if entry.id == id then
         return entry
@@ -480,7 +539,7 @@ function LS.BuildButtons(parent, set, opts)
   end
   local function chooseNew(id, reason)
     if id then
-      set.SetLayout(id)
+      set.SetAccountLayout(id)
     end
     finish(id, reason)
   end
@@ -496,7 +555,7 @@ function LS.BuildButtons(parent, set, opts)
     {
       keys.dup,
       function()
-        local _, id = set.State()
+        local _, id = set.AccountState()
         chooseNew(set.DuplicateLayout(id))
       end,
     },

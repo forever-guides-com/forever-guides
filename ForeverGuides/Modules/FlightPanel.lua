@@ -179,6 +179,7 @@ local function build(taxi)
     width = BUTTON_WIDTH,
     height = BUTTON_HEIGHT,
     tooltip = "flightpanel.open",
+    opens = true,
     onClick = P.Toggle,
   })
   button.icon = button:CreateTexture(nil, "ARTWORK")
@@ -236,6 +237,7 @@ local function build(taxi)
     icon = "gear",
     tooltip = "flightpanel.all",
     width = WIDTH - 2 * PAD,
+    opens = true,
     onClick = function()
       P.Close()
       if ns.Main and ns.Main.Show then

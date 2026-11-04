@@ -4,9 +4,10 @@
 local _, ns = ...
 local W, L, Theme, TL, K, MW, MM, MZ =
   ns.W, ns.L, ns.Theme, ns.TravelLogic, ns.PageKit, ns.MapWorld, ns.MapMarkers, ns.MapZoom
-local MP, PL, ML, MI = ns.MapPins, ns.MapPlaceList, ns.MapLegend, ns.MapIcons
+local MP, PL, ML, MI, MIP = ns.MapPins, ns.MapPlaceList, ns.MapLegend, ns.MapIcons, ns.MapInstancePins
+local MZA = ns.MapZoneArrows
 local MR, MRL, MG = ns.MapRoute, ns.MapRouteList, ns.MapMagnify
-local RV = ns.MapReveal
+local RV, GMap, PM = ns.MapReveal, ns.GatheringMap, ns.MapPlayerMarker
 
 ns.AddLocale("enUS", {
   ["map.intro"] = "Pick start and goal to see the fastest connection.",
@@ -15,6 +16,8 @@ ns.AddLocale("enUS", {
   ["map.world.island"] = "%s (schematic)",
   ["map.art.label"] = "Map image",
   ["map.display"] = "Display",
+  ["map.display.tip"] = "What the map shows: symbols, names, ore and herb spots and your position.",
+  ["map.summary"] = "%s: %d of %d",
   ["map.symbols"] = "Show symbols",
   ["map.names"] = "Show names",
   ["map.symbolSize"] = "Symbol size",
@@ -25,6 +28,7 @@ ns.AddLocale("enUS", {
   ["map.dimTip"] = "Filtered places stay faded and not clickable.\nOff: hidden.",
   ["map.rb.open"] = "Open route window",
   ["map.filters"] = "Filters",
+  ["map.filters.tip"] = "Transport types and route options. A tick means allowed.",
   ["map.useLevel"] = "Respect my level",
   ["map.skyborne"] = "Skyborne race",
   ["map.preferFlight"] = "Prefer flying",
@@ -100,6 +104,8 @@ ns.AddLocale("deDE", {
   ["map.world.island"] = "%s (schematisch)",
   ["map.art.label"] = "Kartenbild",
   ["map.display"] = "Anzeige",
+  ["map.display.tip"] = "Was die Karte zeigt: Symbole, Namen, Erz- und Kräuterstellen und deine Position.",
+  ["map.summary"] = "%s: %d von %d",
   ["map.symbols"] = "Symbole zeigen",
   ["map.names"] = "Namen zeigen",
   ["map.symbolSize"] = "Symbolgröße",
@@ -110,6 +116,7 @@ ns.AddLocale("deDE", {
   ["map.dimTip"] = "Ausgefilterte Orte bleiben blass und nicht klickbar.\nAus: ausgeblendet.",
   ["map.rb.open"] = "Routen-Fenster öffnen",
   ["map.filters"] = "Filter",
+  ["map.filters.tip"] = "Verkehrsmittel und Routenoptionen. Ein Haken heißt erlaubt.",
   ["map.useLevel"] = "Meine Stufe beachten",
   ["map.skyborne"] = "Skyborne-Volk",
   ["map.preferFlight"] = "Fliegen bevorzugen",
@@ -331,8 +338,8 @@ local function build(container)
   Request.shared = state
   local byslug, zoneOf = {}, {}
   local data, world, layout, island, estimated
-  local refresh, layoutPanes, followTab, intro
-  local markers, zoom, pins, places, legend, route, routeList, showStep, mag, stopsList
+  local refresh, layoutPanes, followTab, intro, paintCanvas
+  local markers, zoom, pins, instancePins, zoneArrows, places, legend, route, routeList, showStep, mag, stopsList, gather, player, guild
   local exploredCache = {}
   -- True while the map pane is laid out: a banner that changes its height then must not start another layout.
   local laying = false
@@ -352,15 +359,21 @@ local function build(container)
       view:Layout()
     end,
   })
-  local hint = W.Text(header, { key = "map.route.pick", role = "ui", color = "textSecondary" })
-  function header:fgGridLayout()
+  local hint = W.Text(header, { key = "map.route.pick", role = "ui", color = "textSecondary", wrap = true })
+  -- Height of the header row: the hint wraps beside the button and the row grows with it.
+  local headerH = HEADER_H
+  function header:fgGridLayout(width)
+    local buttonH = Theme.lineHeight(HEADER_H)
+    detailsButton:SetSize(math.max(100, math.ceil(detailsButton.label:GetStringWidth()) + 24), buttonH)
     detailsButton:ClearAllPoints()
     detailsButton:SetPoint("TOPRIGHT", self, "TOPRIGHT")
     hint:ClearAllPoints()
-    hint:SetPoint("LEFT", self, "LEFT", 0, 0)
-    hint:SetPoint("RIGHT", detailsButton, "LEFT", -10, 0)
-    self:SetHeight(HEADER_H)
-    return HEADER_H
+    hint:SetWidth(math.max(1, width - detailsButton:GetWidth() - 10))
+    local textH = math.ceil(hint:GetStringHeight())
+    headerH = math.max(buttonH, textH)
+    hint:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -math.floor((headerH - textH) / 2))
+    self:SetHeight(headerH)
+    return headerH
   end
   s:Add(header, { gap = GAP })
   intro = ns.AddParagraph(view, "map.intro", { gap = GAP })
@@ -387,6 +400,14 @@ local function build(container)
     return ns.Store.get("settings.mapDimFiltered") == true
   end
 
+  -- State of a flight master place ("known", "unknown", "neutral") while the flight dim switch is on, nil for
+  -- every other place: the hubs of cities and harbors keep their own symbol.
+  local function flightState(n)
+    if n.k == "flightMaster" and ns.Store.get("settings.mapFlightAddonMap") ~= false then
+      return ns.FlightKnown.NodeState(n.s)
+    end
+  end
+
   -- Display settings: symbols and names default on, the map image defaults to fully revealed.
   local function symbolsOn()
     return ns.Store.get("settings.mapSymbols") ~= false
@@ -398,6 +419,14 @@ local function build(container)
 
   local function revealOn()
     return RV.Revealed()
+  end
+
+  local function gatherOn()
+    return ns.Store.get("settings.gather.forever") ~= false
+  end
+
+  local function playerOn()
+    return ns.Store.get("settings.mapPlayerMarker") ~= false
   end
 
   local function symbolScale()
@@ -427,7 +456,7 @@ local function build(container)
   -- Two panes under the header: the map on the left, the side column (filters, places,
   -- start/destination, route) with its own scroll on the right. Stacked on narrow pages, map first.
   local function visibleHeight()
-    local above = HEADER_H + GAP + (state.introOpen and intro:GetStringHeight() + GAP or 0)
+    local above = headerH + GAP + (state.introOpen and intro:GetStringHeight() + GAP or 0)
     return view.area:GetHeight() - 2 * s.pad - above
   end
   local split = FL.TwoPane(view.content, {
@@ -452,7 +481,9 @@ local function build(container)
   sideArea:SetAllPoints()
   local side = { area = sideArea, content = sideArea.content, stack = W.Stack(sideArea, GAP) }
 
-  -- Filters ----------------------------------------------------------------
+  -- Filters and display ------------------------------------------------------------------
+  -- Faction on a row of its own, then two check lists: what the route may use (and how it is
+  -- chosen) and what the map shows. Both write into the same places as the switches did before.
   ns.AddHeading(side, "map.filters")
   local filterBox = CreateFrame("Frame", nil, side.content)
   K.Anchor("FG.Map.Filters", filterBox)
@@ -465,24 +496,22 @@ local function build(container)
       refresh()
     end,
   })
-  local checks = {}
-  for _, m in ipairs(UI_MODES) do
-    checks[#checks + 1] = W.Checkbox(filterBox, {
-      key = "map.mode." .. m,
-      get = function()
-        return state.modes[m]
-      end,
-      set = function(v)
-        state.modes[m] = v
-        refresh()
-      end,
-    })
+  -- The symbol the map draws for a kind of place, painted into the icon box of a list row.
+  local function kindIcon(kind)
+    return function(box)
+      local badge = MI.NewBadge(box)
+      badge.box:SetPoint("CENTER", box, "CENTER")
+      badge:Set(kind, "B", 14)
+    end
   end
-  local function option(key, field)
-    return W.Checkbox(filterBox, {
+  local function stateItem(id, key, field, look, tip)
+    return {
+      id = id,
       key = key,
-      tooltip = key,
-      tooltipText = key .. ".tip",
+      tooltip = tip and key,
+      tooltipText = tip and key .. ".tip",
+      icon = look.kind and kindIcon(look.kind),
+      glyph = look.glyph,
       get = function()
         return state[field]
       end,
@@ -490,69 +519,111 @@ local function build(container)
         state[field] = v
         refresh()
       end,
-    })
+    }
   end
-  checks[#checks + 1] = option("map.preferFlight", "preferFlight")
-  checks[#checks + 1] = option("map.mount", "mount")
-  checks[#checks + 1] = W.Checkbox(filterBox, {
-    key = "map.useLevel",
-    get = function()
-      return state.useLevel
-    end,
-    set = function(v)
-      state.useLevel = v
-      refresh()
-    end,
-  })
-  checks[#checks + 1] = W.Checkbox(filterBox, {
-    key = "map.skyborne",
-    get = function()
-      return state.skyborne
-    end,
-    set = function(v)
-      state.skyborne = v
-      refresh()
-    end,
-  })
-  function filterBox:fgGridLayout(width)
-    faction:ClearAllPoints()
-    faction:SetPoint("TOPLEFT", self, "TOPLEFT")
-    faction:SetWidth(width)
-    local top = faction:fgGridLayout(width) + 12
-    local cols = math.max(1, math.min(4, math.floor(width / 150)))
-    local cw = width / cols
-    for i, c in ipairs(checks) do
-      local col, row = (i - 1) % cols, math.floor((i - 1) / cols)
-      c:ClearAllPoints()
-      c:SetPoint("TOPLEFT", self, "TOPLEFT", col * cw, -top - row * 26)
-      c:SetSize(cw - 8, 24)
+  local function modeItem(mode, look)
+    return {
+      id = mode,
+      key = "map.mode." .. mode,
+      icon = look.kind and kindIcon(look.kind),
+      glyph = look.glyph,
+      get = function()
+        return state.modes[mode]
+      end,
+      set = function(v)
+        state.modes[mode] = v
+        refresh()
+      end,
+    }
+  end
+  local function summaryOf(key)
+    return function(on, total)
+      return string.format(L["map.summary"], L[key], on, total)
     end
-    local h = top + math.ceil(#checks / cols) * 26
-    self:SetHeight(h)
-    return h
   end
-  side.stack:Add(filterBox)
+  local filterList = W.CheckDropdown(filterBox, {
+    summary = summaryOf("map.filters"),
+    tooltip = "map.filters",
+    tooltipText = "map.filters.tip",
+    items = {
+      modeItem("flight", { kind = "flightMaster" }),
+      modeItem("zeppelin", { kind = "zeppelinTower" }),
+      modeItem("portal", { kind = "portal" }),
+      modeItem("spell", { glyph = "star" }),
+      stateItem("mount", "map.mount", "mount", { glyph = "play" }, true),
+      stateItem("skyborne", "map.skyborne", "skyborne", { glyph = "star-outline" }),
+      modeItem("boat", { kind = "harbor" }),
+      modeItem("tram", { kind = "tram" }),
+      modeItem("walk", { glyph = "chevron-right" }),
+      stateItem("preferFlight", "map.preferFlight", "preferFlight", { glyph = "chevron-up" }, true),
+      stateItem("useLevel", "map.useLevel", "useLevel", { glyph = "sort-up" }),
+    },
+  })
+  K.Anchor("FG.Map.FilterList", filterList)
 
-  -- Display: symbols, names, symbol size ------------------------------------------------------
-  ns.AddHeading(side, "map.display")
-  local displayBox = CreateFrame("Frame", nil, side.content)
-  K.Anchor("FG.Map.Display", displayBox)
-  local function switch(key, setting, on, tip)
-    return W.Checkbox(displayBox, {
+  local function storeItem(id, key, setting, on, glyph, tip)
+    return {
+      id = id,
       key = key,
       tooltip = tip and key,
       tooltipText = tip,
+      glyph = glyph,
       get = on,
       set = function(v)
         ns.Store.set(setting, v)
         refresh()
       end,
-    })
+    }
   end
-  local switches = {
-    switch("map.symbols", "settings.mapSymbols", symbolsOn),
-    switch("map.names", "settings.mapNames", namesOn),
-  }
+  local displayList = W.CheckDropdown(filterBox, {
+    summary = summaryOf("map.display"),
+    tooltip = "map.display",
+    tooltipText = "map.display.tip",
+    items = {
+      storeItem("symbols", "map.symbols", "settings.mapSymbols", symbolsOn, "pin"),
+      storeItem("names", "map.names", "settings.mapNames", namesOn, "tag"),
+      storeItem("gather", "map.gather", "settings.gather.forever", gatherOn, "search", "map.gather.tip"),
+      storeItem("player", "map.player", "settings.mapPlayerMarker", playerOn, "marker", "map.player.tip"),
+    },
+  })
+  K.Anchor("FG.Map.DisplayList", displayList)
+  filterBox.filterList, filterBox.displayList = filterList, displayList
+  local GAP_DD = 8
+  -- The two lists stand side by side while both summaries fit into half of the width, else
+  -- one below the other. Their height follows the font like the rows do.
+  function filterBox:fgGridLayout(width)
+    faction:ClearAllPoints()
+    faction:SetPoint("TOPLEFT", self, "TOPLEFT")
+    faction:SetWidth(width)
+    local top = faction:fgGridLayout(width) + 10
+    local rowH = Theme.lineHeight(24)
+    local natural = 0
+    for _, dd in ipairs({ filterList, displayList }) do
+      dd:SetHeight(rowH)
+      natural = math.max(natural, math.ceil(dd.current:GetStringWidth()) + 8 + 6 + 12 + 8)
+    end
+    local sideBySide = 2 * natural + GAP_DD <= width
+    local half = math.floor((width - GAP_DD) / 2)
+    filterList:ClearAllPoints()
+    filterList:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -top)
+    filterList:SetWidth(sideBySide and half or width)
+    displayList:ClearAllPoints()
+    if sideBySide then
+      displayList:SetPoint("TOPLEFT", self, "TOPLEFT", half + GAP_DD, -top)
+      displayList:SetWidth(width - half - GAP_DD)
+    else
+      displayList:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -(top + rowH + GAP_DD))
+      displayList:SetWidth(width)
+    end
+    local h = top + (sideBySide and rowH or 2 * rowH + GAP_DD)
+    self:SetHeight(h)
+    return h
+  end
+  side.stack:Add(filterBox)
+
+  -- Symbol size and the ore and herb line under the lists ---------------------------------
+  local displayBox = CreateFrame("Frame", nil, side.content)
+  K.Anchor("FG.Map.Display", displayBox)
   local sizeLabel = W.Text(displayBox, { key = "map.symbolSize", role = "ui" })
   local sizeValue
   local function paintSize()
@@ -591,29 +662,85 @@ local function build(container)
     end,
   })
   paintSize()
-  displayBox.switches, displayBox.smaller = switches, smaller
-  displayBox.sizeValue, displayBox.bigger = sizeValue, bigger
-  function displayBox:fgGridLayout(width)
-    local cols = math.max(1, math.min(3, math.floor(width / 170)))
-    local cw = width / cols
-    for i, c in ipairs(switches) do
-      local col, row = (i - 1) % cols, math.floor((i - 1) / cols)
-      c:ClearAllPoints()
-      c:SetPoint("TOPLEFT", self, "TOPLEFT", col * cw, -row * 26)
-      c:SetSize(cw - 8, 24)
+  -- Ore and herb spots of the open zone: what is shown, and the way to choose or clear the items.
+  local gatherText = W.Text(displayBox, { role = "ui", color = "textSecondary", wrap = true })
+  local gatherHide = W.Button(displayBox, {
+    key = "map.gather.hide",
+    tooltip = "map.gather.hide",
+    tooltipText = "map.gather.hideTip",
+    width = 170,
+    height = 24,
+    onClick = function()
+      local zv = zoom.View()
+      if zv then
+        -- An empty stored choice: the page shows every item of the zone as off too.
+        ns.GatherSelection.Set(zv.mapId, {})
+      end
+    end,
+  })
+  local gatherChoose = W.Button(displayBox, {
+    key = "map.gather.choose",
+    tooltip = "map.gather.choose",
+    tooltipText = "map.gather.chooseTip",
+    width = 170,
+    height = 24,
+    opens = true,
+    onClick = function()
+      ns.Main.Show("gathering")
+    end,
+  })
+  local function paintGather()
+    local on = gatherOn()
+    gatherText:SetShown(on)
+    local button
+    if on then
+      local info = gather.Info()
+      if info.state == "shown" then
+        gatherText:SetText(string.format(L["map.gather.spots"], info.points, info.items))
+        button = gatherHide
+      elseif info.state == "data" then
+        gatherText:SetText(ns.GatherDataAccess.Hint(info.status))
+      else
+        gatherText:SetText(L["map.gather." .. info.state])
+        button = info.state ~= "empty" and gatherChoose or nil
+      end
     end
-    local top = math.ceil(#switches / cols) * 26 + 4
+    gatherHide:SetShown(button == gatherHide)
+    gatherChoose:SetShown(button == gatherChoose)
+    displayBox.gatherButton = button
+  end
+  displayBox.smaller, displayBox.sizeValue, displayBox.bigger = smaller, sizeValue, bigger
+  displayBox.gatherText, displayBox.gatherHide, displayBox.gatherChoose = gatherText, gatherHide, gatherChoose
+  function displayBox:fgGridLayout(width)
+    local rowH = math.max(Theme.lineHeight(24), math.ceil(sizeLabel:GetStringHeight()) + 2)
+    local mid = math.floor(rowH / 2)
     bigger:ClearAllPoints()
-    bigger:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -top)
+    bigger:SetPoint("RIGHT", self, "TOPRIGHT", 0, -mid)
     sizeValue:ClearAllPoints()
     sizeValue:SetPoint("RIGHT", bigger, "LEFT")
     smaller:ClearAllPoints()
     smaller:SetPoint("RIGHT", sizeValue, "LEFT")
     sizeLabel:ClearAllPoints()
-    sizeLabel:SetPoint("LEFT", self, "TOPLEFT", 0, -(top + 12))
+    sizeLabel:SetPoint("LEFT", self, "TOPLEFT", 0, -mid)
     sizeLabel:SetPoint("RIGHT", smaller, "LEFT", -6, 0)
-    self:SetHeight(top + 24)
-    return top + 24
+    local y = rowH
+    if gatherOn() then
+      y = y + 8
+      gatherText:ClearAllPoints()
+      gatherText:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+      gatherText:SetWidth(width)
+      y = y + math.ceil(gatherText:GetStringHeight()) + 6
+      local button = self.gatherButton
+      if button then
+        local h = Theme.lineHeight(24)
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+        button:SetSize(math.min(width, math.max(170, math.ceil(button.label:GetStringWidth()) + 24)), h)
+        y = y + h
+      end
+    end
+    self:SetHeight(y)
+    return y
   end
   side.stack:Add(displayBox)
 
@@ -703,8 +830,9 @@ local function build(container)
     planTitle:ClearAllPoints()
     planTitle:SetPoint("LEFT", self, "LEFT")
     planTitle:SetPoint("RIGHT", resetButton, "LEFT", -6, 0)
-    self:SetHeight(resetButton:GetHeight())
-    return resetButton:GetHeight()
+    local h = math.max(resetButton:GetHeight(), math.ceil(planTitle:GetStringHeight()))
+    self:SetHeight(h)
+    return h
   end
   side.stack:Add(planHead, { gap = 6 })
   stopsList = MRL.AttachStops({
@@ -855,6 +983,7 @@ local function build(container)
       icon = "open",
       tooltip = "map.rb.open",
       width = 200,
+      opens = true,
       onClick = function()
         if ns.RouteBuilder then
           ns.RouteBuilder.Show()
@@ -1047,6 +1176,7 @@ local function build(container)
 
   markers = MM.Attach({
     canvas = canvas,
+    frame = viewport,
     toolbar = toolbar,
     side = side,
     view = activeView,
@@ -1078,6 +1208,8 @@ local function build(container)
     end,
     routeModeChanged = function()
       state.pickNext = nil
+      -- The instance markers give way to the places of their zones while Start and Goal are picked.
+      paintCanvas()
     end,
   })
   canvas.markers = markers
@@ -1085,8 +1217,16 @@ local function build(container)
   mag = MG.Attach({
     viewport = viewport,
     canvas = canvas,
-    active = function()
-      return data ~= nil and zoom ~= nil and zoom.View() == nil and worldActive() and not islandMode()
+    view = function()
+      if data == nil or zoom == nil then
+        return nil
+      end
+      if zoom.View() ~= nil then
+        return "zone"
+      end
+      if worldActive() and not islandMode() then
+        return "world"
+      end
     end,
     dragAllowed = function()
       return not markers.mode and not ns.Keys.Matches("mapMarker")
@@ -1096,6 +1236,7 @@ local function build(container)
     end,
     moved = function()
       pins.Paint()
+      gather.Paint(false)
     end,
   })
   canvas.mag = mag
@@ -1115,6 +1256,10 @@ local function build(container)
       local z = zoneOf[slug]
       return z and ns.T(z.n) or nil
     end,
+    levels = function(slug)
+      local z = zoneOf[slug]
+      return z and z.lmin, z and z.lmax
+    end,
     placeCount = function(slug)
       return placesIn[slug] or 0
     end,
@@ -1128,7 +1273,13 @@ local function build(container)
       return count
     end,
     markers = markers,
+    frame = viewport,
+    zoomKey = function(key)
+      return mag.Key(key)
+    end,
     changed = function()
+      -- Every zone opens at 100 percent, the world view keeps its own zoom.
+      mag.ResetView("zone")
       places.Update()
       view:Layout()
     end,
@@ -1149,6 +1300,15 @@ local function build(container)
         return TL.NodeVisible(n, o)
       end
     end,
+    -- Where the markers speak for a zone, its instance entrances are not drawn twice (a Start, Goal
+    -- or selected place keeps its pin so the flag stays visible).
+    skip = function(n)
+      return n.k == "instanceEntrance"
+        and instancePins.Covers(n.z)
+        and state.start ~= n.s
+        and state.dest ~= n.s
+        and state.selected ~= n.s
+    end,
     pos = nodePos,
     name = nodeName,
     tip = function(n)
@@ -1162,9 +1322,16 @@ local function build(container)
       if n.est and zoom.View() then
         lines[#lines + 1] = Theme.hexText("textMuted", L["map.zoom.estimated"])
       end
+      local flightText = ns.FlightPointsLogic.StateText(flightState(n), L)
+      if flightText then
+        lines[#lines + 1] = Theme.hexText("textSecondary", flightText)
+      end
       return table.concat(lines, "\n")
     end,
     dim = dimFiltered,
+    faded = function(n)
+      return flightState(n) == "unknown"
+    end,
     symbols = symbolsOn,
     names = namesOn,
     scale = symbolScale,
@@ -1199,7 +1366,113 @@ local function build(container)
     unhover = unhover,
   })
 
-  canvas.pins, canvas.places, canvas.legend = pins, places, legend
+  instancePins = MIP.Attach({
+    canvas = canvas,
+    view = activeView,
+    maps = function()
+      return layout and layout.maps
+    end,
+    width = function()
+      local _, _, w = mag.Window()
+      return w
+    end,
+    scale = symbolScale,
+    symbols = symbolsOn,
+    blocked = function()
+      return markers.mode or markers.routeMode
+    end,
+    picking = function()
+      return markers.routeMode == true
+    end,
+    repaint = function()
+      paintCanvas()
+    end,
+  })
+
+  zoneArrows = MZA.Attach({
+    canvas = canvas,
+    zone = function()
+      return zoom.View()
+    end,
+    zones = function()
+      return data and data.zones
+    end,
+    open = function(slug)
+      zoom.Enter(slug)
+    end,
+    width = function()
+      local _, _, w = mag.Window()
+      return w
+    end,
+    scale = symbolScale,
+    symbols = symbolsOn,
+    blocked = function()
+      return markers.mode or markers.routeMode
+    end,
+  })
+
+  canvas.pins, canvas.instPins, canvas.places, canvas.legend = pins, instancePins.pins, places, legend
+  canvas.arrowPins, canvas.zoneArrows = zoneArrows.pins, zoneArrows
+
+  gather = GMap.Attach({
+    canvas = canvas,
+    mapId = function()
+      local zv = zoom.View()
+      return zv and zv.mapId
+    end,
+    enabled = gatherOn,
+    scale = symbolScale,
+    window = function()
+      return mag.Window()
+    end,
+    cursor = function()
+      local fx, fy = MM.CursorFraction(viewport)
+      if fx and fx >= 0 and fx <= 1 and fy >= 0 and fy <= 1 and canvas:IsMouseOver() then
+        return fx, fy
+      end
+    end,
+  })
+  canvas.gather = gather
+
+  player = PM.Attach({
+    canvas = canvas,
+    view = activeView,
+    enabled = playerOn,
+    zoneName = zoneLabel,
+    window = function()
+      return mag.Window()
+    end,
+    cursor = function()
+      local fx, fy = MM.CursorFraction(viewport)
+      if fx and fx >= 0 and fx <= 1 and fy >= 0 and fy <= 1 and canvas:IsMouseOver() then
+        return fx, fy
+      end
+    end,
+  })
+  canvas.player = player
+  -- Guild members: the symbols of the world map, from the positions members share (see MapGuildMarkers.lua).
+  guild = ns.MapGuildMarkers.Attach({
+    canvas = canvas,
+    view = activeView,
+    window = function()
+      return mag.Window()
+    end,
+    cursor = function()
+      local fx, fy = MM.CursorFraction(viewport)
+      if fx and fx >= 0 and fx <= 1 and fy >= 0 and fy <= 1 and canvas:IsMouseOver() then
+        return fx, fy
+      end
+    end,
+  })
+  canvas.guild = guild
+  -- The page of the items or the material filter changed a choice: the map lays out again with it.
+  local function onGatherChoice()
+    if container:IsShown() and data then
+      view:Layout()
+    end
+  end
+  ns.On("FG_GATHER_SELECTION", onGatherChoice)
+  ns.On("FG_GATHER_FILTER_CHANGED", onGatherChoice)
 
   -- Positions of a place on the current view as canvas px, y down.
   local function routePoint(slug)
@@ -1286,7 +1559,8 @@ local function build(container)
     return cached or nil
   end
 
-  local function paintCanvas()
+  function paintCanvas()
+    paintGather()
     if not data then
       return
     end
@@ -1311,9 +1585,14 @@ local function build(container)
     ns.Safe("map-art", paintArt, canvas, art, pieces, dim)
     ns.Safe("map-island", paintPanel, canvas, (onIsland and not zoomed) and island.panel or nil, panelTitle(), zoneOf)
     zoom.Paint()
+    gather.Paint(true)
+    ns.Safe("map-instance-pins", instancePins.Paint)
+    ns.Safe("map-zone-arrows", zoneArrows.Paint)
     pins.Paint()
     markers.Paint()
     route.Paint()
+    player.Update(true)
+    guild.Update(true)
   end
   ns.Bind(canvas, paintCanvas)
 
@@ -1344,7 +1623,7 @@ local function build(container)
     -- Mode group and diagnostics share the first row. Below it (and below the hint of the
     -- Start/Goal mode) the image mode switch, the art switch and the dim switch flow side by side
     -- and wrap, then the banner of the map data comes last.
-    local rowH = math.max(TOOLBAR_H, markers.modeRow:SetWidthAvailable(MM.MODE_WIDTH))
+    local rowH = math.max(Theme.lineHeight(TOOLBAR_H), markers.modeRow:SetWidthAvailable(MM.MODE_WIDTH))
     local artShown = layout ~= nil and not onIsland
     local revealShown = artShown and state.artOn
     local zoomed = zoom.View() ~= nil
@@ -1356,14 +1635,19 @@ local function build(container)
     local hintH = markers.LayoutHint(w, rowH + GAP)
     local extra = hintH > 0 and hintH + GAP or 0
     local chips = {}
+    -- A switch is as high as the font needs and as wide as its label, so a text never reaches a neighbor.
+    local chipH = Theme.lineHeight(24)
+    local function switchW(toggle, base)
+      return math.min(w, math.max(base, math.ceil(toggle.label:GetStringWidth()) + 32))
+    end
     if revealShown then
       local rw = math.min(RV.ROW_W, w)
       chips[#chips + 1] = { frame = reveal.row, w = rw, h = reveal.row:SetWidthAvailable(rw) }
     end
     if artShown then
-      chips[#chips + 1] = { frame = artToggle, w = math.min(200, w), h = 24 }
+      chips[#chips + 1] = { frame = artToggle, w = switchW(artToggle, 200), h = chipH }
     end
-    chips[#chips + 1] = { frame = dimToggle, w = math.min(DIM_W, w), h = 24 }
+    chips[#chips + 1] = { frame = dimToggle, w = switchW(dimToggle, DIM_W), h = chipH }
     local chipsH = flowChips(chips, w)
     local bannerH = needData and reveal.banner:Update(true) and reveal.banner:Fit(w) or 0
     if not needData then

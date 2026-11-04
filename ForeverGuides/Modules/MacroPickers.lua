@@ -64,7 +64,7 @@ local function buildPicker()
 
   local function selectedRow()
     for _, row in ipairs(st.data) do
-      if row.id == st.selected then
+      if row.id == st.selected and not row.empty then
         return row
       end
     end
@@ -338,7 +338,8 @@ end
 
 -- opts: onPick(row, mode) with mode token|name|known|id|base; selectMode (preset slot, no mode choice);
 -- class: initial class filter; query: initial search text; rankStyle: the builder's rank style (any
--- other than "picked" decides the rank itself, so the "highest rank" button goes away).
+-- other than "picked" decides the rank itself, so the "highest rank" button goes away); knownOnly: sets the
+-- "only learned spells" filter (left as it was when absent).
 function UI.OpenSpellPicker(opts)
   if not S.count or S.count() == 0 then
     ns.Notify(L["macros.picker.nodata"], "warning")
@@ -352,6 +353,10 @@ function UI.OpenSpellPicker(opts)
   st.class = opts.class or st.class or "ALL"
   st.query = opts.query or ""
   st.search.edit:SetText(st.query)
+  if opts.knownOnly ~= nil then
+    st.known = opts.knownOnly == true
+    st.knownBox.Refresh()
+  end
   W.SetText(picker.title, opts.selectMode and "macros.picker.titleSelect" or "macros.picker.title")
   st.modeDrop:SetShown(not opts.selectMode)
   st.baseBtn:SetShown(not opts.rankStyle or opts.rankStyle == "picked")
@@ -386,7 +391,7 @@ local function buildItemPicker()
   count:SetPoint("BOTTOMLEFT", 16, 18)
 
   local function refresh()
-    st.data = I.search(st.query, { limit = I.LIMIT })
+    st.data = (st.opts and st.opts.search or I.search)(st.query, { limit = I.LIMIT })
     list:SetData(st.data)
     list:SetShown(#st.data > 0)
     empty:SetShown(#st.data == 0)
@@ -416,16 +421,9 @@ local function buildItemPicker()
   list = ns.PageKit.NewList(host, {
     rowHeight = 40,
     bind = function(row)
-      local sources = {}
-      for _, source in ipairs(row.sources) do
-        sources[#sources + 1] = L["macros.items.source." .. source]
-      end
-      if #sources == 0 then
-        sources[1] = L["macros.items.source.none"]
-      end
       return {
         title = ns.ItemInfo.ColorName(row.name, row.quality),
-        sub = string.format(L["macros.items.sub"], row.id) .. ", " .. table.concat(sources, ", "),
+        sub = I.line(row),
         icon = I.icon(row.id),
       }
     end,
@@ -437,8 +435,9 @@ local function buildItemPicker()
   return f
 end
 
--- opts: onPick(row) with row = { id, name, quality, sources }. One click on a row chooses it, so does
--- Enter in the search field (the first row).
+-- opts: onPick(row) with row = { id, name, quality, sources, slot? }, search(query, opts) -> rows (the macro item
+-- search when absent), title (a locale key). One click on a row chooses it, so does Enter in the search field
+-- (the first row).
 function UI.OpenItemPicker(opts)
   if not itemPicker then
     itemPicker = buildItemPicker()
@@ -446,7 +445,7 @@ function UI.OpenItemPicker(opts)
   local st = itemPicker.st
   st.opts, st.query = opts, opts.query or ""
   I.Reset()
-  W.SetText(itemPicker.title, "macros.items.title")
+  W.SetText(itemPicker.title, opts.title or "macros.items.title")
   st.search.edit:SetText(st.query)
   itemPicker:Show()
   st.refresh()

@@ -12,16 +12,17 @@ local function lib()
 end
 
 -- `host` (optional) names the display a layout string belongs to, for types that more than one display reads.
-function Strings.envelope(kind, data, exportedAt, host)
-  return { v = Strings.VERSION, type = kind, exportedAt = exportedAt or ns.U.now(), data = data, host = host }
+-- `version` (optional) raises the envelope version for data an older reader must refuse; the others stay at VERSION.
+function Strings.envelope(kind, data, exportedAt, host, version)
+  return { v = version or Strings.VERSION, type = kind, exportedAt = exportedAt or ns.U.now(), data = data, host = host }
 end
 
-function Strings.encode(kind, data, exportedAt, host)
+function Strings.encode(kind, data, exportedAt, host, version)
   local LD = lib()
   if not LD then
     return nil, "LibDeflate missing"
   end
-  local ok, json = pcall(ns.Json.encode, Strings.envelope(kind, data, exportedAt, host))
+  local ok, json = pcall(ns.Json.encode, Strings.envelope(kind, data, exportedAt, host, version))
   if not ok then
     return nil, json
   end

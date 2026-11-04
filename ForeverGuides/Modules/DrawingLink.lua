@@ -252,6 +252,7 @@ local function build()
     width = 150,
     tooltip = "drawlink.window",
     tooltipText = "drawlink.windowTip",
+    opens = true,
     onClick = openAsWindow,
   })
   d.window:SetPoint("BOTTOMRIGHT", d.save, "TOPRIGHT", 0, 6)
@@ -261,6 +262,7 @@ local function build()
     width = 150,
     tooltip = "drawlink.edit",
     tooltipText = "drawlink.editTip",
+    opens = true,
     onClick = openInEditor,
   })
   d.edit:SetPoint("RIGHT", d.save, "LEFT", -8, 0)

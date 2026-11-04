@@ -41,7 +41,10 @@ local function base(name, width, height)
   end)
   -- A hook, so a module that sets its own OnShow keeps it: the newest dialog is on top and on screen.
   f:HookScript("OnShow", function()
+    -- Over a window pinned to the top strata (setup wizard) a dialog goes to that strata too.
+    f:SetFrameStrata(ns.TopLayer.Active() and "TOOLTIP" or "FULLSCREEN_DIALOG")
     f:Raise()
+    ns.TopLayer.Over(f, ns.TopLayer.DIALOG)
     ns.WindowShell.FitToScreen(f)
   end)
   ns.WindowShell.RegisterEsc(f)
@@ -218,20 +221,40 @@ function Dialogs.Copy(titleKey, text, hintKey, actions)
 end
 
 local confirm
-function Dialogs.Confirm(titleKey, textKey, onYes, onNo)
+-- titleKey, textKey: locale keys. opts (optional): yesKey (label of the confirming button instead of "OK"),
+-- text and title (literal strings that replace the keys, for texts built from several parts). A long
+-- text makes the dialog taller.
+function Dialogs.Confirm(titleKey, textKey, onYes, onNo, opts)
+  opts = opts or {}
   if not confirm then
     confirm = base("ForeverGuidesConfirmDialog", 420, 170)
     confirm.text = W.Text(confirm, { role = "text", wrap = true })
     confirm.text:SetPoint("TOPLEFT", 16, -48)
-    confirm.text:SetPoint("RIGHT", -16, 0)
+    confirm.text:SetWidth(388)
     confirm.yes = W.Action(
       confirm,
       { label = "act.confirm", icon = "check", tooltip = "common.confirm", variant = "primary", width = 110 }
     )
     confirm.yes:SetPoint("BOTTOMRIGHT", -16, 14)
     confirm.no = W.Action(confirm, { label = "act.cancel", icon = "close", tooltip = "common.cancel", width = 110 })
-    confirm.no:SetPoint("RIGHT", confirm.yes, "LEFT", -8, 0)
+    confirm.alt = {}
   end
+  local yes = confirm.yes
+  if opts.yesKey then
+    yes = confirm.alt[opts.yesKey]
+    if not yes then
+      yes = W.Action(confirm, { key = opts.yesKey, icon = "check", variant = "primary", width = 130 })
+      yes:SetPoint("BOTTOMRIGHT", -16, 14)
+      confirm.alt[opts.yesKey] = yes
+    end
+  end
+  confirm.yes:SetShown(yes == confirm.yes)
+  for _, button in pairs(confirm.alt) do
+    button:SetShown(button == yes)
+  end
+  confirm.active = yes
+  confirm.no:ClearAllPoints()
+  confirm.no:SetPoint("RIGHT", yes, "LEFT", -8, 0)
   confirm.no:SetScript(
     "OnClick",
     ns.Wrap("confirm-no", function()
@@ -241,15 +264,16 @@ function Dialogs.Confirm(titleKey, textKey, onYes, onNo)
       end
     end)
   )
-  W.SetText(confirm.title, titleKey)
-  W.SetText(confirm.text, textKey)
-  confirm.yes:SetScript(
+  W.SetText(confirm.title, titleKey, opts.title)
+  W.SetText(confirm.text, textKey, opts.text)
+  yes:SetScript(
     "OnClick",
     ns.Wrap("confirm", function()
       confirm:Hide()
       onYes()
     end)
   )
+  confirm:SetHeight(math.max(170, 48 + confirm.text:GetStringHeight() + 64))
   confirm:Show()
 end
 

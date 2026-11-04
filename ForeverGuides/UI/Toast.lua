@@ -393,6 +393,7 @@ ensure = function()
     height = BUTTON_H,
     iconSize = 14,
     tooltip = "toast.history",
+    opens = true,
     onClick = function()
       Toast.OpenHistory()
     end,

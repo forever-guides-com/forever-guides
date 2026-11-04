@@ -44,6 +44,12 @@
   <Binding name="FOREVERGUIDES_SHARE" category="ADDONS">
     ForeverGuides.KeyBindings.Share()
   </Binding>
+  <Binding name="FOREVERGUIDES_CHAT" category="ADDONS">
+    ForeverGuides.KeyBindings.Chat()
+  </Binding>
+  <Binding name="FOREVERGUIDES_CHAT_REPLY" category="ADDONS">
+    ForeverGuides.KeyBindings.ChatReply()
+  </Binding>
   <Binding name="FOREVERGUIDES_WAYPOINT_NEXT" category="ADDONS">
     ForeverGuides.KeyBindings.WaypointNext()
   </Binding>
@@ -64,5 +70,8 @@
   </Binding>
   <Binding name="FOREVERGUIDES_CURSORRING" category="ADDONS">
     ForeverGuides.KeyBindings.CursorRing()
+  </Binding>
+  <Binding name="FOREVERGUIDES_FARMHUD" category="ADDONS">
+    ForeverGuides.KeyBindings.FarmHud()
   </Binding>
 </Bindings>

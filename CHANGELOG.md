@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.5.0
+
+### Added
+
+- HUD windows: place your own windows on the screen and fill them in the layout editor. /fg hudwindow creates, edits, locks and lists them, and a settings page holds the cards.
+- HUD windows: every window has a gear button on mouse over, a Duplicate button and a Layer field (behind, level with or above the game's panels). A pinned window lets the mouse click through it.
+- HUD windows: a Window section in the layout editor shows visibility, pinning, X, Y and scale for the current character, with a button that resets the position to the screen center.
+- Layout editor: groups arrange elements as a row, column, grid, circle or freely. Add a group, wrap the selection with Ctrl+G, and drag elements in and out of a collapsible tree.
+- Layout editor: resize the window at the corner grip (the size is saved), fold the property sections of Aura and Cooldown, and use New, Duplicate and Save as new.
+- Mouse cursor ring: the Cooldown element shows spells, pet spells and items (trinkets, potions) as a ring, square or bar, with charges, time text, color by remaining time and a pulse when ready.
+- Mouse cursor ring: the Aura element shows a buff or debuff on you, target, focus or pet, or a proc glow, with stacks and time text. It can show while the aura is missing.
+- Mouse cursor ring: in combat the Aura element uses the game's own aura display, or counts the time itself when the game hides it. The Display in combat setting lets you choose.
+- Mouse cursor ring: a Show setting (always, only below a time left, only while it runs, only when ready) and a Time format setting (automatic, seconds, clock, compact) apply to cooldowns and auras.
+- When active: HUD windows and the ring use On, Any and Off switches for combat, instance, group, mount, vehicle and target. Class and character can be chosen too.
+- Per character: the ring can use its own layout and on or off state for each character, and a line on the ring page shows an override and resets it.
+- Minimap: ore and herb nodes appear as pins on the minimap, with size, opacity, edge behavior and a close range that shows circles only. Pins are hidden in instances.
+- Farm HUD: a farm mode enlarges the real minimap over the screen center with your pins, a compass and a gathering ring. Switch it with /fg farmhud, a key binding or the Farm HUD card.
+- Experience bar: new placeholders show where your session XP comes from (kills, quests, exploration) and kills per hour, XP per kill and mobs to level. The Detailed preset uses them.
+- Zone transitions: 42 checked transitions between zones ship with the add-on, and 24 estimated arrows were removed.
+- Profession route: steps before the start skill and after the target skill are collapsed and open with a click. Each trainer with a position has a waypoint button next to the map button.
+- Forever Chat: a messenger window for whispers, group, teams, guild, raid and channels, with tabs and unread counts. It is its own add-on, off by default, and you switch it on under Addons.
+- Forever Chat: it takes in every chat source, including say, yell, emotes, Battle.net whispers and community channels. Whispers and Battle.net chats stay separate.
+- Forever Chat: chats are saved on this PC only and come back after a reload or a restart. You can switch saving off and delete the history at any time.
+- Forever Chat: opens by itself per kind of chat (off by default). Use a key binding, /fg chat, /fgchat, an optional screen button or the minimap icon with the unread count.
+- Forever Chat: a small window per whisper partner, a New message button (Ctrl+N), a draft per chat and a settings card for view, time stamps, keywords, mentions, sound and opacity.
+- Teams: your own chats with other add-on users, up to 80 members. An invite has to be accepted, every team has an icon and a history. Teams only work with sharing switched on.
+- Chat logos: the Forever logo, guild and community logos or neutral symbols can appear at names in chat. Off by default.
+- Guild map: guild members who allow it show on the world map and the minimap. Off by default, the accuracy is adjustable and sending and receiving are separate.
+- Crafter lists: "Who can make this?" shows the guild members who craft a recipe, with profession and skill. It uses shared data and is off by default. Whispers only prepare text until you press Enter.
+- Whisper invites: a player who whispers inv or ginv can get a group or guild invite from a window or a bar. Requests queue up, a key confirms and the waiting time is adjustable.
+- GildenManager: twelve rule templates, an editor and an assistant build rules that suggest a promotion, demotion, removal, note or marker. Nothing runs by itself, you confirm every step.
+- GildenManager: a preview shows what would happen per member, with dry run, pauses and undo. Added are a log with export, a ban list, an overview with anniversaries and returners, and help tours.
+- Sharing: the Share tab lists every function with separate Send and Receive switches, all off by default. A new setup step guides you through them. Nothing is sent without your choice.
+- GildenManager: join dates, markers and notes can be shared with officers. Off by default and only with your consent.
+
+### Changed
+
+- Version number: Versions 0.3.0 and 0.4.0 were not published, so this release contains everything since 0.2.0 and jumps from 0.2.0 to 0.5.0.
+- Map and route: Filters and Display are multi-select dropdowns that show a short summary, keep the list open while you click and work with the keyboard.
+- Ore and herb filters: with both checked, the add-on map and the world map show all items of every zone at once, and your selection per zone narrows them down.
+- Profession route: the Start skill field now comes before the Target skill field.
+- Instance reset: the group chat line is now off by default and was reset once on update. Switch it on again if you want it.
+- Setup: the summary lists the sharing you switched on, and Reset all switches sharing off completely.
+- Game data: talents, spells and trainer lists follow the latest Forever client build, and the German names match the game.
+
+### Fixed
+
+- Experience bar: the session counts every XP gain, a reload or teleport no longer loses any, and a new login after a break of more than 10 minutes starts a new session.
+- Map and route: texts and buttons no longer overlap, also with a larger font and a small window.
+- Setup window: it stays on top of tutorials and other game windows, and /fg setup close closes it without the mouse.
+- Zone transitions: the arrow is drawn with lines and no longer shows a letter Z instead of the arrow shape.
+- Exports: window and zone transition strings no longer lose a letter after a pipe character, and older strings are still read. A pipe character in pin text survives the JSON export.
+- Window style: the title band and the top border line of the WoW Forever style now sit flush with the window edge.
+
 ## 0.2.0
 
 ### Changed

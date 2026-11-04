@@ -160,6 +160,18 @@ local function inCombat()
   return type(InCombatLockdown) == "function" and InCombatLockdown() == true
 end
 
+-- Work of a hook on a window. The deferred windows (the map) run it on the next frame, outside of the
+-- client's call that the hook belongs to.
+local function fromHook(name, fn)
+  if FL.DEFERRED[name] then
+    ns.MapOps.Defer("frametweaks " .. name, function()
+      guard(fn)
+    end)
+  else
+    guard(fn)
+  end
+end
+
 local function isProtected(frame)
   local ok, value = pcall(function()
     return frame:IsProtected()
@@ -614,23 +626,29 @@ local function attach(name, frame, detected)
     end)
   end
   -- The panel manager anchors a window again when it opens: put it back at once.
-  pcall(hooksecurefunc, frame, "SetPoint", function()
-    guard(restore, name, frame, true)
-  end)
+  -- Our own SetPoint (restoring) must not queue a second pass, a deferred one would find the flag cleared.
+  local function onPlaced()
+    if not restoring[frame] then
+      fromHook(name, function()
+        restore(name, frame, true)
+      end)
+    end
+  end
+  pcall(hooksecurefunc, frame, "SetPoint", onPlaced)
   if FL.MAXIMIZABLE[name] then
-    pcall(hooksecurefunc, frame, "SynchronizeDisplayState", function()
-      guard(restore, name, frame, true)
-    end)
+    pcall(hooksecurefunc, frame, "SynchronizeDisplayState", onPlaced)
   end
   pcall(frame.HookScript, frame, "OnShow", function()
-    if handles[frame] and canTouch(name, frame) then
-      guard(syncHandle, name, frame, handles[frame])
-    end
-    if name:find("^ContainerFrame") then
-      guard(restore, name, frame, false)
-    else
-      guard(syncScale, name, frame)
-    end
+    fromHook(name, function()
+      if handles[frame] and canTouch(name, frame) then
+        guard(syncHandle, name, frame, handles[frame])
+      end
+      if name:find("^ContainerFrame") then
+        restore(name, frame, false)
+      else
+        syncScale(name, frame)
+      end
+    end)
   end)
   if frame:IsShown() then
     restore(name, frame, false)
@@ -773,7 +791,9 @@ local function installPanelHook()
       if started and type(frame) == "table" then
         local name = nameOf(frame)
         if name then
-          attach(name, frame)
+          fromHook(name, function()
+            attach(name, frame)
+          end)
         end
         if not panelShown then
           panelShown = true

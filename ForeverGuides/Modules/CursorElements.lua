@@ -333,11 +333,24 @@ end
 
 local defs = {}
 
--- The drawing half of an element type: def = { render, drive?, release?, panel, variants?, title? }. The data
--- half is CursorLogic.Register under the same name. variants and title go to the editor as they are (see
--- CanvasEditor: one Add entry per variant, the display title of an element).
+-- The drawing half of an element type: def = { render, drive?, release?, panel, variants?, title?, hosts? }. The
+-- data half is CursorLogic.Register under the same name. variants and title go to the editor as they are (see
+-- CanvasEditor: one Add entry per variant, the display title of an element). hosts names the layouts that may
+-- use the type, { cursor = true, area = true } when left out; a type bound to the mouse pointer says
+-- { cursor = true }.
 function E.Register(kind, def)
   defs[kind] = def
+end
+
+local function allowed(def, host)
+  local hosts = def.hosts
+  if host == nil then
+    return true
+  end
+  if hosts == nil then
+    return host == "cursor" or host == "area"
+  end
+  return hosts[host] == true
 end
 
 E.Register("ring", { render = renderRing, drive = nothing, release = nothing, panel = E.RingPanel })
@@ -345,12 +358,13 @@ E.Register("shape", { render = renderShape, drive = nothing, release = nothing, 
 E.Register("cross", { render = renderCross, drive = nothing, release = nothing, panel = E.CrossPanel })
 
 -- The `types` table of CanvasRender.Draw and the editor, built on every call so the labels follow the
--- language. Only types with both halves are listed.
-function E.Types()
+-- language. Only types with both halves are listed. `host` keeps the types that host may use; without it
+-- every type is listed.
+function E.Types(host)
   local out = {}
   for _, kind in ipairs(CU.Kinds()) do
     local def = defs[kind]
-    if def then
+    if def and allowed(def, host) then
       out[kind] = {
         label = L["cursor.type." .. kind],
         desc = "cursor.type." .. kind .. ".desc",

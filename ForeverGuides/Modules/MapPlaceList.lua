@@ -328,9 +328,14 @@ function PL.Attach(ctx)
     end
   end
 
-  -- Search field, counter line and the cards.
+  -- Search field, counter line and the cards. The cards start below the counter whatever height its
+  -- font gives it.
   function ctl.Height()
-    return 32 + 18 + PL.RowHeight() * PL.CARDS
+    local top = math.max(24, 8 + math.ceil(ctl.count:GetStringHeight()))
+    ctl.list:ClearAllPoints()
+    ctl.list:SetPoint("TOPLEFT", ctx.search, "BOTTOMLEFT", 0, -top)
+    ctl.list:SetPoint("RIGHT")
+    return ctx.search:GetHeight() + top + PL.RowHeight() * PL.CARDS
   end
 
   return ctl

@@ -51,6 +51,7 @@ function Kit.ActionButton(parent, o)
     height = o.height or scaled(28),
     tooltip = o.tooltip,
     tooltipText = o.tooltipText,
+    opens = o.opens,
     onClick = o.onClick,
   })
 end

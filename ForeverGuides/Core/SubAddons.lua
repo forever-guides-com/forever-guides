@@ -15,10 +15,14 @@ ns.SubAddons = M
 ns.AddLocale("enUS", {
   ["subaddon.guildmanager.title"] = "GildenManager",
   ["subaddon.guildmanager.desc"] = "Guild tools for officers: main and alt links, inactivity list and guild actions with preview.",
+  ["subaddon.chat.title"] = "Forever Chat",
+  ["subaddon.chat.desc"] = "Messenger window for chat and whispers. Work in progress.",
 })
 ns.AddLocale("deDE", {
   ["subaddon.guildmanager.title"] = "GildenManager",
   ["subaddon.guildmanager.desc"] = "Gildenwerkzeuge für Offiziere: Main und Alt, Inaktivitätsliste und Gildenaktionen mit Vorschau.",
+  ["subaddon.chat.title"] = "Forever Chat",
+  ["subaddon.chat.desc"] = "Messenger-Fenster für Chat und Flüstern. In Arbeit.",
 })
 
 -- id: switch key and value of the TOC field X-Forever-Guides-Addon. addon: folder name.
@@ -33,6 +37,13 @@ local MANIFEST = {
     defaultOn = false,
     loadWhen = "inGuild",
     seedFromList = true,
+  },
+  {
+    id = "chat",
+    addon = "ForeverGuides_Chat",
+    titleKey = "subaddon.chat.title",
+    descKey = "subaddon.chat.desc",
+    defaultOn = false,
   },
 }
 

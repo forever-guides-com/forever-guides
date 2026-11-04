@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-10-22.
 -- Learn list of HUNTER.
 local _, ns = ...
 ns.Data = ns.Data or {}

@@ -221,7 +221,7 @@ local function create()
       DW.Hide()
     end)
   )
-  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title" })
+  f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title", opens = true })
   f.look:SetPoint("RIGHT", f.close, "LEFT", -2, 0)
   f.look:SetScript(
     "OnClick",
@@ -229,7 +229,7 @@ local function create()
       DW.OpenLook()
     end)
   )
-  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "dur.win.open" })
+  f.open = W.Action(f.bar, { icon = "open", size = 18, tooltip = "dur.win.open", opens = true })
   f.open:SetPoint("RIGHT", f.look, "LEFT", -2, 0)
   f.open:SetScript(
     "OnClick",
@@ -467,6 +467,7 @@ ns.RegisterPage({
         tooltip = "dur.page.window",
         width = 170,
         height = 28,
+        opens = true,
         onClick = function()
           DW.Open()
         end,
@@ -480,6 +481,7 @@ ns.RegisterPage({
         tooltip = "dur.page.settings",
         width = 170,
         height = 28,
+        opens = true,
         onClick = function()
           ns.SettingsPage.Select("bags")
           ns.Main.Show("settings")

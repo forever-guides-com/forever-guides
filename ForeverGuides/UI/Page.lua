@@ -94,6 +94,7 @@ ns.ICONS = {
   professions = STOCK .. "Trade_BlackSmithing",
   professionroute = OWN_ICONS .. "professionroute.png",
   proftrainers = STOCK .. "Trade_Engineering",
+  gathering = STOCK .. "Trade_Mining",
   items = STOCK .. "INV_Chest_Plate06",
   macros = STOCK .. "INV_Misc_Note_01",
   character = STOCK .. "INV_Misc_Note_06",
@@ -107,6 +108,7 @@ ns.ICONS = {
   durability = OWN_ICONS .. "durability.png",
   xpbar = STOCK .. "INV_Misc_PocketWatch_01",
   cursor = STOCK .. "Ability_Hunter_SniperShot",
+  areas = STOCK .. "INV_Misc_Gear_03",
   loot = STOCK .. "INV_Misc_Bag_10",
   tutorials = STOCK .. "INV_Misc_Book_07",
   help = STOCK .. "INV_Misc_QuestionMark",
@@ -129,6 +131,7 @@ ns.ICONS_FALLBACK = {
   durability = STOCK .. "INV_Chest_Plate06",
   errors = STOCK .. "INV_Misc_Note_06",
   legacy = STOCK .. "INV_Misc_Book_11",
+  areas = STOCK .. "INV_Misc_Gear_01",
 }
 
 -- A missing file renders as a green square, so the existence check decides before a path is used.

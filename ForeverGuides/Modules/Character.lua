@@ -330,6 +330,7 @@ local function section(view, name, dataFn, infoKey, infoColor)
     height = 28,
     tooltip = "character." .. name .. ".title",
     tooltipText = infoKey,
+    opens = true,
     onClick = function()
       export(
         name == "char" and "character" or name == "seen" and "itemsSeen" or "transmog",
@@ -347,6 +348,7 @@ local function section(view, name, dataFn, infoKey, infoColor)
     height = 28,
     tooltip = "character.link.button",
     tooltipText = "character.link.hint",
+    opens = true,
     onClick = function()
       ns.Dialogs.Copy("character.link.dialog", Page.Url(name), "character.link.hint")
     end,
