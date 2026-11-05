@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+### Fixed
+
+- Whisper invites: on the Forever client the guild invite no longer shows a blocked warning. The game's own window asks first and sends the invite when you confirm.
+- Whisper invites: a keyword that ended up typed twice in the settings field, such as ginvginv, now counts once.
+
 ## 0.5.0
 
 ### Added

@@ -4,6 +4,13 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.5.1] - 2026-11-05
+
+### Fixed
+
+- Whisper invites: on the Forever client the guild invite no longer shows a blocked warning. The game's own window asks first and sends the invite when you confirm.
+- Whisper invites: a keyword that ended up typed twice in the settings field, such as ginvginv, now counts once.
+
 ## [0.5.0] - 2026-11-04
 
 ### Added
@@ -297,6 +304,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.5.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.2.0...v0.5.0
 [0.2.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.8...v0.2.0
 [0.1.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.7...v0.1.8

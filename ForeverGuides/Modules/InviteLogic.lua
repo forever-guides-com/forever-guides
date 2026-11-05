@@ -73,6 +73,19 @@ function IL.Normalize(text)
   return lower(text)
 end
 
+-- A keyword typed into a field that already held it ("ginvginv") is the keyword once: no real keyword is
+-- the same text twice, and the doubled form would never match a whisper.
+local function collapseDouble(word)
+  local half = #word / 2
+  if half >= 2 and half == math.floor(half) and word:sub(1, half) == word:sub(half + 1) then
+    local first = word:sub(1, half)
+    if first:sub(1, 1):rep(#first) ~= first then
+      return first
+    end
+  end
+  return word
+end
+
 -- "Inv, !Invite ,inv" -> { "inv", "invite" }: at most MAX_WORDS words of MAX_WORD characters.
 function IL.ParseWords(text)
   local out, seen = {}, {}
@@ -80,7 +93,7 @@ function IL.ParseWords(text)
     return out
   end
   for part in (text .. ","):gmatch("([^,]*),") do
-    local word = IL.Normalize(cut(IL.Normalize(part), IL.MAX_WORD))
+    local word = collapseDouble(IL.Normalize(cut(IL.Normalize(part), IL.MAX_WORD)))
     if word ~= "" and not seen[word] then
       seen[word] = true
       out[#out + 1] = word
