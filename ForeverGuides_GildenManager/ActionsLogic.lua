@@ -65,6 +65,8 @@ AL.REASONS = {
   "unverified",
   "expired",
   "stopped",
+  "clientNote",
+  "clientRank",
 }
 
 local YES = { ok = true }

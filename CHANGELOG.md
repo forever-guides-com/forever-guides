@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.4
+
+### Changed
+
+- Guild manager on the Forever client: the game does not let add-ons change the guild, so each step opens a box with the command to copy. Notes and rank jumps are not offered there.
+
+### Fixed
+
+- Guild manager: the run no longer stops at waiting for the guild list, it goes on by itself once the list is fresh.
+- Windows no longer trigger a blocked action when you press Esc in combat, they close when the combat ends.
+- Player menu: the guild invite entry on the Forever client no longer raises an error when the game hides a player's name.
+
 ## 0.5.3
 
 ### Changed

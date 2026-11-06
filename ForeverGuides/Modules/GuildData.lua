@@ -10,9 +10,12 @@ ns.GuildData = D
 
 D.MIN_ASK = 10
 D.MAX_MEMBERS = 2000
+-- Seconds a request may stay unanswered by an event before the cache counts as the answer: a client that
+-- has nothing new to say may skip GUILD_ROSTER_UPDATE, and the age of the list must not stay behind.
+D.ANSWER_WAIT = 4
 local UPDATE_DELAY = 0.5
 
-local state = { dirty = true, asked = -1e9 }
+local state = { dirty = true, asked = -1e9, events = 0, requests = 0, reads = 0, silent = 0 }
 -- A stand-in source (an extension showing sample data) instead of the game's roster: see D.SetSource.
 local source
 
@@ -77,6 +80,7 @@ local function read()
   -- Rows can be fewer than the total (filter "online only", unreadable rows): a reader that finds
   -- departures must compare both.
   snap.total, snap.takenAt = count, clock()
+  state.reads = state.reads + 1
   local ranks = {}
   for i = 1, math.min(count, D.MAX_MEMBERS) do
     local raw = call(g("GetGuildRosterInfo"), i)
@@ -113,6 +117,9 @@ function D.Get()
   if source then
     return source.snapshot()
   end
+  if state.pending and clock() - state.pending >= D.ANSWER_WAIT then
+    state.pending, state.silent, state.dirty = nil, state.silent + 1, true
+  end
   if state.dirty and not inCombat() then
     read()
   end
@@ -138,8 +145,35 @@ function D.Request()
     return false
   end
   state.asked = now
-  pcall(fn)
+  state.requests = state.requests + 1
+  state.askOk = pcall(fn)
+  state.pending = state.askOk and now or nil
   return true
+end
+
+-- What the age of the list is made of, for the support report: seconds since the last read, the last
+-- roster event and the last request, how many of each happened, whether the call raised and how often a
+-- request went unanswered by an event. Plain numbers and booleans only.
+function D.Diag()
+  local now = clock()
+  local function ago(t)
+    return type(t) == "number" and now - t or nil
+  end
+  local snap = state.snap
+  return {
+    takenAge = ago(snap.takenAt),
+    eventAge = ago(state.lastEvent),
+    askAge = state.requests > 0 and ago(state.asked) or nil,
+    events = state.events,
+    requests = state.requests,
+    reads = state.reads,
+    silent = state.silent,
+    askOk = state.askOk,
+    hasCall = type(api("GuildRoster")) == "function",
+    dirty = state.dirty,
+    loaded = snap.loaded == true,
+    members = #snap.members,
+  }
 end
 
 -- One right as the game answers it (api name such as "CanEditPublicNote"); nil for a function the
@@ -158,7 +192,8 @@ function D.Rights()
 end
 
 local function onUpdate()
-  state.dirty = true
+  state.dirty, state.pending = true, nil
+  state.events, state.lastEvent = state.events + 1, clock()
   ns.Debounce("guild-update", UPDATE_DELAY, function()
     ns.Emit("FG_GUILD_UPDATE")
   end)
@@ -191,4 +226,6 @@ end
 function D.Reset()
   source = nil
   state.dirty, state.asked, state.snap = true, -1e9, empty()
+  state.events, state.requests, state.reads, state.silent = 0, 0, 0, 0
+  state.pending, state.lastEvent, state.askOk = nil, nil, nil
 end

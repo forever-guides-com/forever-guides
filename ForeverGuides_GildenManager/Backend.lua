@@ -3,6 +3,9 @@
 --   macro   arms a secure button with a slash command, one click per member, never in combat
 --   copy    shows the command (or the note text) in the copy window, changes nothing
 -- Choice "auto" takes macro when the secure button template works and we are out of combat, else copy.
+-- On a client that blocks guild changes from add-on code (Locked, WoW Forever) the way is always copy,
+-- whatever the choice says: no game call and no secure button is ever made there, the player types the
+-- command shown in the copy window.
 -- Every game function is looked up at call time, nil safe and inside pcall: C_GuildInfo first, the older
 -- global name second. A static test keeps all other files free of these calls.
 local _, gm = ...
@@ -19,6 +22,10 @@ gm.Backend = B
 B.CHOICES = { "auto", "macro", "copy", "direct" }
 -- Slash command per action. Notes and rank orders have none.
 B.SLASH = { promote = "/gpromote", demote = "/gdemote", remove = "/guninvite", invite = "/ginvite" }
+-- The command the player types on a locked client; /gremove is the short form of /guildremove.
+B.TYPED = { promote = "/gpromote", demote = "/gdemote", remove = "/gremove", invite = "/ginvite" }
+-- Reason code (locale key "gm.why.<code>") per action that has no typed command at all.
+B.NO_COMMAND = { editNote = "clientNote", editOfficerNote = "clientNote", setRank = "clientRank" }
 -- First line of every macro: the secure code itself refuses to run in combat.
 local GUARD_LINE = "/stopmacro [combat]"
 local POOL_MAX = 4
@@ -26,6 +33,20 @@ local POOL_MAX = 4
 local function inCombat()
   local ok, fighting = pcall(InCombatLockdown)
   return ok and fighting == true
+end
+
+-- True on a client that blocks guild changes from add-on code, see Caps.Locked.
+function B.Locked()
+  return gm.Caps.Locked()
+end
+
+-- Why the action cannot be offered on this client, nil when it can: a locked client only has the typed
+-- commands of B.TYPED. A note or a rank set directly has no command.
+function B.Unavailable(action)
+  if not B.Locked() or B.TYPED[action] then
+    return nil
+  end
+  return B.NO_COMMAND[action] or "noApi"
 end
 
 -- The game function: C_GuildInfo.<new> first, the global <old> second. nil when the client has neither.
@@ -49,6 +70,10 @@ end
 -- The command (or the text to paste) of an action for the copy window; nil when there is nothing to show.
 function B.Command(action, step)
   step = type(step) == "table" and step or {}
+  if B.Locked() then
+    local typed, who = B.TYPED[action], safeName(step.name)
+    return typed and who and typed .. " " .. who or nil
+  end
   if action == "editNote" or action == "editOfficerNote" then
     return type(step.value) == "string" and step.value ~= "" and step.value or nil
   end
@@ -70,7 +95,7 @@ end
 
 -- "sent" when the call went through, false and a reason when the function is missing or raised.
 local function call(fn, ...)
-  if not fn then
+  if not fn or B.Locked() then
     return false, "noApi"
   end
   if pcall(fn, ...) then
@@ -220,6 +245,9 @@ end
 
 -- True when the secure button template works here. The first call creates the first pool button.
 function B.SecureAvailable()
+  if B.Locked() then
+    return false
+  end
   if #pool > 0 then
     return true
   end
@@ -231,10 +259,19 @@ function B.PoolSize()
   return #pool
 end
 
+-- A protected frame that is anchored to a window makes that window protected in combat (Hide, Show and
+-- SetPoint refused). So the button hangs on UIParent only, hidden and without anchors while it is unused.
+local function detach(button)
+  button:Hide()
+  button:ClearAllPoints()
+  button:SetParent(UIParent)
+end
+
 local function clear(slot)
   slot.button:SetAttribute("type", nil)
   slot.button:SetAttribute("macrotext", nil)
   slot.button.fgDone = nil
+  detach(slot.button)
   stale[slot] = nil
   slot.free = true
 end
@@ -242,6 +279,9 @@ end
 -- Arms a pool button with the command of the action. onClick(button) runs after the click. Answers the
 -- button, or false and a reason code. Attributes only change out of combat.
 function B.Arm(action, step, onClick)
+  if B.Locked() then
+    return false, "noApi"
+  end
   if inCombat() then
     return false, "combat"
   end
@@ -255,6 +295,30 @@ function B.Arm(action, step, onClick)
   slot.button:SetAttribute("macrotext", text)
   slot.button.fgDone = onClick
   return slot.button
+end
+
+-- Lays an armed button over `anchor` without anchoring it to it: the button stays a child of UIParent
+-- and takes the screen rectangle of the anchor, so no window becomes protected. `shown` (default the
+-- anchor) says whether the overlay is visible. Only out of combat; call again after the window moved.
+function B.Place(button, anchor, shown)
+  local slot = type(button) == "table" and button.fgSlot
+  if not slot or slot.free or type(anchor) ~= "table" or inCombat() then
+    return false
+  end
+  local ok = pcall(function()
+    local ratio = (anchor:GetEffectiveScale() or 1) / (UIParent:GetEffectiveScale() or 1)
+    local left, bottom = anchor:GetLeft(), anchor:GetBottom()
+    if not (left and bottom) then
+      error("anchor has no rectangle")
+    end
+    button:SetParent(UIParent)
+    button:ClearAllPoints()
+    button:SetFrameStrata("FULLSCREEN_DIALOG")
+    button:SetSize(anchor:GetWidth() * ratio, anchor:GetHeight() * ratio)
+    button:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", left * ratio, bottom * ratio)
+    button:SetShown((shown or anchor):IsVisible() == true)
+  end)
+  return ok
 end
 
 -- Gives the button back to the pool. In combat the attributes stay until the combat ends.
@@ -282,6 +346,9 @@ end)
 -- Which way an action takes. env = { combat, secure } (read from the game when missing). Only the
 -- choice "direct" ever gives "direct"; a macro that cannot run gives "copy".
 function B.Resolve(choice, action, env)
+  if B.Locked() then
+    return "copy"
+  end
   if choice == "direct" then
     return "direct"
   elseif choice == "copy" then
@@ -305,6 +372,10 @@ end
 -- call of the direct way. Second result of the true case: the way (see Resolve).
 function B.Available(choice, action, env)
   local kind = B.Resolve(choice, action, env)
+  local why = B.Unavailable(action)
+  if why then
+    return false, why
+  end
   if kind == "direct" then
     local cap = CAP_OF[action]
     if not DIRECT[action] or (cap and gm.Caps.Get(cap) == false) then
@@ -312,6 +383,20 @@ function B.Available(choice, action, env)
     end
   end
   return true, kind
+end
+
+-- Shows the command (or the note text) of an action in the copy window. Answers the text, nil when there
+-- is nothing to show. Changes nothing in the game.
+function B.ShowCopy(action, step)
+  local text = B.Command(action, step)
+  if not text then
+    return nil
+  end
+  local copy = FG.Dialogs and FG.Dialogs.Copy
+  if type(copy) == "function" then
+    pcall(copy, "gm.copy.title", text, B.Locked() and "gm.copy.hintTyped" or "gm.copy.hint")
+  end
+  return text
 end
 
 -- Runs an action the chosen way. step = { name, guid, index, toRank, value }. opts = { choice, env,
@@ -324,6 +409,10 @@ function B.Do(action, step, opts)
   opts = opts or {}
   step = type(step) == "table" and step or {}
   local kind = B.Resolve(opts.choice, action, opts.env)
+  local unavailable = B.Unavailable(action)
+  if unavailable then
+    return false, unavailable, kind
+  end
   if inCombat() then
     return false, "combat", kind
   end
@@ -341,13 +430,9 @@ function B.Do(action, step, opts)
     end
     return "armed", button, kind
   end
-  local text = B.Command(action, step)
+  local text = B.ShowCopy(action, step)
   if not text then
     return false, "noApi", kind
-  end
-  local copy = FG.Dialogs and FG.Dialogs.Copy
-  if type(copy) == "function" then
-    pcall(copy, "gm.copy.title", text, "gm.copy.hint")
   end
   return "copy", text, kind
 end

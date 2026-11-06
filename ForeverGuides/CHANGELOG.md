@@ -4,6 +4,18 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.5.4] - 2026-11-06
+
+### Changed
+
+- Guild manager on the Forever client: the game does not let add-ons change the guild, so each step opens a box with the command to copy. Notes and rank jumps are not offered there.
+
+### Fixed
+
+- Guild manager: the run no longer stops at waiting for the guild list, it goes on by itself once the list is fresh.
+- Windows no longer trigger a blocked action when you press Esc in combat, they close when the combat ends.
+- Player menu: the guild invite entry on the Forever client no longer raises an error when the game hides a player's name.
+
 ## [0.5.3] - 2026-11-06
 
 ### Changed
@@ -321,6 +333,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.5.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.0...v0.5.1

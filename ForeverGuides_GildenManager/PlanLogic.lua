@@ -5,7 +5,8 @@
 --   rules = { Rule... }  raw or clean, position = priority (see RulesLogic, repaired here again)
 --   ctx = { today = day number, me = { key, rank }, ranks = { { index, name }... } (rank 0 = master),
 --           rights = GuildExt.Rights() fields promote, demote, remove, publicNote, officerNote, officerEdit,
---           caps = { setNote = bool }, rosterAge = seconds (nil = not checked), maxTotal, maxLevel,
+--           caps = { setNote = bool, locked = bool (the client only has typed commands: no notes, no jump
+--           over several ranks) }, rosterAge = seconds (nil = not checked), maxTotal, maxLevel,
 --           protect = { ranks, keys, words, newbieDays, graceDays, activeGroupDays }, skip = { [key] = untilDay },
 --           only = id of the one rule to check (also when it is off),
 --           members = { Member... } }
@@ -60,6 +61,8 @@ PL.REASONS = {
   "overruled",
   "maxPerRun",
   "maxTotal",
+  "clientNote",
+  "clientRank",
 }
 
 local MATURITY_OF = {
@@ -146,6 +149,13 @@ local function blockReason(a, m, to, x)
   end
   if field and x.rights[field] ~= true then
     return "noRight"
+  end
+  if x.caps.locked == true then
+    if a.kind == "setNote" then
+      return "clientNote"
+    elseif a.kind == "setRank" and to and math.abs(to - m.rank) > 1 then
+      return "clientRank"
+    end
   end
   if a.kind == "setNote" and x.caps.setNote ~= true then
     return "noApi"

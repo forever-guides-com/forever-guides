@@ -6,6 +6,8 @@
 --   macro      the secure button with a slash command
 --   direct     the plain promote, demote and invite calls
 -- A measurement can only forbid ("false" stops the way) or, for rankOrder, allow a more exact call.
+-- On a client that reserves the guild calls (Locked) every name answers false without any call: the
+-- result of the measurement there is known and trying it again would only show the game's warning.
 -- Nothing is asked from the game here.
 local _, gm = ...
 if not gm.ext then
@@ -33,8 +35,18 @@ local function store(create)
   return type(prefs.caps) == "table" and prefs.caps or nil
 end
 
+-- True on a client that blocks guild changes from add-on code (WoW Forever, whose project id differs
+-- from the mainline one); the same rule as I.GuildCallReserved of the main add-on.
+function C.Locked()
+  local project, mainline = rawget(_G, "WOW_PROJECT_ID"), rawget(_G, "WOW_PROJECT_MAINLINE")
+  return project ~= nil and mainline ~= nil and project ~= mainline
+end
+
 -- true, false or nil for a name that is unknown, not measured or has no store yet.
 function C.Get(name)
+  if VALID[name] and C.Locked() then
+    return false
+  end
   local caps = VALID[name] and store(false)
   local value = caps and caps[name]
   if type(value) == "boolean" then

@@ -86,7 +86,7 @@ local function inputNow(only)
     offset = offset,
     meKey = PN.Key(PN.Self()),
     rights = FG.GuildExt.Rights(),
-    caps = { setNote = gm.Caps.Get("setNote") },
+    caps = { setNote = gm.Caps.Get("setNote"), locked = gm.Caps.Locked() },
     plan = gm.Actions.PlanContext(),
     age = rosterAge(),
   })
@@ -124,10 +124,12 @@ local function wayInfo()
   local choice = SL.Get(sctx(), "actionBackend")
   local way = gm.Backend.Resolve(choice, "promote")
   local dry = guild().settings.dryRun == true
+  local text = gm.Backend.Locked() and L["gm.rules.way.locked"]
+    or string.format(L["gm.rules.way"], L["gm.rules.choice." .. tostring(choice)], L["gm.rules.way." .. way])
   return {
     live = not dry,
     dry = L[dry and "gm.rules.dryOn" or "gm.rules.dryOff"],
-    way = string.format(L["gm.rules.way"], L["gm.rules.choice." .. tostring(choice)], L["gm.rules.way." .. way]),
+    way = text,
   }
 end
 

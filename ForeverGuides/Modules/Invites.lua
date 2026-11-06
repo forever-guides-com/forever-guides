@@ -820,15 +820,23 @@ local function addMenuEntries()
   end
   for _, tag in ipairs(MENU_TAGS) do
     pcall(menu.ModifyMenu, tag, function(_, root, context)
-      local name = type(context) == "table" and context.name
-      if type(name) ~= "string" or name == "" or not I.CanGuild() then
-        return
-      end
-      if type(root) == "table" and type(root.CreateButton) == "function" then
-        root:CreateButton(ns.L["invite.menu.guild"], function()
-          I.MenuInvite(name)
-        end)
-      end
+      -- Runs inside the menu code of the game: nothing may raise here. A name that is a secret value (the client
+      -- hides names of some players) is never compared or stored, the entry is left out for it.
+      pcall(function()
+        local name = type(context) == "table" and context.name
+        local secret = rawget(_G, "issecretvalue")
+        if type(secret) == "function" and secret(name) then
+          return
+        end
+        if type(name) ~= "string" or name == "" or not I.CanGuild() then
+          return
+        end
+        if type(root) == "table" and type(root.CreateButton) == "function" then
+          root:CreateButton(ns.L["invite.menu.guild"], function()
+            I.MenuInvite(name)
+          end)
+        end
+      end)
     end)
   end
 end

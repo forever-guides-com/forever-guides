@@ -507,6 +507,9 @@ end
 
 local Esc = { list = {} }
 ns.EscStack = Esc
+ns.On("PLAYER_REGEN_ENABLED", function()
+  ns.FlushDeferredHides()
+end)
 
 -- frame -> onEscape(frame) of RegisterEsc: may take the key instead of the close.
 local escHandlers = setmetatable({}, { __mode = "k" })
@@ -564,7 +567,10 @@ function Esc.Close(receiver)
       if onEscape and onEscape(f) then
         return true
       end
-      f:Hide()
+      if not ns.SafeHide(f) then
+        -- The client does not let us hide it now (combat): it closes afterwards, Esc is taken.
+        return true
+      end
       if not f:IsVisible() then
         return true
       end

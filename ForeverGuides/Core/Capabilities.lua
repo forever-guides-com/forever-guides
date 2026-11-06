@@ -200,6 +200,33 @@ function ns.ProtectedAllowed(frame)
   return not ok or allowed ~= false
 end
 
+-- Frames whose Hide the client refused (a protected window in combat): they close when the combat ends.
+local deferredHides = {}
+
+-- Hides the frame when the client lets this add-on do it now. Otherwise the hide waits for the end of the
+-- combat (ns.FlushDeferredHides) and the call is never made, so no ADDON_ACTION_BLOCKED is raised. Returns
+-- true when the frame was hidden.
+function ns.SafeHide(frame)
+  if not frame then
+    return false
+  end
+  if ns.ProtectedAllowed(frame) then
+    frame:Hide()
+    return true
+  end
+  deferredHides[frame] = true
+  return false
+end
+
+function ns.FlushDeferredHides()
+  for frame in pairs(deferredHides) do
+    if ns.ProtectedAllowed(frame) then
+      deferredHides[frame] = nil
+      frame:Hide()
+    end
+  end
+end
+
 -- Key propagation of a frame. In combat the client blocks the call and reports it as an addon
 -- action, so nothing is called then and the frame keeps its last state. The method runs inside
 -- a Lua closure: a protected function handed straight to pcall shows up as UNKNOWN(). Returns

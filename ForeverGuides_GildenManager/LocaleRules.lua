@@ -457,6 +457,11 @@ add("gm.rules.choice.direct", "direct call", "direkter Aufruf")
 add("gm.rules.way.macro", "one click per step on a secure button", "ein Klick pro Schritt auf einem sicheren Knopf")
 add("gm.rules.way.copy", "command to paste into the chat", "Befehl zum Einfügen in den Chat")
 add("gm.rules.way.direct", "direct call, the game decides", "direkter Aufruf, das Spiel entscheidet")
+add(
+  "gm.rules.way.locked",
+  "Way: copy. The game does not allow guild changes from add-ons here,\nyou type each command yourself (Ctrl+C, Enter, Ctrl+V, Enter).",
+  "Weg: Kopieren. Das Spiel lässt Addons hier keine Gildenänderung zu,\ndu tippst jeden Befehl selbst (Strg+C, Enter, Strg+V, Enter)."
+)
 
 -- Data and run step ------------------------------------------------------------------------------------------------
 add("gm.rules.dataTitle", "Data", "Datenlage")
@@ -542,6 +547,8 @@ add(
 )
 add("gm.rules.confirmRun", "Confirm run", "Lauf bestätigen")
 add("gm.rules.next", "Next step", "Nächster Schritt")
+add("gm.rules.skip", "Skip this step", "Schritt überspringen")
+add("gm.rules.again", "Show command again", "Befehl erneut zeigen")
 add("gm.rules.startSeries", "Start series", "Serie starten")
 add("gm.rules.stop", "Stop", "Stopp")
 add("gm.rules.closeRun", "Close", "Schließen")
@@ -554,12 +561,22 @@ add("gm.rules.res.unverified", "not confirmed yet", "noch nicht bestätigt")
 add("gm.rules.res.mismatch", "list shows something else", "Liste zeigt etwas anderes")
 add("gm.rules.res.dry", "dry run, not sent", "Trockenlauf, nicht gesendet")
 add("gm.rules.res.copy", "command copied", "Befehl kopiert")
+add("gm.rules.res.open", "open, the list showed no change", "offen, die Liste zeigte keine Änderung")
 add("gm.rules.res.skipped", "skipped", "übersprungen")
 add("gm.rules.res.failed", "failed", "fehlgeschlagen")
 add("gm.rules.wait.wait", "Pause between steps", "Pause zwischen den Schritten")
 add("gm.rules.wait.gap", "Pause between steps", "Pause zwischen den Schritten")
 add("gm.rules.wait.combat", "Waiting: combat", "Wartet: Kampf")
-add("gm.rules.wait.roster", "Waiting for the guild list", "Wartet auf die Gildenliste")
+add(
+  "gm.rules.wait.roster",
+  "Waiting for the guild list, the step goes on by itself",
+  "Wartet auf die Gildenliste, der Schritt geht danach von selbst weiter"
+)
+add(
+  "gm.rules.wait.change",
+  "Waiting for the change in the guild list. Type the command, or skip the step.",
+  "Wartet auf die Änderung in der Gildenliste. Befehl eintippen oder Schritt überspringen."
+)
 add("gm.rules.wait.verify", "Waiting for the list to confirm", "Wartet auf die Bestätigung der Liste")
 add("gm.rules.wait.click", "Click the button", "Auf den Knopf klicken")
 add("gm.rules.wait.state", "Not possible in this state", "In diesem Zustand nicht möglich")

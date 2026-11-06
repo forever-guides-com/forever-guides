@@ -538,7 +538,7 @@ local function buildTitleBar()
 
   local close = W.Action(bar, { icon = "close", size = W.CLOSE_SIZE, tooltip = "common.close" })
   close:SetScript("OnClick", function()
-    frame:Hide()
+    ns.SafeHide(frame)
   end)
   parts.close = close
   local settings = W.Action(bar, { icon = "gear", size = 24, tooltip = "page.settings", opens = true })
@@ -1283,13 +1283,13 @@ end
 
 function Main.Hide()
   if frame then
-    frame:Hide()
+    ns.SafeHide(frame)
   end
 end
 
 function Main.Toggle()
   if frame and frame:IsShown() then
-    frame:Hide()
+    ns.SafeHide(frame)
   else
     Main.Show()
   end
@@ -1308,7 +1308,7 @@ end)
 ns.On("PLAYER_REGEN_DISABLED", function()
   if ns.db and ns.db.settings.combatHide and Main.IsShown() then
     Main.wasShownBeforeCombat = true
-    frame:Hide()
+    ns.SafeHide(frame)
   end
 end)
 

@@ -164,6 +164,10 @@ function A.Run(action, member, value, opts)
   if not (AL.RIGHT[action] and AL.LOGGED[action] and type(member) == "table") then
     return false, "unknownAction"
   end
+  local unavailable = B.Unavailable(action)
+  if unavailable then
+    return false, unavailable
+  end
   local roster = GD.Get()
   local m = find(roster, member.key)
   local v = verdict(action, GE.Rights(), context(roster, m))
@@ -252,9 +256,7 @@ end
 -- Macro way: the secure button takes the place of the confirm button, one click on it sends the command.
 local function arm(d, button)
   d.sendButton = button
-  button:SetParent(d)
-  button:ClearAllPoints()
-  button:SetAllPoints(d.ok)
+  B.Place(button, d.ok, d)
   if not button.fgLabel then
     W.Fill(button, "surface", 1)
     W.Border(button, "white", 0.4)
@@ -394,7 +396,7 @@ function A.Open(action, member, ctx, opts)
   local roster = GD.Get()
   local m = find(roster, member.key)
   local v = verdict(action, GE.Rights(), context(roster, m))
-  local why = not v.ok and v.reason or inCombat() and "combat" or nil
+  local why = not v.ok and v.reason or B.Unavailable(action) or inCombat() and "combat" or nil
   if why then
     FG.Notify(L["gm.why." .. why], "warning")
     return false
@@ -568,6 +570,8 @@ function A.StartRun(entries, opts)
   run = RL.New(entries, {
     settings = settings,
     backend = B.Resolve(setting("actionBackend"), "promote"),
+    -- A client that only has typed commands cannot tell by itself that a command ran: the roster must show it.
+    copyWait = B.Locked(),
     env = {
       now = clock,
       time = gm.History.Epoch,
@@ -576,6 +580,15 @@ function A.StartRun(entries, opts)
       request = GD.Request,
       rule = opts.plan and RL.RuleCheck(opts.plan) or nil,
       disarm = B.Disarm,
+      offer = function(step)
+        return B.Unavailable(step.action)
+      end,
+      again = function(step)
+        local m = find(GD.Get(), step.key)
+        if m then
+          B.ShowCopy(step.action, stepOf(step.action, m, step.value))
+        end
+      end,
       exec = function(step)
         local m = find(GD.Get(), step.key)
         if not m then
@@ -613,6 +626,23 @@ function A.StartRun(entries, opts)
           end
         elseif event == "update" and e.stored and AL.RESULTS[e.result] then
           e.stored.result = e.result
+        elseif event == "update" and e.copy and e.result == "verified" then
+          -- A typed command the roster confirmed is a change like any other and goes into the log.
+          local action = e.action == "setRank" and (e.to < e.from and "promote" or "demote") or e.action
+          local _, stored = AL.Record(gm.Guild(), {
+            action = action,
+            name = e.name,
+            old = e.old,
+            new = e.new,
+            rule = e.rule,
+            result = "verified",
+            from = e.from,
+            to = e.to,
+          }, e.t)
+          e.stored = stored
+          if e.undoOf then
+            e.undoOf.undone = true
+          end
         end
       end,
       finish = function(summary)
@@ -659,7 +689,7 @@ gm.ext.RegisterDetail({
     local c = context(roster, m)
     local out = {}
     for _, action in ipairs(BUTTONS) do
-      if verdict(action, rights, c).ok then
+      if verdict(action, rights, c).ok and not B.Unavailable(action) then
         out[#out + 1] = {
           key = "gm.act." .. action,
           onClick = function(member, hookCtx)

@@ -12,6 +12,8 @@
 --   request()           asks the game for a fresh roster
 --   rule(step, snap)    true, or false and a reason: does the rule still apply to fresh data
 --   exec(step)          the action through the backend: "sent", "dry", "copy", "armed" or false and a reason
+--   offer(step)         nil when the client can do the step, else the reason code why it never can (skipped)
+--   again(step)         shows the command of the step in the copy window once more
 --   values(step)        old and new text of the step for the protocol
 --   log(entry, event)   called with "new" and "update"; finish(summary, run) once at the end
 -- A row is { key, name, rank, note, officerNote }, rank indexes count from 0 (guild master).
@@ -29,6 +31,9 @@ RL.STATES = { "ready", "confirmed", "running", "paused", "done", "aborted" }
 -- for before the run stops, and after how many steps the long pause comes.
 RL.MAX_AGE = 60
 RL.WAIT_LIMIT = 15
+-- Seconds a run waits for a fresh roster after the click that started the step: the game answers a
+-- request at most every ten seconds and the answer comes as an event.
+RL.ROSTER_LIMIT = 25
 RL.LONG_EVERY = 5
 -- Share of the pause that is added at random so the steps do not fall into a fixed rhythm.
 RL.JITTER = 0.2
@@ -201,7 +206,9 @@ local function zero()
 end
 
 -- entries: plan entries (PlanLogic) or steps; only "ready" ones run, the guild master never, one step
--- per member. opts: { settings = RL.Settings(..), backend = "direct" | "macro" | "copy", env }.
+-- per member. opts: { settings = RL.Settings(..), backend = "direct" | "macro" | "copy", env, copyWait }.
+-- copyWait (backend "copy"): a shown command is not a sent step. The step waits until the roster shows its
+-- change (verified) or the player skips it (open); the next command only comes with the next click.
 function RL.New(entries, opts)
   opts = type(opts) == "table" and opts or {}
   local env = type(opts.env) == "table" and opts.env or {}
@@ -214,10 +221,11 @@ function RL.New(entries, opts)
     notify = s.notify == true,
     -- A series needs the setting and the direct way: macro and copy take one click per member.
     series = s.series == true and opts.backend == "direct",
+    copyWait = opts.copyWait == true and opts.backend == "copy",
     steps = {},
     skipped = {},
     log = {},
-    counts = { sent = 0, dry = 0, copy = 0, skipped = 0, failed = 0, verified = 0, unverified = 0 },
+    counts = { sent = 0, dry = 0, copy = 0, skipped = 0, failed = 0, verified = 0, unverified = 0, open = 0 },
     i = 1,
     executed = 0,
   }, Run)
@@ -258,6 +266,7 @@ local function entryOf(self, step, result, reason)
     rule = step.rule,
     result = result,
     reason = reason,
+    copy = result == "copy" or nil,
     from = step.fromRank,
     to = step.toRank,
     undoOf = step.undoOf,
@@ -285,6 +294,12 @@ local function finish(self, state, reason)
     self.env.disarm(self.pendingButton)
   end
   self.pendingButton = nil
+  if self.awaitingChange then
+    -- The command was shown and nothing proved it: the step stays open.
+    self.counts.open = self.counts.open + 1
+    setResult(self, self.awaitingChange.log, "open")
+    self.awaitingChange = nil
+  end
   if self.env.finish and self.notify then
     self.env.finish(self:Summary(), self)
   end
@@ -308,6 +323,7 @@ function Run:Summary()
     failed = c.failed,
     verified = c.verified,
     unverified = c.unverified,
+    open = c.open,
   }
 end
 
@@ -354,7 +370,29 @@ local function gap(self)
 end
 
 -- The answer of the game after a step that went out: did the roster change as the step says.
+-- The roster after a command was shown (copyWait): "ok" when the step landed, "wait" while it did not.
+-- A roster that does not show the change keeps the step waiting, the player decides (Skip).
+local function settleCopy(self, snap)
+  local p = self.awaitingChange
+  if snap and not snap.combat and type(snap.takenAt) == "number" and snap.takenAt > p.shownAt then
+    if RL.Landed(p.step, snap.members and snap.members[p.step.key]) then
+      self.awaitingChange = nil
+      self.i = self.i + 1
+      self.executed = self.executed + 1
+      self.counts.verified = self.counts.verified + 1
+      setResult(self, p.log, "verified")
+      wait(self, "gap", gap(self))
+      return "ok"
+    end
+  end
+  self.state, self.why = "paused", "change"
+  return "wait"
+end
+
 local function settle(self, snap, now)
+  if self.awaitingChange then
+    return settleCopy(self, snap)
+  end
   local p = self.pending
   if not p then
     return nil
@@ -385,7 +423,7 @@ local function settle(self, snap, now)
 end
 
 local function done(self)
-  if self.i > #self.steps and not self.pending and not self.awaitingClick then
+  if self.i > #self.steps and not self.pending and not self.awaitingClick and not self.awaitingChange then
     finish(self, "done")
   end
 end
@@ -395,6 +433,10 @@ end
 local function recheck(self, step, snap)
   if step.action == "remove" and step.confirmed ~= true then
     return "nameMismatch", "abort"
+  end
+  local never = self.env.offer and self.env.offer(step)
+  if never then
+    return never
   end
   local member = snap.members and snap.members[step.key]
   if not member then
@@ -462,6 +504,9 @@ function Run:Step()
   if verdict == "abort" then
     return false, self.reason
   elseif verdict == "wait" then
+    if self.awaitingChange then
+      return false, "change"
+    end
     wait(self, "verify")
     return false, "verify"
   end
@@ -473,7 +518,7 @@ function Run:Step()
         env.request()
       end
       self.staleSince = self.staleSince or now
-      if now - self.staleSince > RL.WAIT_LIMIT then
+      if now - self.staleSince > RL.ROSTER_LIMIT then
         finish(self, "aborted", "rosterStale")
         return false, "rosterStale"
       end
@@ -509,6 +554,12 @@ function Run:Step()
         self.awaitingClick, self.pendingStep, self.pendingButton = true, step, info
         return true, "armed", info
       end
+      if status == "copy" and self.copyWait then
+        self.counts.copy = self.counts.copy + 1
+        self.awaitingChange = { step = step, log = entryOf(self, step, "copy"), shownAt = now, text = info }
+        self.why = "change"
+        return true, "copy", info
+      end
       self.i = self.i + 1
       self.executed = self.executed + 1
       if status == "dry" or status == "copy" then
@@ -533,7 +584,11 @@ function Run:Clicked()
   if not step then
     return false
   end
+  local button = self.pendingButton
   self.awaitingClick, self.pendingStep, self.pendingButton = nil, nil, nil
+  if button and self.env.disarm then
+    self.env.disarm(button)
+  end
   self.i = self.i + 1
   self.executed = self.executed + 1
   self.counts.sent = self.counts.sent + 1
@@ -543,10 +598,50 @@ function Run:Clicked()
   return true
 end
 
+-- The player moves on without the change (copyWait): the step stays open and counts as such. False when
+-- no command is waiting.
+function Run:Skip()
+  local p = self.awaitingChange
+  if not p then
+    return false
+  end
+  self.awaitingChange = nil
+  self.i = self.i + 1
+  self.counts.open = self.counts.open + 1
+  setResult(self, p.log, "open")
+  self.state, self.why = "running", nil
+  done(self)
+  return true
+end
+
+-- Shows the command of the waiting step in the copy window once more.
+function Run:Again()
+  local p = self.awaitingChange
+  if p and self.env.again then
+    self.env.again(p.step)
+    return true
+  end
+  return false
+end
+
 -- Called regularly while the run is open: a series goes on when its pause is over, every run settles the
--- last step against the roster and ends when nothing is left.
+-- last step against the roster and ends when nothing is left. A click that met an old roster is
+-- not lost: the step goes on by itself as soon as the roster is fresh.
 function Run:Tick()
   if self.state == "done" or self.state == "aborted" or self.state == "ready" then
+    return
+  end
+  if self.awaitingChange then
+    -- A change shows up in the roster only after the game sent it again; asking is throttled by the game side.
+    if self.env.request then
+      self.env.request()
+    end
+    settle(self, self.env.snapshot and self.env.snapshot(), self.env.now())
+    done(self)
+    return
+  end
+  if self.state == "paused" and self.why == "roster" and not self.awaitingClick then
+    self:Step()
     return
   end
   if self.series and self.state ~= "confirmed" and not self.awaitingClick then

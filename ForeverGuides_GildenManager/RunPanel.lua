@@ -66,13 +66,16 @@ function RP.New(parent, hooks)
   panel.nextBtn = K.Button(panel, "gm.rules.next", function()
     panel:Next()
   end, "primary", "gm-run-next")
+  panel.againBtn = K.Button(panel, "gm.rules.again", function()
+    panel:Again()
+  end, nil, "gm-run-again")
   panel.stopBtn = K.Button(panel, "gm.rules.stop", function()
     panel:Stop()
   end, "danger", "gm-run-stop")
   panel.closeBtn = K.Button(panel, "gm.rules.closeRun", function()
     panel:Close()
   end, nil, "gm-run-close")
-  panel.flow = K.Flow(panel, { panel.confirmBtn, panel.nextBtn, panel.stopBtn, panel.closeBtn })
+  panel.flow = K.Flow(panel, { panel.confirmBtn, panel.nextBtn, panel.againBtn, panel.stopBtn, panel.closeBtn })
   panel.flow.fgId = "gm-run-buttons"
 
   local elapsed = 0
@@ -85,6 +88,15 @@ function RP.New(parent, hooks)
       end
     end
   end)
+
+  -- The overlay of the macro way hangs on UIParent: it follows the panel when this is shown or hidden.
+  local function follow(self)
+    if self.armed then
+      B.Place(self.armed, self.nextBtn, self)
+    end
+  end
+  panel:HookScript("OnHide", follow)
+  panel:HookScript("OnShow", follow)
 
   -- entries: the ticked ready entries of the plan, plan(): builds the plan again on fresh data.
   function panel:Start(entries, plan)
@@ -118,10 +130,25 @@ function RP.New(parent, hooks)
     return ok
   end
 
-  -- One click, one step. The macro way hands over a secure button that takes the place of this one.
+  -- Shows the command of the waiting step in the copy window once more.
+  function panel:Again()
+    if self.run then
+      self.run:Again()
+    end
+  end
+
+  -- One click, one step. The macro way hands over a secure button that takes the place of this one. While a
+  -- typed command waits for the roster the click moves on without it (the step stays open).
   function panel:Next()
     local run = self.run
     if not run then
+      return
+    end
+    if run.awaitingChange then
+      run:Skip()
+      self.msg:SetText("")
+      self:Refresh()
+      self.hooks.ctx.Refresh()
       return
     end
     local ok, info, extra = run:Step()
@@ -223,20 +250,21 @@ function RP.New(parent, hooks)
     self.confirmBtn:SetShown(state == "ready" and total > 0)
     local waiting = state == "confirmed" or state == "running" or state == "paused"
     local clicking = run.awaitingClick == true and self.armed ~= nil
-    self.nextBtn:SetShown(waiting and not clicking)
+    -- The button stays under the secure overlay of the macro way, which has its own place on the screen.
+    self.nextBtn:SetShown(waiting)
+    self.againBtn:SetShown(waiting and run.awaitingChange ~= nil)
     self.stopBtn:SetShown(waiting or state == "ready")
     self.closeBtn:SetShown(finished or state == "ready")
-    if run.series and waiting then
+    if run.awaitingChange then
+      W.SetText(self.nextBtn.label, "gm.rules.skip")
+    elseif run.series and waiting then
       W.SetText(self.nextBtn.label, "gm.rules.startSeries")
     else
       W.SetText(self.nextBtn.label, "gm.rules.next")
     end
     if self.armed then
       if clicking then
-        self.armed:SetParent(self)
-        self.armed:ClearAllPoints()
-        self.armed:SetAllPoints(self.nextBtn)
-        self.armed:Show()
+        B.Place(self.armed, self.nextBtn, self)
       else
         release(self)
       end
