@@ -408,6 +408,8 @@ Store.defaults = {
     inviteGuildReplyOn = false,
     inviteGuildReply = "",
     inviteGuildNotify = true,
+    -- Forever client: open the box with the /ginvite command at every guild request (Modules/Invites.lua).
+    inviteGuildCopyBox = false,
     inviteAllow = "",
     inviteBlock = "",
     inviteSkipAway = false,

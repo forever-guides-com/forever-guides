@@ -14,6 +14,7 @@ ns.AddLocale("enUS", {
   ["invite.set.groupHeading"] = "Group",
   ["invite.set.guildHeading"] = "Guild",
   ["invite.set.enable"] = "Invite by whisper",
+  ["invite.set.copyBox"] = "Open the box with the /ginvite command at every request (the game only takes this invite when you enter it yourself)",
   ["invite.set.words"] = "Keywords, comma separated",
   ["invite.set.mode"] = "Who may ask",
   ["invite.set.minLevel"] = "Minimum level",
@@ -91,6 +92,7 @@ ns.AddLocale("deDE", {
   ["invite.set.groupHeading"] = "Gruppe",
   ["invite.set.guildHeading"] = "Gilde",
   ["invite.set.enable"] = "Per Flüstern einladen",
+  ["invite.set.copyBox"] = "Bei jeder Anfrage das Feld mit dem Befehl /ginvite öffnen (das Spiel nimmt diese Einladung nur an, wenn du sie selbst eingibst)",
   ["invite.set.words"] = "Stichwörter, mit Komma getrennt",
   ["invite.set.mode"] = "Wer darf fragen",
   ["invite.set.minLevel"] = "Mindeststufe",
@@ -340,6 +342,9 @@ local function section(view, kind)
     id = id .. "reply",
   })
   toggle(p .. "Notify", "invite.set.notify", "notify", true)
+  if kind == "guild" and Inv.GuildCallReserved() then
+    toggle("inviteGuildCopyBox", "invite.set.copyBox", "copybox")
+  end
   return frames
 end
 

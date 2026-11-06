@@ -20,7 +20,7 @@ ns.AddLocale("enUS", {
   ["invite.prompt.button"] = "Invite to guild",
   ["invite.prompt.copy"] = "Copy command",
   ["invite.prompt.copyTitle"] = "Guild invite command",
-  ["invite.prompt.copyHint"] = "Paste the command into the chat to invite the player.",
+  ["invite.prompt.copyHint"] = "Press Ctrl+C, open the chat with Enter, paste with Ctrl+V and press Enter. The game only takes this invite when you enter the command yourself.",
   ["invite.prompt.detail"] = "Level %d %s",
   ["invite.prompt.detailLevel"] = "Level %d",
   ["invite.prompt.hint"] = "Key %s",
@@ -37,7 +37,7 @@ ns.AddLocale("deDE", {
   ["invite.prompt.button"] = "In die Gilde einladen",
   ["invite.prompt.copy"] = "Befehl kopieren",
   ["invite.prompt.copyTitle"] = "Gilden-Einladungsbefehl",
-  ["invite.prompt.copyHint"] = "Füge den Befehl in den Chat ein, um den Spieler einzuladen.",
+  ["invite.prompt.copyHint"] = "Drücke Strg+C, öffne den Chat mit Enter, füge mit Strg+V ein und drücke Enter. Das Spiel nimmt diese Einladung nur an, wenn du den Befehl selbst eingibst.",
   ["invite.prompt.detail"] = "Stufe %d %s",
   ["invite.prompt.detailLevel"] = "Stufe %d",
   ["invite.prompt.hint"] = "Taste %s",
@@ -103,6 +103,16 @@ end
 function P.Command(name)
   name = safeName(name)
   return name and (P.SLASH .. " " .. name) or nil
+end
+
+-- Opens the copy box with the command of one player (the way that works where the game refuses add-ons).
+function P.OpenCopy(name)
+  local text = P.Command(name)
+  if text and ns.Dialogs and ns.Dialogs.Copy then
+    ns.Dialogs.Copy("invite.prompt.copyTitle", text, "invite.prompt.copyHint")
+    return true
+  end
+  return false
 end
 
 function P.MacroText(name)
@@ -701,10 +711,7 @@ local function newRow()
     width = BTN_MIN_W,
     height = 24,
     onClick = function()
-      local text = P.Command(row.name)
-      if text and ns.Dialogs and ns.Dialogs.Copy then
-        ns.Dialogs.Copy("invite.prompt.copyTitle", text, "invite.prompt.copyHint")
-      end
+      P.OpenCopy(row.name)
     end,
   })
   -- The normal button sits on top of the secure one and hides itself when the game blocks its call.

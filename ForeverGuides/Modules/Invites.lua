@@ -34,8 +34,8 @@ ns.AddLocale("enUS", {
   ["invite.fb.guild-sent"] = "invited to the guild",
   ["invite.fb.guild-blocked"] = "the game blocked the direct call, click the button once more",
   ["invite.fb.guild-secure"] = "guild invite command sent, the game reports the result",
-  ["invite.fb.guild-prepared"] = "the guild invite command is in the chat box, press Enter",
-  ["invite.popup.guild"] = "Invite %s to the guild?",
+  ["invite.fb.guild-link"] = "the game only takes this invite when you enter it yourself: copy the command from the box (Ctrl+C), paste it in the chat (Ctrl+V) and press Enter, or type /ginvite %s",
+  ["invite.menu.guild"] = "Invite to guild (copy command)",
   ["invite.fb.guild-combat"] = "in combat, the guild invite waits",
   ["invite.fb.failed"] = "invite failed (%s)",
   ["invite.fb.off"] = "the automatic invite is off",
@@ -83,8 +83,8 @@ ns.AddLocale("deDE", {
   ["invite.fb.guild-sent"] = "in die Gilde eingeladen",
   ["invite.fb.guild-blocked"] = "das Spiel hat den direkten Aufruf blockiert, klicke den Knopf noch einmal",
   ["invite.fb.guild-secure"] = "Gilden-Einladungsbefehl gesendet, das Spiel meldet das Ergebnis",
-  ["invite.fb.guild-prepared"] = "der Gilden-Einladungsbefehl steht im Chatfeld, drücke Enter",
-  ["invite.popup.guild"] = "%s in die Gilde einladen?",
+  ["invite.fb.guild-link"] = "das Spiel nimmt diese Einladung nur an, wenn du sie selbst eingibst: kopiere den Befehl aus dem Fenster (Strg+C), füge ihn im Chat ein (Strg+V) und drücke Enter, oder tippe /ginvite %s",
+  ["invite.menu.guild"] = "In die Gilde einladen (Befehl kopieren)",
   ["invite.fb.guild-combat"] = "im Kampf, die Gildeneinladung wartet",
   ["invite.fb.failed"] = "Einladung fehlgeschlagen (%s)",
   ["invite.fb.off"] = "die automatische Einladung ist aus",
@@ -408,7 +408,11 @@ ns.On("ADDON_ACTION_BLOCKED", onBlocked)
 -- Runs fn(name). Answers "sent", "blocked" (the game refused it by event) or false and a reason.
 local function guarded(fn, name)
   blockedFlag = false
-  local ok = pcall(fn, name)
+  -- A Lua function of ours calls the game, not pcall itself: with pcall as the caller the client cannot tell who
+  -- asks and refuses calls that it takes from a click.
+  local ok = pcall(function()
+    fn(name)
+  end)
   local blocked = blockedFlag
   blockedFlag = nil
   if blocked then
@@ -435,97 +439,51 @@ end
 -- refused for every other caller, a chat event above all.
 local clickDepth = 0
 
--- Clients other than Retail refuse the guild call of a button of the add-on. The game's own confirmation
--- window takes it (the way other invite add-ons do), and when that is refused too the command goes to the
--- chat box for the player to confirm with Enter.
+-- The Forever client refuses the guild invite to every add-on: from a button, a macro, the game's own
+-- confirmation window, a key press, a click into the world and a command that the add-on put in the chat box
+-- (ADDON_ACTION_FORBIDDEN, measured and reported by other add-ons for it). Only an invite that the player
+-- starts completely alone works there, by typing /ginvite or by the right-click menu of the game. So the
+-- add-on never tries the call there and points to those two ways, with the name as a link to right-click.
 function I.GuildCallReserved()
   local project, mainline = g("WOW_PROJECT_ID"), g("WOW_PROJECT_MAINLINE")
   return project ~= nil and mainline ~= nil and project ~= mainline
 end
 
-local function prepareGuildCommand(name)
-  local prompt = ns.InvitePrompt
-  local command = prompt and prompt.Command(name)
-  local open = g("ChatFrame_OpenChat")
-  if not command or type(open) ~= "function" then
-    return false, "no-api"
-  end
-  if not pcall(open, command) then
-    return false, "error"
-  end
-  return "prepared"
-end
-
-local POPUP = "FOREVERGUIDES_GUILD_INVITE"
-
--- Shows the game's confirmation window; done(status, reason) gets the outcome after the player answered yes.
-local function showGuildPopup(name, done)
-  local dialogs, show = g("StaticPopupDialogs"), g("StaticPopup_Show")
-  if type(dialogs) ~= "table" or type(show) ~= "function" then
-    return false
-  end
-  dialogs[POPUP] = dialogs[POPUP]
-    or {
-      text = ns.L["invite.popup.guild"],
-      button1 = g("YES") or "Yes",
-      button2 = g("NO") or "No",
-      OnAccept = function(_, data)
-        if type(data) ~= "table" then
-          return
-        end
-        clickDepth = clickDepth + 1
-        local ok, status, why = pcall(I.GuildInviteFromClick, data.name, nil, true)
-        clickDepth = clickDepth - 1
-        if not ok then
-          status, why = false, "error"
-        end
-        if status == "blocked" then
-          status, why = prepareGuildCommand(data.name)
-        end
-        if data.done then
-          data.done(status, why)
-        end
-      end,
-      timeout = 0,
-      whileDead = true,
-      hideOnEscape = true,
-      multiple = 1,
-      preferredIndex = 3,
-    }
-  local okShow, dialog = pcall(show, POPUP, name)
-  if not okShow or type(dialog) ~= "table" then
-    return false
-  end
-  dialog.data = { name = name, done = done }
-  return true
-end
-
--- The guild invite, the only place that calls the game for it. Answers "sent", "blocked", "popup" (the game's
--- window asks first, done gets the outcome), "prepared" or false and a reason.
-function I.GuildInviteFromClick(name, done, answered)
+-- The guild invite, the only place that calls the game for it. Answers "sent", "blocked", "manual" (the
+-- player has to start it, the game refuses add-ons) or false and a reason.
+function I.GuildInviteFromClick(name)
   if clickDepth == 0 then
     return false, "not-from-click"
   end
   if not I.CanGuild() then
     return false, "no-permission"
   end
-  if not answered and I.GuildCallReserved() then
-    if showGuildPopup(name, done) then
-      return "popup"
-    end
-    return prepareGuildCommand(name)
+  if I.GuildCallReserved() then
+    return "manual"
   end
   local info = g("C_GuildInfo")
-  local fn = type(info) == "table" and type(info.Invite) == "function" and info.Invite or g("GuildInvite")
-  if type(fn) ~= "function" then
+  local modern = type(info) == "table" and type(info.Invite) == "function" and info.Invite or nil
+  local global = g("GuildInvite")
+  global = type(global) == "function" and global or nil
+  local reserved = I.GuildCallReserved()
+  local fn = reserved and (global or modern) or (modern or global)
+  if not fn then
     return false, "no-api"
   end
-  return guarded(fn, name)
+  local status, why = guarded(fn, name)
+  if status == "blocked" and reserved then
+    -- The other function of the game once, then done; each refusal shows a warning.
+    local other = fn == global and modern or global
+    if other then
+      status, why = guarded(other, name)
+    end
+  end
+  return status, why
 end
 
-local function clickInvite(name, done)
+local function clickInvite(name)
   clickDepth = clickDepth + 1
-  local ok, status, why = pcall(I.GuildInviteFromClick, name, done)
+  local ok, status, why = pcall(I.GuildInviteFromClick, name)
   clickDepth = clickDepth - 1
   if ok then
     return status, why
@@ -605,6 +563,15 @@ local function senderInfo(name, guid)
   return info
 end
 
+-- Chat line of the way that works where the game refuses add-ons the guild invite.
+function I.TellManual(cfg, who, keyword, target)
+  if cfg.notify == false then
+    return
+  end
+  local text = string.format(ns.L["invite.fb.guild-link"], target)
+  ns.Notify.chat(string.format(ns.L["invite.fb.line"], who, keyword, text))
+end
+
 -- The bar of a guild request; the invite itself happens on its click (see GuildInviteFromClick).
 local function askGuild(cfg, name, who, keyword, battleNetId, info)
   local prompt = ns.InvitePrompt
@@ -618,35 +585,13 @@ local function askGuild(cfg, name, who, keyword, battleNetId, info)
       reply("guild", cfg, target, battleNetId)
     end
   end
-  local function outcome(target, status, reason)
-    if status == "prepared" then
-      record("guild", who, "prepared", "ok")
-      feedback(cfg, who, keyword, "guild-prepared")
-    elseif status == "sent" then
-      sent(target)
-    else
-      feedback(cfg, who, keyword, "failed", reason or "error")
-    end
-  end
-  -- Where the game keeps the guild call, its own confirmation window comes up at once, as with other invite
-  -- add-ons. When no window is free (the game shows a few at a time) the request waits in the bar below.
-  if I.CanGuild() and I.GuildCallReserved() then
-    local shown = showGuildPopup(name, function(status, reason)
-      outcome(name, status, reason)
-    end)
-    if shown then
-      return "ready"
-    end
-  end
   local state, why = prompt.Request(name, {
     invite = function(target)
-      local status, reason = clickInvite(target, function(answer, answerReason)
-        outcome(target, answer, answerReason)
-      end)
-      if status == "popup" then
-        return "sent"
-      elseif status == "prepared" then
-        outcome(target, status)
+      local status, reason = clickInvite(target)
+      if status == "manual" then
+        -- The copy box carries the command; it is entered by the player, the only way the game takes it.
+        prompt.OpenCopy(target)
+        I.TellManual(cfg, who, keyword, target)
         return "sent"
       elseif status == "sent" then
         sent(target)
@@ -707,11 +652,17 @@ local function process(kind, text, sender, guid, label, battleNetId, missing)
   if decision.action == "invite" then
     IL.RateRecord(rate, IL.RateKey(kind, sender), now)
     if kind == "guild" then
-      local state, why = askGuild(cfg, PN.Clean(sender), who, keyword, battleNetId, senderInfo(sender, guid))
+      local target = PN.Clean(sender)
+      local state, why = askGuild(cfg, target, who, keyword, battleNetId, senderInfo(sender, guid))
       if state then
         result, reason = "asked", state
         -- A request in line is not worth a chat line each: 200 of them would fill the chat.
-        if state ~= "queued" then
+        if state == "ready" and I.GuildCallReserved() then
+          I.TellManual(cfg, who, keyword, target)
+          if ns.db.settings.inviteGuildCopyBox == true and ns.InvitePrompt then
+            ns.InvitePrompt.OpenCopy(target)
+          end
+        elseif state ~= "queued" then
           feedback(cfg, who, keyword, state == "ready" and "guild-ready" or "guild-waiting")
         end
       else
@@ -836,3 +787,50 @@ local function dirty()
 end
 ns.On("GUILD_ROSTER_UPDATE", dirty)
 ns.On("PLAYER_GUILD_UPDATE", dirty)
+
+-- Right-click menu entry ----------------------------------------------------------------------------------
+
+-- On the Forever client the unit menus of the game get an entry that opens the box with the command of that player,
+-- the one way the game takes the guild invite: the player copies it and enters it in the chat.
+function I.MenuInvite(name)
+  name = PN.Clean(name)
+  if name == "" then
+    return
+  end
+  local prompt = ns.InvitePrompt
+  if prompt and prompt.OpenCopy then
+    prompt.OpenCopy(name)
+  end
+end
+
+local MENU_TAGS = {
+  "MENU_UNIT_PLAYER",
+  "MENU_UNIT_FRIEND",
+  "MENU_UNIT_TARGET",
+  "MENU_UNIT_PARTY",
+  "MENU_UNIT_RAID_PLAYER",
+  "MENU_UNIT_BN_FRIEND",
+  "MENU_UNIT_CHAT_ROSTER",
+}
+
+local function addMenuEntries()
+  local menu = g("Menu")
+  if not I.GuildCallReserved() or type(menu) ~= "table" or type(menu.ModifyMenu) ~= "function" then
+    return
+  end
+  for _, tag in ipairs(MENU_TAGS) do
+    pcall(menu.ModifyMenu, tag, function(_, root, context)
+      local name = type(context) == "table" and context.name
+      if type(name) ~= "string" or name == "" or not I.CanGuild() then
+        return
+      end
+      if type(root) == "table" and type(root.CreateButton) == "function" then
+        root:CreateButton(ns.L["invite.menu.guild"], function()
+          I.MenuInvite(name)
+        end)
+      end
+    end)
+  end
+end
+ns.On("PLAYER_LOGIN", addMenuEntries)
+I.AddMenuEntries = addMenuEntries

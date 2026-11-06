@@ -48,7 +48,7 @@ local function reloadConfirmed(afterReload)
   end
   local why = S.CanReload() and S.ConfirmReason() or nil
   if why then
-    ns.Dialogs.Confirm("save.confirmTitle", "save.confirm." .. why, S.Click(go))
+    ns.Dialogs.Confirm("save.confirmTitle", "save.confirm." .. why, S.Click(go), nil, { callFirst = true })
   else
     go()
   end

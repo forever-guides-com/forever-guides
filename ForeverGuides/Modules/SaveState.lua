@@ -279,7 +279,11 @@ function S.Reload()
   local a = { api = api, at = S.clock() }
   attempt = a
   S.last = a
-  local called, err = pcall(fn)
+  -- The game is called by a Lua function of ours and not by pcall itself: with pcall as the caller the client
+  -- cannot tell who asks, names the call UNKNOWN() and refuses the reload.
+  local called, err = pcall(function()
+    fn()
+  end)
   a.ok, a.err = called, not called and tostring(err) or nil
   local blocked = a.blocked
   after(SL.ATTEMPT_SECONDS, function()

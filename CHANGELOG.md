@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.3
+
+### Changed
+
+- Whisper invites: on the Forever client the game only takes a guild invite that you enter yourself. The button opens a box with the command to copy, and the chat tells you the steps.
+- Whisper invites: on the Forever client the player menus get an entry that opens the box with the command, and a new switch opens that box at every request (off by default).
+
+### Fixed
+
+- Save button: the reload now works from the question that appears in a group, instead of ending in the notice that the game blocked it.
+
 ## 0.5.2
 
 ### Changed

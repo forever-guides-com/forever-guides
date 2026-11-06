@@ -269,6 +269,14 @@ function Dialogs.Confirm(titleKey, textKey, onYes, onNo, opts)
   yes:SetScript(
     "OnClick",
     ns.Wrap("confirm", function()
+      if opts.callFirst then
+        -- The action needs the click as it is (a reload): the dialog stays until the action has run.
+        onYes()
+        if confirm.active == yes then
+          confirm:Hide()
+        end
+        return
+      end
       confirm:Hide()
       onYes()
     end)

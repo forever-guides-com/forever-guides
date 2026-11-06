@@ -4,7 +4,7 @@
 ## Notes-deDE: Messenger-Fenster für Chat und Flüstern. Standardmäßig aus, alles bleibt auf diesem PC. In Arbeit.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 0.5.2
+## Version: 0.5.3
 ## Dependencies: ForeverGuides
 ## DefaultState: disabled
 ## LoadOnDemand: 1

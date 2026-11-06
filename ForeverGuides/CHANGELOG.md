@@ -4,6 +4,17 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.5.3] - 2026-11-06
+
+### Changed
+
+- Whisper invites: on the Forever client the game only takes a guild invite that you enter yourself. The button opens a box with the command to copy, and the chat tells you the steps.
+- Whisper invites: on the Forever client the player menus get an entry that opens the box with the command, and a new switch opens that box at every request (off by default).
+
+### Fixed
+
+- Save button: the reload now works from the question that appears in a group, instead of ending in the notice that the game blocked it.
+
 ## [0.5.2] - 2026-11-06
 
 ### Changed
@@ -310,6 +321,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.5.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.2.0...v0.5.0
