@@ -30,8 +30,10 @@ Store.defaults = {
     -- Short text next to the icon of action buttons (W.Action label); off = icons only.
     buttonLabels = true,
     combatHide = false,
-    -- Reminder bar after a price scan and at calm moments while data is unsaved (Modules/SaveState.lua).
-    saveHint = true,
+    -- Reminder bar after a price scan and at calm moments while data is unsaved (Modules/SaveState.lua), off
+    -- by default. saveHintDefault marks that Store.migrateSaveHint ran (a fresh database starts with it).
+    saveHint = false,
+    saveHintDefault = 1,
     sidebarCollapsed = false,
     -- Account default of the optional sub-addons by manifest id (Core/SubAddons.lua); a character
     -- overrides it in ForeverGuidesCharDB.subaddons. The key must exist so the controls can bind.
@@ -884,6 +886,18 @@ function Store.migrateXpSession(account)
   bar.migrated = 1
 end
 
+-- saveHint used to default to true and now defaults to false. The old default is turned off once for every
+-- existing database, marked by saveHintDefault; a later deliberate true stays. Runs before the defaults are
+-- filled in (a database without settings gets the new defaults and the marker with them).
+function Store.migrateSaveHint(account)
+  local s = account.settings
+  if type(s) ~= "table" or s.saveHintDefault ~= nil then
+    return
+  end
+  s.saveHint = false
+  s.saveHintDefault = 1
+end
+
 -- settings.inviteBarStyle was a number (1 bar, 2 card, 3 chat line); it is a word now ("window" or "bar"):
 -- every old number becomes the window (the new default: the number 1 was only the old default, not a choice).
 -- A word stays as it is, so it can run on every start.
@@ -959,6 +973,7 @@ function Store.init(account, char)
   Store.migrateSocialAccept(account)
   Store.migrateHostSkin(account)
   Store.migrateXpSession(account)
+  Store.migrateSaveHint(account)
   Store.migrateInviteStyle(account)
   Store.cleanFontScales(account)
   if ns.Consent then

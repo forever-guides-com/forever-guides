@@ -345,7 +345,7 @@ end
 
 local function hintEnabled()
   local settings = ns.db and ns.db.settings
-  return not (settings and settings.saveHint == false)
+  return settings ~= nil and settings.saveHint == true
 end
 
 -- Shows the reminder when the rules allow it. trigger: "scan" or "pause". Returns true, or false and why.

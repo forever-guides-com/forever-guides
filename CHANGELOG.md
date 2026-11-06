@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+
+### Changed
+
+- Save reminder: the notice about unsaved data with its reload button is now off by default and was switched off once on update. Turn it on in Settings under Saving to be reminded.
+
 ## 0.5.1
 
 ### Fixed

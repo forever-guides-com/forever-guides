@@ -4,6 +4,12 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.5.2] - 2026-11-06
+
+### Changed
+
+- Save reminder: the notice about unsaved data with its reload button is now off by default and was switched off once on update. Turn it on in Settings under Saving to be reminded.
+
 ## [0.5.1] - 2026-11-05
 
 ### Fixed
@@ -304,6 +310,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.5.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.2.0...v0.5.0
 [0.2.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.1.8...v0.2.0
