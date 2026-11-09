@@ -577,7 +577,7 @@ local BUILT_IN = {
   { "professions", { "jobs", "skill" }, { "group", "guild" } },
   { "presenceMark", { "presence" }, { "group", "guild" } },
   { "crestMark", { "crests" }, { "group", "guild" } },
-  { "linkShare", { "notes", "drawings", "builds", "lists" }, { "chat" } },
+  { "linkShare", { "notes", "drawings", "builds", "lists", "layouts" }, { "chat" } },
   { "guildMap", { "position" }, { "guild" } },
   { "crafting", { "recipes" }, { "guild" } },
   { "gmShare", { "rules" }, { "guild" } },

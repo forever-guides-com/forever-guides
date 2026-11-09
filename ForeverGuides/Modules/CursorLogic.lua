@@ -6,7 +6,8 @@ local _, ns = ...
 local U, L, CL, A, LL = ns.U, ns.L, ns.CanvasLogic, ns.CursorAssets, ns.LoadLogic
 
 local CU = {
-  -- The game's frame layers, lowest first.
+  -- The game's frame layers the ring may use, lowest first. TOOLTIP is left out on purpose: the ring would
+  -- cover the tooltips (a saved TOOLTIP repairs to the default).
   STRATA = {
     "BACKGROUND",
     "LOW",
@@ -15,7 +16,6 @@ local CU = {
     "DIALOG",
     "FULLSCREEN",
     "FULLSCREEN_DIALOG",
-    "TOOLTIP",
   },
   -- What the ring does while the camera is turned with the mouse: disappear, stay at the cursor, or stand
   -- in the middle of the screen.
@@ -35,7 +35,8 @@ ns.CursorLogic = CU
 
 CU.DEFAULTS = {
   enabled = false,
-  strata = "TOOLTIP",
+  -- Above every dialog and window, below the dropdowns, dialogs and tooltips of the game and the add-on.
+  strata = "FULLSCREEN",
   mouselook = "hide",
   layoutId = "standard",
   layouts = {},

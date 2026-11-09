@@ -20,6 +20,10 @@ ns.AddLocale("enUS", {
   ["trainers.emptyHint"] = "Visit a trainer in game and the addon remembers it.",
   ["trainers.mapTip"] = "Show the trainer's zone on the map",
   ["trainers.markerTip"] = "Set a waypoint at the trainer",
+  ["trainers.search"] = "Search",
+  ["trainers.searchPh"] = "Name or place",
+  ["trainers.count"] = "%d of %d trainers",
+  ["trainers.searchEmpty"] = "No trainer matches this search.",
   ["tour.trainers.title"] = "Class trainers",
   ["tour.trainers.intro.title"] = "Class trainers",
   ["tour.trainers.intro.text"] = "Find your class trainers (Enter: next, Esc: end)",
@@ -47,6 +51,10 @@ ns.AddLocale("deDE", {
   ["trainers.emptyHint"] = "Besuche einen Lehrer im Spiel, das Addon merkt ihn sich.",
   ["trainers.mapTip"] = "Lehrerzone auf der Karte zeigen",
   ["trainers.markerTip"] = "Wegpunkt am Lehrer setzen",
+  ["trainers.search"] = "Suchen",
+  ["trainers.searchPh"] = "Name oder Ort",
+  ["trainers.count"] = "%d von %d Lehrern",
+  ["trainers.searchEmpty"] = "Kein Lehrer passt zu dieser Suche.",
   ["tour.trainers.title"] = "Klassenlehrer",
   ["tour.trainers.intro.title"] = "Klassenlehrer",
   ["tour.trainers.intro.text"] = "Finde deine Klassenlehrer (Enter: weiter, Esc: Ende)",
@@ -85,6 +93,8 @@ end
 -- at the bottom right, so the two never touch.
 local ROW_HEIGHT = 48
 local ROW_ACTION_TOP = 5
+local FIELD_W = 220
+local FIELD_H = 46
 
 local KIND_BADGE_COLOR =
   { start = "success", town = "textMuted", capital = "accent2", own = "accent2", pet = "warning" }
@@ -177,6 +187,7 @@ local function build(container)
     class = K.PlayerClass() or "WARRIOR",
     faction = K.PlayerFaction() or "A",
     view = ns.db.settings.trainersView or "list",
+    query = "",
   }
   local refresh
 
@@ -208,6 +219,24 @@ local function build(container)
     return K.StackLayout(filters, { classButtons, factionButtons }, width, 12)
   end
   s:Add(filters, { gap = 8 })
+
+  -- Search by name or place, like the profession trainers (Modules/TrainerSearchLogic.lua).
+  local searchBox = CreateFrame("Frame", nil, view.content)
+  K.Anchor("FG.Trainers.Search", searchBox)
+  W.Text(searchBox, { key = "trainers.search", role = "ui" }):SetPoint("TOPLEFT")
+  local search = W.EditBox(searchBox, {
+    placeholder = "trainers.searchPh",
+    clear = true,
+    onChange = function(text)
+      state.query = text
+      refresh()
+    end,
+  })
+  search:SetPoint("TOPLEFT", 0, -18)
+  search:SetWidth(FIELD_W)
+  s:Add(searchBox, { height = FIELD_H, width = FIELD_W, gap = 4 })
+  local counter = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 10 })
+  K.Anchor("FG.Trainers.Count", counter)
 
   -- Small link line: the abilities per level are on the level overview page.
   local levelsLink = CreateFrame("Button", nil, view.content)
@@ -392,11 +421,12 @@ local function build(container)
   local note = ns.AddParagraph(view, nil, { role = "ui", color = "textSecondary" })
 
   -- Fills the panels from the faction groups; groups = {} hides all of them.
-  local function paintPanels(groups)
+  -- headings: name the faction above each group (always while both factions are asked for).
+  local function paintPanels(groups, headings)
     local asList = state.view == "list"
     for i, p in ipairs(panels) do
       local g = groups[i]
-      p.heading:SetShown(g ~= nil and #groups > 1)
+      p.heading:SetShown(g ~= nil and headings == true)
       p.list:SetShown(g ~= nil and not g.empty and asList)
       p.grid:SetShown(g ~= nil and not g.empty and not asList)
       p.empty:SetShown(g ~= nil and g.empty)
@@ -411,10 +441,33 @@ local function build(container)
     end
   end
 
+  -- The faction groups reduced to the trainers that match the search; a group without a hit drops out.
+  local function narrow(groups)
+    local out = {}
+    for _, g in ipairs(groups) do
+      local hits = ns.TrainerSearchLogic.FilterTrainers(g.trainers, state.query, ns.Data.Trainers.zones)
+      if #hits > 0 then
+        local copy = {}
+        for k, v in pairs(g) do
+          copy[k] = v
+        end
+        copy.trainers, copy.pets = hits, {}
+        for _, t in ipairs(hits) do
+          if R.roleOf(t) == "pet" then
+            copy.pets[#copy.pets + 1] = t
+          end
+        end
+        out[#out + 1] = copy
+      end
+    end
+    return out
+  end
+
   function refresh()
     if not K.HasData("Trainers") then
       paintPanels({})
       petHint:Hide()
+      counter:Hide()
       note:SetText(L["kit.noData"])
       note:Show()
       view:Layout()
@@ -423,14 +476,32 @@ local function build(container)
     local faction = state.faction ~= "all" and state.faction or nil
     basis:SetText(ns.T(ns.Data.Trainers.basis) or "")
     local groups = R.TrainerGroups(state.class, faction)
-    paintPanels(groups)
+    local headings = #groups > 1
+    local total, matched = 0, 0
+    for _, g in ipairs(groups) do
+      total = total + #g.trainers
+    end
+    if ns.TrainerSearchLogic.HasQuery(state.query) then
+      groups = narrow(groups)
+    end
+    for _, g in ipairs(groups) do
+      matched = matched + (g.empty and 0 or #g.trainers)
+    end
+    paintPanels(groups, headings)
     local hasPets = false
     for _, g in ipairs(groups) do
       hasPets = hasPets or #g.pets > 0
     end
     petHint:SetText(ns.T(ns.TrainerRoles.NOTE_PET) or "")
     petHint:SetShown(hasPets)
-    note:Hide()
+    counter:SetText(string.format(L["trainers.count"], matched, total))
+    counter:SetShown(total > 0)
+    if total > 0 and matched == 0 then
+      note:SetText(L["trainers.searchEmpty"])
+      note:Show()
+    else
+      note:Hide()
+    end
     classButtons.Refresh()
     factionButtons.Refresh()
     viewToggle.Refresh()

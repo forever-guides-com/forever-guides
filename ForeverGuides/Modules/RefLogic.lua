@@ -322,7 +322,7 @@ end
 -- Lowest level of an instance for sorting: start of the level range, else the
 -- recommended level, else nil.
 function R.InstanceLevel(inst)
-  return tonumber(tostring(inst.lv or ""):match("^%d+")) or tonumber(inst.rl)
+  return (ns.InstanceLevelLogic.SortKey(inst))
 end
 
 local function instanceMatches(inst, query, match)
@@ -330,6 +330,17 @@ local function instanceMatches(inst, query, match)
     return type(field) == "table" and ((field.de and match(field.de, query)) or (field.en and match(field.en, query)))
   end
   if hit(inst.n) then
+    return true
+  end
+  -- Earlier names and abbreviations (field al) find the instance like its current name.
+  for _, alias in ipairs(inst.al or {}) do
+    if type(alias) == "string" and match(alias, query) then
+      return true
+    end
+  end
+  -- A level ("40") finds the instances whose range or entry level holds it.
+  local level = ns.InstanceLevelLogic.QueryLevel(query)
+  if level and ns.InstanceLevelLogic.Covers(inst, level) then
     return true
   end
   for _, b in ipairs(inst.bo or {}) do
@@ -341,9 +352,11 @@ local function instanceMatches(inst, query, match)
 end
 
 -- Instances of a kind ("dungeon"/"raid"/nil), faction-filtered, sorted by display name
--- or, with sort == "level", by lowest level (unknown levels last), then name.
--- match(text, query) is applied to the German and English names of the instance and its
--- bosses when a query is given.
+-- or, with sort == "level", by level range (start, then end; unknown levels last), then name. sort == "faction"
+-- groups Alliance, Horde, both (each by level, then name).
+-- A query of digits only also matches the level range and the entry level.
+-- match(text, query) is applied to the German and English names of the instance, its aliases (al)
+-- and its bosses when a query is given.
 function R.Instances(kind, faction, query, match, sort)
   local out = {}
   for _, i in ipairs(data().Instances or {}) do
@@ -353,21 +366,13 @@ function R.Instances(kind, faction, query, match, sort)
       end
     end
   end
-  local byLevel = sort == "level"
-  table.sort(out, function(a, b)
-    if byLevel then
-      local la, lb = R.InstanceLevel(a), R.InstanceLevel(b)
-      if la ~= lb then
-        return (la or math.huge) < (lb or math.huge)
-      end
+  return ns.InstanceLevelLogic.Sort(out, sort == "faction", sort == "level" or sort == "faction", function(x, y)
+    local nx, ny = ns.T(x.n) or "", ns.T(y.n) or ""
+    if nx ~= ny then
+      return nx < ny
     end
-    local na, nb = ns.T(a.n) or "", ns.T(b.n) or ""
-    if na ~= nb then
-      return na < nb
-    end
-    return (a.id or 0) < (b.id or 0)
+    return (x.id or 0) < (y.id or 0)
   end)
-  return out
 end
 
 function R.InstanceSlug(inst)
@@ -419,6 +424,10 @@ end
 -- content (they differ at most in the quest ID) merged to one entry for both factions. The data stays as it is,
 -- the merged entry is a copy of the Alliance entry with f = "B" and merged = true.
 function R.MergedQuests(inst)
+  -- The quests live in a load-on-demand data add-on; this is the shared entry for every reader.
+  if ns.InstanceDataAccess then
+    ns.InstanceDataAccess.Ensure()
+  end
   local byId, byName = {}, {}
   for _, q in ipairs(inst.q or {}) do
     byId[q.id or 0] = q
@@ -455,11 +464,12 @@ function R.MergedQuests(inst)
   return out
 end
 
--- Quests of an instance for the faction (merged, see R.MergedQuests), sorted by level then name.
+-- Named quests of an instance for the faction (merged, see R.MergedQuests), sorted by level then name.
 function R.Quests(inst, faction)
   local out = {}
   for _, q in ipairs(R.MergedQuests(inst)) do
-    if factionOk(q.f, faction) then
+    -- A step known only by its ID (a quest of a chain, not named in the data) is no row of the list.
+    if q.n and factionOk(q.f, faction) then
       out[#out + 1] = q
     end
   end

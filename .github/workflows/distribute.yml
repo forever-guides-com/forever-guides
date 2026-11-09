@@ -126,7 +126,7 @@ jobs:
             echo "::error::The zip holds unsafe paths."
             exit 1
           fi
-          expected=$(printf '%s\n' ForeverGuides ForeverGuides_Chat ForeverGuides_Gathering ForeverGuides_GildenManager ForeverGuides_MapData ForeverGuides_Professions ForeverGuides_Recipes | sort)
+          expected=$(printf '%s\n' ForeverGuides ForeverGuides_Chat ForeverGuides_Gathering ForeverGuides_GildenManager ForeverGuides_InstanceData ForeverGuides_MapData ForeverGuides_Professions ForeverGuides_Recipes | sort)
           actual=$(cut -d/ -f1 <<< "$entries" | sort -u)
           if [ "$expected" != "$actual" ]; then
             echo "::error::Unexpected top-level entries in the zip:"

@@ -61,10 +61,14 @@ local function entryOf(inst, boss)
   return instance and name and ns.DataApi.BossModel(instance, name) or nil
 end
 
--- The display ID of a boss, nil without a model in the data.
+-- The display ID of a boss, nil without a model in the data: the boss model data first, then the boss's own dp.
 function BM.DisplayId(inst, boss)
   local entry = entryOf(inst, boss)
   local id = entry and entry.display
+  if type(id) == "number" and id > 0 then
+    return id
+  end
+  id = boss and boss.dp
   return type(id) == "number" and id > 0 and id or nil
 end
 

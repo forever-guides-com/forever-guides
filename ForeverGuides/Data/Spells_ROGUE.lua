@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-04.
+-- Generated data, do not edit. Data as of 2026-11-07.
 -- Spell catalog of ROGUE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -1584,6 +1584,7 @@ ns.Data.Spells.ROGUE = {
     k="spell",
     l=24,
     n={de="Scharfe Klinge",en="Shank"},
+    rk=1,
   },
   {
     b=1329283,
@@ -1593,6 +1594,7 @@ ns.Data.Spells.ROGUE = {
     k="spell",
     l=44,
     n={de="Scharfe Klinge",en="Shank"},
+    rk=2,
     sup=1329283,
   },
   {

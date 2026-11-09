@@ -2,8 +2,8 @@
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.Manifest = {
-  build="1.60.1.70790",
-  dataStamp="2026-11-04",
+  build="1.60.1.70862",
+  dataStamp="2026-11-07",
   files={
     ["Abilities_DRUID.lua"]={bytes=8464,hash="bb3fa5a398e656d5"},
     ["Abilities_HUNTER.lua"]={bytes=9640,hash="78bf6a8d5c190940"},
@@ -19,20 +19,20 @@ ns.Data.Manifest = {
     ["Macros.lua"]={bytes=16003,hash="1c2af0f6199d6e68"},
     ["Meta.lua"]={bytes=1906,hash="aa9bb3b895ec007c"},
     ["Spells_DRUID.lua"]={bytes=46811,hash="1a534df5795469c7"},
-    ["Spells_GENERAL.lua"]={bytes=23004,hash="c74ead8d02802b21"},
-    ["Spells_HUNTER.lua"]={bytes=64283,hash="f763f751ef6e7f6a"},
+    ["Spells_GENERAL.lua"]={bytes=24275,hash="82b17745703ae2e7"},
+    ["Spells_HUNTER.lua"]={bytes=63819,hash="4dc6ba421c67abff"},
     ["Spells_MAGE.lua"]={bytes=41596,hash="cbdf7a2de55b4359"},
     ["Spells_PALADIN.lua"]={bytes=40829,hash="e5a13a0defcde320"},
-    ["Spells_PRIEST.lua"]={bytes=53288,hash="c9eac9423a679860"},
-    ["Spells_ROGUE.lua"]={bytes=32761,hash="04e06ca062c06261"},
+    ["Spells_PRIEST.lua"]={bytes=52956,hash="1d705e4fcf4f05a8"},
+    ["Spells_ROGUE.lua"]={bytes=32781,hash="006af548998b6932"},
     ["Spells_SHAMAN.lua"]={bytes=45567,hash="678ddd61fd38933c"},
     ["Spells_WARLOCK.lua"]={bytes=42480,hash="cd58415c7f9082cb"},
-    ["Spells_WARRIOR.lua"]={bytes=36949,hash="020c78162d674e37"},
+    ["Spells_WARRIOR.lua"]={bytes=36474,hash="3e363418af41fc2c"},
     ["Trainers.lua"]={bytes=33209,hash="aa9d5723057d25be"},
     ["Travel.lua"]={bytes=100632,hash="a947bb02966b0ccc"},
     ["Weapons.lua"]={bytes=20552,hash="ada92017cae08425"},
   },
-  generatedAt="2026-11-04T00:00:00Z",
+  generatedAt="2026-11-07T00:00:00Z",
   generator="2.0.0",
   schema=1,
   sources={

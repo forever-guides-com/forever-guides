@@ -19,6 +19,10 @@
 --       save(id, layout),                   create(name, layout) -> id | nil, reason
 --       rename(id, name) -> ok,             delete(id) -> ok,       canDelete(id) -> boolean
 --       import(name, layout) -> id | nil, reason,
+--       assignment() -> { id, source, classToken, accountId } | nil, assign(id, scope) -> ok | nil, reason
+--                                           which layout this player uses ("char", "class" or "account") and the
+--                                           scope of one layout ("char", "class" or nil); an entry of list() may
+--                                           carry `scope` and `classes` (tokens), see LayoutSet.Manager
 --       new(name) -> id | nil, reason,      an empty layout under that name ("New"; without it "New" copies)
 --       labels = { layouts, deleteTitle, deleteAsk } },   locale keys that name the list and the delete question
 --     host = "xpbar" | "cursor" | "area",   names the display for export and import (default: by canvas kind)
@@ -41,16 +45,17 @@
 -- A canvas of kind "cursor" (CanvasLogic: canvas.kind, hotX, hotY, symmetric) previews at its true screen size
 -- (zoom 100 percent, CE.REAL_ZOOMS) and edits the hotspot in the canvas section.
 -- CanvasEditor.Redraw() redraws the preview without an undo step.
--- With a manager the band under the title holds the list of all layouts (right, as wide as the
--- sidebar): a click or Enter switches, each row renames, duplicates and deletes, "New" adds an empty
--- layout (a copy of the working copy when the manager has no `new`) and "Duplicate" next to it copies the
--- open layout; Save and Save as new sit left in the band, Import adds a layout. A function the
--- host leaves out hides its control (the list needs list and select). A list entry with a `detail` text
--- (one line, for example who uses the layout) makes the rows two lines high, the detail sits under the name. Switching selects the layout
--- through the host and hands the host the new working copy with Live. The sidebar starts with the
--- elements.
+-- With a manager the band under the title holds one row over the side column: the layout picker (a field with
+-- the open layout, a search box in its list, the open layout marked), "New" (an empty layout, a copy of the
+-- working copy when the manager has no `new`), "Duplicate" and "Manage" (the dialog of LayoutDialog.lua: a
+-- window of its own with a search box and the full list, each row opens, renames, copies and deletes, and
+-- sets who uses the layout). With `assignment` a line under the row says which layout this player uses.
+-- Save and Save as new sit left in the band, Import adds a layout. A function the host leaves out hides its
+-- control (the picker needs list and select). A list entry with a `detail` text (one line, for example who uses
+-- the layout) shows it under the name in the dialog. Switching selects the layout through the host and hands
+-- the host the new working copy with Live. The sidebar starts with the elements.
 --   CanvasEditor.Close() discards without a question, IsOpen(), Frame(), Layout() copy of the working
---   layout, Selected() id, Select(id), Apply(), Discard(force).
+--   layout, LayoutId() id of the open layout, Selected() id, Select(id), Apply(), Discard(force).
 --
 -- panel(parent, element, onChange) returns a frame; the editor calls onChange() after the panel changed
 -- element.props. A frame with a Refresh(element) method is built once and reused for every element of
@@ -59,7 +64,7 @@
 -- list rows); all positions are explicit and come from the current metrics G.
 local _, ns = ...
 local W, L, Theme, U, WS = ns.W, ns.L, ns.Theme, ns.U, ns.WindowStyle
-local CL, CR = ns.CanvasLogic, ns.CanvasRender
+local CL, CR, LA = ns.CanvasLogic, ns.CanvasRender, ns.LayoutAssign
 local GL, GT = ns.GroupLogic, ns.GroupTree
 
 local CE = ns.CanvasEditor or {}
@@ -69,6 +74,9 @@ local Controls = CE.Controls
 local ES = ns.EditorSize
 local HEAD_H, PAD, ROW_H, FOOT_H = ES.HEAD_H, ES.PAD, ES.ROW_H, ES.FOOT_H
 local LAYOUT_HEAD_H, ELEMENTS_HEAD_H = ES.LAYOUT_HEAD_H, ES.ELEMENTS_HEAD_H
+-- Symbol of a list row and the glyph inside that box (px, the icons do not scale with the font).
+local SYMBOL_PX, SYMBOL_GLYPH_PX = 16, 14
+local CC = ns.CanvasClipLogic
 -- The band under the title: tools, Export, Import and presets on the left, the layout list on the right.
 -- The sizes that depend on the window (view, side column, rows): see EditorSizeLogic.lua, replaced by
 -- layoutFrames whenever the window changes its size.
@@ -83,6 +91,8 @@ local GK = { choiceH = 46, pair = 0.4, dash = 6, dashGap = 4, badge = 14 }
 local grp = {}
 local XFER_W, XFER_GAP, ROW2_Y = 100, 6, TOOL_SIZE + 4
 local DROP_W, MIN_DROP_W = 160, 100
+-- Layout row of the side column: its height and the least width the picker keeps next to the buttons.
+local LAYOUT_ROW_H, LAYOUT_PICK_MIN = 24, 150
 local BACKDROP_W = 110
 -- A heading row: the text sits level with the button of the row, at the edge of the list under it.
 local HEAD_DROP, HEAD_BUTTON_W = 2, 130
@@ -214,6 +224,10 @@ ns.AddLocale("enUS", {
   ["canvas.liveTest"] = "Test at real cursor",
   ["canvas.liveTestTip"] = "Shows the layout at your real mouse cursor while the editor is open.",
   ["canvas.layouts"] = "Layouts",
+  ["canvas.usage"] = "This character uses: %s (%s)",
+  ["canvas.usage.char"] = "this character only",
+  ["canvas.usage.class"] = "class %s",
+  ["canvas.usage.account"] = "account default",
   ["canvas.newTip"] = "Creates a new, empty layout. Where a display has no empty start, it is a copy of the one you are editing.",
   ["canvas.dupHeadTip"] = "Makes a copy of the layout you are editing under a new name and switches to it.",
   ["canvas.layoutOpenTip"] = "Click to switch to this layout. Unsaved changes are asked about first.",
@@ -247,7 +261,7 @@ ns.AddLocale("enUS", {
   ["canvas.export.hint"] = "Copy with Ctrl+C, Import reads it back.",
   ["canvas.export.fail"] = "The layout could not be exported.",
   ["canvas.import.title"] = "Import layout",
-  ["canvas.import.hint"] = "Paste an exported layout.\nNothing changes until you press Import.",
+  ["canvas.import.hint"] = "Paste an exported layout or copied elements.\nNothing changes until you confirm.",
   ["canvas.import.paste"] = "Exchange string",
   ["canvas.import.do"] = "Reads the pasted layout into the editor.",
   ["canvas.import.empty"] = "Paste an exchange string above.",
@@ -262,6 +276,30 @@ ns.AddLocale("enUS", {
   ["canvas.import.err.version"] = "This layout comes from a newer version of the addon.",
   ["canvas.import.err.host"] = "This layout belongs to another display.",
   ["canvas.msg.imported"] = "Layout imported, %d value(s) repaired.",
+  ["canvas.copy.title"] = "Copy element",
+  ["canvas.copy.titleGroup"] = "Copy group",
+  ["canvas.copy.hint"] = "Copy with Ctrl+C. Import adds the element to a layout.",
+  ["canvas.copy.hintGroup"] = "Copy with Ctrl+C. The text holds the group and all its elements, Import adds them to a layout.",
+  ["canvas.copy.tip"] = "Copies this element as text you can pass on. For a group, all its elements are included. Ctrl+C does the same, Import adds it to a layout.",
+  ["canvas.copy.rowTip"] = "Copies this element as text to pass on (a group with all its elements).",
+  ["canvas.copy.fail"] = "The element could not be copied.",
+  ["canvas.copy.tooLarge"] = "The element is too large to copy as text.",
+  ["canvas.import.insert"] = "Insert",
+  ["canvas.import.insertDo"] = "Adds the copied elements to the open layout. Ctrl+Z takes them out again.",
+  ["canvas.import.asNew"] = "Add as a new layout instead",
+  ["canvas.import.asNewTip"] = "Creates a layout of its own with these elements and opens it. The open layout stays as it is.",
+  ["canvas.import.okElement"] = "1 element found: %s.",
+  ["canvas.import.okGroup"] = "Group %s with %d element(s) found.",
+  ["canvas.import.insertHere"] = "Insert adds it to the open layout.",
+  ["canvas.import.insertNew"] = "Insert adds it as a new layout.",
+  ["canvas.import.skipped"] = "%d element(s) do not exist in this display and are left out.",
+  ["canvas.import.err.elements"] = "This is a single element or a group, not a whole layout.",
+  ["canvas.import.err.layout"] = "This is a whole layout, not a single element.",
+  ["canvas.import.err.hostElements"] = "These elements belong to another display.",
+  ["canvas.msg.pasted"] = "%d element(s) inserted. Ctrl+Z undoes it.",
+  ["canvas.msg.pastedSkipped"] = "%d element(s) inserted, %d left out (not in this display).",
+  ["canvas.msg.pasteLimit"] = "The layout has room for %d more element(s), the text holds %d.",
+  ["canvas.msg.pasteType"] = "This display does not offer that element type.",
   ["canvas.group"] = "Group",
   ["canvas.groupTip"] = "Puts this element into a group so you can move the group as a whole. It stays where it is on the canvas.",
   ["canvas.group.none"] = "None (on the canvas)",
@@ -274,13 +312,21 @@ ns.AddLocale("enUS", {
   ["canvas.backwardTip"] = "Moves this element one step down in the list. In a group it takes the place after.",
   ["canvas.group.limit"] = "A group holds at most %d elements.",
   ["canvas.group.level"] = "A group cannot go into another group.",
+  ["canvas.group.self"] = "A group cannot be moved into itself.",
+  ["canvas.group.above"] = "There is no group right above this element in the list.",
+  ["canvas.group.top"] = "This element is not in a group.",
+  ["canvas.group.indent"] = "Indent",
+  ["canvas.group.indentTip"] = "Puts the element at the end of the group right above it in the list. Ctrl+Right does the same.",
+  ["canvas.group.outdent"] = "Outdent",
+  ["canvas.group.outdentTip"] = "Takes the element out of its group, directly behind the group in the list. Ctrl+Left does the same.",
+  ["canvas.group.sortNote"] = "This group sorts its elements by itself while the game runs. The order here is the starting order.",
   ["canvas.group.wrapGroup"] = "A group cannot be put into a group.",
   ["canvas.group.wrapIn"] = "This element is in a group already. Take it out first.",
   ["canvas.group.lockedPlace"] = "Arranged by the group. Move the element out of the group to set X and Y.",
   ["canvas.group.lockedBox"] = "The size follows from the arrangement of the group. Set the group to Free to set width and height.",
   ["canvas.group.arranged"] = "This element sits on a place in its group. Alt+arrow keys change the place, or set the group to Free to move it by hand.",
   ["canvas.help.title"] = "Keyboard",
-  ["canvas.help.keys"] = "Arrow keys move the element by 1 px, with Shift by 10 px.\nDelete removes it, F2 renames it, Ctrl+D duplicates it.\nCtrl+G puts the element in a new group, Ctrl+Shift+G dissolves the group.\nAlt+arrow keys change the place in a group.\nCtrl+Z undoes, Ctrl+Y redoes.\nTab selects the next element, Shift+Tab the previous one.\nCtrl+Tab walks through the buttons, Enter presses one.\nThe mouse wheel zooms the preview, dragging the empty area moves a large one.",
+  ["canvas.help.keys"] = "Arrow keys move the element by 1 px, with Shift by 10 px.\nDelete removes it, F2 renames it, Ctrl+D duplicates it, Ctrl+C copies it as text.\nCtrl+G puts the element in a new group, Ctrl+Shift+G dissolves the group.\nAlt+arrow keys change the place in a group.\nCtrl+Z undoes, Ctrl+Y redoes.\nTab selects the next element, Shift+Tab the previous one.\nCtrl+Tab walks through the buttons, Enter presses one.\nThe mouse wheel zooms the preview, dragging the empty area moves a large one.",
 })
 ns.AddLocale("deDE", {
   ["canvas.title"] = "Layout-Editor",
@@ -367,6 +413,10 @@ ns.AddLocale("deDE", {
   ["canvas.liveTest"] = "Am echten Cursor",
   ["canvas.liveTestTip"] = "Zeigt das Layout an deinem echten Mauszeiger, solange der Editor offen ist.",
   ["canvas.layouts"] = "Layouts",
+  ["canvas.usage"] = "Dieser Charakter nutzt: %s (%s)",
+  ["canvas.usage.char"] = "nur dieser Charakter",
+  ["canvas.usage.class"] = "Klasse %s",
+  ["canvas.usage.account"] = "Konto-Standard",
   ["canvas.newTip"] = "Legt ein neues, leeres Layout an. Wo eine Anzeige keinen leeren Start hat, ist es eine Kopie des Layouts, das du gerade bearbeitest.",
   ["canvas.dupHeadTip"] = "Macht eine Kopie des Layouts, das du gerade bearbeitest, unter einem neuen Namen und wechselt dorthin.",
   ["canvas.layoutOpenTip"] = "Klicken wechselt zu diesem Layout. Bei ungespeicherten Änderungen wird vorher gefragt.",
@@ -400,7 +450,7 @@ ns.AddLocale("deDE", {
   ["canvas.export.hint"] = "Mit Strg+C kopieren, Importieren liest es wieder ein.",
   ["canvas.export.fail"] = "Das Layout ließ sich nicht exportieren.",
   ["canvas.import.title"] = "Layout importieren",
-  ["canvas.import.hint"] = "Füge ein exportiertes Layout ein.\nErst Importieren ändert etwas.",
+  ["canvas.import.hint"] = "Füge ein exportiertes Layout oder kopierte Elemente ein.\nErst die Bestätigung ändert etwas.",
   ["canvas.import.paste"] = "Austausch-String",
   ["canvas.import.do"] = "Liest das eingefügte Layout in den Editor ein.",
   ["canvas.import.empty"] = "Füge oben einen Austausch-String ein.",
@@ -415,6 +465,30 @@ ns.AddLocale("deDE", {
   ["canvas.import.err.version"] = "Dieses Layout stammt aus einer neueren Version des Addons.",
   ["canvas.import.err.host"] = "Dieses Layout gehört zu einer anderen Anzeige.",
   ["canvas.msg.imported"] = "Layout importiert, %d Wert(e) repariert.",
+  ["canvas.copy.title"] = "Element kopieren",
+  ["canvas.copy.titleGroup"] = "Gruppe kopieren",
+  ["canvas.copy.hint"] = "Mit Strg+C kopieren. Der Import fügt das Element in ein Layout ein.",
+  ["canvas.copy.hintGroup"] = "Mit Strg+C kopieren. Der Text enthält die Gruppe mit allen Unterelementen, der Import fügt sie in ein Layout ein.",
+  ["canvas.copy.tip"] = "Kopiert dieses Element als Text zum Weitergeben. Bei einer Gruppe sind alle Unterelemente dabei. Strg+C macht dasselbe, der Import fügt es in ein Layout ein.",
+  ["canvas.copy.rowTip"] = "Kopiert dieses Element als Text zum Weitergeben (eine Gruppe mit allen Unterelementen).",
+  ["canvas.copy.fail"] = "Das Element ließ sich nicht kopieren.",
+  ["canvas.copy.tooLarge"] = "Das Element ist zu groß, um es als Text zu kopieren.",
+  ["canvas.import.insert"] = "Einfügen",
+  ["canvas.import.insertDo"] = "Fügt die kopierten Elemente in das geöffnete Layout ein. Strg+Z nimmt sie wieder heraus.",
+  ["canvas.import.asNew"] = "Stattdessen als neues Layout anlegen",
+  ["canvas.import.asNewTip"] = "Legt ein eigenes Layout mit diesen Elementen an und öffnet es. Das geöffnete Layout bleibt, wie es ist.",
+  ["canvas.import.okElement"] = "1 Element gefunden: %s.",
+  ["canvas.import.okGroup"] = "Gruppe %s mit %d Unterelement(en) gefunden.",
+  ["canvas.import.insertHere"] = "Einfügen fügt es in das geöffnete Layout ein.",
+  ["canvas.import.insertNew"] = "Einfügen legt es als neues Layout an.",
+  ["canvas.import.skipped"] = "%d Element(e) gibt es in dieser Anzeige nicht und bleiben weg.",
+  ["canvas.import.err.elements"] = "Das ist ein einzelnes Element oder eine Gruppe, kein ganzes Layout.",
+  ["canvas.import.err.layout"] = "Das ist ein ganzes Layout, kein einzelnes Element.",
+  ["canvas.import.err.hostElements"] = "Diese Elemente gehören zu einer anderen Anzeige.",
+  ["canvas.msg.pasted"] = "%d Element(e) eingefügt. Strg+Z macht es rückgängig.",
+  ["canvas.msg.pastedSkipped"] = "%d Element(e) eingefügt, %d bleiben weg (nicht in dieser Anzeige).",
+  ["canvas.msg.pasteLimit"] = "Im Layout ist noch Platz für %d Element(e), der Text enthält %d.",
+  ["canvas.msg.pasteType"] = "Diese Anzeige kennt diesen Elementtyp nicht.",
   ["canvas.group"] = "Gruppe",
   ["canvas.groupTip"] = "Ordnet dieses Element einer Gruppe unter, damit du die Gruppe als Ganzes verschiebst. Es bleibt an seiner Stelle auf der Leinwand.",
   ["canvas.group.none"] = "Keine (auf der Leinwand)",
@@ -427,13 +501,21 @@ ns.AddLocale("deDE", {
   ["canvas.backwardTip"] = "Schiebt dieses Element in der Liste einen Schritt nach unten. In einer Gruppe rückt es einen Platz zurück.",
   ["canvas.group.limit"] = "Eine Gruppe fasst höchstens %d Elemente.",
   ["canvas.group.level"] = "Eine Gruppe lässt sich nicht in eine andere Gruppe stecken.",
+  ["canvas.group.self"] = "Eine Gruppe lässt sich nicht in sich selbst verschieben.",
+  ["canvas.group.above"] = "Direkt über diesem Element liegt in der Liste keine Gruppe.",
+  ["canvas.group.top"] = "Dieses Element ist in keiner Gruppe.",
+  ["canvas.group.indent"] = "Einrücken",
+  ["canvas.group.indentTip"] = "Legt das Element ans Ende der Gruppe, die in der Liste direkt darüber liegt. Strg+Rechts tut dasselbe.",
+  ["canvas.group.outdent"] = "Ausrücken",
+  ["canvas.group.outdentTip"] = "Holt das Element aus seiner Gruppe, in der Liste direkt hinter die Gruppe. Strg+Links tut dasselbe.",
+  ["canvas.group.sortNote"] = "Diese Gruppe sortiert ihre Elemente im laufenden Spiel selbst. Die Reihenfolge hier ist die Ausgangsreihenfolge.",
   ["canvas.group.wrapGroup"] = "Eine Gruppe lässt sich nicht in eine Gruppe stecken.",
   ["canvas.group.wrapIn"] = "Dieses Element ist schon in einer Gruppe. Hole es zuerst heraus.",
   ["canvas.group.lockedPlace"] = "Wird von der Gruppe angeordnet. Ordne das Element außerhalb der Gruppe an, um X und Y zu setzen.",
   ["canvas.group.lockedBox"] = "Die Größe ergibt sich aus der Anordnung der Gruppe. Stelle die Gruppe auf Frei, um Breite und Höhe zu setzen.",
   ["canvas.group.arranged"] = "Dieses Element sitzt auf einem Platz in seiner Gruppe. Alt+Pfeiltasten ändern den Platz, oder stelle die Gruppe auf Frei, um es von Hand zu verschieben.",
   ["canvas.help.title"] = "Tastatur",
-  ["canvas.help.keys"] = "Pfeiltasten verschieben das Element um 1 px, mit Umschalt um 10 px.\nEntf löscht es, F2 benennt es um, Strg+D dupliziert es.\nStrg+G hüllt das Element in eine neue Gruppe, Strg+Umschalt+G löst die Gruppe auf.\nAlt+Pfeiltasten ändern den Platz in einer Gruppe.\nStrg+Z macht rückgängig, Strg+Y stellt wieder her.\nTab wählt das nächste Element, Umschalt+Tab das vorige.\nStrg+Tab geht durch die Knöpfe, Enter drückt einen.\nDas Mausrad zoomt die Vorschau, Ziehen im leeren Bereich verschiebt eine große.",
+  ["canvas.help.keys"] = "Pfeiltasten verschieben das Element um 1 px, mit Umschalt um 10 px.\nEntf löscht es, F2 benennt es um, Strg+D dupliziert es, Strg+C kopiert es als Text.\nStrg+G hüllt das Element in eine neue Gruppe, Strg+Umschalt+G löst die Gruppe auf.\nAlt+Pfeiltasten ändern den Platz in einer Gruppe.\nStrg+Z macht rückgängig, Strg+Y stellt wieder her.\nTab wählt das nächste Element, Umschalt+Tab das vorige.\nStrg+Tab geht durch die Knöpfe, Enter drückt einen.\nDas Mausrad zoomt die Vorschau, Ziehen im leeren Bereich verschiebt eine große.",
 })
 ns.AddLocale(
   "enUS",
@@ -1420,6 +1502,20 @@ local function tipOf(el)
   return def and type(def.label) == "string" and def.label or el.type, def and localized(def.desc)
 end
 
+-- The symbol in front of a list row: { texture } of what the element shows, { glyph } of its type, nil when the
+-- host's type has no icon function (the row then shows the name only).
+local function symbolOf(el)
+  local def = typeDef(el.type)
+  if not (def and type(def.icon) == "function") then
+    return nil
+  end
+  local ok, symbol = pcall(def.icon, el)
+  if ok and type(symbol) == "table" and (symbol.texture ~= nil or symbol.glyph ~= nil) then
+    return symbol
+  end
+  return nil
+end
+
 -- Tooltip of a list row: the type and what it is for, and for an element with a name of its own the whole
 -- name as a line of its own (the row cuts a long one).
 local function rowTip(el)
@@ -1543,12 +1639,77 @@ function act.duplicate()
   changed("duplicate")
 end
 
+-- Display the element belongs to, for the exchange string.
+local function hostName()
+  return type(S.opts.host) == "string" and S.opts.host or CL.HostOf(S.work)
+end
+
+-- Opens the copy dialog with the exchange string of an element (id, default: the selected one) or, for a group, of the
+-- group with all its elements.
+function act.copyElement(id)
+  local el = id and CL.Find(S.work, id) or sel()
+  if not el then
+    return
+  end
+  local text, why = CC.Export(S.work, el, hostName())
+  if not text then
+    noteFail(why == "too-large" and "canvas.copy.tooLarge" or "canvas.copy.fail")
+    return
+  end
+  local group = el.type == GL.TYPE
+  ns.Dialogs.Copy(
+    group and "canvas.copy.titleGroup" or "canvas.copy.title",
+    text,
+    group and "canvas.copy.hintGroup" or "canvas.copy.hint"
+  )
+end
+
+-- Shares element `id` (default: the selected one), a group with all its elements, as a chat link.
+function act.shareElement(id)
+  local el = S and (id and CL.Find(S.work, id) or sel())
+  if el then
+    ns.LayoutShare.ShareElement(S.work, el, hostName())
+  end
+end
+
+-- Shares layout `id` (default: the open one) as a chat link. Another layout is opened first (it may ask about
+-- unsaved changes) because only the host's select hands out its contents; the link carries what the editor shows.
+function act.shareLayout(id)
+  if not S then
+    return
+  end
+  if id ~= nil and id ~= S.layoutId then
+    act.switchTo(id, nil, function()
+      act.shareLayout()
+    end)
+    return
+  end
+  ns.LayoutShare.ShareLayout(S.work, hostName())
+end
+
 -- Reports a refused group operation.
 function grp.refuse(why)
   if why == "limit" then
     noteFail("canvas.group.limit", GL.MAX_CHILDREN)
   elseif why == "level" then
     noteFail("canvas.group.level")
+  elseif why == "self" then
+    noteFail("canvas.group.self")
+  elseif why == "above" then
+    noteFail("canvas.group.above")
+  elseif why == "top" then
+    noteFail("canvas.group.top")
+  elseif why == "in" then
+    noteFail("canvas.group.wrapIn")
+  end
+end
+
+-- Says once per session that a group which sorts by itself keeps the order of the list as its starting order.
+function grp.sortNote(groupId)
+  local group = groupId and CL.Find(S.work, groupId)
+  if group and group.type == GL.TYPE and GL.Clean(group.props).sort ~= "manual" and not S.sortNote then
+    S.sortNote = true
+    ns.Notify(L["canvas.group.sortNote"], "info")
   end
 end
 
@@ -1655,17 +1816,50 @@ function act.toggleFold(id)
   paintOverlay()
 end
 
--- A row of the list let go before (or, with `after`, behind) the row of `anchorId`.
-function act.dropRow(id, anchorId, after)
+-- A row of the list let go at `target` (GroupTree.Target): into a group, among its children or among the
+-- elements of the canvas. One undo step. The moved element stays selected, a folded group that took it is
+-- selected instead because the element is not in the list then.
+function act.dropRow(id, target)
   if not groupsOn() then
     return
   end
-  local ok, why = GT.Drop(S.work, id, anchorId, after, S.folded, S.measure)
+  local ok, why = GT.Move(S.work, id, target, S.measure)
   if not ok then
     grp.refuse(why)
     return
   end
+  local el = CL.Find(S.work, id)
+  S.sel = (el and el.group ~= nil and S.folded[el.group]) and el.group or id
   undoStep("group:drop")
+  grp.sortNote(el and el.group)
+end
+
+-- Ctrl+Right and the Indent button: the selected element goes to the end of the group right above it in the list.
+-- Ctrl+Left and the Outdent button: it leaves its group and stands directly behind it. Same moves as a drag.
+function act.indent()
+  local el = sel()
+  if not (groupsOn() and el) then
+    return
+  end
+  local target, why = GT.IndentTarget(S.work, el.id)
+  if not target then
+    grp.refuse(why)
+    return
+  end
+  act.dropRow(el.id, target)
+end
+
+function act.outdent()
+  local el = sel()
+  if not (groupsOn() and el) then
+    return
+  end
+  local target, why = GT.OutdentTarget(S.work, el.id)
+  if not target then
+    grp.refuse(why)
+    return
+  end
+  act.dropRow(el.id, target)
 end
 
 function act.nudge(dx, dy)
@@ -1861,6 +2055,8 @@ local function finish()
   end
   local s = S
   S = nil
+  ns.LayoutDialog.Close()
+  ns.LayoutPicker.Close()
   if s.liveTest and type(s.opts.liveTest) == "function" then
     ns.Safe("canvas-livetest", s.opts.liveTest, false)
   end
@@ -1919,7 +2115,21 @@ local function layoutList()
       -- Names come from the host's storage: shown as plain text, never as escapes.
       local name = CL.CleanText(type(entry.name) == "string" and entry.name or tostring(entry.id), CL.MAX_LAYOUT_NAME)
       local detail = type(entry.detail) == "string" and CL.CleanText(entry.detail, 120) or nil
-      out[#out + 1] = { id = entry.id, name = name, detail = detail ~= "" and detail or nil }
+      local classes = {}
+      for _, token in ipairs(type(entry.classes) == "table" and entry.classes or {}) do
+        if LA.CleanToken(token) then
+          classes[#classes + 1] = token
+        end
+      end
+      out[#out + 1] = {
+        id = entry.id,
+        name = name,
+        default = type(entry.default) == "boolean" and entry.default or nil,
+        defaultKey = type(entry.defaultKey) == "string" and entry.defaultKey or nil,
+        detail = detail ~= "" and detail or nil,
+        scope = LA.CleanScope(entry.scope),
+        classes = classes,
+      }
     end
   end
   return out
@@ -2172,6 +2382,24 @@ local function createFrom(name, session, duplicate)
   return true
 end
 
+-- "New variant": a copy of the working copy becomes another layout of the window that owns the open layout
+-- (hosts with `manager.variant`), opened at once. The layout it came from keeps its saved state.
+function CE.NewVariant()
+  if not (S and mgrFn("variant")) then
+    return false
+  end
+  local ok, id, reason = mgrCall("variant", S.layoutId, nil, CL.Pack(S.work))
+  if not (ok and id ~= nil) then
+    explain(reason)
+    return false
+  end
+  local copy = CL.Pack(S.work)
+  copy.id, copy.name = id, layoutName(id)
+  revertLive()
+  switchNow(id, copy)
+  return true
+end
+
 function act.saveAs()
   if not (S and mgrFn("create")) then
     return
@@ -2301,6 +2529,89 @@ function act.deleteLayout(id)
   end)
 end
 
+-- Sets the scope of layout `id` for this player ("char", "class" or nil for not assigned). The host stores it and
+-- the display may switch to another layout; the open layout stays what it is.
+function act.assign(id, scope)
+  if not (S and mgrFn("assign")) then
+    return
+  end
+  local ok, done, reason = mgrCall("assign", id, scope)
+  if not (ok and done) and (reason == "missing" or reason == "scope") then
+    explain(reason)
+  end
+  refreshAll()
+end
+
+-- The text of the line under the layout row: which layout this player uses and why.
+local function usageText()
+  local ok, info = mgrCall("assignment")
+  if not (ok and type(info) == "table") then
+    return nil
+  end
+  local name = layoutName(info.id)
+  if name == "" then
+    return nil
+  end
+  local how
+  if info.source == "char" then
+    how = L["canvas.usage.char"]
+  elseif info.source == "class" then
+    how = string.format(L["canvas.usage.class"], ns.RefLogic.className(info.classToken) or tostring(info.classToken))
+  else
+    how = L[type(info.accountKey) == "string" and info.accountKey or "canvas.usage.account"]
+  end
+  return string.format(L["canvas.usage"], name, how)
+end
+
+-- What the dialog "Manage layouts" needs; a missing manager function leaves out its control.
+local function dialogHost()
+  local labels = type(S.mgr.labels) == "table" and S.mgr.labels or {}
+  local host = {
+    headKey = labels.layouts,
+    entries = layoutList,
+    current = function()
+      return S and S.layoutId
+    end,
+    dirty = function()
+      return S ~= nil and isDirty()
+    end,
+    select = function(id)
+      act.switchTo(id)
+    end,
+    canDelete = canDelete,
+    editorSize = function()
+      return frame:GetWidth(), frame:GetHeight()
+    end,
+  }
+  if mgrFn("rename") then
+    host.rename = act.rename
+  end
+  host.share = act.shareLayout
+  if mgrFn("create") then
+    host.duplicate = act.dupLayout
+  end
+  if mgrFn("delete") then
+    host.delete = act.deleteLayout
+  end
+  if mgrFn("new") or mgrFn("create") then
+    host.new = act.newLayout
+  end
+  if mgrFn("assign") and mgrFn("assignment") then
+    host.assign = act.assign
+    host.assignment = function()
+      local ok, info = mgrCall("assignment")
+      return ok and type(info) == "table" and info or nil
+    end
+  end
+  return host
+end
+
+function act.manage()
+  if S and mgrFn("list") and mgrFn("select") then
+    ns.LayoutDialog.Open(dialogHost())
+  end
+end
+
 -- Import dialog --------------------------------------------------------------------------------
 
 local importDlg
@@ -2326,9 +2637,56 @@ function act.importAs(layout, problems)
   end)
 end
 
-local function showImport()
+-- Explains why a paste was refused.
+local function pasteRefused(why, room, need)
+  if why == "limit" then
+    noteFail("canvas.msg.pasteLimit", room or 0, need or 0)
+  elseif why == "max" then
+    noteFail("canvas.addMax")
+  elseif why == "type" then
+    noteFail("canvas.msg.pasteType")
+  else
+    noteFail("canvas.err")
+  end
+end
+
+-- Adds the elements of a clip (CanvasClipLogic) to the open layout with new ids, one undo step, and selects the first
+-- one. With `asNew` (and a host that imports layouts) they become a layout of their own on the canvas of this one.
+function act.insertClip(clip, asNew)
+  if not S then
+    return
+  end
+  local opts = { types = S.opts.types }
+  if asNew and mgrFn("import") then
+    local base = CL.Pack(S.work)
+    base.elements = {}
+    local result, why, room, need = CC.Paste(base, clip, opts)
+    if not result then
+      pasteRefused(why, room, need)
+      return
+    end
+    base.name = CL.CleanText(clip.elements[1].name, CL.MAX_LAYOUT_NAME)
+    act.importAs(base, clip.problems)
+    return
+  end
+  local result, why, room, need = CC.Paste(S.work, clip, opts)
+  if not result then
+    pasteRefused(why, room, need)
+    return
+  end
+  S.sel = result.root
+  undoStep("paste")
+  if result.skipped > 0 then
+    ns.Notify(string.format(L["canvas.msg.pastedSkipped"], #result.ids, result.skipped), "success")
+  else
+    ns.Notify(string.format(L["canvas.msg.pasted"], #result.ids), "success")
+  end
+end
+
+-- `preset` (optional) fills the field, for a string that came from a chat link.
+local function showImport(preset)
   if not importDlg then
-    local d = ns.Dialogs.Create("ForeverGuidesCanvasImport", 520, 380)
+    local d = ns.Dialogs.Create("ForeverGuidesCanvasImport", 520, 420)
     importDlg = d
     W.SetText(d.title, "canvas.import.title")
     d.hint = W.Text(d, { key = "canvas.import.hint", role = "ui", color = "textSecondary", wrap = true })
@@ -2345,6 +2703,22 @@ local function showImport()
     d.paste:SetPoint("TOPLEFT", 16, -120)
     d.paste:SetPoint("RIGHT", -16, 0)
     d.paste.edit:SetMaxLetters(0)
+    -- Elements can go into the open layout (default) or into a layout of their own.
+    d.asNewOn = false
+    d.asNew = W.Checkbox(d, {
+      key = "canvas.import.asNew",
+      tooltip = "canvas.import.asNew",
+      tooltipText = "canvas.import.asNewTip",
+      get = function()
+        return d.asNewOn
+      end,
+      set = function(on)
+        d.asNewOn = on
+        d.refresh(d.paste:GetValue())
+      end,
+    })
+    d.asNew:SetSize(300, 22)
+    d.asNew:SetPoint("BOTTOMLEFT", 16, 54)
     d.status = W.Text(d, { role = "ui", color = "textSecondary", wrap = true })
     d.status:SetPoint("TOPLEFT", 16, -272)
     d.status:SetPoint("RIGHT", -16, 0)
@@ -2368,17 +2742,50 @@ local function showImport()
     })
     d.cancel:SetPoint("RIGHT", d.go, "LEFT", -8, 0)
     function d.refresh(text)
-      local host = S and (type(S.opts.host) == "string" and S.opts.host or CL.HostOf(S.work)) or nil
-      local layout, why = CL.Import(text or "", host)
-      -- Second result: what had to be repaired when it worked, the reason when it did not.
-      d.layout, d.problems = layout, why
-      if layout then
+      local host = S and hostName() or nil
+      local read, why, what = CC.Read(text or "", host)
+      d.read, d.layout, d.problems = read, nil, nil
+      d.asNew:Hide()
+      W.SetText(d.go.label, "act.import")
+      W.SetText(d.status, nil, "")
+      if read and read.kind == "layout" then
+        -- Second result: what had to be repaired.
+        d.layout, d.problems = read.layout, read.problems
         local key = mgrFn("import") and "canvas.import.okNew" or "canvas.import.ok"
-        W.SetText(d.status, nil, string.format(L[key], #layout.elements))
+        W.SetText(d.status, nil, string.format(L[key], #read.layout.elements))
         d.go:Enable()
+        return
+      elseif read then
+        W.SetText(d.go.label, "canvas.import.insert")
+        local clip = read.clip
+        local info = CC.Describe(clip)
+        local lines = {
+          info.group and string.format(L["canvas.import.okGroup"], info.name, info.children)
+            or string.format(L["canvas.import.okElement"], info.name),
+        }
+        local types = S and S.opts.types
+        local skipped = CC.Unsupported(clip, types)
+        local rootMissing = type(types) == "table" and type(types[clip.elements[1].type]) ~= "table"
+        if rootMissing then
+          lines[#lines + 1] = L["canvas.msg.pasteType"]
+        else
+          local canNew = mgrFn("import") ~= nil
+          d.asNew:SetShown(canNew)
+          d.asNew:Refresh()
+          lines[#lines + 1] = L[canNew and d.asNewOn and "canvas.import.insertNew" or "canvas.import.insertHere"]
+          if skipped > 0 then
+            lines[#lines + 1] = string.format(L["canvas.import.skipped"], skipped)
+          end
+        end
+        W.SetText(d.status, nil, table.concat(lines, "\n"))
+        d.go:SetEnabled(not rootMissing)
         return
       end
       local key = "canvas.import.err." .. tostring(why)
+      if what == "elements" and why == "host" then
+        key = "canvas.import.err.hostElements"
+      end
+      d.problems = why
       W.SetText(d.status, L[key] ~= key and key or "canvas.import.err.decode")
       d.go:Disable()
     end
@@ -2386,6 +2793,11 @@ local function showImport()
       "OnClick",
       ns.Wrap("canvas-import", function()
         local layout, problems = d.layout, d.problems
+        if d.read and d.read.kind == "elements" and S then
+          d:Hide()
+          act.insertClip(d.read.clip, d.asNewOn)
+          return
+        end
         if not (layout and S) then
           return
         end
@@ -2400,13 +2812,26 @@ local function showImport()
       end)
     )
   end
-  importDlg.paste:SetValue("")
-  importDlg.refresh("")
+  importDlg.paste:SetValue(preset or "")
+  importDlg.asNewOn = false
+  importDlg.refresh(preset or "")
   importDlg:Show()
   importDlg.paste.edit:SetFocus()
 end
 
 act.import = showImport
+
+-- Opens the import dialog with `text` in it (an exchange string): preview and confirmation are the dialog's own.
+function CE.ImportText(text)
+  if S and type(text) == "string" then
+    showImport(text)
+  end
+end
+
+-- Display of the open editor ("xpbar", "cursor" or "area"), nil when it is closed.
+function CE.Host()
+  return S and hostName() or nil
+end
 
 -- Keyboard -------------------------------------------------------------------------------------
 
@@ -2437,30 +2862,6 @@ local function cycle(step)
   selectElement(list[nextAt].id)
 end
 
--- Up and Down inside the layout list move the keyboard focus to the row above or below, scrolling the
--- list at its edge. Enter then switches (the focused row's button is pressed). True when handled.
-local function moveLayoutFocus(step)
-  local shown = {}
-  local at
-  for _, row in ipairs(ui.layoutRows) do
-    if row:IsShown() then
-      shown[#shown + 1] = row
-      if row.name == ns.Focus.current then
-        at = #shown
-      end
-    end
-  end
-  if not at then
-    return false
-  end
-  if shown[at + step] then
-    ns.Focus.set(shown[at + step].name)
-  else
-    ui.layoutList:ScrollBy(step)
-  end
-  return true
-end
-
 local function dialogOpen()
   for f in pairs(ns.Dialogs.open) do
     if f:IsShown() then
@@ -2478,6 +2879,10 @@ local function handleKey(key)
   if key == "ESCAPE" then
     if S.drag then
       cancelDrag()
+      return true
+    end
+    if ui.list and ui.list:IsDragging() then
+      ui.list:CancelDrag()
       return true
     end
     return ns.EscStack.Close(frame)
@@ -2500,6 +2905,11 @@ local function handleKey(key)
       act.redo()
     elseif key == "D" then
       act.duplicate()
+    elseif key == "C" then
+      if not sel() then
+        return false
+      end
+      act.copyElement()
     elseif key == "G" and groupsOn() then
       if shift() then
         act.ungroup()
@@ -2508,14 +2918,16 @@ local function handleKey(key)
       end
     elseif key == "TAB" then
       ns.Focus.move(shift() and -1 or 1)
+    elseif (key == "RIGHT" or key == "LEFT") and groupsOn() and sel() then
+      if key == "RIGHT" then
+        act.indent()
+      else
+        act.outdent()
+      end
     else
       return false
     end
     return true
-  end
-  local focus = ns.Focus.current
-  if (key == "UP" or key == "DOWN") and focus and focus.fgLayoutRow and insideWindow(focus) then
-    return moveLayoutFocus(key == "UP" and -1 or 1)
   end
   if IsAltKeyDown and IsAltKeyDown() and ARROWS[key] then
     return act.place(key)
@@ -2656,7 +3068,11 @@ local function applyWidths()
   ui.symmetric:SetSize(c, 22)
   ui.remove:SetSize(G.removeW, 24)
   ui.dup:SetSize(G.dupW, 24)
+  ui.copyEl:SetSize(G.removeW, 24)
+  ui.shareEl:SetSize(G.dupW, 24)
   ui.groupDd:SetWidth(c)
+  ui.outdent:SetSize(G.halfW, 24)
+  ui.indent:SetSize(G.halfW, 24)
   if ui.groupDd.button then
     ui.groupDd.button:SetWidth(c)
   end
@@ -2703,6 +3119,9 @@ local function layoutSide()
     ui.dup:ClearAllPoints()
     ui.dup:SetPoint("TOPLEFT", content, "TOPLEFT", G.removeW + 6, -y)
     put(ui.remove, 32)
+    ui.shareEl:ClearAllPoints()
+    ui.shareEl:SetPoint("TOPLEFT", content, "TOPLEFT", G.removeW + 6, -y)
+    put(ui.copyEl, 32)
     put(ui.anchorBox, 0)
     local col2 = 84 + G.fieldW + 8
     ui.fx:ClearAllPoints()
@@ -2724,8 +3143,15 @@ local function layoutSide()
     end
     local inGroupable = groupsOn() and el.type ~= GL.TYPE
     ui.groupDd:SetShown(inGroupable)
+    ui.outdent:SetShown(inGroupable)
+    ui.indent:SetShown(inGroupable)
     if inGroupable then
       put(ui.groupDd, GK.choiceH)
+      ui.outdent:ClearAllPoints()
+      ui.outdent:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+      ui.indent:ClearAllPoints()
+      ui.indent:SetPoint("TOPLEFT", content, "TOPLEFT", G.halfW + 8, -y)
+      y = y + 32
     end
     local _, description = tipOf(el)
     ui.desc:SetShown(description ~= nil)
@@ -2821,6 +3247,8 @@ local function refreshFields()
   end
   if groupsOn() and el.type ~= GL.TYPE then
     ui.groupDd:Refresh()
+    ui.outdent:SetEnabled(el.group ~= nil)
+    ui.indent:SetEnabled(GT.IndentTarget(S.work, el.id) ~= nil)
   end
   if ui.nameFor ~= el.id then
     if ui.name.edit:HasFocus() then
@@ -2848,6 +3276,7 @@ local function refreshList()
     S.folded[parent] = nil
   end
   local data = GT.Rows(S.work, S.folded)
+  ui.listData = data
   ui.listIndex = {}
   for i, row in ipairs(data) do
     ui.listIndex[row.el.id] = i
@@ -3035,32 +3464,61 @@ local function placeBand()
   local sx = PAD + G.leftW + PAD
   local layouts = mgrFn("list") ~= nil and mgrFn("select") ~= nil
   local canNew = layouts and (canCreate or mgrFn("new") ~= nil)
-  ui.layoutHead:SetShown(layouts)
-  ui.layoutList:SetShown(layouts)
+  local canDup = layouts and canCreate
+  ui.layoutPick:SetShown(layouts)
   ui.layoutNew:SetShown(canNew)
-  ui.layoutDup:SetShown(layouts and canCreate)
+  ui.layoutDup:SetShown(canDup)
+  ui.layoutManage:SetShown(layouts)
+  ui.layoutShare:SetShown(layouts)
+  ui.layoutStatus:SetShown(layouts and mgrFn("assignment") ~= nil)
   if layouts then
-    local labels = type(S.mgr.labels) == "table" and S.mgr.labels or {}
-    W.SetText(ui.layoutHead, labels.layouts or "canvas.layouts")
-    -- Heading on the left, Duplicate and New at the right edge. The buttons share what the heading leaves and
-    -- drop their text for the icon when it is too little.
+    -- One row: the picker takes what the buttons leave. The buttons show text and icon while the picker keeps
+    -- LAYOUT_PICK_MIN, else the icon only.
     local gap = 4
-    local room = G.sideW - math.ceil(ui.layoutHead:GetStringWidth()) - 8 - gap
-    local newW = ui.layoutNew:Fit(math.floor(room / 2))
-    local dupW = ui.layoutDup:Fit(math.max(room - newW - gap, 0))
-    local used = (canNew and newW or 0) + (canCreate and dupW + gap or 0)
-    ui.layoutHead:ClearAllPoints()
-    ui.layoutHead:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(G.bandY + HEAD_DROP))
-    ui.layoutHead:SetSize(math.max(G.sideW - used - 8, 20), 18)
-    ui.layoutNew:ClearAllPoints()
-    ui.layoutNew:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + G.sideW, -G.bandY)
-    ui.layoutNew:SetSize(newW, 22)
-    ui.layoutDup:ClearAllPoints()
-    ui.layoutDup:SetPoint("TOPRIGHT", frame, "TOPLEFT", sx + G.sideW - (canNew and newW + gap or 0), -G.bandY)
-    ui.layoutDup:SetSize(dupW, 22)
-    ui.layoutList:ClearAllPoints()
-    ui.layoutList:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -(G.bandY + LAYOUT_HEAD_H))
-    ui.layoutList:SetSize(G.sideW, G.layoutListH)
+    -- Share gives up its text first, then Copy, then New and Manage.
+    local function widths(stage)
+      local wNew = canNew and ui.layoutNew:Fit(stage >= 3 and 0 or 90) or 0
+      local wDup = canDup and ui.layoutDup:Fit(stage >= 2 and 0 or 120) or 0
+      local wManage = ui.layoutManage:Fit(stage >= 3 and 0 or 130)
+      local wShare = ui.layoutShare:Fit(stage >= 1 and 0 or 140)
+      return wNew, wDup, wManage, wShare
+    end
+    local function total(wNew, wDup, wManage, wShare)
+      return wManage + wShare + gap + (canNew and wNew + gap or 0) + (canDup and wDup + gap or 0)
+    end
+    local function tight(...)
+      return G.sideW - total(...) - gap < LAYOUT_PICK_MIN
+    end
+    local wNew, wDup, wManage, wShare = widths(0)
+    for stage = 1, 3 do
+      if tight(wNew, wDup, wManage, wShare) then
+        wNew, wDup, wManage, wShare = widths(stage)
+      end
+    end
+    local right = sx + G.sideW
+    ui.layoutManage:ClearAllPoints()
+    ui.layoutManage:SetPoint("TOPRIGHT", frame, "TOPLEFT", right, -G.bandY)
+    ui.layoutManage:SetSize(wManage, LAYOUT_ROW_H)
+    right = right - wManage - gap
+    ui.layoutShare:ClearAllPoints()
+    ui.layoutShare:SetPoint("TOPRIGHT", frame, "TOPLEFT", right, -G.bandY)
+    ui.layoutShare:SetSize(wShare, LAYOUT_ROW_H)
+    right = right - wShare - gap
+    for _, item in ipairs({ { ui.layoutDup, canDup, wDup }, { ui.layoutNew, canNew, wNew } }) do
+      local button, shown, width = item[1], item[2], item[3]
+      if shown then
+        button:ClearAllPoints()
+        button:SetPoint("TOPRIGHT", frame, "TOPLEFT", right, -G.bandY)
+        button:SetSize(width, LAYOUT_ROW_H)
+        right = right - width - gap
+      end
+    end
+    ui.layoutPick:ClearAllPoints()
+    ui.layoutPick:SetPoint("TOPLEFT", frame, "TOPLEFT", sx, -G.bandY)
+    ui.layoutPick:SetSize(math.max(right - sx + gap, 60), LAYOUT_ROW_H)
+    ui.layoutStatus:ClearAllPoints()
+    ui.layoutStatus:SetPoint("TOPLEFT", frame, "TOPLEFT", sx + 2, -(G.bandY + LAYOUT_HEAD_H - 2))
+    ui.layoutStatus:SetSize(G.sideW - 4, ES.STATUS_H - 2)
   end
 
   local y = G.bodyY
@@ -3092,40 +3550,18 @@ local function placeViewBar()
   ui.toolX, ui.toolY = bx, by + W.DROPDOWN_FIELD_Y
 end
 
--- Height of a layout row with a detail line at the font size of now.
-function grp.twoLineH()
-  return (ES.TwoLineRowH(Theme.fontSize("small")))
-end
-
 function refreshManager()
   ui.mgrSave:SetEnabled(isDirty())
   local layouts = mgrFn("list") ~= nil and mgrFn("select") ~= nil
-  local list = layouts and layoutList() or {}
-  local two = false
-  for _, entry in ipairs(list) do
-    two = two or entry.detail ~= nil
-  end
-  ui.layoutTwoLine = two
-  local rowH = two and grp.twoLineH() or nil
-  if G.layoutRowH ~= rowH then
-    -- The band grows or shrinks with its rows: what lies under it moves with it.
-    layoutFrames(frame)
-    paintBackdrop()
-    redraw()
-  end
+  local usage = layouts and mgrFn("assignment") and usageText() or nil
   placeBand()
-  if ui.layoutList:IsShown() then
-    ui.layoutList:SetRowHeight(rowH or ROW_H)
-    ui.layoutList:SetData(list)
-    -- Scrolls to the open layout when it changes, not on every refresh (the player may be scrolling).
-    if ui.layoutRevealed ~= S.layoutId then
-      ui.layoutRevealed = S.layoutId
-      for i, entry in ipairs(list) do
-        if entry.id == S.layoutId then
-          ui.layoutList:Reveal(i)
-        end
-      end
-    end
+  if layouts then
+    ui.layoutPick.Refresh()
+    ui.layoutManage:SetEnabled(true)
+    W.SetText(ui.layoutStatus, nil, usage or "")
+  end
+  if ns.LayoutDialog.IsOpen() then
+    ns.LayoutDialog.Refresh()
   end
 end
 
@@ -3405,6 +3841,12 @@ local function createRow(parent)
     return string.format(L[row.open and "canvas.foldOpen" or "canvas.foldClosed"], row.fullName or "")
   end
   row.glyph = W.Glyph(row, "folder", 14, "accent2")
+  -- The symbol of what the element shows (a texture of a spell, item or weapon, else a glyph of its type). It is
+  -- decoration: the name stays the accessible name of the row.
+  row.symbol = row:CreateTexture(nil, "ARTWORK")
+  row.symbol:SetSize(SYMBOL_PX, SYMBOL_PX)
+  row.symbol:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  row.symbolGlyph = W.Glyph(row, "tag", SYMBOL_GLYPH_PX, "textSecondary")
   row.guide = row:CreateTexture(nil, "ARTWORK")
   row.guide:SetWidth(2)
   ns.Bind(row.guide, function(t)
@@ -3431,6 +3873,26 @@ local function createRow(parent)
     end,
   })
   row.ren:SetPoint("RIGHT", row.del, "LEFT", -2, 0)
+  row.copy = W.Action(row, {
+    icon = "export",
+    size = 22,
+    tooltip = "act.copy",
+    tooltipText = "canvas.copy.rowTip",
+    onClick = function()
+      act.copyElement(row.id)
+    end,
+  })
+  row.copy:SetPoint("RIGHT", row.ren, "LEFT", -2, 0)
+  row.share = W.Action(row, {
+    icon = "share",
+    size = 22,
+    tooltip = "layoutshare.btn",
+    tooltipText = "layoutshare.tip.element",
+    onClick = function()
+      act.shareElement(row.id)
+    end,
+  })
+  row.share:SetPoint("RIGHT", row.copy, "LEFT", -2, 0)
   row.down = W.Action(row, {
     icon = "chevron-down",
     size = 22,
@@ -3440,7 +3902,7 @@ local function createRow(parent)
       act.reorder(row.id, "down")
     end,
   })
-  row.down:SetPoint("RIGHT", row.ren, "LEFT", -2, 0)
+  row.down:SetPoint("RIGHT", row.share, "LEFT", -2, 0)
   row.up = W.Action(row, {
     icon = "chevron-up",
     size = 22,
@@ -3497,124 +3959,6 @@ local function createRow(parent)
   return row
 end
 
--- A row of the layout list: the check mark of the open layout, its name (switches), then rename,
--- duplicate and delete as icons in fixed slots from the right edge.
-local LAYOUT_ICON, LAYOUT_FLAG_W = 22, 14
-
-local function createLayoutRow(parent)
-  local row = CreateFrame("Frame", nil, parent)
-  ui.layoutRows[#ui.layoutRows + 1] = row
-  row.mark = W.Glyph(row, "check", 14, "accent2")
-  row.mark:SetPoint("LEFT", 4, 0)
-  row.flag = W.Text(row, { text = "*", role = "ui", color = "warning", justify = "RIGHT" })
-  row.flag:SetWidth(LAYOUT_FLAG_W - 4)
-  row.detail = W.Text(row, { role = "small", color = "textMuted" })
-  local function icon(name, tip, tipText, onClick)
-    return W.Action(row, {
-      icon = name,
-      size = LAYOUT_ICON,
-      tooltip = tip,
-      tooltipText = tipText,
-      wrap = "canvas-layout-row",
-      onClick = onClick,
-    })
-  end
-  row.del = icon("trash", "act.delete", "canvas.deleteTip", function()
-    act.deleteLayout(row.id)
-  end)
-  row.dup = icon("copy", "act.duplicate", "canvas.dupTip", function()
-    act.dupLayout(row.id)
-  end)
-  row.ren = icon("pencil", "act.rename", "canvas.renameTip", function()
-    act.rename(row.id)
-  end)
-  row.name = W.Action(row, {
-    text = " ",
-    variant = "ghost",
-    height = LAYOUT_ICON,
-    width = 100,
-    wrap = "canvas-layout-row",
-    onClick = function()
-      act.switchTo(row.id)
-    end,
-  })
-  row.name.label:SetJustifyH("LEFT")
-  row.name.fgLayoutRow = true
-  -- The accessible name is the layout's own name.
-  row.name.fgName = function()
-    return row.fullName
-  end
-  -- The state of the row (open, unsaved) is told by tooltip too, on hover and on keyboard focus.
-  local function tip(self)
-    local key = row.dirty and "canvas.layoutDirtyTip"
-      or (row.current and "canvas.layoutCurrentTip" or "canvas.layoutOpenTip")
-    ns.ShowTooltip(self, row.fullName, L[key] .. (row.fullDetail and ("\n" .. row.fullDetail) or ""))
-  end
-  row.name:HookScript("OnEnter", tip)
-  row.name:HookScript("OnLeave", ns.HideTooltip)
-  row.name.fgOnFocus, row.name.fgOnBlur = tip, ns.HideTooltip
-  return row
-end
-
-local function bindLayoutRow(row, entry)
-  row.id, row.fullName, row.fullDetail = entry.id, entry.name, entry.detail
-  row.current = entry.id == S.layoutId
-  -- Only the open layout can hold unsaved changes: a switch asks about them first.
-  row.dirty = row.current and isDirty()
-  row.mark:SetShown(row.current)
-  W.SetText(row.name.label, nil, entry.name)
-  row.name:SetSelected(row.current)
-  -- Two lines: the name line sits at the top and the detail under it; else the row is one centered line.
-  local two = ui.layoutTwoLine == true
-  local side, y = two and "TOPRIGHT" or "RIGHT", two and -1 or 0
-  row.mark:ClearAllPoints()
-  row.mark:SetPoint(two and "TOPLEFT" or "LEFT", 4, two and -5 or 0)
-  local slots = 0
-  for _, item in ipairs({
-    { row.del, mgrFn("delete") ~= nil },
-    { row.dup, mgrFn("create") ~= nil },
-    { row.ren, mgrFn("rename") ~= nil },
-  }) do
-    local button, offered = item[1], item[2]
-    button:Hide()
-    if offered then
-      button:ClearAllPoints()
-      button:SetPoint(side, row, side, -slots * (LAYOUT_ICON + 2), y)
-      slots = slots + 1
-      -- A layout the host will not delete (the last one) shows no delete icon.
-      button:SetShown(button ~= row.del or canDelete(entry.id))
-    end
-  end
-  local edge = slots * (LAYOUT_ICON + 2)
-  -- The star of unsaved changes has its own slot, so a long name cannot push it out of sight.
-  row.flag:SetShown(row.dirty)
-  row.flag:ClearAllPoints()
-  row.flag:SetPoint(side, row, side, -edge - 2, two and -5 or 0)
-  row.name:ClearAllPoints()
-  local right = -edge - (row.dirty and LAYOUT_FLAG_W or 0)
-  if two then
-    row.name:SetPoint("TOPLEFT", row, "TOPLEFT", 22, -1)
-    row.name:SetPoint("TOPRIGHT", row, "TOPRIGHT", right, -1)
-  else
-    row.name:SetPoint("LEFT", row, "LEFT", 22, 0)
-    row.name:SetPoint("RIGHT", row, "RIGHT", right, 0)
-  end
-  row.detail:ClearAllPoints()
-  row.detail:SetShown(two and entry.detail ~= nil)
-  if two and entry.detail then
-    W.SetText(row.detail, nil, entry.detail)
-    local _, line = ES.TwoLineRowH(Theme.fontSize("small"))
-    row.detail:SetPoint("TOPLEFT", row, "TOPLEFT", 24, -ES.TwoLineDetailY())
-    row.detail:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -ES.TwoLineDetailY())
-    -- One line at the height of the font: a longer text is cut, it never runs into the row below.
-    row.detail:SetHeight(line)
-    row.detail:SetWordWrap(false)
-    if row.detail.SetMaxLines then
-      row.detail:SetMaxLines(1)
-    end
-  end
-end
-
 -- A row of the tree list: entry = { el, depth, isGroup, open, count } (GroupTree.Rows).
 local function bindRow(row, entry)
   local el = entry.el
@@ -3643,6 +3987,22 @@ local function bindRow(row, entry)
     row.guide:ClearAllPoints()
     row.guide:SetPoint("TOP", row, "TOPLEFT", GT.GuideX(entry.depth), 0)
     row.guide:SetPoint("BOTTOM", row, "BOTTOMLEFT", GT.GuideX(entry.depth), 0)
+  end
+  -- A group keeps its folder; every other row with an icon function shows its symbol and the name moves right.
+  local symbol = not entry.isGroup and symbolOf(el) or nil
+  row.symbol:SetShown(symbol ~= nil and symbol.texture ~= nil)
+  row.symbolGlyph:SetShown(symbol ~= nil and symbol.texture == nil)
+  if symbol then
+    if symbol.texture ~= nil then
+      row.symbol:ClearAllPoints()
+      row.symbol:SetPoint("LEFT", row, "LEFT", nameLeft + 2, 0)
+      row.symbol:SetTexture(symbol.texture)
+    else
+      row.symbolGlyph:ClearAllPoints()
+      row.symbolGlyph:SetPoint("LEFT", row, "LEFT", nameLeft + 2 + (SYMBOL_PX - SYMBOL_GLYPH_PX) / 2, 0)
+      row.symbolGlyph:SetIcon(symbol.glyph)
+    end
+    nameLeft = nameLeft + GT.SYMBOL
   end
   row.name:ClearAllPoints()
   row.name:SetPoint("LEFT", row, "LEFT", nameLeft, 0)
@@ -3675,14 +4035,38 @@ end
 
 local function buildSide(f)
   -- placeBand sets every position and size (the layout list only shows with a manager).
-  ui.layoutHead = W.Text(f, { key = "canvas.layouts", role = "ui", color = "accent2" })
+  ui.layoutPick = ns.LayoutPicker.New(f, {
+    height = LAYOUT_ROW_H,
+    -- The host may name the list ("Windows"), the picker takes that for its accessible name.
+    title = function()
+      local mgr = S and S.mgr
+      return type(mgr) == "table" and type(mgr.labels) == "table" and mgr.labels.layouts or "picker.title"
+    end,
+    entries = function()
+      local list = {}
+      for i, entry in ipairs(S and layoutList() or {}) do
+        local badge = ns.LayoutDialog.Tags(entry)
+        list[i] = { id = entry.id, name = entry.name, badge = badge ~= "" and badge or nil }
+      end
+      return list
+    end,
+    current = function()
+      return S and S.layoutId
+    end,
+    onPick = function(id)
+      act.switchTo(id)
+    end,
+    maxRows = function()
+      return math.floor((G.h * 0.55 - 40) / 24)
+    end,
+  })
   ui.layoutNew = W.Action(f, {
     label = "act.new",
     icon = "plus",
     tooltip = "act.new",
     tooltipText = "canvas.newTip",
-    height = 22,
-    width = HEAD_BUTTON_W - 20,
+    height = LAYOUT_ROW_H,
+    width = 90,
     onClick = function()
       act.newLayout()
     end,
@@ -3692,18 +4076,38 @@ local function buildSide(f)
     icon = "copy",
     tooltip = "act.duplicate",
     tooltipText = "canvas.dupHeadTip",
-    height = 22,
-    width = HEAD_BUTTON_W - 20,
+    height = LAYOUT_ROW_H,
+    width = 120,
     onClick = function()
       act.dupLayout()
     end,
   })
-  ui.layoutRows = {}
-  ui.layoutList = W.ScrollList(f, {
-    rowHeight = ROW_H,
-    createRow = createLayoutRow,
-    bindRow = bindLayoutRow,
+  ui.layoutManage = W.Action(f, {
+    label = "layoutdlg.manage",
+    icon = "gear",
+    tooltip = "layoutdlg.title",
+    tooltipText = "layoutdlg.manageTip",
+    opens = true,
+    height = LAYOUT_ROW_H,
+    width = 130,
+    onClick = function()
+      act.manage()
+    end,
   })
+  ui.layoutShare = W.Action(f, {
+    label = "layoutshare.btn",
+    icon = "share",
+    tooltip = "layoutshare.btn",
+    tooltipText = "layoutshare.tip.layout",
+    height = LAYOUT_ROW_H,
+    width = 140,
+    onClick = function()
+      act.shareLayout()
+    end,
+  })
+  ui.layoutStatus = W.Text(f, { role = "small", color = "textSecondary" })
+  ui.layoutStatus:SetWordWrap(false)
+  ui.layoutStatus:SetJustifyH("LEFT")
 
   ui.elementsHead = W.Text(f, { key = "canvas.elements", role = "ui", color = "accent2" })
   -- Same choice as the Add element dropdown of the band, where the player looks first.
@@ -3723,13 +4127,21 @@ local function buildSide(f)
     createRow = createRow,
     bindRow = bindRow,
     canReorder = groupsOn,
-    indentOf = function(item, anchor, after)
-      return S and GT.DropIndent(S.work, item.el.id, anchor.el.id, after, S.folded)
+    dropAt = function(item, probe)
+      return S and ui.listData and GT.Target(S.work, ui.listData, item.el.id, probe.index, probe.frac, probe.x) or nil
     end,
-    onReorder = function(item, anchor, after)
+    onDrop = function(item, target)
       if S then
-        act.dropRow(item.el.id, anchor.el.id, after)
+        act.dropRow(item.el.id, target)
       end
+    end,
+    ghost = function(item)
+      local el = item.el
+      if item.isGroup then
+        return { text = string.format("%s (%d)", titleOf(el), item.count), glyph = "folder" }
+      end
+      local symbol = symbolOf(el)
+      return { text = titleOf(el), texture = symbol and symbol.texture, glyph = symbol and symbol.glyph or "tag" }
     end,
   })
   ui.listIndex = {}
@@ -3800,6 +4212,32 @@ local function buildSide(f)
     end,
   })
 
+  ui.copyEl = W.Action(c, {
+    key = "act.copy",
+    icon = "export",
+    tooltip = "act.copy",
+    tooltipText = "canvas.copy.tip",
+    height = 24,
+    width = G.removeW,
+    wrap = "canvas-copy",
+    onClick = function()
+      act.copyElement()
+    end,
+  })
+
+  ui.shareEl = W.Action(c, {
+    key = "layoutshare.btn",
+    icon = "share",
+    tooltip = "layoutshare.btn",
+    tooltipText = "layoutshare.tip.element",
+    height = 24,
+    width = G.dupW,
+    wrap = "canvas-share",
+    onClick = function()
+      act.shareElement()
+    end,
+  })
+
   ui.anchorBox = CreateFrame("Frame", nil, c)
   ui.anchorBox:SetSize(76, 76)
   ui.anchors = {}
@@ -3851,6 +4289,28 @@ local function buildSide(f)
     groupRefresh()
   end
 
+  ui.outdent = W.Action(c, {
+    label = "canvas.group.outdent",
+    icon = "chevron-left",
+    tooltip = "canvas.group.outdent",
+    tooltipText = "canvas.group.outdentTip",
+    height = 24,
+    width = G.halfW,
+    onClick = function()
+      act.outdent()
+    end,
+  })
+  ui.indent = W.Action(c, {
+    label = "canvas.group.indent",
+    icon = "chevron-right",
+    tooltip = "canvas.group.indent",
+    tooltipText = "canvas.group.indentTip",
+    height = 24,
+    width = G.halfW,
+    onClick = function()
+      act.indent()
+    end,
+  })
   ui.holder = CreateFrame("Frame", nil, c)
   ui.holder:SetSize(G.contentW, 1)
   ui.warn = W.Text(c, { role = "ui", color = "warning", wrap = true })
@@ -3863,7 +4323,7 @@ local function buildSide(f)
   ui.lockNote:SetWidth(G.contentW)
   ui.headEl:SetWidth(G.contentW)
   ui.elementParts =
-    { ui.headEl, ui.name, ui.remove, ui.dup, ui.anchorBox, ui.fx, ui.fy, ui.fw, ui.fh, ui.desc, ui.groupDd }
+    { ui.headEl, ui.name, ui.remove, ui.dup, ui.copyEl, ui.shareEl, ui.anchorBox, ui.fx, ui.fy, ui.fw, ui.fh, ui.desc, ui.groupDd, ui.outdent, ui.indent }
 
   ui.headCanvas = heading("canvas.settings")
   local function canvasNumber(key, prop, lo, hi)
@@ -4159,7 +4619,7 @@ end
 
 -- Moves the parts that do not depend on a session to the current metrics (they come from the size of the window).
 function layoutFrames(f)
-  G = ES.Metrics(f:GetWidth(), f:GetHeight(), ui.layoutTwoLine and grp.twoLineH() or nil)
+  G = ES.Metrics(f:GetWidth(), f:GetHeight())
   f.fgMetrics = G
   Controls.PANEL_WIDTH = G.contentW
   ui.view:SetSize(G.leftW, G.viewH)
@@ -4170,7 +4630,7 @@ end
 -- The window changed its size: every part follows. The view and the lists keep their content, the preview keeps
 -- its zoom (the canvas is never rescaled by the window), the property panel measures its wrapped rows again.
 local function relayout(f)
-  local m = ES.Metrics(f:GetWidth(), f:GetHeight(), ui.layoutTwoLine and grp.twoLineH() or nil)
+  local m = ES.Metrics(f:GetWidth(), f:GetHeight())
   if f.fgMetrics and m.w == G.w and m.h == G.h then
     return
   end
@@ -4184,6 +4644,9 @@ local function relayout(f)
   refreshList()
   redraw()
   layoutSide()
+  if ns.LayoutDialog.IsOpen() then
+    ns.LayoutDialog.Fit()
+  end
 end
 
 -- The client reports every step of a drag: the parts are laid out after a short quiet time, so a held slider or
@@ -4434,10 +4897,21 @@ local function validSnap(v)
   return 0
 end
 
+-- Whether the list repaints when the client has loaded an item a symbol was waiting for.
+local symbolsHooked = false
+
 -- Opens the editor for opts (see the top of the file). Returns the window, nil for unusable options.
 function CE.Open(opts)
   if not (ns.db and type(opts) == "table" and type(opts.layout) == "table" and type(opts.types) == "table") then
     return nil
+  end
+  if not symbolsHooked and ns.ElementIcon then
+    symbolsHooked = true
+    ns.ElementIcon.OnLoad(function()
+      if S and ui and ui.list and frame and frame:IsShown() then
+        refreshList()
+      end
+    end)
   end
   if S then
     finish()
@@ -4475,7 +4949,6 @@ function CE.Open(opts)
   end
   S.backdrop = stageOf() and backdropById(db.backdrop).id or nil
   S.real = hasRealValues()
-  ui.layoutRevealed = nil
   if not frame then
     frame = create()
   end
@@ -4545,6 +5018,10 @@ end
 
 function CE.Layout()
   return S and U.copy(S.work) or nil
+end
+
+function CE.LayoutId()
+  return S and S.layoutId or nil
 end
 
 function CE.Selected()

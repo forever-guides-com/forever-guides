@@ -16,6 +16,11 @@
 -- as the overlay of the spell (IsSpellOverlayed, the glow events), as an aura by id, or both (procMode); a boolean
 -- the game keeps secret goes to SetAlphaFromBoolean. Events trigger a read, a slow check catches what they miss.
 --
+-- The source "weapon" follows the temporary enchantment of a weapon (a poison, sharpening stone, oil or shaman weapon
+-- buff), which is no aura. WeaponEnchantLogic reads both hands (C_PaperDollInfo.GetTemporaryEnchantmentInfo, else
+-- GetWeaponEnchantInfo), the events of the inventory and the slow check keep it current, and the ring runs on the
+-- element's own duration object. A reading the game keeps secret keeps the last readable run going until its end.
+--
 -- In combat the element can show a buff or debuff of the player through the native aura container (AuraNative):
 -- the engine fills icon, ring, number and stacks and Lua reads nothing. The element keeps the read and computed
 -- state running underneath, because the show rule "below" and the condition "missing" are decided from it. The
@@ -25,6 +30,7 @@ local W, L, CU, E, S = ns.W, ns.L, ns.CursorLogic, ns.CursorElements, ns.CursorS
 local T, CC, AL, SL, K = ns.CursorTimers, ns.CursorCooldowns, ns.AuraLogic, ns.ShowLogic, ns.CooldownCore
 local TR = ns.AuraTrack
 local NL, AN, PL = ns.AuraNativeLogic, ns.AuraNative, ns.PanelLogic
+local WE, WF, U = ns.WeaponEnchantLogic, ns.WellFedLogic, ns.U
 local Kit = CC.Kit
 local G = T.Guard
 local hidden, readable, now, api, try, method = G.hidden, G.readable, G.now, G.api, G.try, G.method
@@ -38,6 +44,8 @@ ns.CursorAuras = AU
 AU.diag = { polls = 0, procVia = nil, track = { castReadable = nil, via = nil, activations = 0 } }
 -- Length of the aura the editor preview counts down.
 AU.SAMPLE_SECONDS = 12
+-- The color of the ring that stands for a missing weapon enchantment.
+AU.WEAPON_MISSING_COLOR = "ff4d4d"
 local SIM_PAUSE = 3
 local POLL = 0.5
 local UNKNOWN_ICON = 134400
@@ -48,9 +56,30 @@ ns.AddLocale("enUS", {
   ["cursor.type.aura.desc"] = "Shows a buff or debuff, or the glow of a proc such as Revenge, as a ring, square or status bar. Can show only while the aura is missing, or only when little time is left.",
   ["cursor.preset.aura"] = "Aura (buff missing)",
   ["cursor.aura.source"] = "Source",
-  ["cursor.aura.source.tip"] = "An aura (buff or debuff) on a unit, or the glow a spell gets when it procs.",
+  ["cursor.aura.source.tip"] = "An aura (buff or debuff) on a unit, the glow a spell gets when it procs, or the temporary enchantment of a weapon such as a poison, sharpening stone, oil or shaman weapon buff.",
   ["cursor.aura.source.aura"] = "Aura (buff or debuff)",
   ["cursor.aura.source.proc"] = "Proc (spell glow)",
+  ["cursor.aura.source.weapon"] = "Weapon enchantment",
+  ["cursor.aura.weaponHand"] = "Weapon",
+  ["cursor.aura.weaponHand.tip"] = "Which weapon is looked at. Any shows the enchantment with the least time left and counts as missing only when no weapon has one.",
+  ["cursor.aura.weaponHand.any"] = "Any hand",
+  ["cursor.aura.weaponHand.main"] = "Main hand",
+  ["cursor.aura.weaponHand.off"] = "Off hand",
+  ["cursor.aura.weaponWarn"] = "Low below (s)",
+  ["cursor.aura.weaponWarn.tip"] = "Under this many seconds the ring and the time take the low color (red by default, set with the color curve). 0 turns it off.",
+  ["cursor.aura.weapon.name"] = "Weapon enchantment",
+  ["cursor.aura.weapon.current"] = "Right now",
+  ["cursor.aura.weapon.line"] = "%s: %s",
+  ["cursor.aura.weapon.hand.main"] = "Main hand",
+  ["cursor.aura.weapon.hand.off"] = "Off hand",
+  ["cursor.aura.weapon.kind.bare"] = "no enchantment",
+  ["cursor.aura.weapon.kind.none"] = "no weapon",
+  ["cursor.aura.weapon.kind.secret"] = "hidden by the game",
+  ["cursor.aura.weapon.kind.unreadable"] = "this client does not tell",
+  ["cursor.aura.weaponNote"] = "Poisons, sharpening stones, weightstones, oils and shaman weapon buffs are enchantments of the weapon, not auras. The conditions above work on the enchantment. A symbol is known for the common ones, any other shows your weapon.",
+  ["cursor.aura.status.weapon"] = "Read from the weapon, on the events of the inventory and by a slow check.",
+  ["cursor.preset.weapon"] = "Weapon enchantment (missing)",
+  ["cursor.preset.wellfed"] = "Well Fed (missing)",
   ["cursor.aura.unit"] = "Unit",
   ["cursor.aura.unit.tip"] = "Whose auras are looked at.",
   ["cursor.aura.unit.player"] = "You",
@@ -61,6 +90,14 @@ ns.AddLocale("enUS", {
   ["cursor.aura.mineOnly.tip"] = "Counts only auras you or your pet applied. Switched on by default for target and focus.",
   ["cursor.aura.spell"] = "Aura or spell",
   ["cursor.aura.spell.tip"] = "Opens the spell list with search. The saved base ID counts for all ranks.",
+  ["cursor.aura.wellFed"] = "Any Well Fed buff counts",
+  ["cursor.aura.wellFed.tip"] = "Every food gives its own Well Fed buff with another spell ID. On (default): the element counts any of them, found by ID and by the name Well Fed. Off: only the spell you chose counts.",
+  ["cursor.aura.rank"] = "Rank",
+  ["cursor.aura.rank.tip"] = "Which rank of the chosen spell counts. Highest rank matches every rank of the spell, so a new rank needs no change here. Chosen ID matches exactly the spell you picked, with its rank.",
+  ["cursor.aura.rank.max"] = "Highest rank (default)",
+  ["cursor.aura.rank.max.tip"] = "Any rank of the spell counts as the aura or proc.",
+  ["cursor.aura.rank.exact"] = "Chosen ID only",
+  ["cursor.aura.rank.exact.tip"] = "Only the spell ID you picked counts. Pick the spell again to choose its rank. A layout saved before this option has no exact ID yet and uses the first rank.",
   ["cursor.aura.spellId"] = "Spell ID",
   ["cursor.aura.spellId.tip"] = "Types the spell ID of the aura, or of the spell for a proc. Enter or leaving the field saves it.",
   ["cursor.aura.current"] = "Current auras...",
@@ -158,9 +195,30 @@ ns.AddLocale("deDE", {
   ["cursor.type.aura.desc"] = "Zeigt einen Buff oder Debuff oder das Leuchten eines Procs wie Rache als Ring, Quadrat oder Statusbalken. Kann nur erscheinen, wenn die Aura fehlt, oder nur bei wenig Restzeit.",
   ["cursor.preset.aura"] = "Aura (Buff fehlt)",
   ["cursor.aura.source"] = "Quelle",
-  ["cursor.aura.source.tip"] = "Eine Aura (Buff oder Debuff) auf einer Einheit oder das Leuchten, das ein Zauber bei einem Proc bekommt.",
+  ["cursor.aura.source.tip"] = "Eine Aura (Buff oder Debuff) auf einer Einheit, das Leuchten, das ein Zauber bei einem Proc bekommt, oder die zeitlich begrenzte Verzauberung einer Waffe wie Gift, Wetzstein, Öl oder ein Waffenbuff des Schamanen.",
   ["cursor.aura.source.aura"] = "Aura (Buff oder Debuff)",
   ["cursor.aura.source.proc"] = "Proc (Zauberleuchten)",
+  ["cursor.aura.source.weapon"] = "Waffenverzauberung",
+  ["cursor.aura.weaponHand"] = "Waffe",
+  ["cursor.aura.weaponHand.tip"] = "Welche Waffe angesehen wird. Beliebig zeigt die Verzauberung mit der kürzesten Restzeit und zählt nur als fehlend, wenn keine Waffe eine hat.",
+  ["cursor.aura.weaponHand.any"] = "Beliebige Hand",
+  ["cursor.aura.weaponHand.main"] = "Haupthand",
+  ["cursor.aura.weaponHand.off"] = "Nebenhand",
+  ["cursor.aura.weaponWarn"] = "Niedrig unter (Sek)",
+  ["cursor.aura.weaponWarn.tip"] = "Unter dieser Zahl Sekunden nehmen Ring und Zeit die niedrige Farbe an (standardmäßig rot, einstellbar bei der Farbkurve). 0 schaltet es aus.",
+  ["cursor.aura.weapon.name"] = "Waffenverzauberung",
+  ["cursor.aura.weapon.current"] = "Gerade jetzt",
+  ["cursor.aura.weapon.line"] = "%s: %s",
+  ["cursor.aura.weapon.hand.main"] = "Haupthand",
+  ["cursor.aura.weapon.hand.off"] = "Nebenhand",
+  ["cursor.aura.weapon.kind.bare"] = "keine Verzauberung",
+  ["cursor.aura.weapon.kind.none"] = "keine Waffe",
+  ["cursor.aura.weapon.kind.secret"] = "vom Spiel verborgen",
+  ["cursor.aura.weapon.kind.unreadable"] = "dieser Client sagt es nicht",
+  ["cursor.aura.weaponNote"] = "Gifte, Wetzsteine, Gewichtssteine, Öle und Waffenbuffs des Schamanen sind Verzauberungen der Waffe und keine Auren. Die Bedingungen oben gelten für die Verzauberung. Für die gängigen ist ein Symbol bekannt, bei jeder anderen erscheint deine Waffe.",
+  ["cursor.aura.status.weapon"] = "Wird an der Waffe gelesen, bei den Ereignissen des Inventars und durch eine langsame Prüfung.",
+  ["cursor.preset.weapon"] = "Waffenverzauberung (fehlt)",
+  ["cursor.preset.wellfed"] = "Satt (fehlt)",
   ["cursor.aura.unit"] = "Einheit",
   ["cursor.aura.unit.tip"] = "Wessen Auren angesehen werden.",
   ["cursor.aura.unit.player"] = "Du",
@@ -171,6 +229,14 @@ ns.AddLocale("deDE", {
   ["cursor.aura.mineOnly.tip"] = "Zählt nur Auren, die du oder dein Pet gewirkt haben. Bei Ziel und Fokus standardmäßig an.",
   ["cursor.aura.spell"] = "Aura oder Zauber",
   ["cursor.aura.spell.tip"] = "Öffnet die Zauberliste mit Suche. Die gespeicherte Basis-ID gilt für alle Ränge.",
+  ["cursor.aura.wellFed"] = "Jeder Satt-Buff zählt",
+  ["cursor.aura.wellFed.tip"] = "Jede Nahrung gibt ihren eigenen Satt-Buff mit einer anderen Zauber-ID. An (Standard): das Element zählt jeden davon, gefunden über die ID und über den Namen Satt. Aus: nur der gewählte Zauber zählt.",
+  ["cursor.aura.rank"] = "Rang",
+  ["cursor.aura.rank.tip"] = "Welcher Rang des gewählten Zaubers gilt. Höchster Rang passt auf jeden Rang des Zaubers, ein neuer Rang braucht hier keine Änderung. Gewählte ID passt genau auf den Zauber, den du gewählt hast, mit seinem Rang.",
+  ["cursor.aura.rank.max"] = "Höchster Rang (Standard)",
+  ["cursor.aura.rank.max.tip"] = "Jeder Rang des Zaubers zählt als Aura oder Proc.",
+  ["cursor.aura.rank.exact"] = "Nur die gewählte ID",
+  ["cursor.aura.rank.exact.tip"] = "Nur die gewählte Zauber-ID zählt. Wähle den Zauber neu, um seinen Rang zu wählen. Ein Layout, das vor dieser Option gespeichert wurde, hat noch keine genaue ID und nimmt den ersten Rang.",
   ["cursor.aura.spellId"] = "Zauber-ID",
   ["cursor.aura.spellId.tip"] = "Tippt die Zauber-ID der Aura ein, bei einem Proc die des Zaubers. Enter oder das Verlassen des Felds speichert.",
   ["cursor.aura.current"] = "Aktuelle Auren...",
@@ -356,14 +422,15 @@ local function byId(unit, id)
   return false
 end
 
--- Reader B: a scan of the unit's auras by index, matched on readable spell ids. Returns whether the client has
--- the call, and the first aura of the set or nil.
-local function scan(unit, ids, mineOnly)
+-- Reader B: a scan of the unit's auras by index, matched on readable spell ids and, when `names` is given, on a
+-- readable aura name (a food buff the data does not list yet). Returns whether the client has the call, and the
+-- first aura of the set or nil.
+local function scan(unit, ids, mineOnly, names)
   local at = api("C_UnitAuras", "GetAuraDataByIndex")
   if not at then
     return false
   end
-  for _, filter in ipairs({ "HELPFUL", "HARMFUL" }) do
+  for _, filter in ipairs(names and { "HELPFUL" } or { "HELPFUL", "HARMFUL" }) do
     local full = filter .. (mineOnly and "|PLAYER" or "")
     for i = 1, SCAN_MAX do
       local aura = try(at, unit, i, full)
@@ -371,7 +438,7 @@ local function scan(unit, ids, mineOnly)
         break
       end
       local f = auraFields(aura)
-      if AL.Matches(ids, f.spellId) then
+      if AL.Matches(ids, f.spellId) or (names and WF.IsName(f.name)) then
         return true, aura
       end
     end
@@ -382,8 +449,9 @@ end
 AU.ReadById, AU.ReadScan, AU.Fields = byId, scan, auraFields
 
 -- The aura of the set on the unit. Returns the aura table (or nil), whether any reader could answer, and the
--- reader that did ("id" or "scan"). A unit that does not exist has no aura.
-local function lookup(unit, list, ids, mineOnly)
+-- reader that did ("id", "scan" or "name"). A unit that does not exist has no aura. With `names` an aura that
+-- no id found is searched by its name as well.
+local function lookup(unit, list, ids, mineOnly, names)
   if unit ~= "player" and Kit.flagOf(try(api(nil, "UnitExists"), unit)) == false then
     return nil, true, "none"
   end
@@ -397,10 +465,13 @@ local function lookup(unit, list, ids, mineOnly)
       end
     end
   end
-  if answered then
+  if answered and not names then
     return nil, true, "id"
   end
-  local has, aura = scan(unit, ids, mineOnly)
+  local has, aura = scan(unit, ids, mineOnly, names)
+  if answered then
+    return aura, true, aura ~= nil and "name" or "id"
+  end
   return aura, has, has and "scan" or nil
 end
 
@@ -482,15 +553,32 @@ end
 
 -- State ------------------------------------------------------------------------------------------------
 
--- What an element looks up: the unit, the ids of the spell (the glow), and the ids of the aura.
+-- The name of a spell as the game gives it, nil when it is unreadable or unknown.
+local function spellNameOf(id)
+  if id <= 0 then
+    return nil
+  end
+  local name = try(api("C_Spell", "GetSpellName"), id)
+  return plainString(name)
+end
+
+-- Whether the chosen spell is a well fed buff, for the panel and the lookup.
+function AU.IsWellFed(spellBase, spellExact)
+  return WF.Chosen({ spellBase = spellBase, spellExact = spellExact }, spellNameOf(spellBase))
+end
+
+-- What an element looks up: the unit, the ids of the spell (the glow), the ids of the aura and, for any well fed
+-- buff, the names to compare.
 local function resolve(st)
   local p = st.p
   local proc = p.source == "proc"
-  local spellIds = AL.IdSet(p.spellBase)
+  local spellIds = AL.SpellIds(p)
   local auraIds = spellIds
   if proc and p.procAuraId > 0 then
-    auraIds = AL.IdSet(p.procAuraId)
+    auraIds = AL.SpellIds(p, p.procAuraId)
   end
+  local names
+  auraIds, names = AL.LookFor(p, auraIds, p.source == "aura" and spellNameOf(p.spellBase) or nil)
   local all = {}
   for id in pairs(spellIds) do
     all[id] = true
@@ -500,12 +588,14 @@ local function resolve(st)
   end
   local triggerBase = p.trackSpell > 0 and p.trackSpell or p.spellBase
   st.own = {
+    source = p.source,
     unit = proc and "player" or p.unit,
     ids = all,
     spellList = sortedIds(spellIds),
     auraIds = auraIds,
+    auraNames = names,
     auraList = sortedIds(auraIds),
-    trigger = AL.IdSet(triggerBase),
+    trigger = AL.SpellIds(p, triggerBase),
     triggerBase = triggerBase,
   }
   st.notes.id = p.spellBase
@@ -683,12 +773,104 @@ local function calcView(st, c, s)
   }
 end
 
+-- Weapon enchantment -----------------------------------------------------------------------------------
+
+local function plainValue(v)
+  if hidden(v) then
+    return nil
+  end
+  return v
+end
+
+-- The two calls of the client for WeaponEnchantLogic.Read. A call the client lacks stays out, the logic then
+-- falls back to the other and never raises.
+local function weaponReader()
+  return {
+    plain = plainValue,
+    temporary = api("C_PaperDollInfo", "GetTemporaryEnchantmentInfo"),
+    legacy = api(nil, "GetWeaponEnchantInfo"),
+  }
+end
+
+-- The texture of the item in an inventory slot of the player, nil when empty or unreadable.
+local function slotTexture(slot)
+  local texture = plainValue(try(api(nil, "GetInventoryItemTexture"), "player", slot))
+  if type(texture) == "number" or type(texture) == "string" then
+    return texture
+  end
+  return nil
+end
+
+-- Whether each hand holds a weapon: { main, off }.
+local function weaponEquip()
+  local equip = {}
+  local info = api("C_Item", "GetItemInfoInstant") or api(nil, "GetItemInfoInstant")
+  for hand, slot in pairs(WE.SLOT) do
+    local id = readable(try(api(nil, "GetInventoryItemID"), "player", slot))
+    local has = (id ~= nil and id > 0) or slotTexture(slot) ~= nil
+    local class
+    if has and id and info then
+      -- GetItemInfoInstant: id, type, subtype, equip location, icon, class id, subclass id.
+      local ok, _, _, _, _, _, classId = pcall(info, id)
+      class = ok and readable(classId) or nil
+    end
+    equip[hand] = WE.EquippedWeapon(has, class)
+  end
+  return equip
+end
+
+AU.WeaponReader, AU.WeaponEquip = weaponReader, weaponEquip
+
+local function weaponData()
+  return ns.Data and ns.Data.WeaponEnchants and ns.Data.WeaponEnchants.e or nil
+end
+
+-- The state of a weapon element: the fields of an aura reading (present, remaining, permanent, stacks, object)
+-- plus the symbol and name of the enchantment, low (under the warning threshold) and the hand it came from.
+local function readWeapon(st)
+  local p = st.p
+  local reading = WE.Read(weaponReader())
+  local equip = weaponEquip()
+  local data = weaponData()
+  local state = WE.State(p, reading, equip, st.weaponMem, now(), data)
+  st.weaponMem = state.mem
+  st.weaponReading, st.weaponEquip = reading, equip
+  local s = {
+    present = state.present,
+    how = state.stale and "stale" or "weapon",
+    via = reading.how,
+    stale = state.stale,
+    remaining = state.remaining,
+    permanent = state.permanent,
+    unknown = state.unknown,
+    stacks = state.stacks,
+    low = state.low,
+    hand = state.hand,
+    enchantID = state.enchantID,
+  }
+  if state.hand then
+    local described =
+      WE.Describe(state.enchantID, data, slotTexture(WE.SLOT[state.hand]), L["cursor.aura.weapon.name"], ns.T)
+    s.icon, s.name = described.icon, described.name
+  end
+  if state.present == true and state.startAt and state.duration and state.remaining and state.remaining > 0 then
+    s.object = calcObject(st, { startAt = state.startAt, duration = state.duration })
+    s.calcStart, s.calcDuration = state.startAt, state.duration
+  end
+  return s
+end
+
+AU.ReadWeapon = readWeapon
+
 -- Reads the game for one element: { present, via, how, stale, remaining, permanent, object, stacks, stacksRaw,
 -- presentRaw }. `how` says what the presence came from (AuraLogic.Presence), `stale` that it is the state from
 -- before the fight.
 local function read(st)
   local p, own = st.p, st.own
   local s = {}
+  if own ~= nil and p.source == "weapon" then
+    return readWeapon(st)
+  end
   if own == nil or (p.spellBase == 0 and p.procAuraId == 0) then
     return s
   end
@@ -699,7 +881,7 @@ local function read(st)
   local withheld = restricted(st)
   local aura, answered
   if not withheld and (not proc or p.procMode ~= "overlay") then
-    aura, answered, s.via = lookup(unit, own.auraList, own.auraIds, p.mineOnly)
+    aura, answered, s.via = lookup(unit, own.auraList, own.auraIds, p.mineOnly, own.auraNames)
     if not answered then
       s.via = nil
     end
@@ -798,8 +980,11 @@ end
 local refresh, applyView
 
 local function iconTexture(p)
-  local id = p.spellBase > 0 and p.spellBase or p.procAuraId
-  return textureOf(id) or UNKNOWN_ICON
+  if p.source == "weapon" then
+    return slotTexture(WE.SLOT[p.weaponHand == "off" and "off" or "main"]) or UNKNOWN_ICON
+  end
+  local spell = p.rankMode == "exact" and K.ExactOf(p) or p.spellBase
+  return textureOf(spell > 0 and spell or p.procAuraId) or UNKNOWN_ICON
 end
 
 local function paintIcon(st)
@@ -861,7 +1046,7 @@ end
 function nativeSync(st)
   local p = st.p
   local plan = NL.Plan(p, nativeCaps())
-  local ids = plan.mode == "native" and sortedIds(AL.IdSet(p.spellBase)) or {}
+  local ids = plan.mode == "native" and sortedIds(st.own and st.own.auraIds or AL.SpellIds(p)) or {}
   local notes = { mode = plan.mode, reason = plan.reason }
   st.notes.native = notes
   if st.editor or not st.driven or #ids == 0 then
@@ -938,6 +1123,20 @@ local function paintNative(st, viaCurve)
   st.charges:SetShown(false)
 end
 
+-- Ring (or bar) and time text in the low color while a weapon enchantment is about to run out. The next paint of
+-- the timer takes it back through resetTint.
+local function paintLow(st)
+  local p = st.p
+  local r, g, b = U.hex(p.curveColorLow)
+  if st.style == "bar" then
+    method(st.bar, "SetStatusBarColor", r, g, b, p.alpha)
+  else
+    method(st.cd, "SetSwipeColor", r, g, b, p.alpha)
+  end
+  st.timer:SetTextColor(r, g, b, 1)
+  st.tinted = true
+end
+
 -- Shows the state `st.s`: visibility by condition and show rule, the ring or bar, the time and the stacks.
 function applyView(st)
   local p, s = st.p, st.s
@@ -977,6 +1176,9 @@ function applyView(st)
   end
   nativeLeave(st)
   paintMark(st, p.trackMark == "dot" and s.calc == true)
+  if p.source == "weapon" and s.icon and not st.editor then
+    st.icon:SetTexture(s.icon)
+  end
   local absent = s.present == false
   st.icon:SetDesaturated(absent)
   st.ready = absent
@@ -994,6 +1196,9 @@ function applyView(st)
   })
   if not ok then
     return applyView(st)
+  end
+  if s.low and present and not p.colorCurve and not st.editor then
+    paintLow(st)
   end
   local count = present and p.charges and (s.stacksRaw or s.stacks) or nil
   local shown = count ~= nil and pcall(st.charges.SetText, st.charges, count)
@@ -1047,8 +1252,10 @@ local hub = T.NewHub({
   "PLAYER_ALIVE",
   "PLAYER_UNGHOST",
   "SPELL_UPDATE_COOLDOWN",
+  "PLAYER_EQUIPMENT_CHANGED",
 }, {
   { "UNIT_AURA", "player", "target", "focus", "pet" },
+  { "UNIT_INVENTORY_CHANGED", "player" },
   { "UNIT_PET", "player" },
   { "UNIT_SPELLCAST_SUCCEEDED", "player" },
 }, function(st, event, a1, a2, a3)
@@ -1149,6 +1356,9 @@ local function identity(p)
     p.source,
     p.unit,
     p.spellBase,
+    p.spellExact,
+    p.rankMode,
+    p.anyWellFed and 1 or 0,
     p.procAuraId,
     p.procMode,
     p.mineOnly and 1 or 0,
@@ -1156,6 +1366,7 @@ local function identity(p)
     p.trackSpell,
     p.timerMode,
     p.style,
+    p.weaponHand,
   }, "|")
 end
 
@@ -1176,6 +1387,7 @@ local function render(frame, element, ctx)
   elseif changed and st.driven then
     local combat = st.calc ~= nil and st.calc.combat == true
     st.calc, st.calcKey, st.calcObject, st.knownEnd = TR.New(), nil, nil, nil
+    st.weaponMem = nil
     st.calc.combat = combat
     resolve(st)
     paintIcon(st)
@@ -1230,6 +1442,7 @@ local function release(frame)
     Kit.resetTint(st)
     st.s, st.own, st.mem, st.last, st.removed = nil, nil, nil, nil, nil
     st.calc, st.calcKey, st.calcObject, st.knownEnd = nil, nil, nil, nil
+    st.weaponMem, st.weaponReading, st.weaponEquip = nil, nil, nil
     paintMark(st, false)
     st.frame:SetAlpha(1)
   end
@@ -1373,7 +1586,7 @@ local function controls()
 end
 
 -- A button row that opens the picker of current auras.
-local function currentRow(state, add)
+local function currentRow(state, add, shown)
   local row = CreateFrame("Frame", nil, state.panel)
   row:SetHeight(28)
   local button = W.Action(row, {
@@ -1384,7 +1597,7 @@ local function currentRow(state, add)
     wrap = "cursor-aura-current",
     onClick = function()
       AU.OpenPicker(function(picked)
-        state.write("spellBase", K.BaseOf(picked.id))
+        state.writeMany({ spellBase = K.BaseOf(picked.id), spellExact = picked.id })
         state.panel:Refresh()
       end)
     end,
@@ -1392,7 +1605,7 @@ local function currentRow(state, add)
   button:SetPoint("TOPLEFT", 0, -2)
   button:SetPoint("TOPRIGHT", 0, -2)
   row.button = button
-  return add(row, 28)
+  return add(row, 28, shown)
 end
 
 -- Where the duration of the computed timer comes from, as a sentence for the panel.
@@ -1425,9 +1638,52 @@ local function durationNoteRow(state, add, shown)
   end, shown)
 end
 
+-- What each hand holds now, as lines for the panel: "Main hand: Instant Poison V, 24:30".
+function AU.WeaponLines()
+  local reading, equip = WE.Read(weaponReader()), weaponEquip()
+  local data = weaponData()
+  local lines = {}
+  for _, hand in ipairs(WE.Hands(reading, equip)) do
+    local what
+    if reading.how == nil then
+      what = L["cursor.aura.weapon.kind.unreadable"]
+    elseif hand.kind == "enchanted" then
+      local described = WE.Describe(hand.entry.enchantID, data, nil, L["cursor.aura.weapon.name"], ns.T)
+      what = described.name
+      if hand.entry.remainingSec then
+        what = what .. ", " .. K.FormatStyled(hand.entry.remainingSec, { timeStyle = "clock" }, "own")
+      end
+    else
+      what = L["cursor.aura.weapon.kind." .. hand.kind]
+    end
+    lines[#lines + 1] = string.format(L["cursor.aura.weapon.line"], L["cursor.aura.weapon.hand." .. hand.hand], what)
+  end
+  return lines
+end
+
+-- A wrapped text row with the lines of AU.WeaponLines, read again with every refresh.
+local function weaponCurrentRow(state, add, shown)
+  local row = CreateFrame("Frame", nil, state.panel)
+  local text = W.Text(row, { role = "ui", color = "textMuted", wrap = true })
+  text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+  text:SetWidth(controls().PANEL_WIDTH or 284)
+  function row:Refresh()
+    W.SetText(text, nil, L["cursor.aura.weapon.current"] .. "\n" .. table.concat(AU.WeaponLines(), "\n"))
+  end
+  row:Refresh()
+  return add(row, function()
+    local height = controls().FitText(state, text)
+    row:SetHeight(height)
+    return height
+  end, shown)
+end
+
 -- The status of the combat display for the props `p`, for the panel line and the test window: { key, color, text }.
 -- `st` is the drawn element (nil in the editor), which knows whether the game refused its container.
 function AU.Status(p, st)
+  if p.source == "weapon" then
+    return { key = "weapon", color = "success", text = L["cursor.aura.status.weapon"] }
+  end
   local state = st ~= nil and st.notes.native and st.notes.native.state or nil
   local status = NL.Status(p, nativeCaps(), {
     poolFull = AN.Info().full or state == "limit",
@@ -1480,14 +1736,67 @@ function AU.Panel(parent, element, onChange)
       local R = CC.Rows
       local c = CC.LookConds(state)
       local proc = c.on("source", "proc")
-      local aura = c.negate(proc)
+      local weapon = c.on("source", "weapon")
+      local aura = c.on("source", "aura")
+      local spellBased = c.negate(weapon)
       local whenAlways = c.on("when", "always")
+      -- The spell shown in the fields: the exact id while only the chosen id counts, else the base.
+      local function shownSpell()
+        if state.get("rankMode") == "exact" then
+          return K.ExactOf({ spellBase = state.get("spellBase"), spellExact = state.get("spellExact") })
+        end
+        return state.get("spellBase")
+      end
       local belowOn = c.on("showWhen", "below")
       local procAuraOn = c.both(proc, function()
         return state.get("procMode") ~= "overlay"
       end)
       state.section("basics", "canvas.sec.basics")
-      R.choice(state, add, "cursor.aura.source", "source", AL.SOURCES)
+      -- A weapon enchantment is a warning most of the time, so choosing it also takes the warning color for the
+      -- missing ring, as long as the color was never changed.
+      add(
+        C.Choice(state.panel, {
+          label = "cursor.aura.source",
+          tooltip = "cursor.aura.source",
+          tooltipText = "cursor.aura.source.tip",
+          options = C.Choices(AL.SOURCES, "cursor.aura.source."),
+          get = function()
+            return state.get("source")
+          end,
+          set = function(source)
+            state.write("source", source)
+            if source == "weapon" and state.get("readyColor") == DEFAULTS.readyColor then
+              state.write("readyColor", AU.WEAPON_MISSING_COLOR)
+            elseif source ~= "weapon" and state.get("readyColor") == AU.WEAPON_MISSING_COLOR then
+              state.write("readyColor", DEFAULTS.readyColor)
+            end
+            state.panel:Refresh()
+          end,
+        }),
+        C.HEIGHT.choice
+      )
+      R.choice(state, add, "cursor.aura.weaponHand", "weaponHand", WE.HANDS, weapon)
+      add(
+        C.Number(state.panel, {
+          label = "cursor.aura.weaponWarn",
+          tooltip = "cursor.aura.weaponWarn",
+          tooltipText = "cursor.aura.weaponWarn.tip",
+          labelWidth = 110,
+          min = 0,
+          max = WE.WARN_MAX,
+          step = 30,
+          get = function()
+            return state.get("weaponWarn")
+          end,
+          set = function(seconds)
+            state.write("weaponWarn", seconds)
+          end,
+        }),
+        C.HEIGHT.number,
+        weapon
+      )
+      weaponCurrentRow(state, add, weapon)
+      C.TextRow(state, add, "cursor.aura.weaponNote", nil, weapon)
       -- Own auras only is the usual wish for a target or focus, so choosing the unit sets it too.
       add(
         C.Choice(state.panel, {
@@ -1516,14 +1825,15 @@ function AU.Panel(parent, element, onChange)
             return playerClass() or "ALL"
           end,
           get = function()
-            local id = state.get("spellBase")
+            local id = shownSpell()
             return id > 0 and id or nil
           end,
           set = function(id)
-            state.write("spellBase", id and K.BaseOf(id) or 0)
+            state.writeMany({ spellBase = id and K.BaseOf(id) or 0, spellExact = id or 0 })
           end,
         }),
-        C.HEIGHT.spell
+        C.HEIGHT.spell,
+        spellBased
       )
       add(
         C.Number(state.panel, {
@@ -1534,15 +1844,26 @@ function AU.Panel(parent, element, onChange)
           max = AL.SPELL_ID_MAX,
           step = 1,
           get = function()
-            return state.get("spellBase")
+            return shownSpell()
           end,
           set = function(id)
-            state.write("spellBase", K.BaseOf(id))
+            state.writeMany({ spellBase = K.BaseOf(id), spellExact = id })
           end,
         }),
-        C.HEIGHT.number
+        C.HEIGHT.number,
+        spellBased
       )
-      currentRow(state, add)
+      R.choice(state, add, "cursor.aura.rank", "rankMode", AL.RANK_MODES, spellBased, true)
+      R.toggle(
+        state,
+        add,
+        "cursor.aura.wellFed",
+        "anyWellFed",
+        c.both(aura, function()
+          return AU.IsWellFed(state.get("spellBase"), state.get("spellExact"))
+        end)
+      )
+      currentRow(state, add, aura)
       R.choice(state, add, "cursor.aura.procMode", "procMode", AL.PROC_MODES, proc)
       add(
         C.Number(state.panel, {
@@ -1669,6 +1990,23 @@ CU.RegisterPreset("aura", function(el, build)
   return build("aura", {
     el("ring", "ring", 64, 64, { thickness = 1, alpha = 0.85 }),
     el("aura", "aura", 56, 56, { spellBase = AL.Sample(playerClass()) or 0, when = "missing" }),
+  })
+end)
+
+-- A ring that shows while the player has no well fed buff of any food.
+CU.RegisterPreset("wellfed", function(el, build)
+  return build("wellfed", {
+    el("ring", "ring", 64, 64, { thickness = 1, alpha = 0.85 }),
+    el("aura", "aura", 56, 56, { spellBase = WF.SAMPLE, spellExact = WF.SAMPLE, when = "missing" }),
+  })
+end)
+
+-- A ring that shows while no weapon carries a temporary enchantment (a poison, a stone, an oil), in the
+-- warning color.
+CU.RegisterPreset("weapon", function(el, build)
+  return build("weapon", {
+    el("ring", "ring", 64, 64, { thickness = 1, alpha = 0.85 }),
+    el("aura", "aura", 56, 56, { source = "weapon", when = "missing", readyColor = AU.WEAPON_MISSING_COLOR }),
   })
 end)
 

@@ -9,9 +9,13 @@ local A = {}
 ns.AuraLogic = A
 
 local SL = ns.ShowLogic
+local WE = ns.WeaponEnchantLogic
+local CC = ns.CooldownCore
+local WF = ns.WellFedLogic
 
--- What the element follows: an aura on a unit, or the activation glow of a spell (a proc such as Revenge).
-A.SOURCES = { "aura", "proc" }
+-- What the element follows: an aura on a unit, the activation glow of a spell (a proc such as Revenge), or the
+-- temporary enchantment of a weapon (poison, sharpening stone, oil, shaman weapon buff; WeaponEnchantLogic).
+A.SOURCES = { "aura", "proc", "weapon" }
 A.UNITS = { "player", "target", "focus", "pet" }
 -- aura: shows while the aura is there, missing: only while it is gone, always: dimmed while it is gone.
 A.WHEN = { "active", "missing", "always" }
@@ -22,12 +26,16 @@ A.PROC_MODES = { "auto", "overlay", "aura" }
 A.COMBAT_STALE = { "keep", "hide", "dim" }
 -- The kind of aura on the player the native container is asked for: a buff (HELPFUL) or a debuff (HARMFUL).
 A.AURA_TYPES = { "buff", "debuff" }
+-- Which rank of the chosen spell counts: every rank of its chain (max), or only the chosen id (exact).
+A.RANK_MODES = CC.RANK_MODES
 A.SPELL_ID_MAX = 4000000
 A.SAMPLES = { WARRIOR = 6673 }
 
 A.DEFAULTS = {
   source = "aura",
   spellBase = 0,
+  spellExact = 0,
+  rankMode = "max",
   unit = "player",
   mineOnly = false,
   when = "active",
@@ -40,6 +48,9 @@ A.DEFAULTS = {
   auraType = "buff",
   showWhen = "always",
   showBelow = SL.BELOW_DEFAULT,
+  weaponHand = WE.DEFAULTS.weaponHand,
+  weaponWarn = WE.DEFAULTS.weaponWarn,
+  anyWellFed = WF.DEFAULTS.anyWellFed,
 }
 
 local function finite(v)
@@ -79,6 +90,28 @@ function A.IdSet(base, extra)
   return ids
 end
 
+-- The ids that count for a spell of an element: only the chosen id in the mode "exact", else every rank of the
+-- chain of the base id. `base` is the spell of the element (p.spellBase) or another base such as the aura id
+-- of a proc, which has no exact id of its own.
+function A.SpellIds(p, base)
+  base = base or p.spellBase
+  if p.rankMode ~= "exact" then
+    return A.IdSet(base)
+  end
+  local id = base == p.spellBase and CC.ExactOf(p) or base
+  return finite(id) and id > 0 and { [id] = true } or {}
+end
+
+-- What the aura lookup of an element searches for: the ids, and for a well fed buff (any food counts) every
+-- well fed id plus the names to compare a readable aura name with. spellName is the name of the chosen spell when
+-- the game gave it. Returns the id set and the name set (nil when only ids count).
+function A.LookFor(p, ids, spellName)
+  if WF.Applies(p, spellName) then
+    return WF.Join(ids), WF.Names()
+  end
+  return ids, nil
+end
+
 -- Whether a readable spell id belongs to the set; a secret id (nil) never does.
 function A.Matches(ids, spellId)
   return finite(spellId) and ids[spellId] == true
@@ -98,8 +131,11 @@ function A.Clean(raw, d)
     auraType = oneOf(raw.auraType, A.AURA_TYPES, d.auraType),
     permanentCounts = type(raw.permanentCounts) == "boolean" and raw.permanentCounts or d.permanentCounts,
     pulseOnEnd = type(raw.pulseOnEnd) == "boolean" and raw.pulseOnEnd or d.pulseOnEnd,
+    rankMode = oneOf(raw.rankMode, A.RANK_MODES, d.rankMode),
     spellBase = finite(raw.spellBase) and math.min(math.max(math.floor(raw.spellBase + 0.5), 0), A.SPELL_ID_MAX)
       or d.spellBase,
+    spellExact = finite(raw.spellExact) and math.min(math.max(math.floor(raw.spellExact + 0.5), 0), A.SPELL_ID_MAX)
+      or d.spellExact,
     procAuraId = finite(raw.procAuraId) and math.min(math.max(math.floor(raw.procAuraId + 0.5), 0), A.SPELL_ID_MAX)
       or d.procAuraId,
     dimAlpha = finite(raw.dimAlpha) and math.min(math.max(raw.dimAlpha, 0), 1) or d.dimAlpha,
@@ -110,6 +146,12 @@ function A.Clean(raw, d)
     p.mineOnly = p.unit == "target" or p.unit == "focus"
   end
   p.showWhen, p.showBelow = SL.Clean(raw, d.showWhen, d.showBelow, SL.AURA_SHOW_WHEN)
+  for key, value in pairs(WE.Clean(raw, d)) do
+    p[key] = value
+  end
+  for key, value in pairs(WF.Clean(raw, d)) do
+    p[key] = value
+  end
   return p
 end
 
@@ -262,8 +304,8 @@ end
 -- Events ---------------------------------------------------------------------------------------------------
 
 -- What a game event means for one element: "resolve" (the spell list changed), "refresh" (read the aura again)
--- or nil. own = { unit, ids }; a1 is the first event argument, nil when the game keeps it secret (a missing
--- payload refreshes instead of being missed).
+-- or nil. own = { unit, ids, source }; a1 is the first event argument, nil when the game keeps it secret (a missing
+-- payload refreshes instead of being missed). The inventory events only matter to the source "weapon".
 function A.Route(event, own, a1)
   if event == "SPELLS_CHANGED" then
     return "resolve"
@@ -275,6 +317,10 @@ function A.Route(event, own, a1)
     return own.unit == "focus" and "refresh" or nil
   elseif event == "UNIT_PET" then
     return own.unit == "pet" and "refresh" or nil
+  elseif event == "UNIT_INVENTORY_CHANGED" then
+    return own.source == "weapon" and (a1 == nil or a1 == "player") and "refresh" or nil
+  elseif event == "PLAYER_EQUIPMENT_CHANGED" then
+    return own.source == "weapon" and "refresh" or nil
   elseif event == "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW" or event == "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE" then
     return (a1 == nil or own.ids[a1]) and "refresh" or nil
   end

@@ -10,6 +10,8 @@ ns.CooldownCore = K
 
 -- Where the cooldown comes from. The game-facing side keeps one entry per source.
 K.SOURCES = { "spell", "pet", "item" }
+-- Which rank of a chosen spell counts: the highest learned rank of its chain, or only the chosen id.
+K.RANK_MODES = { "max", "exact" }
 K.TIME_FORMATS = { "auto", "short" }
 -- How a time is written: by length (a decimal below ten seconds, minutes and hours from a minute on), as the
 -- one number of seconds the game formats, as a clock, or compact (whole minutes and hours).
@@ -115,6 +117,37 @@ function K.Resolve(base, env)
     end
   end
   return out
+end
+
+-- The id an exact choice means: the saved exact id, the base id for a choice saved without one.
+function K.ExactOf(props)
+  if finite(props.spellExact) and props.spellExact > 0 then
+    return props.spellExact
+  end
+  return props.spellBase
+end
+
+-- The spell of one exact id, no other rank stands in for it. Same shape as K.Resolve: the id is known, unknown
+-- or unsure (nil, it then stands), and an override replaces a known one.
+function K.ResolveExact(id, env)
+  local known = env.known(id)
+  local out = { id = id, base = id, known = known, ids = { [id] = true } }
+  if known ~= false then
+    local replaced = env.override(id)
+    if finite(replaced) and replaced > 0 then
+      out.id = replaced
+      out.ids[replaced] = true
+    end
+  end
+  return out
+end
+
+-- The spell the props mean: the exact id for rankMode "exact", else the highest learned rank of the base chain.
+function K.ResolveSpell(props, env)
+  if props.rankMode == "exact" then
+    return K.ResolveExact(K.ExactOf(props), env)
+  end
+  return K.Resolve(props.spellBase, env)
 end
 
 -- The item a saved choice means right now. props: itemMode, itemSlot, itemId. env.slotItem(slot) answers the

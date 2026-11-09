@@ -31,41 +31,8 @@ end
 
 -- Names ------------------------------------------------------------------------------------------
 
--- Second UTF-8 byte (after \195) of a Latin letter with an accent -> the plain letter.
-local ACCENT = {}
-for b = 160, 165 do
-  ACCENT[b] = "a"
-end
-ACCENT[167] = "c"
-for b = 168, 171 do
-  ACCENT[b] = "e"
-end
-for b = 172, 175 do
-  ACCENT[b] = "i"
-end
-ACCENT[177] = "n"
-for b = 178, 182 do
-  ACCENT[b] = "o"
-end
-for b = 185, 188 do
-  ACCENT[b] = "u"
-end
-ACCENT[189], ACCENT[191] = "y", "y"
-
-local function foldAccent(second)
-  local b = second:byte()
-  if b == 159 then
-    return ""
-  end
-  return ACCENT[b < 160 and b + 32 or b] or ""
-end
-
--- Lower case, no accents, no apostrophes or punctuation, single spaces ("Tel'Athir" = "TEL’ATHIR").
-function P.NormalizeName(text)
-  text = tostring(text or ""):gsub("\226\128\153", ""):gsub("\195([\128-\191])", foldAccent)
-  text = text:lower():gsub("'", ""):gsub("[^a-z0-9 ]", "")
-  return (text:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", ""))
-end
+-- The folding lives in the search logic the class trainer page shares.
+P.NormalizeName = ns.TrainerSearchLogic.NormalizeName
 
 local TITLES = {
   doctor = true,
@@ -543,10 +510,6 @@ function P.CountBySlug(entries)
   return out
 end
 
-local function plainMatch(text, query)
-  return text:lower():find(query:lower(), 1, true) ~= nil
-end
-
 local function haystack(e)
   local parts = { e.name, e.nameDe or "" }
   for _, t in ipairs({ e.profession, e.zone, e.place }) do
@@ -562,11 +525,7 @@ end
 -- all), query (every word has to occur), match(text, word) (default: plain, case-insensitive).
 function P.Filter(entries, f)
   f = f or {}
-  local match = f.match or plainMatch
-  local words = {}
-  for word in tostring(f.query or ""):gmatch("%S+") do
-    words[#words + 1] = word
-  end
+  local words = ns.TrainerSearchLogic.Words(f.query)
   local out = {}
   for _, e in ipairs(list(entries)) do
     local ok = (f.slug == nil or f.slug == "all" or e.slug == f.slug)
@@ -578,10 +537,7 @@ function P.Filter(entries, f)
       end
     end
     if ok and #words > 0 then
-      local text = haystack(e)
-      for _, word in ipairs(words) do
-        ok = ok and match(text, word)
-      end
+      ok = ns.TrainerSearchLogic.MatchAll(haystack(e), words, f.match)
     end
     if ok then
       out[#out + 1] = e

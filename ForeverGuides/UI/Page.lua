@@ -114,6 +114,7 @@ ns.ICONS = {
   help = STOCK .. "INV_Misc_QuestionMark",
   search = STOCK .. "INV_Misc_Spyglass_03",
   errors = OWN_ICONS .. "errors.png",
+  changelog = OWN_ICONS .. "changelog.png",
 }
 
 -- Second choice per entry, all stock icons the Forever client is known to have. New PNG files are
@@ -130,6 +131,7 @@ ns.ICONS_FALLBACK = {
   calc = STOCK .. "Trade_Engineering",
   durability = STOCK .. "INV_Chest_Plate06",
   errors = STOCK .. "INV_Misc_Note_06",
+  changelog = STOCK .. "INV_Misc_Book_09",
   legacy = STOCK .. "INV_Misc_Book_11",
   areas = STOCK .. "INV_Misc_Gear_01",
 }

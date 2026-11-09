@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-04.
+-- Generated data, do not edit. Data as of 2026-11-07.
 -- Spell catalog of WARRIOR: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -236,14 +236,6 @@ ns.Data.Spells.WARRIOR = {
     id=264,
     k="weapon",
     n={de="Bogen",en="Bows"},
-  },
-  {
-    fid=132278,
-    i="ability_racial_cannibalize",
-    id=20577,
-    k="racial",
-    n={de="Kannibalismus",en="Cannibalize"},
-    rt={de="Volk",en="Racial"},
   },
   {
     fid=132091,
@@ -2035,13 +2027,6 @@ ns.Data.Spells.WARRIOR = {
     n={de="Entfesselter Zorn",en="Unbridled Wrath"},
   },
   {
-    fid=136148,
-    id=5227,
-    k="racial",
-    n={de="Unterwasseratmung",en="Underwater Breathing"},
-    rt={de="Volk Passiv",en="Racial Passive"},
-  },
-  {
     fid=4667427,
     i="ability_warrior_shieldcharge",
     id=1310317,
@@ -2095,12 +2080,5 @@ ns.Data.Spells.WARRIOR = {
     k="spell",
     l=36,
     n={de="Wirbelwind",en="Whirlwind"},
-  },
-  {
-    fid=136187,
-    id=7744,
-    k="racial",
-    n={de="Wille der Verlassenen",en="Will of the Forsaken"},
-    rt={de="Volk",en="Racial"},
   },
 }

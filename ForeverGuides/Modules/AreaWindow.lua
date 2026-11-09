@@ -13,9 +13,12 @@
 -- attaches to a frame of the game.
 local _, ns = ...
 local W, L = ns.W, ns.L
-local AL, AY, CL, CR, E, Store, LS, CS =
+local AL, AY, AU, AV, LA, CL, CR, E, Store, LS, CS =
   ns.AreaLogic,
   ns.AreaLayouts,
+  ns.AreaAudience,
+  ns.AreaVariants,
+  ns.LayoutAssign,
   ns.CanvasLogic,
   ns.CanvasRender,
   ns.CursorElements,
@@ -54,7 +57,14 @@ ns.AddLocale(
     ["areas.menu.settings"] = "Settings",
     ["areas.edit.title"] = "Window: %s",
     ["areas.edit.head"] = "Windows",
-    ["areas.edit.deleteAsk"] = "Delete this window and its layout for good? Export it first if you want to keep it.",
+    ["areas.edit.deleteAsk"] = "Delete this layout for good? A {window} without further variants is deleted with it. Export it first if you want to keep it.",
+    ["areas.variant.tag.default"] = "Default variant",
+    ["areas.variant.usageDefault"] = "default variant",
+    ["areas.variant.hint"] = "Choose per variant of a {window} whether this character only or every character of its class draws it. A choice for the character wins over the class, the default variant applies otherwise.",
+    ["areas.variant.new"] = "New variant",
+    ["areas.variant.newTip"] = "Copies the layout in the editor into a new variant of this {window}. Assign it to this character or to a class in the dialog Manage.",
+    ["areas.variant.limit"] = "A {window} has at most six layouts: the default and five variants.",
+    ["canvas.err.variantLimit"] = "A {window} has at most six layouts: the default and five variants.",
     ["areas.edit.missing"] = "The layout editor is not available.",
     ["areas.delete.title"] = "Delete window",
     ["areas.delete.text"] = "The window and its layout are deleted for good, on all characters.",
@@ -82,6 +92,13 @@ ns.AddLocale(
     ["areas.slash.unlockEditor"] = "Unlock in the layout editor (/fg {cmd} edit %s) or in the gear menu of the window.",
     ["areas.unlock.editor"] = "A pinned window can be unlocked in the layout editor or in the gear menu of the window.",
     ["areas.host.head"] = "Window",
+    ["areas.audience"] = "Visible for",
+    ["areas.audience.tip"] = "Who sees this {window}: every character, every character of the class of this character, only this character, or everybody except this character. The tick \"Visible\" of a character and the conditions of \"When active\" still apply on top.",
+    ["areas.audience.all"] = "All characters",
+    ["areas.audience.class"] = "This class (%s)",
+    ["areas.audience.char"] = "Only this character",
+    ["areas.audience.off"] = "Not on this character",
+    ["areas.audience.other"] = "Other characters only",
     ["areas.host.shown"] = "Visible",
     ["areas.host.shownTip"] = "Shows or hides this window on this character. The card of the window on the page shows the same switch.",
     ["areas.host.locked"] = "Pinned (locked)",
@@ -129,7 +146,14 @@ ns.AddLocale(
     ["areas.menu.settings"] = "Einstellungen",
     ["areas.edit.title"] = "Fenster: %s",
     ["areas.edit.head"] = "Fenster",
-    ["areas.edit.deleteAsk"] = "Dieses Fenster und sein Layout endgültig löschen? Exportiere es vorher, wenn du es behalten willst.",
+    ["areas.edit.deleteAsk"] = "Dieses Layout endgültig löschen? Ein {window} ohne weitere Varianten wird damit gelöscht. Exportiere es vorher, wenn du es behalten willst.",
+    ["areas.variant.tag.default"] = "Standardvariante",
+    ["areas.variant.usageDefault"] = "Standardvariante",
+    ["areas.variant.hint"] = "Lege pro Variante eines {window}s fest, ob nur dieser Charakter oder alle Charaktere seiner Klasse sie zeichnen. Eine Wahl für den Charakter schlägt die Klasse, sonst gilt die Standardvariante.",
+    ["areas.variant.new"] = "Neue Variante",
+    ["areas.variant.newTip"] = "Kopiert das Layout im Editor in eine neue Variante dieses {window}s. Weise sie im Dialog Verwalten diesem Charakter oder einer Klasse zu.",
+    ["areas.variant.limit"] = "Ein {window} hat höchstens sechs Layouts: die Standardvariante und fünf Varianten.",
+    ["canvas.err.variantLimit"] = "Ein {window} hat höchstens sechs Layouts: die Standardvariante und fünf Varianten.",
     ["areas.edit.missing"] = "Der Layout-Editor ist nicht verfügbar.",
     ["areas.delete.title"] = "Fenster löschen",
     ["areas.delete.text"] = "Das Fenster und sein Layout werden endgültig gelöscht, für alle Charaktere.",
@@ -157,6 +181,13 @@ ns.AddLocale(
     ["areas.slash.unlockEditor"] = "Entsperren geht im Layout-Editor (/fg {cmd} bearbeiten %s) oder im Zahnrad-Menü des Fensters.",
     ["areas.unlock.editor"] = "Ein angepinntes Fenster lässt sich im Layout-Editor oder im Zahnrad-Menü des Fensters entsperren.",
     ["areas.host.head"] = "Fenster",
+    ["areas.audience"] = "Sichtbar für",
+    ["areas.audience.tip"] = "Wer dieses {window} sieht: alle Charaktere, alle Charaktere der Klasse dieses Charakters, nur dieser Charakter oder alle außer diesem Charakter. Der Haken \"Sichtbar\" eines Charakters und die Bedingungen unter \"Wann aktiv\" gelten zusätzlich.",
+    ["areas.audience.all"] = "Alle Charaktere",
+    ["areas.audience.class"] = "Diese Klasse (%s)",
+    ["areas.audience.char"] = "Nur dieser Charakter",
+    ["areas.audience.off"] = "Nicht auf diesem Charakter",
+    ["areas.audience.other"] = "Nur andere Charaktere",
     ["areas.host.shown"] = "Sichtbar",
     ["areas.host.shownTip"] = "Zeigt oder versteckt dieses Fenster auf diesem Charakter. Die Karte des Fensters auf der Seite zeigt denselben Schalter.",
     ["areas.host.locked"] = "Angepinnt (gesperrt)",
@@ -227,6 +258,17 @@ local function placementOf(a)
   return AL.Placement(charEntry(a.id))
 end
 
+-- Whether this character is meant to see the window at all: its own wish (shown) and the audience rule of the
+-- window (character, class, account step). The "when active" conditions come on top and only set opacity.
+local function wanted(item, p)
+  if not (item and p.shown) then
+    return false
+  end
+  local state = LS.Get()
+  return AU.Visible(item.audience, state.character, state.class)
+end
+Areas.Wanted = wanted
+
 -- The windows and layouts of the account: one set of functions bound to the settings, every change goes through
 -- Store.
 local library
@@ -245,8 +287,21 @@ local function lib()
 end
 Areas.Library = lib
 
+-- The variant of window `id` this character chose (charDB.areas[id].variant), nil when it chose none.
+local function charVariantOf(id)
+  local entry = ns.charDB and ns.charDB.areas and ns.charDB.areas[id]
+  return type(entry) == "table" and entry.variant or nil
+end
+
+-- The layout window `id` draws for this character: its own choice, else the choice for its class, else the
+-- default layout (AreaVariants.Resolve).
+local function activeLayoutId(id)
+  return (lib().Active(id, charVariantOf(id), LS.Get().class))
+end
+Areas.ActiveLayout = activeLayoutId
+
 local function layoutOf(a)
-  return lib().Layout(a.id)
+  return lib().Layout(a.id, activeLayoutId(a.id))
 end
 
 local function nameOf(a)
@@ -376,7 +431,7 @@ end
 local function applyMouse(a)
   local f = a.frame
   local p, item = placementOf(a), items()[a.id]
-  if not (f and item and p.shown) then
+  if not (f and wanted(item, p)) then
     return
   end
   local visible = AL.Visible(item, LS.Get())
@@ -451,7 +506,7 @@ local function applyRules(a)
     return
   end
   local p, item = placementOf(a), items()[a.id]
-  if not (item and p.shown) then
+  if not wanted(item, p) then
     if f:IsShown() then
       CR.Clear(f.canvas)
       f:Hide()
@@ -1124,13 +1179,13 @@ end
 -- A copy of window `id` with a copy of its layout (default name "<name> Copy"). Returns the new id, or nil and the
 -- reason. Every way to duplicate (settings page, slash command, editor) ends here; `layout` (optional) is the
 -- content to copy instead of the stored one, the editor passes its working copy.
-function Areas.Duplicate(id, name, layout)
+function Areas.Duplicate(id, name, layout, onlyId)
   if not ns.db then
     return nil
   end
   local newId, reason = lib().DuplicateWindow(id, AL.CleanName(name, nil), function(areaId)
     Store.setChar(AL.CharPath(areaId) .. ".shown", true)
-  end, layout)
+  end, layout, onlyId)
   if not newId then
     return nil, reason
   end
@@ -1164,6 +1219,165 @@ function Areas.SetShown(id, on)
   end
 end
 
+-- Who sees a window -----------------------------------------------------------------------------------------
+
+local function identity()
+  local state = LS.Get()
+  return state.character, state.class
+end
+
+-- How the audience rule of window `id` reads for this character: "all", "class", "char", "off" or "other"
+-- (AreaAudience.ScopeOf); nil for an unknown window.
+function Areas.Audience(id)
+  local item = items()[id]
+  if type(item) ~= "table" then
+    return nil
+  end
+  local key, token = identity()
+  return AU.ScopeOf(item.audience, key, token)
+end
+
+-- The choice of this character for window `id`: "all", "class", "char" or "off". Returns true, or false and the
+-- reason ("missing", "class", "char", "scope"). Only the entries of this character and its class move.
+function Areas.SetAudience(id, scope)
+  local item = items()[id]
+  if type(item) ~= "table" then
+    return false, "missing"
+  end
+  local key, token = identity()
+  local rule, reason = AU.Set(item.audience, key, token, scope)
+  if reason then
+    return false, reason
+  end
+  if not AU.Same(rule, item.audience) then
+    Store.set(AL.ItemPath(id) .. ".audience", rule)
+  end
+  return true
+end
+
+-- The choices the field offers for this character: the ones that need a class or a character key only when it
+-- is known, "other" only while it is what the rule says.
+local function audienceOptions(scope)
+  local key, token = identity()
+  local out = { { value = "all", key = "areas.audience.all" } }
+  if token then
+    local name = ns.RefLogic.className(token) or token
+    out[#out + 1] = { value = "class", text = string.format(L["areas.audience.class"], name) }
+  end
+  if key then
+    out[#out + 1] = { value = "char", key = "areas.audience.char" }
+    out[#out + 1] = { value = "off", key = "areas.audience.off" }
+  end
+  if scope == "other" then
+    out[#out + 1] = { value = "other", key = "areas.audience.other" }
+  end
+  return out
+end
+
+-- The field "Visible for" for the window `window()` names (the window card and the editor section share it).
+-- `Update()` rebuilds the choices and reads the value.
+function Areas.AudienceField(parent, window)
+  local options = {}
+  local field
+  field = ns.CanvasEditor.Controls.Choice(parent, {
+    label = "areas.audience",
+    tooltip = "areas.audience",
+    tooltipText = "areas.audience.tip",
+    options = options,
+    get = function()
+      local id = window()
+      return id and Areas.Audience(id) or "all"
+    end,
+    set = function(value)
+      local id = window()
+      if id and value ~= "other" then
+        local ok, reason = Areas.SetAudience(id, value)
+        if not ok then
+          Areas.Explain(reason)
+        end
+      end
+    end,
+  })
+  function field.Update()
+    local id = window()
+    for i = #options, 1, -1 do
+      options[i] = nil
+    end
+    for i, option in ipairs(audienceOptions(id and Areas.Audience(id) or "all")) do
+      options[i] = option
+    end
+    field.Refresh()
+  end
+  return field
+end
+
+-- Variants of a window ----------------------------------------------------------------------------------------
+
+-- Which layout window `id` draws for this character: { id, source, classToken, defaultId, stale } with source
+-- "char", "class" or "account" (the default layout); nil for an unknown window.
+function Areas.Variant(id)
+  if type(items()[id]) ~= "table" then
+    return nil
+  end
+  local token = LS.Get().class
+  local layoutId, source, stale = lib().Active(id, charVariantOf(id), token)
+  return { id = layoutId, source = source, classToken = token, defaultId = lib().LayoutId(id), stale = stale }
+end
+
+-- Sets who uses layout `layoutId` of its window: scope "char" (this character), "class" (every character of its
+-- class) or nil (nobody in particular, the default applies). Returns true, or nil and "missing", "scope" or
+-- "class" (no class known). A choice moves the old entry of this layout, a layout never sits in both places.
+function Areas.AssignVariant(layoutId, scope)
+  local id = lib().WindowOf(layoutId)
+  if not id then
+    return nil, "missing"
+  end
+  local item = items()[id]
+  local current = charVariantOf(id)
+  local char, map, reason = AV.Plan(item, current, LS.Get().class, layoutId, scope)
+  if reason then
+    return nil, reason
+  end
+  if char ~= current then
+    Store.setChar(AL.CharPath(id) .. ".variant", char)
+  end
+  if not LA.SameClasses(map, item.classVariants) then
+    Store.set(AL.ItemPath(id) .. ".classVariants", map)
+  end
+  return true
+end
+
+-- A new variant of window `id` (a copy of `layout`, else of the default layout). Returns its layout id, or nil
+-- and the reason ("missing", "variantLimit", "layoutLimit").
+function Areas.AddVariant(id, name, layout)
+  if not ns.db then
+    return nil, "missing"
+  end
+  return lib().AddVariant(id, layout, name)
+end
+
+-- Deletes one layout of a window and every assignment that named it for this character and for the classes.
+-- Other characters keep a dead entry that falls back to the default when read. Returns true, or nil and a reason.
+function Areas.DeleteVariant(layoutId)
+  local id = lib().WindowOf(layoutId)
+  if not id then
+    return nil, "missing"
+  end
+  local ok, reason = lib().DeleteVariant(id, layoutId)
+  if not ok then
+    return nil, reason
+  end
+  local item = items()[id]
+  local char, map = AV.Forget(charVariantOf(id), item.classVariants, layoutId)
+  if char ~= charVariantOf(id) then
+    Store.setChar(AL.CharPath(id) .. ".variant", char)
+  end
+  if not LA.SameClasses(map, item.classVariants) then
+    Store.set(AL.ItemPath(id) .. ".classVariants", map)
+  end
+  return true
+end
+
 -- Locks or unlocks the window on this character. A pinned window is released only by a deliberate act: `via` is
 -- "editor" (true counts as "editor") or "menu" (the gear menu). Every other caller gets false when it asks for "off".
 function Areas.SetLocked(id, on, via)
@@ -1185,7 +1399,7 @@ function Areas.Position(id)
     return nil
   end
   local p = Areas.Placement(id)
-  local canvas = lib().Layout(id).canvas
+  local canvas = lib().Layout(id, activeLayoutId(id)).canvas
   local cx, cy
   if p.x and p.y then
     cx, cy = AL.CenterOffset(p.x, p.y, p.scale, canvas.w, canvas.h, UIParent:GetWidth(), UIParent:GetHeight())
@@ -1203,7 +1417,7 @@ function Areas.SetPosition(id, cx, cy)
   if not (a and a.frame) or Areas.Placement(id).locked then
     return false
   end
-  local p, canvas = Areas.Placement(id), lib().Layout(id).canvas
+  local p, canvas = Areas.Placement(id), lib().Layout(id, activeLayoutId(id)).canvas
   local x, y = AL.CornerFor(cx, cy, p.scale, canvas.w, canvas.h, UIParent:GetWidth(), UIParent:GetHeight())
   if not x then
     return false
@@ -1221,7 +1435,7 @@ function Areas.SetScale(id, scale)
   if not (a and a.frame) or Areas.Placement(id).locked then
     return false
   end
-  local pos, canvas = Areas.Position(id), lib().Layout(id).canvas
+  local pos, canvas = Areas.Position(id), lib().Layout(id, activeLayoutId(id)).canvas
   local newScale = AL.RoundScale(scale)
   local x, y = AL.CornerFor(pos.x, pos.y, newScale, canvas.w, canvas.h, UIParent:GetWidth(), UIParent:GetHeight())
   local db = charEntry(id)
@@ -1263,6 +1477,7 @@ local REASON_KEYS = {
   name = "areas.lib.badName",
   dup = "areas.lib.dup",
   limit = "areas.slash.limit",
+  variantLimit = "areas.variant.limit",
   layoutLimit = "areas.lib.limit",
   missing = "areas.lib.missing",
 }
@@ -1290,29 +1505,47 @@ function Areas.Manager(areaId)
     labels = { layouts = "areas.edit.head", deleteTitle = "areas.delete.title", deleteAsk = "areas.edit.deleteAsk" },
   }
   local picked = areaId
+  local pickedLayout = areaId and activeLayoutId(areaId) or nil
   -- The window the editor works on.
   function m.window()
     return picked
   end
+  -- One entry per layout: the default of a window under the name of the window, a variant under
+  -- "<window>: <variant>". `scope` and `classes` say who uses it (character, class), `default` marks the default
+  -- of a window that has variants.
   function m.list()
     local out = {}
+    local token = LS.Get().class
     for _, window in ipairs(lib().Windows()) do
-      if window.layoutId then
-        out[#out + 1] = { id = window.layoutId, name = window.name }
+      local item = items()[window.id]
+      local variants = lib().Variants(window.id)
+      for _, variant in ipairs(variants) do
+        local scope, classes = AV.ScopeOf(item, charVariantOf(window.id), token, variant.id)
+        out[#out + 1] = {
+          id = variant.id,
+          name = variant.default and window.name or (window.name .. ": " .. variant.name),
+          scope = scope,
+          classes = classes,
+          default = #variants > 1 and variant.default or false,
+          defaultKey = "areas.variant.tag.default",
+        }
       end
     end
     return out
   end
   function m.current()
-    return picked and lib().LayoutId(picked) or nil
+    if not (picked and pickedLayout and lib().WindowOf(pickedLayout) == picked) then
+      pickedLayout = picked and activeLayoutId(picked) or nil
+    end
+    return pickedLayout
   end
   function m.select(layoutId)
     local windowId = lib().WindowOf(layoutId)
     if not windowId then
       return nil, "missing"
     end
-    picked = windowId
-    return CL.Copy(lib().Layout(windowId))
+    picked, pickedLayout = windowId, layoutId
+    return CL.Copy(lib().Layout(windowId, layoutId))
   end
   function m.save(layoutId, layout)
     return lib().Save(layoutId, layout)
@@ -1326,14 +1559,15 @@ function Areas.Manager(areaId)
     return lib().LayoutId(windowId)
   end
   m.import = m.create
-  -- "Duplicate" of the editor: a copy of window `layoutId` with `layout` (the working copy) as its content and
-  -- the conditions of the window; returns the id of the new layout.
+  -- "Duplicate" of the editor: a copy of the window of layout `layoutId` with `layout` (the working copy) as its
+  -- content and the conditions of the window; returns the id of the new layout. A row of a variant copies that
+  -- variant alone, the row of the default copies the window with all its variants.
   function m.duplicate(layoutId, name, layout)
     local windowId = lib().WindowOf(layoutId)
     if not windowId then
       return nil, "missing"
     end
-    local newId, reason = Areas.Duplicate(windowId, name, layout)
+    local newId, reason = Areas.Duplicate(windowId, name, layout, not lib().IsDefault(layoutId) and layoutId or nil)
     if not newId then
       return nil, reason
     end
@@ -1343,15 +1577,27 @@ function Areas.Manager(areaId)
   function m.new(name)
     return m.create(name)
   end
+  -- The name of a window and its default layout is one name, a variant has its own.
   function m.rename(layoutId, name)
-    return lib().RenameWindow(lib().WindowOf(layoutId), name)
+    if lib().IsDefault(layoutId) then
+      return lib().RenameWindow(lib().WindowOf(layoutId), name)
+    end
+    return lib().RenameVariant(layoutId, name)
   end
-  -- The editor needs a window to show, so the last one stays. The editor moves to the first other window when
-  -- the one it shows goes.
+  -- A variant (or the default while others can take its place) goes alone. The default of a window without
+  -- variants takes the window with it; the editor needs a window to show, so the last one stays, and moves to the
+  -- first other window when the one it shows goes.
   function m.delete(layoutId)
     local windowId = lib().WindowOf(layoutId)
     if not windowId then
       return nil, "missing"
+    end
+    if #lib().Variants(windowId) > 1 then
+      local ok, reason = Areas.DeleteVariant(layoutId)
+      if ok and pickedLayout == layoutId then
+        pickedLayout = activeLayoutId(windowId)
+      end
+      return ok, reason
     end
     local replacement
     for _, window in ipairs(lib().Windows()) do
@@ -1365,11 +1611,39 @@ function Areas.Manager(areaId)
     local ok, reason = lib().DeleteWindow(windowId)
     if ok and picked == windowId then
       picked = replacement
+      pickedLayout = activeLayoutId(replacement)
     end
     return ok, reason
   end
   function m.canDelete(layoutId)
-    return lib().Has(layoutId) and lib().Count() > 1
+    local windowId = lib().WindowOf(layoutId)
+    return windowId ~= nil and (#lib().Variants(windowId) > 1 or #lib().Windows() > 1)
+  end
+  -- Which layout this character draws for the open window and why, for the line under the layout row.
+  function m.assignment()
+    local info = picked and Areas.Variant(picked)
+    if not info then
+      return nil
+    end
+    return {
+      id = info.id,
+      source = info.source,
+      classToken = info.classToken,
+      accountId = info.defaultId,
+      accountKey = "areas.variant.usageDefault",
+      hintKey = "areas.variant.hint",
+    }
+  end
+  function m.assign(layoutId, scope)
+    return Areas.AssignVariant(layoutId, scope)
+  end
+  -- "New variant": a copy of `layout` (the working copy) as another layout of the window of `layoutId`.
+  function m.variant(layoutId, name, layout)
+    local windowId = lib().WindowOf(layoutId)
+    if not windowId then
+      return nil, "missing"
+    end
+    return Areas.AddVariant(windowId, name, layout)
   end
   return m
 end
@@ -1415,6 +1689,7 @@ function Areas.HostSection(parent)
       end
     end,
   })
+  f.audience = Areas.AudienceField(f, window)
   f.locked = W.Checkbox(f, {
     key = "areas.host.locked",
     tooltip = "areas.host.locked",
@@ -1489,6 +1764,17 @@ function Areas.HostSection(parent)
       end
     end,
   })
+  f.variant = W.Button(f, {
+    key = "areas.variant.new",
+    width = 160,
+    tooltip = "areas.variant.new",
+    tooltipText = "areas.variant.newTip",
+    onClick = function()
+      if ns.CanvasEditor.NewVariant then
+        ns.CanvasEditor.NewVariant()
+      end
+    end,
+  })
   f.reset = W.Button(f, {
     key = "areas.host.reset",
     width = 160,
@@ -1520,6 +1806,12 @@ function Areas.HostSection(parent)
     f.locked.Refresh()
     put(f.shown, ns.Theme.lineHeight(24))
     put(f.locked, ns.Theme.lineHeight(24))
+    f.audience.Update()
+    put(f.audience, Controls.HEIGHT.choice)
+    f.variant:ClearAllPoints()
+    f.variant:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+    f.variant:SetSize(math.min(f.variant:FullWidth(), width), ns.Theme.lineHeight(26))
+    y = y + ns.Theme.lineHeight(26) + gap
     for _, field in ipairs({ f.x, f.y, f.scale }) do
       field:Refresh()
       put(field, ns.Theme.lineHeight(28))
@@ -1588,7 +1880,7 @@ end
 -- Opens the layout editor on the window `id`; the list of the editor holds every window.
 function Areas.Edit(id)
   if items()[id] then
-    openEditor(Areas.Manager(id), lib().Layout(id))
+    openEditor(Areas.Manager(id), lib().Layout(id, activeLayoutId(id)))
   end
 end
 
@@ -1759,10 +2051,12 @@ ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
     return
   end
   if scope == "char" then
-    local id = path:match("^areas%.([%w_%-]+)")
+    local id, field = path:match("^areas%.([%w_%-]+)%.?([%w_]*)")
     local a = id and instances[id]
-    if a then
-      -- Anything of this character only moves or shows the window.
+    if a and field == "variant" then
+      refresh(a)
+    elseif a then
+      -- Anything else of this character only moves or shows the window.
       apply(a)
     end
     hostChanged()
@@ -1773,7 +2067,7 @@ ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
     -- A layout changed: the window that shows it repaints, no other. A new name changes no picture.
     if not layoutRest:find("^%.name") then
       for _, a in pairs(instances) do
-        if lib().LayoutId(a.id) == layoutId then
+        if activeLayoutId(a.id) == layoutId then
           refresh(a)
         end
       end
@@ -1794,7 +2088,16 @@ ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
   local a = instances[id]
   if (a == nil) ~= (type(items()[id]) ~= "table") then
     Areas.Sync()
-  elseif a and (rest == "" or rest:find("^%.layout") or rest:find("^%.name")) then
+  elseif
+    a
+    and (
+      rest == ""
+      or rest:find("^%.layout")
+      or rest:find("^%.name")
+      or rest:find("^%.variants")
+      or rest:find("^%.classVariants")
+    )
+  then
     refresh(a)
   elseif a then
     apply(a)

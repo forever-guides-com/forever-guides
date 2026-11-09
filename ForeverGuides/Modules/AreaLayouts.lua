@@ -9,10 +9,13 @@
 -- add-on goes through Store.set, so every window follows). Every function that changes something returns the
 -- new id or true, or nil and the reason: "name", "dup", "limit" (windows), "layoutLimit", "missing".
 --
+-- A window may carry more layouts, its variants (items[id].variants, see Modules/AreaVariantLogic.lua): the
+-- default layout (items[id].layoutId) keeps the name of the window, a variant has a name of its own.
+--
 -- AreaLayouts.Migrate brings stored data of the earlier model (shared layouts, layouts without a window) into
 -- this one.
 local _, ns = ...
-local U, L, CL, AL = ns.U, ns.L, ns.CanvasLogic, ns.AreaLogic
+local U, L, CL, AL, AV, LA = ns.U, ns.L, ns.CanvasLogic, ns.AreaLogic, ns.AreaVariants, ns.LayoutAssign
 
 local AY = {
   MAX_LAYOUTS = 60,
@@ -26,12 +29,14 @@ ns.AddLocale(
   "enUS",
   ns.AreaTerms.Apply("enUS", {
     ["areas.lib.copyName"] = "%s Copy",
+    ["areas.variant.name"] = "Variant %s",
   })
 )
 ns.AddLocale(
   "deDE",
   ns.AreaTerms.Apply("deDE", {
     ["areas.lib.copyName"] = "%s Kopie",
+    ["areas.variant.name"] = "Variante %s",
   })
 )
 
@@ -63,10 +68,10 @@ function AY.NewId(layouts, force)
   return "layout" .. n
 end
 
-local function takenNames(layouts, exceptId)
+local function takenNames(layouts, exceptId, skip)
   local taken = {}
   for id, layout in pairs(layouts) do
-    if id ~= exceptId and type(layout) == "table" then
+    if id ~= exceptId and not (skip and skip[id]) and type(layout) == "table" then
       taken[AY.CleanName(layout.name):lower()] = true
     end
   end
@@ -93,6 +98,19 @@ end
 -- `name` cleaned, and numbered while another layout already has it (ignoring case).
 function AY.UniqueName(layouts, name)
   return numbered(takenNames(type(layouts) == "table" and layouts or {}), name)
+end
+
+local function sameList(a, b)
+  a, b = type(a) == "table" and a or {}, type(b) == "table" and b or {}
+  if #a ~= #b then
+    return false
+  end
+  for i, v in ipairs(a) do
+    if b[i] ~= v then
+      return false
+    end
+  end
+  return true
 end
 
 -- Brings the stored windows and layouts of `node` (settings.areas) into the model of one layout per window,
@@ -139,6 +157,30 @@ function AY.Migrate(node)
     if item.layout ~= nil then
       item.layout = nil
       changed[id] = true
+    end
+  end
+  -- The variants a window names: a missing, foreign or repeated one leaves the list (a layout that is there
+  -- stays and becomes a window below), the others count as claimed.
+  for _, id in ipairs(ids) do
+    local item = items[id]
+    if item.variants ~= nil or item.classVariants ~= nil then
+      local keep = {}
+      for _, vid in ipairs(AV.Extra(item)) do
+        if type(layouts[vid]) == "table" and not claimed[vid] then
+          claimed[vid] = id
+          keep[#keep + 1] = vid
+        end
+      end
+      local stored = #keep > 0 and keep or nil
+      if not sameList(stored, item.variants) then
+        changed[id] = true
+      end
+      item.variants = stored
+      local map = AV.CleanClassMap(item)
+      if not (map == nil and item.classVariants == nil) and not LA.SameClasses(map, item.classVariants) then
+        changed[id] = true
+      end
+      item.classVariants = map
     end
   end
   -- One name for window and layout, first come first served in the order of the ids.
@@ -242,16 +284,39 @@ function AY.New(o)
     end
   end
 
-  -- The id of the window that shows layout `layoutId`.
+  -- The id of the window that owns layout `layoutId`, as its default or as a variant.
   function lib.WindowOf(layoutId)
     if layoutId == nil then
       return nil
     end
     for _, entry in ipairs(AL.List(items())) do
-      if items()[entry.id].layoutId == layoutId then
+      if AV.Has(items()[entry.id], layoutId) then
         return entry.id
       end
     end
+  end
+
+  -- True when `layoutId` is the default layout of its window.
+  function lib.IsDefault(layoutId)
+    local areaId = lib.WindowOf(layoutId)
+    return areaId ~= nil and items()[areaId].layoutId == layoutId
+  end
+
+  -- The layouts of a window that exist, the default first: { { id, name, default } }.
+  function lib.Variants(areaId)
+    local out = {}
+    local item = items()[areaId]
+    for _, id in ipairs(AV.Ids(item)) do
+      if exists(id) then
+        out[#out + 1] = { id = id, name = lib.Name(id), default = id == item.layoutId }
+      end
+    end
+    return out
+  end
+
+  -- The variant this player draws (see AreaVariants.Resolve): id, source, stale.
+  function lib.Active(areaId, charVariant, classToken)
+    return AV.Resolve(items()[areaId], charVariant, classToken, exists)
   end
 
   -- { id, name, layoutId } of every window, sorted by name (ignoring case), then by id.
@@ -265,8 +330,11 @@ function AY.New(o)
 
   -- The layout a window draws: repaired, of kind "area", carrying the id and the name of its library entry. A
   -- window without a usable layout shows the template (AreaLayouts.Migrate stores one).
-  function lib.Layout(areaId)
+  function lib.Layout(areaId, variantId)
     local id = lib.LayoutId(areaId)
+    if variantId ~= nil and exists(variantId) and AV.Has(items()[areaId], variantId) then
+      id = variantId
+    end
     if not id then
       local item = items()[areaId]
       return AL.NewLayout(areaId, AL.CleanName(type(item) == "table" and item.name, areaId))
@@ -284,7 +352,13 @@ function AY.New(o)
 
   -- The names in use by windows and layouts (lower case), without window `exceptAreaId` and its layout.
   local function taken(exceptAreaId)
-    local names = takenNames(layouts(), lib.LayoutId(exceptAreaId))
+    local variantIds = {}
+    for _, item in pairs(items()) do
+      for _, id in ipairs(AV.Extra(item)) do
+        variantIds[id] = true
+      end
+    end
+    local names = takenNames(layouts(), lib.LayoutId(exceptAreaId), variantIds)
     for id, item in pairs(items()) do
       if id ~= exceptAreaId and type(item) == "table" then
         names[AL.CleanName(item.name, id):lower()] = true
@@ -327,8 +401,10 @@ function AY.New(o)
   end
 
   -- A copy of window `areaId` with a copy of its layout (`layout` replaces it, the editor passes its working
-  -- copy) and its rules (load, startShown), named `name` (default "<name> Copy").
-  function lib.DuplicateWindow(areaId, name, before, layout)
+  -- copy) and its rules (load, audience, startShown), named `name` (default "<name> Copy"). The variants and the
+  -- class assignments go along; with `onlyId` (the id of one variant) the copy holds just that variant as its
+  -- layout, which is what duplicating a row of the editor list means.
+  function lib.DuplicateWindow(areaId, name, before, layout, onlyId)
     local layoutId = lib.LayoutId(areaId)
     if not layoutId then
       return nil, "missing"
@@ -339,15 +415,126 @@ function AY.New(o)
     if type(item.load) == "table" then
       extra.load = U.copy(item.load)
     end
+    if type(item.audience) == "table" then
+      extra.audience = U.copy(item.audience)
+    end
     if type(item.startShown) == "boolean" then
       extra.startShown = item.startShown
     end
-    return lib.CreateWindow(
+    local sourceId = onlyId ~= nil and exists(onlyId) and AV.Has(item, onlyId) and onlyId or layoutId
+    local newArea, newLayout = lib.CreateWindow(
       name or string.format(L["areas.lib.copyName"], base),
-      CL.Copy(type(layout) == "table" and layout or layouts()[layoutId]),
+      CL.Copy(type(layout) == "table" and layout or layouts()[sourceId]),
       before,
       extra
     )
+    if newArea and onlyId == nil then
+      local map = { [layoutId] = newLayout }
+      for _, vid in ipairs(AV.Extra(item)) do
+        if exists(vid) then
+          local copied = lib.AddVariant(newArea, CL.Copy(layouts()[vid]), layouts()[vid].name)
+          if copied then
+            map[vid] = copied
+          end
+        end
+      end
+      local classes = {}
+      for token, id in pairs(AV.CleanClassMap(item) or {}) do
+        classes[token] = map[id]
+      end
+      if next(classes) ~= nil then
+        o.put("items." .. newArea .. ".classVariants", classes)
+      end
+    end
+    return newArea, newLayout
+  end
+
+  -- A new variant of window `areaId` holding `layout` (a copy of the default when nil) under `name` (default
+  -- "Variant B", the next free letter). Returns its layout id, or nil and "missing", "variantLimit" (at most
+  -- AreaVariants.MAX_EXTRA besides the default), "layoutLimit".
+  function lib.AddVariant(areaId, layout, name)
+    local item = items()[areaId]
+    local defaultId = lib.LayoutId(areaId)
+    if not (areaExists(areaId) and defaultId) then
+      return nil, "missing"
+    end
+    local list = AV.Extra(item)
+    if #list >= AV.MAX_EXTRA then
+      return nil, "variantLimit"
+    end
+    local layoutId = AY.NewId(layouts())
+    if not layoutId then
+      return nil, "layoutLimit"
+    end
+    local own = {}
+    for _, entry in ipairs(lib.Variants(areaId)) do
+      own[entry.name:lower()] = true
+    end
+    local clean = AY.CleanName(name)
+    local label = clean ~= "" and numbered(own, clean) or AV.NextName(L["areas.variant.name"], own)
+    local source = type(layout) == "table" and layout or CL.Copy(layouts()[defaultId])
+    o.put("layouts." .. layoutId, CL.Pack(AL.RepairLayout(source, layoutId, label)))
+    list[#list + 1] = layoutId
+    o.put("items." .. areaId .. ".variants", list)
+    return layoutId
+  end
+
+  -- Renames a variant (not the default, that is the name of the window): "name" for an empty name, "dup" when
+  -- another layout of the same window has it (ignoring case).
+  function lib.RenameVariant(layoutId, name)
+    local areaId = lib.WindowOf(layoutId)
+    if not (areaId and exists(layoutId)) or lib.IsDefault(layoutId) then
+      return nil, "missing"
+    end
+    local clean = AY.CleanName(name)
+    if clean == "" then
+      return nil, "name"
+    end
+    for _, entry in ipairs(lib.Variants(areaId)) do
+      if entry.id ~= layoutId and entry.name:lower() == clean:lower() then
+        return nil, "dup"
+      end
+    end
+    if lib.Name(layoutId) ~= clean then
+      o.put("layouts." .. layoutId .. ".name", clean)
+    end
+    return true
+  end
+
+  -- Deletes one layout of a window. A variant goes with its entry. The default goes only while another variant
+  -- can take its place: the first variant becomes the default and carries the name of the window. The last
+  -- layout of a window is refused ("last"), the caller deletes the window. Returns true and the id of the default.
+  function lib.DeleteVariant(areaId, layoutId)
+    local item = items()[areaId]
+    if not (areaExists(areaId) and AV.Has(item, layoutId)) then
+      return nil, "missing"
+    end
+    local list = AV.Extra(item)
+    local function without(id)
+      local rest = {}
+      for _, vid in ipairs(list) do
+        if vid ~= id then
+          rest[#rest + 1] = vid
+        end
+      end
+      return #rest > 0 and rest or nil
+    end
+    if layoutId == item.layoutId then
+      if #list == 0 then
+        return nil, "last"
+      end
+      local promoted = list[1]
+      if exists(promoted) then
+        o.put("layouts." .. promoted .. ".name", AL.CleanName(item.name, areaId))
+      end
+      o.put("items." .. areaId .. ".layoutId", promoted)
+      o.put("items." .. areaId .. ".variants", without(promoted))
+      o.put("layouts." .. layoutId, nil)
+      return true, promoted
+    end
+    o.put("layouts." .. layoutId, nil)
+    o.put("items." .. areaId .. ".variants", without(layoutId))
+    return true, item.layoutId
   end
 
   -- Renames a window and its layout: "name" for an empty name, "dup" when another window has it (ignoring case).
@@ -398,6 +585,11 @@ function AY.New(o)
   function lib.DeleteWindow(areaId)
     if not areaExists(areaId) then
       return nil, "missing"
+    end
+    for _, id in ipairs(AV.Extra(items()[areaId])) do
+      if exists(id) then
+        o.put("layouts." .. id, nil)
+      end
     end
     local layoutId = lib.LayoutId(areaId)
     if layoutId then

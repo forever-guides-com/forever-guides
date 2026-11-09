@@ -30,8 +30,9 @@ function Strings.encode(kind, data, exportedAt, host, version)
   return LD:EncodeForPrint(compressed)
 end
 
--- Returns envelope or nil, reason ("empty" | "too-large" | "decode" | "json" | "shape").
-function Strings.decode(text)
+-- Returns envelope or nil, reason ("empty" | "too-large" | "decode" | "json" | "shape"). `maxJson` (optional) lowers
+-- the inflated size a text may reach, for text that arrives from other players.
+function Strings.decode(text, maxJson)
   local LD = lib()
   text = ns.U.trim(text)
   if text == "" then
@@ -48,11 +49,12 @@ function Strings.decode(text)
   if not okDecode or not compressed then
     return nil, "decode"
   end
-  local okInflate, json, status = pcall(LD.DecompressDeflate, LD, compressed, Strings.MAX_JSON)
+  local limit = math.min(Strings.MAX_JSON, tonumber(maxJson) or Strings.MAX_JSON)
+  local okInflate, json, status = pcall(LD.DecompressDeflate, LD, compressed, limit)
   if not okInflate or not json then
     return nil, status == -20 and "too-large" or "decode"
   end
-  if #json > Strings.MAX_JSON then
+  if #json > limit then
     return nil, "too-large"
   end
   local ok, env = pcall(ns.Json.decode, json)

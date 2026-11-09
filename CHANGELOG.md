@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.6.0
+
+### Added
+
+- Class trainers: the page has a search field that finds a trainer by name, place or zone and shows how many trainers match.
+- Layout editor: "Share in chat" sends a whole layout, one element or a group as a short link. Other players click it, see a preview and import it.
+- Mouse cursor ring: the aura element can check Well Fed for any food. New template "Well Fed (missing)" and a switch "Any Well Fed buff counts".
+- Mouse cursor ring and HUD windows: aura and cooldown elements let you choose under "Rank" whether the highest rank or only the chosen spell ID counts.
+- Mouse cursor ring: the aura element has a new source, Weapon enchantment, for poisons, stones, oils and shaman weapon buffs, with symbol, time left, charges and low color.
+- Mouse cursor ring and HUD windows: the Weapon enchantment source can warn while an equipped weapon has no enchantment. The preset "Weapon enchantment (missing)" sets it up.
+- Layout editor: a "Layout" picker with a search box sits at the top of the side column, next to "New", "Duplicate" and "Manage".
+- Layout editor: "Manage" opens the "Manage layouts" dialog with a search box and a list of all layouts, with rename, duplicate, delete and "Applies to" in every row.
+- Mouse cursor ring: for each layout you choose who uses it, "This character" or "Class". The character choice wins over the class choice, then the account default applies.
+- Layout editor: a line under the picker says which layout this character uses and why.
+- Layout editor: the element list shows the symbol of the chosen spell, item or aura in front of each name.
+- Layout editor: single elements and whole groups can be copied with the "Copy" button or Ctrl+C and passed on as text.
+- Layout editor: the import recognizes copied elements and inserts them into the open layout (Ctrl+Z undoes it) or creates a new layout from them.
+- New Changelog page in the add-on window: it shows what changed in the last versions, in your language. A sidebar dot and a New mark show changes you have not seen.
+- HUD windows: the new field "Visible for" decides per window whether all characters, a class or only this character see it.
+- HUD windows: a window can have up to five more layout variants, assigned per character or class in "Manage layouts". The window keeps its name, position and scale.
+- Layout editor (HUD windows): elements and groups can also be copied, shared in chat and imported in a variant of a window.
+- Layout editor: Ctrl+Right moves the selected element into the group above it, Ctrl+Left takes it out. The Indent and Outdent buttons in the panel do the same.
+- Changelog page: each version first shows a short summary of the key points. A button opens the full list of new, changed and fixed items.
+- Dungeons and raids: five new dungeons are in the list with their bosses: The Drowned City, Blackmaw Hold, Alcaz Prison, The Shaper's Terrace and Krol'dok Stronghold.
+- Dungeons and raids: many instances show more bosses, more loot and more quests, and the access chains that lead to a dungeon or raid.
+- Dungeons and raids: the box Group by faction sorts the list into Alliance, Horde and both factions with a count. Each group can be collapsed, the add-on remembers it.
+- Dungeons and raids: raids that are announced but not reachable yet, such as Barrow Deeps, carry the mark Announced and have no entry level.
+- Instances: clicking a quest opens a window with its chain of prerequisite quests, with a waypoint button and a map button for every step.
+- Instances: the quests come from a data add-on of their own that loads when you first open the Instances page. Without it the page shows the instances and a note.
+- Bosses without a symbol now show a small 3D portrait on the instances page and in the dungeon map, the placeholder stays as fallback.
+
+### Changed
+
+- Forever Chat: the window opacity now runs from 0 to 100 percent. At low values only the background fades, text and buttons stay visible, and at 0 percent title and border still show.
+- Mouse cursor ring: the ring no longer covers tooltips, menus and dropdowns. The layer default is now "Fullscreen" and the layer "Tooltip (top)" is gone.
+- Tooltips of the add-on always sit in the top layer.
+- Layout editor: the narrow layout list in the side column is gone, the picker replaces it. The element list, preview and settings get more room.
+- Game data: state of game build 1.60.1.70862 (2026-11-07) with new spells, levels and flight times. The info page shows the new state.
+- Layout editor: elements and whole groups can be dragged into a group, within it and back out in the list, with a drop line and Ctrl+Z for each move.
+- Dungeons and raids: every instance shows its level range, for example Level 24 to 29, in the list, the header, the Info tab and the map pins. A missing end shows as a question mark.
+- Dungeons and raids: searching a level, for example 40, finds every instance whose level range or entry level contains it.
+- Dungeons and raids: sorting the list by level uses the start and then the end of the range. Instances without a level come last.
+- Instances: quests are grouped by Alliance, Horde and both with a faction filter and sorted by level. Dungeon quests come first, prerequisite quests are folded below.
+- Dungeons and raids: a boss without a symbol or portrait shows the same placeholder icon everywhere instead of a gap or a letter.
+- Dungeons and raids: instance names follow the game in German and English. The former names still work as search terms.
+- Changelog: in the full list the section titles and entry headlines are now large and accent blue, and the "Show all changes" button stands out.
+
+### Fixed
+
+- Look: colorblind mode no longer resets the chosen window style. It now only swaps the red and green pair for blue and orange.
+- Racial spells of Orcs, Undead and Gnomes belong to no class any more. The macro checker no longer warns wrongly, and the spell picker shows them for every class.
+- Search: instances can be found again by their former names and abbreviations in search and instance filter, for example "Tiefschwarze Grotte" or "BFD".
+
 ## 0.5.5
 
 ### Added

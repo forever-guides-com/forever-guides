@@ -26,7 +26,8 @@ SL.GROUPS =
 -- Game sounds the choice offers (names in SOUNDKIT). A name the client lacks plays nothing.
 SL.SOUNDS =
   { "TELL_MESSAGE", "UI_BNET_TOAST", "IG_QUEST_LIST_OPEN", "IG_MAINMENU_OPTION_CHECKBOX_ON", "ALARM_CLOCK_WARNING_2" }
-SL.OPACITY_MIN, SL.OPACITY_MAX, SL.OPACITY_DEFAULT = 60, 100, 92
+-- Percent. 0 clears only the window background: texts, cards and controls keep their own fills (ChatSettings.Style).
+SL.OPACITY_MIN, SL.OPACITY_MAX, SL.OPACITY_DEFAULT = 0, 100, 92
 SL.CLOCKS = { ["24h"] = { "%H:%M", "%H:%M:%S" }, ["12h"] = { "%I:%M %p", "%I:%M:%S %p" } }
 
 local defs, order = {}, {}
@@ -252,7 +253,7 @@ function SL.ShouldPlay(before, total, on, inCombat)
   return on == true and not inCombat and isNumber(before) and isNumber(total) and total > before
 end
 
--- Window opacity from the options as a share (0.6 to 1), nil while the player never set one (the window then
+-- Window opacity from the options as a share (0 to 1), nil while the player never set one (the window then
 -- follows the window style of the main add-on).
 function SL.Opacity(db)
   local opts = type(db) == "table" and type(db.options) == "table" and db.options or {}

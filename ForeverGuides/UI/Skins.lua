@@ -8,9 +8,10 @@
 --   Skins.ORDER                  ids in the order of the settings dropdown
 --   Skins.cleanId(v)             a known id, else the default
 --   Skins.currentId()            the saved id (settings.skin, validated)
---   Skins.isForever()            true while the Forever look is in force. High contrast and
---                                colorblind mode win: there it behaves like flat.
---   Skins.current()              the entry in force (flat while one of those modes is on)
+--   Skins.isForever()            true while the Forever look is in force. High contrast wins:
+--                                there it behaves like flat. Colorblind mode keeps the chosen
+--                                style and only swaps the red/green pair (UI/Theme.lua).
+--   Skins.current()              the entry in force (flat while high contrast is on)
 --   Skins.palette(token)         color override of the skin in force, nil for flat (Theme.rgb)
 --   Skins.Apply(owner, kind, want)
 --     kind "rock"  tiled stone texture behind the content of a window frame
@@ -103,13 +104,13 @@ ns.AddLocale("enUS", {
   ["settings.skin"] = "Window style",
   ["settings.skin.flat"] = "Flat",
   ["settings.skin.forever"] = "WoW Forever",
-  ["settings.skinHint"] = "Forever: metal frame, stone, gold title\nHigh contrast and colorblind use Flat",
+  ["settings.skinHint"] = "Forever: metal frame, stone, gold title\nHigh contrast uses Flat",
 })
 ns.AddLocale("deDE", {
   ["settings.skin"] = "Fensterstil",
   ["settings.skin.flat"] = "Flach",
   ["settings.skin.forever"] = "WoW Forever",
-  ["settings.skinHint"] = "Forever: Metallrahmen, Fels, Goldtitel\nHoher Kontrast und Farbenblind nutzen Flach",
+  ["settings.skinHint"] = "Forever: Metallrahmen, Fels, Goldtitel\nHoher Kontrast nutzt Flach",
 })
 
 function Skins.cleanId(v)
@@ -121,11 +122,11 @@ function Skins.currentId()
   return Skins.cleanId(s and s.skin)
 end
 
--- The id in force: the two accessibility modes always get the flat look.
+-- The id in force: high contrast always gets the flat look. Colorblind mode does not change the
+-- style, its red/green swap is a token override above the skin palette.
 function Skins.activeId()
   local id = Skins.currentId()
-  -- Theme.rgb asks on every call: the default skin never pays for the CVar lookup.
-  if id == Skins.DEFAULT or Theme.highContrast() or Theme.colorblind() then
+  if id == Skins.DEFAULT or Theme.highContrast() then
     return Skins.DEFAULT
   end
   return id

@@ -45,6 +45,9 @@ local POINTS = { exact = 100, prefix = 80, synonym = 70, substring = 50, typo = 
 -- A query word typed with ae, oe or ue instead of the umlaut (the data keeps the umlaut).
 local VARIANT_POINTS = { exact = 95, prefix = 75 }
 local FIELD_OTHER, FIELD_ALIAS, FIELD_SUB = 0.9, 0.9, 0.3
+-- Former names find the same entry (never a second one) and rank just below a current name, so an
+-- exact hit of another kind on that name (a place) still comes first.
+local FIELD_FORMER = 0.85
 local BONUS_SEQUENCE, BONUS_START = 20, 15
 local LENGTH_PENALTY, LENGTH_PENALTY_MAX = 0.15, 8
 
@@ -275,9 +278,10 @@ local version = 0
 -- Kinds whose source failed during the last index build, and the kinds already reported.
 local failed, reported = {}, {}
 
--- Registers the source of one entry kind. fn(add) calls add(name, subtitle, path, aliases, data)
+-- Registers the source of one entry kind. fn(add) calls add(name, subtitle, path, aliases, data, former)
 -- per entry: name is a string or { de, en }, aliases an optional list of strings, data a payload
--- handed back on the hit. New kinds sort behind the existing ones. o.weight sets the kind weight
+-- handed back on the hit, former an optional list of earlier names (hit.alias names the one that
+-- matched). New kinds sort behind the existing ones. o.weight sets the kind weight
 -- (default 1.0). The kind label is the locale key "search.kind.<kind>" of the registering module.
 -- Without fn the kind is filled through S.NewBatch (entries built in slices over several frames).
 function S.RegisterSource(kind, fn, o)
@@ -313,7 +317,7 @@ end
 -- Called once per kind with (kind, error) when its source fails; set by the results page.
 S.OnSourceError = nil
 
-local function newField(text, weight, isName, vocab)
+local function newField(text, weight, isName, vocab, former)
   local raw = split(text)
   local words = {}
   for i, w in ipairs(raw) do
@@ -323,7 +327,13 @@ local function newField(text, weight, isName, vocab)
     end
     vocab.all[words[i]] = true
   end
-  return { words = words, joined = concat(words, " "), weight = weight, name = isName }
+  return {
+    words = words,
+    joined = concat(words, " "),
+    weight = weight,
+    name = isName,
+    former = former and text or nil,
+  }
 end
 
 local function sortedKeys(set)
@@ -336,20 +346,30 @@ local function sortedKeys(set)
 end
 
 -- One index entry (nil without a display name); its words also go into vocab.
-local function makeEntry(kind, locale, vocab, name, subtitle, path, aliases, data)
+local function makeEntry(kind, locale, vocab, name, subtitle, path, aliases, data, former)
   local display = ns.T(name)
   if not display or display == "" then
     return nil
   end
   local fields = { newField(display, 1, true, vocab) }
+  local known = { [S.fold(display)] = true }
   if type(name) == "table" then
     local other = locale == "deDE" and name.en or name.de
     if other and other ~= "" and S.fold(other) ~= S.fold(display) then
       fields[#fields + 1] = newField(other, FIELD_OTHER, true, vocab)
+      known[S.fold(other)] = true
     end
   end
   for _, alias in ipairs(aliases or {}) do
     fields[#fields + 1] = newField(alias, FIELD_ALIAS, true, vocab)
+  end
+  -- A former name equal to a current name or to an earlier one adds nothing.
+  for _, old in ipairs(former or {}) do
+    local key = type(old) == "string" and S.fold(old) or ""
+    if key ~= "" and not known[key] then
+      known[key] = true
+      fields[#fields + 1] = newField(old, FIELD_FORMER, true, vocab, true)
+    end
   end
   if subtitle and subtitle ~= "" then
     -- Many entries share one subtitle (the instance of a boss, the profession of a recipe): one
@@ -595,6 +615,47 @@ local function scoreEntry(e, ms, joined)
   return total >= S.THRESHOLD and total or nil
 end
 
+-- Points of the query inside one field, nil unless the field covers every query word.
+local function fieldTotal(f, ms)
+  local total = 0
+  for _, m in ipairs(ms) do
+    local top = 0
+    for _, w in ipairs(f.words) do
+      local s = wordScore(m, w)
+      if s > top then
+        top = s
+      end
+    end
+    if top <= 0 then
+      return nil
+    end
+    total = total + top
+  end
+  return total
+end
+
+-- The former name through which an entry was found: set when a former name covers every query word
+-- and no current name field does. nil for the usual name hit.
+local function formerHint(e, ms)
+  local hasName, bestOld, oldText = false, nil, nil
+  for _, f in ipairs(e.fields) do
+    if f.name then
+      local t = fieldTotal(f, ms)
+      if t then
+        if not f.former then
+          hasName = true
+        elseif not bestOld or t > bestOld then
+          bestOld, oldText = t, f.former
+        end
+      end
+    end
+  end
+  if not hasName then
+    return oldText
+  end
+  return nil
+end
+
 local function sortHits(hits)
   table.sort(hits, function(a, b)
     if a.score ~= b.score then
@@ -638,21 +699,32 @@ local function collectSquashed(idx, q, order)
     return hits
   end
   for _, e in ipairs(idx.entries) do
-    local best
+    local best, bestOld, oldText
     for _, f in ipairs(e.fields) do
       if f.name then
         local flat = f.joined:gsub(" ", "")
         local at = find(flat, needle, 1, true)
         if at then
-          local points = (at == 1 and POINTS.prefix or POINTS.substring)
-            - math.min(LENGTH_PENALTY_MAX, LENGTH_PENALTY * (#flat - #needle))
-          best = math.max(best or 0, points * f.weight)
+          local points = ((at == 1 and POINTS.prefix or POINTS.substring)
+            - math.min(LENGTH_PENALTY_MAX, LENGTH_PENALTY * (#flat - #needle))) * f.weight
+          if f.former then
+            if not bestOld or points > bestOld then
+              bestOld, oldText = points, f.former
+            end
+          else
+            best = math.max(best or 0, points)
+          end
         end
       end
     end
-    if best and best >= S.THRESHOLD then
+    local top = math.max(best or 0, bestOld or 0)
+    if top >= S.THRESHOLD then
       local boost = q.kinds and q.kinds[e.kind] and S.EXPECTED_BOOST or 1
-      hits[#hits + 1] = newHit(e, best * (S.KIND_WEIGHT[e.kind] or 1) * boost, order)
+      local hit = newHit(e, top * (S.KIND_WEIGHT[e.kind] or 1) * boost, order)
+      if not best then
+        hit.alias = oldText
+      end
+      hits[#hits + 1] = hit
     end
   end
   return hits
@@ -674,7 +746,9 @@ local function collect(idx, q)
     local raw = scoreEntry(e, ms, joined)
     if raw then
       local boost = q.kinds and q.kinds[e.kind] and S.EXPECTED_BOOST or 1
-      hits[#hits + 1] = newHit(e, raw * (S.KIND_WEIGHT[e.kind] or 1) * boost, order)
+      local hit = newHit(e, raw * (S.KIND_WEIGHT[e.kind] or 1) * boost, order)
+      hit.alias = formerHint(e, ms)
+      hits[#hits + 1] = hit
     end
   end
   if #hits == 0 then
@@ -729,7 +803,8 @@ end
 --   more        { [kind] = hidden count },
 --   counts      { [kind] = all hits of the kind },
 --   suggestion  corrected query, only when nothing reaches the threshold.
--- Each hit is { kind, name, sub, path, data, score }.
+-- Each hit is { kind, name, sub, path, data, score, alias }; alias is the former name that produced
+-- the hit (only when no current name matches).
 function S.Search(query, o)
   o = o or {}
   local result = { items = {}, best = {}, total = 0, more = {}, counts = {} }
@@ -768,6 +843,18 @@ function S.Search(query, o)
     result.suggestion = suggest(idx, q)
   end
   return result
+end
+
+-- Subtitle of a hit with the former name it was found by ("24-32, also known as BFD"); one line.
+function S.SubLine(hit, aliasFormat)
+  if not hit.alias then
+    return hit.sub
+  end
+  local note = string.format(aliasFormat, hit.alias)
+  if hit.sub and hit.sub ~= "" then
+    return hit.sub .. ", " .. note
+  end
+  return note
 end
 
 -- Flat list rows for the results page: a header, the best hits, then the remaining hits (hits
@@ -957,7 +1044,21 @@ end
 
 S.RegisterSource("instance", function(add)
   eachInstance(function(i, slug)
-    add(i.n, i.lv, "instances/" .. slug)
+    -- Every level of the range is a search word, so "40" finds the instances that cover it; the subtitle shows it.
+    local LL = ns.InstanceLevelLogic
+    local from, to = LL.SortKey(i)
+    local levels = {}
+    for level = from or to or 0, to or from or 0 do
+      if level > 0 then
+        levels[#levels + 1] = tostring(level)
+      end
+    end
+    local entry = LL.Of(i).entry
+    if entry and not (from and entry >= from and entry <= (to or from)) then
+      levels[#levels + 1] = tostring(entry)
+    end
+    local range = from and to and (from .. "-" .. to) or (from or to) and tostring(from or to) or nil
+    add(i.n, range, "instances/" .. slug, levels, nil, i.al)
   end)
 end)
 
@@ -970,6 +1071,10 @@ S.RegisterSource("boss", function(add)
 end)
 
 S.RegisterSource("quest", function(add)
+  -- The quests live in a data add-on; its first load happens here, a postponed one rebuilds the index.
+  if ns.InstanceDataAccess then
+    ns.InstanceDataAccess.Ensure()
+  end
   eachInstance(function(i, slug)
     for _, quest in ipairs(i.q or {}) do
       add(quest.n, ns.T(i.n), "instances/" .. slug .. "/quests")

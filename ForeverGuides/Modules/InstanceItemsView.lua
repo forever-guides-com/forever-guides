@@ -230,8 +230,6 @@ local function makeHeader(view)
   h.portrait:SetSize(HEAD_PORTRAIT, HEAD_PORTRAIT)
   h.pic = h.portrait:CreateTexture(nil, "ARTWORK")
   h.pic:SetAllPoints()
-  h.letter = W.Text(h.portrait, { role = "h3", family = "heading", color = "accent2", justify = "CENTER" })
-  h.letter:SetPoint("CENTER")
   h.name = W.Text(h, { role = "text", color = "text", wrap = true })
   h.count = W.Text(h, { role = "micro", color = "textMuted", wrap = true })
   h:SetScript(
@@ -270,17 +268,6 @@ end
 local function paintPortrait(h, inst, boss)
   local fid = IV.Portrait(inst, boss)
   h.pic:SetTexture(fid)
-  h.pic:SetShown(fid ~= nil)
-  if fid == nil and not h.disc then
-    h.disc = ns.IconDraw.new(h.portrait, HEAD_PORTRAIT)
-    h.disc:SetPoint("TOPLEFT")
-    h.disc:Draw(IV.DrawDisc, "?")
-  end
-  if h.disc then
-    h.disc:SetShown(fid == nil)
-  end
-  h.letter:SetText(IV.FirstLetter(R.Names(boss.n)))
-  h.letter:SetShown(fid == nil)
 end
 
 local function paintHeader(h, view, group)

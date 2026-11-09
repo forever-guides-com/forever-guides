@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-07.
 -- Spell catalog of HUNTER: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -521,13 +521,6 @@ ns.Data.Spells.HUNTER = {
     n={de="Schwarzer Pfeil",en="Black Arrow"},
     rk=2,
     sup=3674,
-  },
-  {
-    fid=135726,
-    id=20572,
-    k="racial",
-    n={de="Kochendes Blut",en="Blood Fury"},
-    rt={de="Volk",en="Racial"},
   },
   {
     c={"HUNTER","ROGUE","WARRIOR"},
@@ -1709,13 +1702,6 @@ ns.Data.Spells.HUNTER = {
     n={de="Belästigen",en="Harass"},
     rk=3,
     sup=23166,
-  },
-  {
-    fid=133125,
-    id=20573,
-    k="racial",
-    n={de="Zähigkeit",en="Hardiness"},
-    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=132327,
@@ -3209,15 +3195,6 @@ ns.Data.Spells.HUNTER = {
     n={de="Schattenwiderstand",en="Shadow Resistance"},
     rk=4,
     sup=24515,
-  },
-  {
-    fid=136082,
-    i="spell_nature_removecurse",
-    id=1299026,
-    k="racial",
-    l=1,
-    n={de="Fluch brechen",en="Shatter Curse"},
-    rt={de="Volksfähigkeit",en="Racial"},
   },
   {
     fid=132199,

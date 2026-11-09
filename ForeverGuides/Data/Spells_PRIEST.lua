@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-07.
 -- Spell catalog of PRIEST: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -563,21 +563,6 @@ ns.Data.Spells.PRIEST = {
     k="spell",
     l=20,
     n={de="Elunes Anmut",en="Elune's Grace"},
-  },
-  {
-    fid=134063,
-    id=20593,
-    k="racial",
-    n={de="Technologist",en="Engineering Specialization"},
-    rt={de="Volk Passiv",en="Racial Passive"},
-  },
-  {
-    fid=132309,
-    i="ability_rogue_trip",
-    id=20589,
-    k="racial",
-    n={de="Entfesselungskünstler",en="Escape Artist"},
-    rt={de="Volk",en="Racial"},
   },
   {
     fid=4226119,

@@ -163,6 +163,14 @@ function Sidebar.Create(parent)
     b.label = W.Text(b, { key = page.title, role = "ui", color = "textSecondary" })
     b.label:SetPoint("LEFT", b.icon, "RIGHT", 8, 0)
     b.label:SetPoint("RIGHT", -6, 0)
+    -- A page with page.badge shows a dot on its icon while the function returns true (a page with news).
+    b.dot = b:CreateTexture(nil, "OVERLAY")
+    b.dot:SetSize(8, 8)
+    b.dot:SetPoint("CENTER", b.icon, "TOPRIGHT", -1, -1)
+    ns.Bind(b.dot, function(t)
+      t:SetColorTexture(Theme.color("warning"))
+    end)
+    b.dot:Hide()
     if page.placeholder then
       b.soon = W.Text(b, { key = "common.soonShort", role = "micro", color = "textMuted", justify = "RIGHT" })
       b.soon:SetPoint("RIGHT", -8, 0)
@@ -182,8 +190,12 @@ function Sidebar.Create(parent)
       end
       if f.editing then
         ns.ShowTooltip(self, pageName(self), L["nav.edit.dragHint"])
-      elseif f.collapsed then
-        ns.ShowTooltip(self, pageName(self), self.page.placeholder and L["common.soon"] or nil)
+      elseif f.collapsed or self.dot:IsShown() then
+        local hint = self.page.placeholder and L["common.soon"] or nil
+        if self.dot:IsShown() and self.page.badgeHint then
+          hint = L[self.page.badgeHint]
+        end
+        ns.ShowTooltip(self, pageName(self), hint)
       end
     end)
     b:SetScript("OnLeave", function(self)
@@ -259,6 +271,19 @@ function Sidebar.Create(parent)
   end
   populate()
 
+  -- Shows or hides the dot of every entry whose page has a badge function.
+  function f:RefreshBadges()
+    for _, b in ipairs(f.items) do
+      local on = false
+      if type(b.page.badge) == "function" then
+        local _, value = ns.Safe("nav-badge", b.page.badge)
+        on = value == true
+      end
+      b.dot:SetShown(on)
+    end
+  end
+  f:RefreshBadges()
+
   -- A file the client did not know at the last check is tried again each time the window opens.
   function f:RefreshIcons()
     ns.NextIconEpoch()
@@ -268,6 +293,7 @@ function Sidebar.Create(parent)
   end
   parent:HookScript("OnShow", function()
     f:RefreshIcons()
+    f:RefreshBadges()
   end)
 
   local function paintActive(b, id)
@@ -307,6 +333,7 @@ function Sidebar.Create(parent)
       b:Hide()
     end
     populate()
+    f:RefreshBadges()
     for _, b in ipairs(f.items) do
       paintActive(b, f.activeId)
     end
@@ -383,6 +410,14 @@ function Sidebar.Create(parent)
   ns.Anchors["FG.Sidebar"] = f
   return f
 end
+
+-- A page changed what its badge says (a page with news was opened).
+ns.On("FG_NAV_BADGE", function()
+  local f = ns.Anchors["FG.Sidebar"]
+  if f then
+    f:RefreshBadges()
+  end
+end)
 
 -- The layout changed: the sidebar is built again.
 ns.On("FG_NAV_CHANGED", function()

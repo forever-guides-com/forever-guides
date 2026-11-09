@@ -59,8 +59,9 @@ function S.Set(id, value)
 end
 
 -- The look of a window of the add-on: the window style of the chat kind with the opacity of the options (92
--- percent until the player sets one, never below 60). Text must stay readable, so the opacity of the main window
--- style does not reach the messenger. per: the style of the window itself, may be nil.
+-- percent until the player sets one, 0 to 100). The opacity only fades the backgrounds (WindowStyle.Apply),
+-- texts and controls keep full alpha and below WS.SHADOW_BELOW the title gets a shadow. The opacity of the main
+-- window style does not reach the messenger. per: the style of the window itself, may be nil.
 function S.Style(per)
   local WS = FG.WindowStyle
   local style = WS.Resolve("chat", per)

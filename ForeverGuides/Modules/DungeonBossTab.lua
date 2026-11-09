@@ -43,6 +43,9 @@ local function makeRow(parent, owner)
   local row = CreateFrame("Frame", nil, parent)
   row.portrait = row:CreateTexture(nil, "ARTWORK")
   row.portrait:SetSize(DBT.PORTRAIT, DBT.PORTRAIT)
+  -- The frame over the symbol that holds the 3D portrait of a boss without a symbol (ns.BossPortrait).
+  row.portraitHost = CreateFrame("Frame", nil, row)
+  row.portraitHost:SetAllPoints(row.portrait)
   row.mark = ns.IconDraw.new(row, DBT.MARK)
   row.name = W.Text(row, { role = "text", color = "text", wrap = true })
   row.state = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
@@ -71,6 +74,7 @@ local function makeRow(parent, owner)
     self.portrait:ClearAllPoints()
     self.portrait:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -ROW_PAD)
     self.portrait:SetShown(hasPortrait and self.hasPicture == true)
+    self.portraitHost:SetShown(hasPortrait and self.hasPicture == true)
     local textX = x + (available and (DBT.MARK + GAP) or 0)
     local textW = math.max(40, width - textX)
     self.name:ClearAllPoints()
@@ -136,11 +140,15 @@ function DBT.Create(parent)
       W.SetText(self.head, "bosstab.unavailable")
     end
     state.hasPortrait = false
-    local fids = {}
+    local fids, kinds, displays = {}, {}, {}
     for i, boss in ipairs(bosses) do
-      local fid, kind = IV.Portrait(inst, boss)
-      fids[i] = kind == "own" and fid or nil
-      state.hasPortrait = state.hasPortrait or fids[i] ~= nil
+      fids[i], kinds[i] = IV.Portrait(inst, boss)
+      displays[i] = kinds[i] ~= "own" and ns.BossModelWindow.DisplayId(inst, boss) or nil
+      state.hasPortrait = state.hasPortrait or kinds[i] == "own" or displays[i] ~= nil
+    end
+    -- Without any own symbol or 3D portrait the column stays away, with one every other boss shows the placeholder.
+    if not state.hasPortrait then
+      fids = {}
     end
     for i, boss in ipairs(bosses) do
       local row = state.rows[i]
@@ -155,6 +163,12 @@ function DBT.Create(parent)
       row.name:SetText(text)
       row.hasPicture = fids[i] ~= nil
       row.portrait:SetTexture(fids[i])
+      if displays[i] and row.hasPicture then
+        ns.BossPortrait.Bind(row.portraitHost, displays[i], row.portrait)
+      else
+        ns.BossPortrait.Unbind(row.portraitHost)
+        row.portrait:SetAlpha(1)
+      end
       row.modelName:SetBoss(inst, boss)
       row.modelPic:SetBoss(inst, boss)
       if not row.hasPicture then
@@ -171,6 +185,7 @@ function DBT.Create(parent)
       row:Show()
     end
     for i = #bosses + 1, #state.rows do
+      ns.BossPortrait.Unbind(state.rows[i].portraitHost)
       state.rows[i]:Hide()
     end
     state.count = #bosses

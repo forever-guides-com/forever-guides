@@ -17,6 +17,8 @@ local U, L = ns.U, ns.L
 
 local CL = {
   KIND = "canvaslayout",
+  -- Envelope type of one element or one group with its children (CanvasClipLogic.lua).
+  KIND_ELEMENTS = "canvas-elements",
   MIN_CANVAS = 16,
   MAX_CANVAS = 1024,
   MAX_ELEMENTS = 64,
@@ -1079,15 +1081,18 @@ function CL.Export(layout, host)
 end
 
 -- Layout from a pasted exchange string. Returns the layout and the repair list, or nil and
--- "empty" | "too-large" | "decode" | "json" | "shape" | "type" | "version" | "host". With `host` ("xpbar",
+-- "empty" | "too-large" | "decode" | "json" | "shape" | "type" | "elements" (the string holds elements, not a layout) |
+-- "version" | "host". With `host` ("xpbar",
 -- "cursor" or "area") the string must come from that display: one without a host field counts as "xpbar", and the
 -- canvas must be of the kind the host draws.
-function CL.Import(text, host)
-  local env, why = ns.Strings.decode(text)
+function CL.Import(text, host, maxJson)
+  local env, why = ns.Strings.decode(text, maxJson)
   if not env then
     return nil, why
   end
-  if env.type ~= CL.KIND then
+  if env.type == CL.KIND_ELEMENTS then
+    return nil, "elements"
+  elseif env.type ~= CL.KIND then
     return nil, "type"
   end
   if env.v > CL.MAX_ENVELOPE then

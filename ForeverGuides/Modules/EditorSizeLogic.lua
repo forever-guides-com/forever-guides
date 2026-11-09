@@ -4,7 +4,8 @@
 --
 -- The side column takes a share of the width between a minimum and a maximum, the canvas view gets the
 -- rest (so a wide window grows the canvas first once the column is as wide as it gets). Extra height goes to
--- the lists (more rows) and to the property area, the preview takes the rest of the body.
+-- the element list (more rows) and to the property area, the preview takes the rest of the body. The layouts
+-- take no list: one row of the side column holds the picker, so a small window keeps its room for the elements.
 local _, ns = ...
 local U = ns.U
 
@@ -22,20 +23,22 @@ local ES = {
   ROW_H = 24,
   FOOT_H = 40,
   VIEWBAR_H = 46,
+  -- The band under the title is two rows of controls on the left (the tools and Export, Import, preset, add)
+  -- and, over the side column, the layout row (picker and buttons) with the line under it that says which
+  -- layout this player uses.
+  BAND_H = 76,
   LAYOUT_HEAD_H = 28,
+  STATUS_H = 20,
   ELEMENTS_HEAD_H = 28,
   -- Side column: share of the window width, with a minimum and a maximum.
   SIDE_SHARE = 0.43,
   SIDE_MIN = 380,
   SIDE_MAX = 600,
-  LAYOUT_ROWS = 3,
   ELEMENT_ROWS = 5,
-  MAX_LAYOUT_ROWS = 5,
   MAX_ELEMENT_ROWS = 11,
-  -- Extra window height (over the default) that adds one more row to the layout list and to the element list.
-  LAYOUT_ROW_STEP = 160,
+  -- Extra window height (over the default) that adds one more row to the element list.
   ELEMENT_ROW_STEP = 80,
-  -- Row of the layout list with a second line: the name line (a button of NAME_LINE_H) sits one unit below the
+  -- Row of the layout dialog with a second line: the name line (a button of NAME_LINE_H) sits one unit below the
   -- top, the detail text under it with one unit of air.
   NAME_LINE_H = 22,
   DETAIL_PAD = 3,
@@ -79,7 +82,7 @@ function ES.Saved(db, screenW, screenH)
   return ES.Clamp(db.w, db.h, screenW, screenH)
 end
 
--- Height of a layout list row that carries a detail line set in a font of `fontSize` px: the name line and the
+-- Height of a layout dialog row that carries a detail line set in a font of `fontSize` px: the name line and the
 -- detail line with their air, never below one and a half normal rows. The detail line starts at TwoLineDetailY.
 function ES.TwoLineRowH(fontSize)
   local line = math.ceil((finite(fontSize) and fontSize > 0 and fontSize or 11) * ES.LINE_FACTOR)
@@ -95,28 +98,18 @@ end
 --   leftW, viewH           preview view, sideW (column) and contentW (inside the scroll area), halfW (two
 --                          fields in a row), fieldW (the position fields), removeW and dupW (the two buttons)
 --   bodyY, bodyH           top and height of the body under the band
---   layoutRows, bandH      rows of the layout list and the height of the band
+--   bandH                  height of the band (BAND_H)
 --   elementRows, propsH    rows of the element list and the height left for the properties
---   layoutListH, layoutRowH  height of the layout list and the row height it was made for (nil: single lines)
--- `twoLineH` (optional) is the row height of a layout list whose rows carry a second line: the list then shows as
--- many such rows as fit in the height of its single line rows, so the band grows with the font.
-function ES.Metrics(w, h, twoLineH)
+function ES.Metrics(w, h)
   w = finite(w) and math.max(ES.MIN_W, w) or ES.DEFAULT_W
   h = finite(h) and math.max(ES.MIN_H, h) or ES.DEFAULT_H
   local pad = ES.PAD
   local sideW = U.clamp(whole(w * ES.SIDE_SHARE), ES.SIDE_MIN, ES.SIDE_MAX)
   local leftW = w - pad * 3 - sideW
   local extra = math.max(0, h - ES.DEFAULT_H)
-  local layoutRows = math.min(ES.MAX_LAYOUT_ROWS, ES.LAYOUT_ROWS + math.floor(extra / ES.LAYOUT_ROW_STEP))
   local elementRows = math.min(ES.MAX_ELEMENT_ROWS, ES.ELEMENT_ROWS + math.floor(extra / ES.ELEMENT_ROW_STEP))
   local bandY = ES.HEAD_H + 4
-  local listH = layoutRows * ES.ROW_H
-  if finite(twoLineH) and twoLineH > 0 then
-    listH = math.max(1, math.floor(listH / (ES.ROW_H * 1.5))) * twoLineH
-  else
-    twoLineH = nil
-  end
-  local bandH = ES.LAYOUT_HEAD_H + listH
+  local bandH = ES.BAND_H
   local bodyY = bandY + bandH + 6
   local bodyH = h - bodyY - ES.FOOT_H - 4
   local contentW = sideW - 16
@@ -136,9 +129,6 @@ function ES.Metrics(w, h, twoLineH)
     bodyY = bodyY,
     bodyH = bodyH,
     viewH = bodyH - ES.VIEWBAR_H - 6,
-    layoutRows = layoutRows,
-    layoutListH = listH,
-    layoutRowH = twoLineH,
     elementRows = elementRows,
     propsH = bodyH - (ES.ELEMENTS_HEAD_H + elementRows * ES.ROW_H + 6),
   }

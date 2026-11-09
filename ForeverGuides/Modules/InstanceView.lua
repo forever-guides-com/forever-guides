@@ -11,7 +11,6 @@ ns.AddLocale("enUS", {
   ["instances.map.tip"] = "Show the entrance on the world map",
   ["instances.map.none"] = "No entrance position in the data for this instance.",
   ["instances.dtab.items"] = "Items",
-  ["instances.head.recommended"] = "recommended from level %d",
   ["instances.head.quests.one"] = "1 quest",
   ["instances.head.quests.other"] = "%d quests",
   ["instances.pick.text"] = "Pick a dungeon or raid from the list to see its bosses, quests, rewards and entrance.",
@@ -32,6 +31,8 @@ ns.AddLocale("enUS", {
   ["instances.gap.name"] = "Instance name in English only.",
   ["instances.gap.level"] = "Level not recorded.",
   ["instances.gap.levelRange"] = "Level range missing, only the recommended level is known.",
+  ["instances.gap.levelTo"] = "Upper level not recorded.",
+  ["instances.gap.levelFrom"] = "Lower level not recorded.",
   ["instances.gap.entrance"] = "No entrance position.",
   ["instances.gap.map"] = "No dungeon map.",
   ["instances.gap.bosses"] = "No bosses recorded.",
@@ -47,7 +48,6 @@ ns.AddLocale("deDE", {
   ["instances.map.tip"] = "Eingang auf der Weltkarte zeigen",
   ["instances.map.none"] = "Für diese Instanz ist in den Daten kein Eingang erfasst.",
   ["instances.dtab.items"] = "Items",
-  ["instances.head.recommended"] = "empfohlen ab Stufe %d",
   ["instances.head.quests.one"] = "1 Quest",
   ["instances.head.quests.other"] = "%d Quests",
   ["instances.pick.text"] = "Wähle einen Dungeon oder Raid aus der Liste, dann siehst du Bosse, Quests, Belohnungen und Eingang.",
@@ -68,6 +68,8 @@ ns.AddLocale("deDE", {
   ["instances.gap.name"] = "Instanzname nur auf Englisch.",
   ["instances.gap.level"] = "Stufe nicht erfasst.",
   ["instances.gap.levelRange"] = "Stufenbereich fehlt, nur die empfohlene Stufe ist bekannt.",
+  ["instances.gap.levelTo"] = "Obergrenze der Stufe nicht erfasst.",
+  ["instances.gap.levelFrom"] = "Untergrenze der Stufe nicht erfasst.",
   ["instances.gap.entrance"] = "Keine Eingangsposition.",
   ["instances.gap.map"] = "Keine Dungeonkarte.",
   ["instances.gap.bosses"] = "Keine Bosse erfasst.",
@@ -85,6 +87,8 @@ IV.PORTRAIT = 64
 IV.ICON = 32
 local PAD = 8
 local QUESTION = "Interface\\Icons\\INV_Misc_QuestionMark"
+-- Shown for a boss without a symbol when the client lacks the generic boss image too, so no boss row stays blank.
+IV.PLACEHOLDER = QUESTION
 
 -- Text helpers --------------------------------------------------------------------------------
 
@@ -186,12 +190,27 @@ end
 -- Header numbers: level, group size, location, bosses and quests of the faction.
 function IV.HeadText(inst, faction)
   local lines = {}
-  local level = ns.InstanceLevelLabel(inst)
-  if inst.lv and inst.rl then
-    level = level .. " · " .. string.format(L["instances.head.recommended"], inst.rl)
+  local info = ns.InstanceLevelLogic.Of(inst, L)
+  lines[1] = info.text
+  if info.announced then
+    -- The mark names the state in words, so it never depends on color.
+    local mark = info.announcedText .. (inst.rd and (" · " .. string.format(L["instances.release"], inst.rd)) or "")
+    lines[#lines + 1] = Theme.hexText("warning", mark)
   end
-  lines[1] = level
-  lines[2] = string.format(L["instances.info.group"], IV.Plural(inst.gs))
+  -- Entry and recommended level stand apart from the range: they answer "may I go in" and "how strong should I be".
+  local second = {}
+  for _, bit in ipairs({ info.entryText or false, info.recommendedText or false }) do
+    if bit then
+      second[#second + 1] = bit
+    end
+  end
+  if #second > 0 then
+    lines[#lines + 1] = table.concat(second, " · ")
+  end
+  if info.gapText then
+    lines[#lines + 1] = Theme.hexText("warning", info.gapText)
+  end
+  lines[#lines + 1] = string.format(L["instances.info.group"], IV.Plural(inst.gs))
   if inst.loc then
     lines[#lines + 1] = string.format(L["instances.info.location"], IV.Dual(inst.loc))
   end
@@ -368,8 +387,8 @@ function IV.LoadingImage(inst)
 end
 
 -- Boss portrait: { fid, kind } with kind "own" (the boss image), "default" (the generic boss image)
--- or "initial" (no usable file, the caller draws the first letter in a circle). Order: the portraits of the
--- data, the boss model image (Data.BossModels icon), the generic image, the letter.
+-- or "placeholder" (no usable file, the question mark icon). Order: the portraits of the data, the boss model
+-- image (Data.BossModels icon), the generic image, the placeholder.
 function IV.Portrait(inst, boss)
   local D = ns.Data and ns.Data.DungeonAssets
   local list = D and D.portraits and D.portraits[inst.n.en]
@@ -384,13 +403,8 @@ function IV.Portrait(inst, boss)
   if D and D.ejDefault and known(D.ejDefault) ~= false then
     return D.ejDefault, "default"
   end
-  return nil, "initial"
+  return IV.PLACEHOLDER, "placeholder"
 end
-
-local function firstLetter(text)
-  return (tostring(text or "?"):match("[%z\1-\127\194-\244][\128-\191]*") or "?"):upper()
-end
-IV.FirstLetter = firstLetter
 
 -- Header ------------------------------------------------------------------------------------------
 
@@ -564,18 +578,6 @@ local function newLine(row)
   end)
 end
 
--- Grid of 12 on 12: a filled circle of 24 rows, so the 64 px disc has soft edges.
-local function drawDisc(p)
-  local rows = 24
-  for j = 0, rows - 1 do
-    local ny = (j + 0.5 - rows / 2) / (rows / 2)
-    local half = math.sqrt(math.max(0, 1 - ny * ny)) * 6
-    p:Rect(6 - half, j * 0.5, 2 * half, 0.5, "surface3")
-  end
-end
-
-IV.DrawDisc = drawDisc
-
 -- Boss rows: portrait, name with tags and the ability chips.
 local function makeBossRow(parent)
   local row = CreateFrame("Frame", nil, parent)
@@ -583,11 +585,11 @@ local function makeBossRow(parent)
   row.portrait:SetSize(IV.PORTRAIT, IV.PORTRAIT)
   row.pic = row.portrait:CreateTexture(nil, "ARTWORK")
   row.pic:SetAllPoints()
-  row.letter = W.Text(row.portrait, { role = "title", family = "heading", color = "accent2", justify = "CENTER" })
-  row.letter:SetPoint("CENTER")
   row.name = W.Text(row, { role = "text", color = "text", wrap = true })
   row.abLabel = W.Text(row, { key = "instances.abilities", role = "micro", color = "textMuted" })
   row.chips = K.ChipRow(row)
+  -- Abilities known by name only (no spell ID): a plain line, no chips without a symbol.
+  row.names = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
   newLine(row)
   -- Portrait and name open the 3D model of a boss that has one.
   row.modelPic = ns.BossModelWindow.Hotspot(row, row.portrait)
@@ -601,33 +603,51 @@ local function makeBossRow(parent)
     self.name:ClearAllPoints()
     self.name:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -PAD)
     self.name:SetWidth(textW)
+    -- An explicit height gives the click area over the name its size.
+    self.name:SetHeight(math.max(1, math.ceil(self.name:GetStringHeight())))
     local y = PAD + math.ceil(self.name:GetStringHeight()) + 4
     if self.hasAbilities then
       self.abLabel:ClearAllPoints()
       self.abLabel:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
       y = y + math.ceil(self.abLabel:GetStringHeight()) + 2
-      self.chips:ClearAllPoints()
-      self.chips:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
-      self.chips:SetWidth(textW)
-      y = y + self.chips:Layout(textW)
+      if self.chips:IsShown() then
+        self.chips:ClearAllPoints()
+        self.chips:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
+        self.chips:SetWidth(textW)
+        y = y + self.chips:Layout(textW)
+      end
+      if self.names:IsShown() then
+        self.names:ClearAllPoints()
+        self.names:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
+        self.names:SetWidth(textW)
+        y = y + math.ceil(self.names:GetStringHeight()) + 2
+      end
     end
     return math.max(IV.PORTRAIT + PAD * 2, y + PAD)
   end
   return row
 end
 
+-- Chips for the abilities with a spell ID, and the names of those that have a name only.
 local function abilityChips(list)
-  local chips = {}
+  local chips, names = {}, {}
   for _, a in ipairs(list or {}) do
-    local name, icon = IV.SpellInfo(a.s)
-    chips[#chips + 1] = {
-      icon = icon or QUESTION,
-      name = name or string.format(L["instances.spell.unknown"], a.s),
-      meta = name and "" or L["instances.spell.unknownMeta"],
-      sid = a.s,
-    }
+    if a.s then
+      local name, icon = IV.SpellInfo(a.s)
+      chips[#chips + 1] = {
+        icon = icon or QUESTION,
+        name = name or string.format(L["instances.spell.unknown"], a.s),
+        meta = name and "" or L["instances.spell.unknownMeta"],
+        sid = a.s,
+      }
+    elseif a.n then
+      local name = ns.T(a.n)
+      if name and name ~= "" then
+        names[#names + 1] = name
+      end
+    end
   end
-  return chips
+  return chips, names
 end
 
 -- item = { inst, boss, index }
@@ -652,23 +672,22 @@ local function paintBossRow(row, item)
   local fid, kind = IV.Portrait(item.inst, boss)
   row.portraitKind = kind
   row.pic:SetTexture(fid)
-  row.pic:SetShown(fid ~= nil)
-  -- The disc is 24 textures, so only a row that needs it builds it.
-  if fid == nil and not row.disc then
-    row.disc = ns.IconDraw.new(row.portrait, IV.PORTRAIT)
-    row.disc:SetPoint("TOPLEFT")
-    row.disc:Draw(drawDisc, "?")
+  -- No symbol of its own: a 3D portrait from the display ID, the placeholder stays until the model has loaded.
+  local display = kind ~= "own" and ns.BossModelWindow.DisplayId(item.inst, boss) or nil
+  if display then
+    ns.BossPortrait.Bind(row.portrait, display, row.pic)
+  else
+    ns.BossPortrait.Unbind(row.portrait)
+    row.pic:SetAlpha(1)
   end
-  if row.disc then
-    row.disc:SetShown(fid == nil)
-  end
-  row.letter:SetText(firstLetter(R.Names(boss.n)))
-  row.letter:SetShown(fid == nil)
-  local chips = abilityChips(boss.ab)
-  row.hasAbilities = #chips > 0
+  row.hasPortrait = display ~= nil
+  local chips, names = abilityChips(boss.ab)
+  row.hasAbilities = #chips > 0 or #names > 0
   row.abLabel:SetShown(row.hasAbilities)
-  row.chips:SetShown(row.hasAbilities)
+  row.chips:SetShown(#chips > 0)
   row.chips:SetChips(chips)
+  row.names:SetShown(#names > 0)
+  row.names:SetText(table.concat(names, ", "))
 end
 
 -- Quest rows: head line, details and the map buttons of the start position.
@@ -705,6 +724,8 @@ local function paintQuestRow(row, item)
   local title = lines[1]
   if q.f == "A" or q.f == "H" then
     title = title .. "  " .. Theme.hexText("textMuted", L["kit.faction." .. q.f])
+  elseif item.mixed then
+    title = title .. "  " .. Theme.hexText("textMuted", L["kit.faction.all"])
   end
   row.title:SetText(title)
   local body = {}
@@ -731,6 +752,20 @@ function IV.BossList(parent)
   return list
 end
 
+-- Quests grouped Alliance, Horde, both, each group by level and name.
+function IV.GroupedQuests(quests)
+  local copy = {}
+  for i, q in ipairs(quests) do
+    copy[i] = q
+  end
+  return ns.InstanceLevelLogic.Sort(copy, true, false, function(a, b)
+    if (a.l or 0) ~= (b.l or 0) then
+      return (a.l or 0) < (b.l or 0)
+    end
+    return (ns.T(a.n) or "") < (ns.T(b.n) or "")
+  end)
+end
+
 function IV.QuestList(parent)
   local list = K.RowPool(parent, makeQuestRow)
   function list:SetInstance(inst, faction)
@@ -738,8 +773,13 @@ function IV.QuestList(parent)
     for _, q in ipairs(inst and inst.q or {}) do
       byId[q.id or 0] = q
     end
-    for _, q in ipairs(inst and R.Quests(inst, faction) or {}) do
-      items[#items + 1] = { quest = q, lines = IV.QuestLines(q, byId) }
+    local quests = inst and IV.GroupedQuests(R.Quests(inst, faction)) or {}
+    local mixed = false
+    for _, q in ipairs(quests) do
+      mixed = mixed or q.f == "A" or q.f == "H"
+    end
+    for _, q in ipairs(quests) do
+      items[#items + 1] = { quest = q, lines = IV.QuestLines(q, byId), mixed = mixed }
     end
     self.count = #items
     self:Sync(items, paintQuestRow)

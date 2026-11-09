@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-07.
 -- Spell catalog of GENERAL: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -183,6 +183,21 @@ ns.Data.Spells.GENERAL = {
     n={de="Schmiedekunst",en="Blacksmithing"},
     rt={de="Fachmann",en="Artisan"},
     sup=1240966,
+  },
+  {
+    fid=135726,
+    id=20572,
+    k="racial",
+    n={de="Kochendes Blut",en="Blood Fury"},
+    rt={de="Volk",en="Racial"},
+  },
+  {
+    fid=132278,
+    i="ability_racial_cannibalize",
+    id=20577,
+    k="racial",
+    n={de="Kannibalismus",en="Cannibalize"},
+    rt={de="Volk",en="Racial"},
   },
   {
     fid=136192,
@@ -439,6 +454,21 @@ ns.Data.Spells.GENERAL = {
     rt={de="Fachmann",en="Artisan"},
   },
   {
+    fid=134063,
+    id=20593,
+    k="racial",
+    n={de="Technologist",en="Engineering Specialization"},
+    rt={de="Volk Passiv",en="Racial Passive"},
+  },
+  {
+    fid=132309,
+    i="ability_rogue_trip",
+    id=20589,
+    k="racial",
+    n={de="Entfesselungskünstler",en="Escape Artist"},
+    rt={de="Volk",en="Racial"},
+  },
+  {
     fid=133939,
     id=2383,
     k="profession",
@@ -645,6 +675,13 @@ ns.Data.Spells.GENERAL = {
     id=20222,
     k="profession",
     n={de="Goblin-Ingenieur",en="Goblin Engineer"},
+  },
+  {
+    fid=133125,
+    id=20573,
+    k="racial",
+    n={de="Zähigkeit",en="Hardiness"},
+    rt={de="Volk Passiv",en="Racial Passive"},
   },
   {
     fid=136065,
@@ -958,6 +995,15 @@ ns.Data.Spells.GENERAL = {
     rt={de="Volk",en="Racial"},
   },
   {
+    fid=136082,
+    i="spell_nature_removecurse",
+    id=1299026,
+    k="racial",
+    l=1,
+    n={de="Fluch brechen",en="Shatter Curse"},
+    rt={de="Volksfähigkeit",en="Racial"},
+  },
+  {
     fid=134366,
     id=8613,
     k="profession",
@@ -1150,6 +1196,13 @@ ns.Data.Spells.GENERAL = {
     n={de="Unbewaffnet",en="Unarmed"},
   },
   {
+    fid=136148,
+    id=5227,
+    k="racial",
+    n={de="Unterwasseratmung",en="Underwater Breathing"},
+    rt={de="Volk Passiv",en="Racial Passive"},
+  },
+  {
     fid=132845,
     id=1259416,
     k="racial",
@@ -1170,6 +1223,13 @@ ns.Data.Spells.GENERAL = {
     k="profession",
     n={de="Waffenschmied",en="Weaponsmith"},
     rt={de="Fachmann",en="Artisan"},
+  },
+  {
+    fid=136187,
+    id=7744,
+    k="racial",
+    n={de="Wille der Verlassenen",en="Will of the Forsaken"},
+    rt={de="Volk",en="Racial"},
   },
   {
     fid=136129,

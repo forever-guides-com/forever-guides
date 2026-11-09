@@ -370,6 +370,13 @@ function E.Types(host)
         desc = "cursor.type." .. kind .. ".desc",
         variants = def.variants,
         title = def.title,
+        icon = function(element)
+          return ns.ElementIcon.Of(kind, element.props)
+        end,
+        -- The props of an element of this type with every field valid, for a paste from another player.
+        clean = function(props, element)
+          return CU.Props(kind, props, { element.w, element.h })
+        end,
         new = function()
           return CU.NewProps(kind)
         end,

@@ -2,7 +2,7 @@
 -- Abgeleitet aus der Live-Seite forever-guides.com/de/wow-forever/races
 -- (availableClassIds und newClassIds, Stand 2026-10-06), bis der Web-Generator
 -- diese Datei selbst ausgibt. Schluessel sind die Rassen-Slugs aus Meta.lua.
--- Die beiden Skyborne-Rassen sind gegen die Clienttabelle CharBaseInfo (Build 1.60.1.70790)
+-- Die beiden Skyborne-Rassen sind gegen die Clienttabelle CharBaseInfo (Build 1.60.1.70862)
 -- korrigiert, tests/test_race_classes_client.py haelt sie dort fest.
 local _, ns = ...
 ns.Data = ns.Data or {}

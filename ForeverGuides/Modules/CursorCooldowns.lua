@@ -73,6 +73,12 @@ ns.AddLocale("enUS", {
   ["cursor.cd.source.spell"] = "Spell of the player",
   ["cursor.cd.source.pet"] = "Spell of the pet",
   ["cursor.cd.source.item"] = "Item (trinket, potion, bandage)",
+  ["cursor.cd.rank"] = "Rank",
+  ["cursor.cd.rank.tip"] = "Which rank of the chosen spell counts. Highest rank follows the best rank your character has learned. Chosen ID follows exactly the spell you picked in the list, with its rank.",
+  ["cursor.cd.rank.max"] = "Highest rank (default)",
+  ["cursor.cd.rank.max.tip"] = "Uses the highest rank of the spell your character has learned. A new rank is picked up without any change here.",
+  ["cursor.cd.rank.exact"] = "Chosen ID only",
+  ["cursor.cd.rank.exact.tip"] = "Uses only the spell ID you picked. Pick the spell in the list again to choose its rank. A layout saved before this option has no exact ID yet and uses the first rank.",
   ["cursor.cd.spell"] = "Spell",
   ["cursor.cd.spell.tip"] = "Opens the spell list with search and class filter.",
   ["cursor.cd.item"] = "Item",
@@ -232,6 +238,12 @@ ns.AddLocale("deDE", {
   ["cursor.cd.source.spell"] = "Zauber des Spielers",
   ["cursor.cd.source.pet"] = "Zauber des Pets",
   ["cursor.cd.source.item"] = "Gegenstand (Schmuckstück, Trank, Verband)",
+  ["cursor.cd.rank"] = "Rang",
+  ["cursor.cd.rank.tip"] = "Welcher Rang des gewählten Zaubers gilt. Höchster Rang folgt dem besten Rang, den dein Charakter gelernt hat. Gewählte ID folgt genau dem Zauber, den du in der Liste gewählt hast, mit seinem Rang.",
+  ["cursor.cd.rank.max"] = "Höchster Rang (Standard)",
+  ["cursor.cd.rank.max.tip"] = "Nimmt den höchsten Rang des Zaubers, den dein Charakter gelernt hat. Ein neuer Rang wird ohne Änderung hier übernommen.",
+  ["cursor.cd.rank.exact"] = "Nur die gewählte ID",
+  ["cursor.cd.rank.exact.tip"] = "Nimmt nur die gewählte Zauber-ID. Wähle den Zauber in der Liste neu, um seinen Rang zu wählen. Ein Layout, das vor dieser Option gespeichert wurde, hat noch keine genaue ID und nimmt den ersten Rang.",
   ["cursor.cd.spell"] = "Zauber",
   ["cursor.cd.spell.tip"] = "Öffnet die Zauberliste mit Suche und Klassenfilter.",
   ["cursor.cd.item"] = "Gegenstand",
@@ -534,6 +546,8 @@ CC.CleanLook = cleanLook
 local DEFAULTS = {
   source = "spell",
   spellBase = 0,
+  spellExact = 0,
+  rankMode = "max",
   itemMode = "slot",
   itemSlot = 13,
   itemId = 0,
@@ -554,6 +568,8 @@ CU.Register("spellcd", {
     local p = cleanLook(raw, d)
     p.source = oneOf(raw.source, K.SOURCES, d.source)
     p.spellBase = whole(raw.spellBase, d.spellBase, 0, V.SPELL_ID_MAX)
+    p.spellExact = whole(raw.spellExact, d.spellExact, 0, V.SPELL_ID_MAX)
+    p.rankMode = oneOf(raw.rankMode, K.RANK_MODES, d.rankMode)
     p.itemMode = oneOf(raw.itemMode, K.ITEM_MODES, d.itemMode)
     p.itemSlot = whole(raw.itemSlot, d.itemSlot, 1, K.SLOT_MAX)
     p.itemId = whole(raw.itemId, d.itemId, 0, K.ITEM_ID_MAX)
@@ -848,7 +864,7 @@ local function spellSource(known, override)
     texture = textureOf,
   }
   function src.resolve(p)
-    return p.spellBase > 0 and K.Resolve(p.spellBase, src) or nil
+    return p.spellBase > 0 and K.ResolveSpell(p, src) or nil
   end
   function src.chosen(p)
     return p.spellBase > 0
@@ -2050,7 +2066,10 @@ end
 
 -- What makes an element follow something else or show it another way: a change reads the game again.
 local function identity(p)
-  return table.concat({ p.source, p.spellBase, p.itemMode, p.itemSlot, p.itemId, p.timerMode, p.style }, "|")
+  return table.concat(
+    { p.source, p.spellBase, p.spellExact, p.rankMode, p.itemMode, p.itemSlot, p.itemId, p.timerMode, p.style },
+    "|"
+  )
 end
 
 local function render(frame, element, ctx)
@@ -2562,16 +2581,20 @@ function CC.Panel(parent, element, onChange)
             return playerClass() or "ALL"
           end,
           get = function()
-            local id = state.get("spellBase")
+            local id = K.ExactOf({
+              spellBase = state.get("spellBase"),
+              spellExact = state.get("rankMode") == "exact" and state.get("spellExact") or 0,
+            })
             return id > 0 and id or nil
           end,
           set = function(id)
-            state.write("spellBase", id and K.BaseOf(id) or 0)
+            state.writeMany({ spellBase = id and K.BaseOf(id) or 0, spellExact = id or 0 })
           end,
         }),
         C.HEIGHT.spell,
         spell
       )
+      choiceRow(state, add, "cursor.cd.rank", "rankMode", K.RANK_MODES, spell, true)
       add(
         C.Item(state.panel, {
           label = "cursor.cd.item",

@@ -35,7 +35,7 @@
 -- Panel scaffolding for the element types of a host (rows stacked top down, one write path):
 --   Controls.NewPanel(parent, { element, kind?, onChange, props = function(raw) -> repaired props, build(state, add) })
 --     build adds rows with add(frame, height, shown?) (height a number or a function that measures it)
---     and uses state.get(key) / state.write(key, value); state.section(id, labelKey, open?) starts a folded
+--     and uses state.get(key) / state.write(key, value) / state.writeMany({ key = value }); state.section(id, labelKey, open?) starts a folded
 --     section (every row added after it belongs to it, state.section(nil) ends it; the heading hides while none of
 --     its rows is shown, `kind` keeps the folds of one element type apart);
 --     the panel is built once per type and told the element in edit by :Refresh(element).
@@ -721,12 +721,26 @@ function C.NewPanel(parent, o)
   function state.get(key)
     return o.props(state.element.props, state.element)[key]
   end
-  function state.write(key, value)
+  local function apply(set)
     local el = state.element
     local raw = type(el.props) == "table" and el.props or {}
-    raw[key] = value
+    set(raw)
     el.props = o.props(raw, el)
     o.onChange()
+  end
+  function state.write(key, value)
+    apply(function(raw)
+      raw[key] = value
+    end)
+  end
+  -- Several props as one change (one repair, one onChange), for values that belong together. A nil value
+  -- is not carried by the table, use state.write to clear a prop.
+  function state.writeMany(values)
+    apply(function(raw)
+      for key, value in pairs(values) do
+        raw[key] = value
+      end
+    end)
   end
   function state.owner()
     local editor = ns.CanvasEditor

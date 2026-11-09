@@ -72,6 +72,7 @@ local PAD, GAP, ICON, CARD_GAP = 10, 6, 24, 8
 local NAME_H, CHECK_H, TOGGLE_H, BAR_H = 26, 22, 24, 28
 -- A page that reports no usable width yet must not squeeze the cards below what their controls need.
 local MIN_CARD_W = 2 * PAD + 160
+local AUDIENCE_W = 260
 
 -- The views that were built (weak): a change anywhere repaints every one of them.
 S.views = setmetatable({}, { __mode = "k" })
@@ -162,6 +163,12 @@ local function buildWindowCard(list)
       S.duplicate(row.id)
     end
   end)
+  row.share = iconButton(row, "share", "layoutshare.btn", "layoutshare.tip.layout", function()
+    local layout = row.id and ns.Areas.Library().Layout(row.id, ns.Areas.ActiveLayout(row.id))
+    if layout then
+      ns.LayoutShare.ShareLayout(layout, "area")
+    end
+  end)
   row.delete = iconButton(row, "trash", "areas.page.delete", "areas.page.deleteTip", function()
     if row.id then
       ns.Areas.ConfirmDelete(row.id)
@@ -200,6 +207,9 @@ local function buildWindowCard(list)
       end
     end,
   })
+  row.audience = ns.Areas.AudienceField(row, function()
+    return row.id
+  end)
   row.rulesToggle = W.Action(row, {
     key = "areas.page.rules",
     icon = "chevron-right",
@@ -237,6 +247,7 @@ local function bindWindowCard(row, entry)
   end
   row.shown.Refresh()
   row.locked.Refresh()
+  row.audience.Update()
   row.load:Refresh()
   row.rulesToggle:SetIcon(open[entry.id] and "chevron-down" or "chevron-right")
 end
@@ -246,7 +257,7 @@ local function layoutWindowCard(row, width)
   local inner = width - 2 * PAD
   local y = PAD
   local rowH = scaled(NAME_H)
-  local icons = placeIcons(row, { row.delete, row.duplicate, row.edit }, y + math.floor((rowH - ICON) / 2))
+  local icons = placeIcons(row, { row.delete, row.duplicate, row.edit, row.share }, y + math.floor((rowH - ICON) / 2))
   row.name:ClearAllPoints()
   row.name:SetPoint("TOPLEFT", row, "TOPLEFT", PAD, -y)
   row.name:SetSize(inner - icons - GAP, rowH)
@@ -256,6 +267,7 @@ local function layoutWindowCard(row, width)
   local parts = {
     { row.shown, checkWidth(row.shown), checkH },
     { row.locked, checkWidth(row.locked), checkH },
+    { row.audience, math.min(AUDIENCE_W, inner), scaled(Controls.HEIGHT.choice) },
     { row.rulesToggle, math.min(row.rulesToggle:FullWidth(), inner), scaled(TOGGLE_H) },
   }
   local x, lineH = 0, 0

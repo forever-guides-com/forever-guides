@@ -7,7 +7,6 @@ local _, ns = ...
 ns.AddLocale("enUS", {
   ["mm.type.dungeon"] = "Dungeon",
   ["mm.type.raid"] = "Raid",
-  ["mm.level"] = "Level %s",
   ["mm.players"] = "Players: %s",
   ["mm.hint.map"] = "Click: dungeon map",
   ["mm.hint.page"] = "Click: instance page",
@@ -19,7 +18,6 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["mm.type.dungeon"] = "Dungeon",
   ["mm.type.raid"] = "Raid",
-  ["mm.level"] = "Stufe %s",
   ["mm.players"] = "Spieler: %s",
   ["mm.hint.map"] = "Klicken: Dungeonkarte",
   ["mm.hint.page"] = "Klicken: Instanzseite",
@@ -104,7 +102,7 @@ local function hasDungeonMap(nameEn)
   return view ~= nil and view.KeyFor(nameEn) ~= nil
 end
 
--- One marker per entrance: { slug, name, kind, lv, players, faction, map, x, y, note, source,
+-- One marker per entrance: { slug, name, kind, lv, ml, rl, players, faction, map, x, y, note, source,
 -- hasDungeonMap, entranceIndex }. overrides is ns.db.mapMarkers (or nil); opts.hasMap(nameEn)
 -- tells whether the instance has a dungeon map (default: ns.DungeonMapView.KeyFor). Second result:
 -- count of own entries that were invalid and left out.
@@ -115,7 +113,8 @@ function M.Build(instances, overrides, opts)
   local markers, rejected = {}, 0
   for _, inst in ipairs(instances or {}) do
     local slug = ns.RefLogic.InstanceSlug(inst)
-    if slug ~= "" and hidden[slug] ~= true then
+    -- An announced instance has no entrance to walk to yet, so it gets no pin.
+    if slug ~= "" and hidden[slug] ~= true and not ns.InstanceLevelLogic.Unconfirmed(inst) then
       local list, source = shippedEntrances(inst), "data"
       local custom, bad = ownEntrances(own[slug])
       rejected = rejected + bad
@@ -129,6 +128,8 @@ function M.Build(instances, overrides, opts)
           name = inst.n,
           kind = inst.t == "raid" and "raid" or "dungeon",
           lv = inst.lv,
+          ml = inst.ml,
+          rl = inst.rl,
           players = inst.gs,
           faction = inst.f or "B",
           map = e.map,
@@ -180,8 +181,14 @@ function M.TooltipLines(marker, L, T)
     lines[#lines + 1] = pick and pick(marker.note) or marker.note.en or marker.note
   end
   lines[#lines + 1] = L["mm.type." .. marker.kind]
-  if marker.lv ~= nil and marker.lv ~= "" then
-    lines[#lines + 1] = L["mm.level"]:format(marker.lv)
+  -- Every instance shows its level range, a missing side is named instead of left out.
+  local level = ns.InstanceLevelLogic.Of(marker, L)
+  lines[#lines + 1] = level.text
+  if level.entryText then
+    lines[#lines + 1] = level.entryText
+  end
+  if level.gapText then
+    lines[#lines + 1] = level.gapText
   end
   if marker.players ~= nil and marker.players ~= "" then
     lines[#lines + 1] = L["mm.players"]:format(marker.players)

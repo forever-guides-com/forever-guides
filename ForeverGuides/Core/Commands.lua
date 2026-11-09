@@ -684,6 +684,7 @@ C.PAGE_AREA = {
   settings = "general",
   errors = "general",
   tutorials = "general",
+  changelog = "general",
   windows = "general",
   map = "map",
   waypoints = "map",

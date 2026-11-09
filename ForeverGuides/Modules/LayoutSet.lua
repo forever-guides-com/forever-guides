@@ -10,16 +10,20 @@
 --     presets = function() -> { ids = { id, ... }, build = function(id) -> layout | nil },
 --     maxLayouts = 30,                      onChange = function(),   keys = { ... } (see KEYS),
 --     blank = function() -> layout,         the layout the editor's "New" starts with, empty (optional)
---     override = { get = function() -> id | nil, put = function(id | nil) } })   (optional, see below)
+--     override = { get = function() -> id | nil, put = function(id | nil) },   (optional, see below)
+--     class = { token = function() -> classToken | nil,                     (optional, see below)
+--               get = function() -> { [classToken] = id }, put = function(map | nil) } })
 -- A host may let one character show another layout than the account (`override`, stored per character by the
--- host): State and Layout answer for the character, the manager and SetLayout switch where the value in effect
--- comes from (the override while it names an existing layout, else the account), AccountState and
--- SetAccountLayout always speak for the account and the buttons of a settings page act on that choice.
+-- host) and every character of a class (`class`, stored in the account settings): State and Layout answer for
+-- the character, resolved by LayoutAssign (character, then class, then account). The manager and SetLayout
+-- switch where the value in effect comes from (the override, the class entry or the account), AccountState and
+-- SetAccountLayout always speak for the account and the buttons of a settings page act on that choice. Assign
+-- sets the scope of one layout for this player. Deleting a layout removes every assignment to it.
 -- Every management function returns the new id or true, or nil and the reason ("name", "limit",
 -- "missing", "last", "preset"). None of them changes the chosen layout except SetLayout and the
 -- manager. Changes go through Store.set, so a window follows through FG_SETTING_CHANGED.
 local _, ns = ...
-local W, L, U, CL, CS = ns.W, ns.L, ns.U, ns.CanvasLogic, ns.CharScopeLogic
+local W, L, U, CL, LA = ns.W, ns.L, ns.U, ns.CanvasLogic, ns.LayoutAssign
 
 local LS = { MAX_LAYOUTS = 30 }
 ns.LayoutSet = LS
@@ -29,6 +33,7 @@ ns.AddLocale("enUS", {
   ["layoutset.badName"] = "Enter a name for the layout.",
   ["layoutset.limit"] = "There are too many layouts. Delete one first.",
   ["layoutset.last"] = "The last layout cannot be deleted.",
+  ["layoutset.noClass"] = "The class of this character is not known yet.",
   ["layoutset.new"] = "New",
   ["layoutset.dup"] = "Copy",
   ["layoutset.rename"] = "Rename",
@@ -46,6 +51,7 @@ ns.AddLocale("deDE", {
   ["layoutset.badName"] = "Gib dem Layout einen Namen.",
   ["layoutset.limit"] = "Es gibt zu viele Layouts. Lösche zuerst eines.",
   ["layoutset.last"] = "Das letzte Layout lässt sich nicht löschen.",
+  ["layoutset.noClass"] = "Die Klasse dieses Charakters ist noch nicht bekannt.",
   ["layoutset.new"] = "Neu",
   ["layoutset.dup"] = "Kopieren",
   ["layoutset.rename"] = "Umbenennen",
@@ -65,6 +71,7 @@ local KEYS = {
   badName = "layoutset.badName",
   limit = "layoutset.limit",
   last = "layoutset.last",
+  noClass = "layoutset.noClass",
   new = "layoutset.new",
   dup = "layoutset.dup",
   rename = "layoutset.rename",
@@ -77,11 +84,11 @@ local KEYS = {
   deleteTitle = "layoutset.deleteTitle",
   deleteText = "layoutset.deleteText",
 }
-local REASONS = { name = "badName", limit = "limit", last = "last" }
+local REASONS = { name = "badName", limit = "limit", last = "last", class = "noClass" }
 
 local BUTTON_W, BUTTON_GAP, ROW_GAP = 110, 8, 32
--- Size of the button block: two columns, two rows.
-LS.BUTTONS_W, LS.BUTTONS_H = BUTTON_W * 2 + BUTTON_GAP, 58
+-- Size of the button block: two columns, three rows (the last one holds Share in chat).
+LS.BUTTONS_W, LS.BUTTONS_H = BUTTON_W * 2 + BUTTON_GAP, 90
 
 function LS.New(o)
   local set = { id = o.id, max = o.maxLayouts or LS.MAX_LAYOUTS }
@@ -145,12 +152,31 @@ function LS.New(o)
     return o.override and o.override.get() or nil
   end
 
-  -- The stored layouts and the id this character shows: the override while it names a stored layout, else
-  -- what AccountState says. Also returns where the id comes from ("char" or "account") and whether an
-  -- override exists that points at a layout that is gone.
+  -- The class of this character and the stored class map, nil / empty without a host that has them.
+  local function classToken()
+    return o.class and LA.CleanToken(o.class.token()) or nil
+  end
+
+  local function classMap()
+    return o.class and LA.CleanClasses(o.class.get()) or {}
+  end
+
+  local function putAssignment(charId, classes)
+    if o.override and overrideId() ~= charId then
+      o.override.put(charId)
+    end
+    if o.class and not LA.SameClasses(o.class.get(), classes) then
+      o.class.put(not LA.IsEmpty(classes) and classes or nil)
+    end
+  end
+
+  -- The stored layouts and the id this character shows: the character assignment, else the class assignment,
+  -- else what AccountState says, each only while it names a stored layout. Also returns where the id comes
+  -- from ("char", "class" or "account") and whether an assignment in front of the winner points at a layout
+  -- that is gone.
   function set.State(raw)
     local layouts, accountId = set.AccountState(raw)
-    local id, source, stale = CS.Layout(accountId, overrideId(), function(v)
+    local id, source, stale = LA.Resolve(accountId, overrideId(), classMap(), classToken(), function(v)
       return type(layouts[v]) == "table"
     end)
     if id then
@@ -217,6 +243,18 @@ function LS.New(o)
     return out
   end
 
+  -- A repaired copy of the stored layout `id` with its shown name, or nil.
+  function set.LayoutById(id)
+    set.EnsureLayouts()
+    local raw = stored()[id]
+    if type(raw) ~= "table" then
+      return nil
+    end
+    local layout = CL.Validate(raw)
+    layout.name = nameOf(id, layout)
+    return layout
+  end
+
   -- The repaired layout of the chosen id, kept until the stored table is replaced.
   function set.Layout()
     set.EnsureLayouts()
@@ -246,16 +284,63 @@ function LS.New(o)
     return true
   end
 
-  -- The display shows layout `id` from now on, at the place the value in effect comes from: the override of
-  -- this character while it names a stored layout, else the account (a dead override is dropped on the way).
+  -- Layout `id` gets `scope` for this player: "char" (this character), "class" (every character of its class)
+  -- or nil (not assigned). The old assignment of the layout for the other scope is removed. Returns true, or
+  -- false and the reason ("missing", "scope", "class").
+  function set.Assign(id, scope)
+    if type(stored()[id]) ~= "table" then
+      return false, "missing"
+    end
+    if (scope == "char" and not o.override) or (scope == "class" and not o.class) then
+      return false, "scope"
+    end
+    local charId, classes, reason = LA.Plan(overrideId(), classMap(), classToken(), id, scope)
+    if reason then
+      return false, reason
+    end
+    putAssignment(charId, classes)
+    return true
+  end
+
+  -- How this player uses layout `id`: "char", "class" or nil; and the class tokens that use it.
+  function set.ScopeOf(id)
+    return LA.ScopeOf(id, overrideId(), classMap(), classToken()), LA.ClassesOf(id, classMap())
+  end
+
+  -- What applies to this player: { id, source, stale, classToken, accountId, canChar, canClass }.
+  function set.Assignment()
+    local _, id, source, stale = set.State()
+    local _, accountId = set.AccountState()
+    return {
+      id = id,
+      source = source,
+      stale = stale,
+      classToken = classToken(),
+      accountId = accountId,
+      canChar = o.override ~= nil,
+      canClass = o.class ~= nil and classToken() ~= nil,
+    }
+  end
+
+  -- The display shows layout `id` from now on, at the place the value in effect comes from: the assignment of
+  -- this character, the one of its class or the account (a dead assignment in front of it is dropped).
   function set.SetLayout(id)
     local _, _, source, stale = set.State()
     if source == "char" then
       return set.SetOverride(id)
     end
+    if type(stored()[id]) ~= "table" then
+      return false
+    end
+    if source == "class" then
+      local classes = classMap()
+      classes[classToken()] = id
+      putAssignment(overrideId(), classes)
+      return true
+    end
     local ok = set.SetAccountLayout(id)
     if ok and stale then
-      o.override.put(nil)
+      putAssignment(nil, classMap())
     end
     return ok
   end
@@ -289,10 +374,8 @@ function LS.New(o)
       return nil, "limit"
     end
     clean.id = CL.UniqueId("layout", stored())
-    -- A dead override of this character must not take over the new layout that is given its id.
-    if overrideId() == clean.id then
-      o.override.put(nil)
-    end
+    -- A dead assignment must not take over the new layout that is given its id.
+    putAssignment(LA.Forget(overrideId(), classMap(), clean.id))
     put("layouts." .. clean.id, clean)
     return clean.id
   end
@@ -350,6 +433,8 @@ function LS.New(o)
     if current == id then
       put("layoutId", fallback)
     end
+    -- Whoever used the layout falls back to the next step (class, then account).
+    putAssignment(LA.Forget(overrideId(), classMap(), id))
     put("layouts." .. id, nil)
     return true
   end
@@ -363,7 +448,10 @@ function LS.New(o)
 
   -- The layout manager the editor drives (see CanvasEditor.Open, option `manager`). Every refusal is told
   -- to the player here and returned as nil plus the reason.
-  --   list() -> { { id, name }, ... } sorted by name      current() -> id of the layout the display shows
+  --   list() -> { { id, name, scope, classes }, ... } sorted by name (scope: how this player uses the layout,
+  --     "char", "class" or nil; classes: the class tokens that use it; both only with an assignment host)
+  --   current() -> id of the layout the display shows
+  --   assignment() -> set.Assignment(), assign(id, scope) -> true, or nil, reason  (only with override or class)
   --   select(id) -> copy of that layout, the display shows it from now on, or nil, "missing"
   --   save(id, layout) -> true, or nil, "missing"          canDelete(id) -> bool
   --   create(name, layout) / import(name, layout) -> new id (now the current layout), or nil, reason
@@ -390,6 +478,11 @@ function LS.New(o)
     local m = {}
     function m.list()
       local out = set.Layouts()
+      if o.override or o.class then
+        for _, entry in ipairs(out) do
+          entry.scope, entry.classes = set.ScopeOf(entry.id)
+        end
+      end
       table.sort(out, function(a, b)
         local an, bn = a.name:lower(), b.name:lower()
         if an ~= bn then
@@ -401,6 +494,14 @@ function LS.New(o)
     end
     function m.current()
       return chosenId()
+    end
+    if o.override or o.class then
+      function m.assignment()
+        return set.Assignment()
+      end
+      function m.assign(id, scope)
+        return refuse(set.Assign(id, scope))
+      end
     end
     function m.select(id)
       if not set.SetLayout(id) then
@@ -512,8 +613,9 @@ function LS.New(o)
   return set
 end
 
--- New, Copy, Rename, Delete for the chosen layout of `set` in a block of two rows (LS.BUTTONS_W by
--- LS.BUTTONS_H); the caller places the returned frame. A created or copied layout is chosen at once, a
+-- New, Copy, Rename, Delete and Share (in chat) for the chosen layout of `set` in a block of three rows (LS.BUTTONS_W by
+-- LS.BUTTONS_H); the caller places the returned frame. opts.host names the display for the exchange string
+-- (default: the id of the set). A created or copied layout is chosen at once, a
 -- refusal is explained. opts.onChange() runs after a successful action.
 function LS.BuildButtons(parent, set, opts)
   opts = opts or {}
@@ -579,6 +681,16 @@ function LS.BuildButtons(parent, set, opts)
         ns.Dialogs.Confirm(keys.deleteTitle, keys.deleteText, function()
           finish(set.DeleteLayout(entry.id))
         end)
+      end,
+    },
+    {
+      "act.share",
+      function()
+        local _, id = set.AccountState()
+        local layout = set.LayoutById(id)
+        if layout then
+          ns.LayoutShare.ShareLayout(layout, opts.host or set.id)
+        end
       end,
     },
   }

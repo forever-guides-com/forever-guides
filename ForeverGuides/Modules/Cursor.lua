@@ -8,7 +8,9 @@
 -- Settings: ns.db.settings.cursorRing = { enabled, strata, mouselook, load, layoutId, layouts = { [id] =
 -- layout } }, all layouts account wide. One character may override the switch and the layout for itself:
 -- ns.charDB.cursorRing = { enabled = true | false, layoutId } (a missing field means like the account, a layout
--- that is gone falls back to the account's, Modules/CharScopeLogic.lua).
+-- that is gone falls back to the next step, Modules/CharScopeLogic.lua). The layout is also assignable to a class:
+-- settings.cursorRing.classLayouts = { [classToken] = layoutId }, account wide. Resolution: this character, then
+-- its class, then the account (Modules/LayoutAssignLogic.lua).
 local _, ns = ...
 local L, CU, CR, E, LL, LS, CS =
   ns.L, ns.CursorLogic, ns.CanvasRender, ns.CursorElements, ns.LoadLogic, ns.LoadState, ns.CharScopeLogic
@@ -70,6 +72,13 @@ local function charRing()
   return type(node) == "table" and node or nil
 end
 
+local function set(key, value)
+  ns.Store.set("settings.cursorRing." .. key, value)
+end
+
+-- The class of this character never changes within a session.
+local classToken
+
 -- The layouts of the ring (Modules/LayoutSet.lua), seeded from the presets on first use.
 local LAYOUTS = ns.LayoutSet.New({
   id = "cursor",
@@ -90,6 +99,21 @@ local LAYOUTS = ns.LayoutSet.New({
       ns.Store.setChar("cursorRing.layoutId", id)
     end,
   },
+  class = {
+    token = function()
+      if not classToken then
+        local identity = LS.Identity()
+        classToken = identity and identity.class or nil
+      end
+      return classToken
+    end,
+    get = function()
+      return rawSettings().classLayouts
+    end,
+    put = function(map)
+      set("classLayouts", map)
+    end,
+  },
 })
 C.LayoutSet = LAYOUTS
 C.EnsureLayouts = LAYOUTS.EnsureLayouts
@@ -98,6 +122,9 @@ C.Layout = LAYOUTS.Layout
 C.SetLayout = LAYOUTS.SetLayout
 C.SetAccountLayout = LAYOUTS.SetAccountLayout
 C.Manager = LAYOUTS.Manager
+C.Assign = LAYOUTS.Assign
+C.Assignment = LAYOUTS.Assignment
+C.ScopeOf = LAYOUTS.ScopeOf
 
 -- The settings with every field valid, as they hold for this character: layoutId names a stored layout (the
 -- override of the character while it names one), enabled is the switch in effect. layoutSource and
@@ -114,10 +141,6 @@ function C.Config()
   local node = charRing()
   cfg.enabled, cfg.enabledSource = CS.Enabled(cfg.enabled, node and node.enabled)
   return cfg
-end
-
-local function set(key, value)
-  ns.Store.set("settings.cursorRing." .. key, value)
 end
 
 function C.IsEnabled()
@@ -534,9 +557,9 @@ function C.Edit()
       editing = active == true
       C.Apply()
     end,
-    -- The editor may have switched the layout since it was opened: the result goes to the current one.
+    -- The result goes to the layout the editor has open: it may differ from the one this player uses.
     onApply = function(layout)
-      manager.save(manager.current(), layout)
+      manager.save(editor.LayoutId and editor.LayoutId() or manager.current(), layout)
     end,
     -- Every session ends here, so no simulation outlives the editor.
     onCancel = ns.CursorSim.Reset,

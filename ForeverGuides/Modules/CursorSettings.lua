@@ -17,7 +17,7 @@ ns.AddLocale("enUS", {
   ["cursor.set.enabled"] = "Show ring",
   ["cursor.set.enabledTip"] = "Switches the ring on or off, same as the key binding and /fg cursor. While it is off the add-on does nothing for it.",
   ["cursor.set.strata"] = "Layer",
-  ["cursor.set.strataTip"] = "Which layer of the screen the ring is drawn in. Tooltip is the top layer.",
+  ["cursor.set.strataTip"] = "Which layer of the screen the ring is drawn in. Fullscreen (default) lies over the game windows and under menus, dialogs and tooltips, which therefore stay readable.",
   ["cursor.set.mouselook"] = "On camera turn",
   ["cursor.set.mouselookTip"] = "What the ring does while you turn the camera with the right mouse button.",
   ["cursor.set.load"] = "When active",
@@ -26,7 +26,11 @@ ns.AddLocale("enUS", {
   ["cursor.set.reset"] = "Reset options",
   ["cursor.char.heading"] = "For this character",
   ["cursor.char.layout"] = "Layout for this character",
-  ["cursor.char.layoutTip"] = "Shows this layout on this character only. The layouts stay shared by the whole account.",
+  ["cursor.char.layoutTip"] = "Shows this layout on this character, or on every character of its class (see the next choice). The layouts stay shared by the whole account.",
+  ["cursor.char.scope"] = "Applies to",
+  ["cursor.char.scopeTip"] = "Whether the layout above is used by this character only or by every character of the same class on the account. A choice for this character wins over a choice for the class.",
+  ["cursor.char.scope.char"] = "This character only",
+  ["cursor.char.scope.class"] = "Every character of this class",
   ["cursor.char.enabled"] = "Ring for this character",
   ["cursor.char.enabledTip"] = "Switches the ring on or off on this character only. Like the account follows the switch above. The key binding and /fg cursor switch the value that applies.",
   ["cursor.char.like"] = "Like the account (default)",
@@ -43,7 +47,6 @@ ns.AddLocale("enUS", {
   ["cursor.strata.DIALOG"] = "Dialog",
   ["cursor.strata.FULLSCREEN"] = "Fullscreen",
   ["cursor.strata.FULLSCREEN_DIALOG"] = "Fullscreen dialog",
-  ["cursor.strata.TOOLTIP"] = "Tooltip (top)",
   ["cursor.mouselook.hide"] = "Hide ring",
   ["cursor.mouselook.keep"] = "Keep at cursor",
   ["cursor.mouselook.center"] = "Screen center",
@@ -54,7 +57,7 @@ ns.AddLocale("deDE", {
   ["cursor.set.enabled"] = "Ring anzeigen",
   ["cursor.set.enabledTip"] = "Schaltet den Ring ein oder aus, wie die Tastenbelegung und /fg mauszeiger. Solange er aus ist, tut das Addon dafür nichts.",
   ["cursor.set.strata"] = "Ebene",
-  ["cursor.set.strataTip"] = "In welcher Ebene des Bildschirms der Ring gezeichnet wird. Tooltip ist die oberste Ebene.",
+  ["cursor.set.strataTip"] = "In welcher Ebene des Bildschirms der Ring gezeichnet wird. Vollbild (Standard) liegt über den Spielfenstern und unter Menüs, Dialogen und Tooltips, die dadurch lesbar bleiben.",
   ["cursor.set.mouselook"] = "Beim Kameradrehen",
   ["cursor.set.mouselookTip"] = "Was der Ring tut, solange du die Kamera mit der rechten Maustaste drehst.",
   ["cursor.set.load"] = "Wann aktiv",
@@ -63,7 +66,11 @@ ns.AddLocale("deDE", {
   ["cursor.set.reset"] = "Optionen zurücksetzen",
   ["cursor.char.heading"] = "Für diesen Charakter",
   ["cursor.char.layout"] = "Layout für diesen Charakter",
-  ["cursor.char.layoutTip"] = "Zeigt dieses Layout nur auf diesem Charakter. Die Layouts bleiben für den ganzen Account gemeinsam.",
+  ["cursor.char.layoutTip"] = "Zeigt dieses Layout auf diesem Charakter oder auf allen Charakteren seiner Klasse (siehe nächste Auswahl). Die Layouts bleiben für den ganzen Account gemeinsam.",
+  ["cursor.char.scope"] = "Gilt für",
+  ["cursor.char.scopeTip"] = "Ob das Layout oben nur dieser Charakter nutzt oder alle Charaktere derselben Klasse auf dem Account. Eine Wahl für diesen Charakter schlägt die Wahl für die Klasse.",
+  ["cursor.char.scope.char"] = "Nur dieser Charakter",
+  ["cursor.char.scope.class"] = "Alle Charaktere dieser Klasse",
   ["cursor.char.enabled"] = "Ring für diesen Charakter",
   ["cursor.char.enabledTip"] = "Schaltet den Ring nur auf diesem Charakter ein oder aus. Wie Account folgt dem Schalter oben. Die Tastenbelegung und /fg mauszeiger schalten den Wert, der gerade gilt.",
   ["cursor.char.like"] = "Wie Account (Standard)",
@@ -80,7 +87,6 @@ ns.AddLocale("deDE", {
   ["cursor.strata.DIALOG"] = "Dialog",
   ["cursor.strata.FULLSCREEN"] = "Vollbild",
   ["cursor.strata.FULLSCREEN_DIALOG"] = "Vollbild-Dialog",
-  ["cursor.strata.TOOLTIP"] = "Tooltip (oben)",
   ["cursor.mouselook.hide"] = "Ring ausblenden",
   ["cursor.mouselook.keep"] = "Am Zeiger lassen",
   ["cursor.mouselook.center"] = "Bildschirmmitte",
@@ -131,6 +137,12 @@ local function addCharacter(view)
   local C = ns.Cursor
   ns.AddHeading(view, "cursor.char.heading", { role = "ui", gap = 4 })
   local layoutOptions = { { value = "", key = "cursor.char.like" } }
+  -- The scope picked while no layout is assigned yet; an assigned layout shows its own.
+  local picked = "char"
+  local function assigned()
+    local cfg = C.Config()
+    return cfg.layoutSource ~= "account" and cfg.layoutId or nil, cfg.layoutSource
+  end
   choice(view, "cursor.char.layout", layoutOptions, function()
     for i = #layoutOptions, 2, -1 do
       layoutOptions[i] = nil
@@ -138,11 +150,35 @@ local function addCharacter(view)
     for _, entry in ipairs(C.Layouts()) do
       layoutOptions[#layoutOptions + 1] = { value = entry.id, text = entry.name }
     end
-    local cfg = C.Config()
-    return cfg.layoutSource == "char" and cfg.layoutId or ""
+    return assigned() or ""
   end, function(v)
-    C.SetLayoutOverride(v ~= "" and v or nil)
+    local current = assigned()
+    if v == "" then
+      if current then
+        C.Assign(current, nil)
+      end
+      -- A class entry of this class that sits behind a character override goes too: "like the account".
+      local layout = C.Config().layoutId
+      if C.Config().layoutSource == "class" then
+        C.Assign(layout, nil)
+      end
+    else
+      C.Assign(v, picked)
+    end
   end, "cursor.char.layoutTip")
+  choice(view, "cursor.char.scope", {
+    { value = "char", key = "cursor.char.scope.char" },
+    { value = "class", key = "cursor.char.scope.class" },
+  }, function()
+    local id, source = assigned()
+    return id and source or picked
+  end, function(v)
+    picked = v
+    local id = assigned()
+    if id then
+      C.Assign(id, v)
+    end
+  end, "cursor.char.scopeTip")
   local enabledOptions = {
     { value = "account", key = "cursor.char.like" },
     { value = "on", key = "cursor.char.on" },

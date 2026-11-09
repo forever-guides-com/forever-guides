@@ -225,6 +225,10 @@ function Tooltip.Show(owner, spec)
     return false
   end
   tip:SetOwner(owner, spec.anchor or "ANCHOR_RIGHT")
+  -- Another add-on may have moved the shared tooltip; ours always lies in the top strata.
+  if tip.SetFrameStrata and tip.GetFrameStrata and tip:GetFrameStrata() ~= "TOOLTIP" then
+    tip:SetFrameStrata("TOOLTIP")
+  end
   clearSeparators(tip)
   -- The inventory block comes last (before the hint), so the client's hooks wait until it is added.
   local item, inventory = specItem(spec), ns.InventoryTooltip

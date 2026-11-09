@@ -3,6 +3,7 @@
 -- in Modules/InstanceView.lua, the items in Modules/InstanceItemsView.lua.
 local _, ns = ...
 local W, L, Theme, R, K, IV = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.PageKit, ns.InstanceView
+local DA = ns.InstanceDataAccess
 
 ns.AddLocale("enUS", {
   ["instances.intro"] = "Dungeons and raids: levels, entrance, bosses, quests",
@@ -11,13 +12,14 @@ ns.AddLocale("enUS", {
   ["instances.search"] = "Filter by instance or boss name",
   ["instances.sub"] = "%s · group %s",
   ["instances.unknown"] = "?",
-  ["instances.level.range"] = "Level %s",
-  ["instances.level.from"] = "from level %d",
-  ["instances.level.unknown"] = "Level ?",
-  ["instances.level.tip"] = "Recommended level, maximum unknown.",
   ["instances.sort.label"] = "Sort by",
   ["instances.sort.name"] = "Name",
   ["instances.sort.level"] = "Level",
+  ["instances.group.by"] = "Group by faction",
+  ["instances.group.title"] = "%s (%d)",
+  ["instances.group.open"] = "expanded",
+  ["instances.group.closed"] = "collapsed",
+  ["instances.group.tip"] = "Click to expand or collapse this group.",
   ["instances.status.announced"] = "announced",
   ["instances.release"] = "release %s",
   ["instances.empty"] = "No instance matches.",
@@ -28,7 +30,6 @@ ns.AddLocale("enUS", {
   ["instances.dtab.map"] = "Map",
   ["instances.dtab.access"] = "Access",
   ["instances.info.level"] = "Level: %s",
-  ["instances.info.levelFrom"] = "Level: from %d (recommended)",
   ["instances.info.group"] = "Group size: %s",
   ["instances.info.faction"] = "Faction: %s",
   ["instances.info.location"] = "Location: %s",
@@ -74,13 +75,14 @@ ns.AddLocale("deDE", {
   ["instances.search"] = "Nach Instanz- oder Bossname filtern",
   ["instances.sub"] = "%s · Gruppe %s",
   ["instances.unknown"] = "?",
-  ["instances.level.range"] = "Stufe %s",
-  ["instances.level.from"] = "ab Stufe %d",
-  ["instances.level.unknown"] = "Stufe ?",
-  ["instances.level.tip"] = "Empfohlene Stufe, Maximalstufe unbekannt.",
   ["instances.sort.label"] = "Sortieren nach",
   ["instances.sort.name"] = "Name",
   ["instances.sort.level"] = "Stufe",
+  ["instances.group.by"] = "Nach Fraktion gruppieren",
+  ["instances.group.title"] = "%s (%d)",
+  ["instances.group.open"] = "aufgeklappt",
+  ["instances.group.closed"] = "eingeklappt",
+  ["instances.group.tip"] = "Klicken zum Auf- oder Zuklappen dieser Gruppe.",
   ["instances.status.announced"] = "angekündigt",
   ["instances.release"] = "Release %s",
   ["instances.empty"] = "Keine Instanz passt.",
@@ -91,7 +93,6 @@ ns.AddLocale("deDE", {
   ["instances.dtab.map"] = "Karte",
   ["instances.dtab.access"] = "Zugang",
   ["instances.info.level"] = "Stufe: %s",
-  ["instances.info.levelFrom"] = "Stufe: ab %d (empfohlen)",
   ["instances.info.group"] = "Gruppengröße: %s",
   ["instances.info.faction"] = "Fraktion: %s",
   ["instances.info.location"] = "Lage: %s",
@@ -132,26 +133,31 @@ ns.AddLocale("deDE", {
 
 local plural, dual = IV.Plural, IV.Dual
 
--- Level for list rows: the range from the data, else the recommended level, else "?".
--- The second result is true when only the recommended level is known (maximum unknown).
+-- Level text for list rows, with the tooltip that names a gap, the entry level and the recommended level.
 local function levelLabel(inst)
-  if inst.lv then
-    return string.format(L["instances.level.range"], inst.lv), false
+  local info = ns.InstanceLevelLogic.Of(inst, L)
+  local tip = {}
+  for _, bit in ipairs({ info.gapText or false, info.entryText or false, info.recommendedText or false }) do
+    if bit then
+      tip[#tip + 1] = bit
+    end
   end
-  if inst.rl then
-    return string.format(L["instances.level.from"], inst.rl), true
-  end
-  return L["instances.level.unknown"], false
+  return info.text, #tip > 0 and table.concat(tip, "\n") or nil
 end
 ns.InstanceLevelLabel = levelLabel
 
 function ns.InstanceInfoText(inst)
   local lines = {}
-  if not inst.lv and inst.rl then
-    lines[1] = string.format(L["instances.info.levelFrom"], inst.rl)
-    lines[2] = Theme.hexText("textMuted", L["instances.level.tip"])
-  else
-    lines[1] = string.format(L["instances.info.level"], plural(inst.lv))
+  local info = ns.InstanceLevelLogic.Of(inst, L)
+  lines[1] = string.format(L["instances.info.level"], info.text)
+  if info.entryText then
+    lines[#lines + 1] = info.entryText
+  end
+  if info.recommendedText then
+    lines[#lines + 1] = info.recommendedText
+  end
+  if info.gapText then
+    lines[#lines + 1] = Theme.hexText("textMuted", info.gapText)
   end
   lines[#lines + 1] = string.format(L["instances.info.group"], plural(inst.gs))
   lines[#lines + 1] =
@@ -181,7 +187,11 @@ function ns.InstanceInfoText(inst)
   else
     lines[#lines + 1] = L["instances.info.entranceNone"]
   end
-  lines[#lines + 1] = string.format(L["instances.info.counts"], #(inst.bo or {}), #(inst.q or {}))
+  if inst.q or DA.Loaded() then
+    lines[#lines + 1] = string.format(L["instances.info.counts"], #(inst.bo or {}), #(inst.q or {}))
+  else
+    lines[#lines + 1] = string.format(L["instancedata.counts"], #(inst.bo or {}))
+  end
   if not inst.id then
     lines[#lines + 1] = Theme.hexText("warning", L["instances.info.noId"])
   end
@@ -253,6 +263,8 @@ for _, id in ipairs(TABS) do
   VALID_TAB[id] = true
 end
 
+local SORTS = { name = true, level = true }
+
 -- The instance chosen last, kept while the game runs so the page opens where it was left.
 local lastSlug
 
@@ -266,7 +278,8 @@ local function build(container)
     query = "",
     slug = nil,
     dtab = "bosses",
-    sort = ns.db.settings.instancesSort == "level" and "level" or "name",
+    sort = SORTS[ns.db.settings.instancesSort] and ns.db.settings.instancesSort or "name",
+    group = ns.db.settings.instancesGroup == true,
   }
   local refresh, layoutPanes, relayout, scrollToDetail
   -- The rows of the list as shown, and whether the list still has to scroll to the chosen row (after layout).
@@ -353,6 +366,17 @@ local function build(container)
       refresh()
     end,
   })
+  local groupBox = W.Checkbox(filters, {
+    key = "instances.group.by",
+    get = function()
+      return state.group
+    end,
+    set = function(on)
+      state.group = on
+      ns.Store.set("settings.instancesGroup", on)
+      refresh()
+    end,
+  })
   local resetBtn = ns.InstanceReset.Button(filters)
   function filters:fgGridLayout(width)
     local y = 38
@@ -377,6 +401,10 @@ local function build(container)
       y = y + 22
     end
     y = y + 8
+    groupBox:ClearAllPoints()
+    groupBox:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
+    groupBox:SetWidth(width)
+    y = y + groupBox:GetHeight() + 8
     resetBtn:ClearAllPoints()
     resetBtn:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
     resetBtn:SetWidth(resetBtn:Fit(width))
@@ -388,10 +416,25 @@ local function build(container)
   local list = K.NewList(leftPane, {
     rowHeight = ROW_HEIGHT,
     bind = function(inst)
+      if inst.heading then
+        return {
+          title = string.format(
+            L["instances.group.title"],
+            L[inst.heading == "B" and "kit.faction.all" or "kit.faction." .. inst.heading],
+            inst.count
+          ),
+          right = L[inst.closed and "instances.group.closed" or "instances.group.open"],
+          tooltip = L["instances.group.tip"],
+        }
+      end
       local when = inst.rd and Theme.hexText("textMuted", string.format(L["instances.release"], inst.rd)) or ""
       local name, otherName = R.Names(inst.n)
       local loc, otherLoc = R.Names(inst.loc)
-      local label, estimated = levelLabel(inst)
+      local label, levelTip = levelLabel(inst)
+      local announced = ns.InstanceLevelLogic.Announced(inst)
+      if announced then
+        levelTip = L["instances.announced.tip"] .. (levelTip and ("\n" .. levelTip) or "")
+      end
       local sub = string.format(L["instances.sub"], label, plural(inst.gs)) .. (loc and (" · " .. loc) or "")
       local others = {}
       for _, text in ipairs({ otherName or "", otherLoc or "" }) do
@@ -406,12 +449,23 @@ local function build(container)
         title = name or "?",
         sub = sub,
         wrapSub = true,
-        right = when,
-        tooltip = estimated and L["instances.level.tip"] or nil,
+        right = not announced and when or nil,
+        badge = announced and { text = L["instances.announced"], color = "warning" } or nil,
+        tooltip = levelTip,
         selected = R.InstanceSlug(inst) == state.slug,
       }
     end,
     onClick = function(inst)
+      if inst.heading then
+        local copy = {}
+        for faction, on in pairs(ns.Store.get("settings.instancesClosed") or {}) do
+          copy[faction] = on
+        end
+        copy[inst.heading] = not inst.closed or nil
+        ns.Store.set("settings.instancesClosed", copy)
+        refresh()
+        return
+      end
       scrollToDetail = true
       ns.Router:navigate("instances/" .. R.InstanceSlug(inst))
       scrollToDetail = false
@@ -440,7 +494,7 @@ local function build(container)
     if revealPending then
       revealPending = false
       for i, inst in ipairs(shown or {}) do
-        if R.InstanceSlug(inst) == state.slug then
+        if not inst.heading and R.InstanceSlug(inst) == state.slug then
           list:Reveal(i)
         end
       end
@@ -522,7 +576,10 @@ local function build(container)
 
   local quests = newSection("quests")
   local questNote = note(quests)
-  local questList = part(quests, IV.QuestList(rc), { gap = 14 })
+  local questList = part(quests, ns.QuestChainView.Create(rc), { gap = 14 })
+  questList.onChange = function()
+    relayout()
+  end
 
   local items = newSection("items")
   local itemsView = part(items, ns.InstanceItemsView.Create(rc), { gap = 14 })
@@ -622,6 +679,8 @@ local function build(container)
   end
 
   function refresh()
+    -- The quests are in a data add-on that loads here, before anything reads inst.q.
+    local dataStatus = DA.Ensure()
     if not K.HasData("Instances") then
       state.inst = nil
       listNote:SetText(L["kit.noData"])
@@ -633,8 +692,20 @@ local function build(container)
     end
     local faction = state.faction ~= "all" and state.faction or nil
     local found = currentItems()
-    list:SetData(found)
     shown = found
+    if state.group then
+      shown = {}
+      local closed = ns.Store.get("settings.instancesClosed") or {}
+      for _, group in ipairs(ns.InstanceLevelLogic.Groups(found)) do
+        shown[#shown + 1] = { heading = group.faction, count = #group.items, closed = closed[group.faction] == true }
+        if not closed[group.faction] then
+          for _, inst in ipairs(group.items) do
+            shown[#shown + 1] = inst
+          end
+        end
+      end
+    end
+    list:SetData(shown)
     listNote:SetText(#found == 0 and L["instances.empty"] or "")
     listNote:SetShown(#found == 0)
     local inst = state.slug and R.FindInstance(state.slug) or nil
@@ -648,7 +719,11 @@ local function build(container)
       itemsView:SetInstance(inst, faction)
       bossNote:SetText(L["instances.bosses.none"])
       bossNote.fgOn = bossList.count == 0
-      questNote:SetText(L[#(inst.q or {}) == 0 and "instances.quests.none" or "instances.quests.noneFaction"])
+      if dataStatus ~= DA.STATUS.ok then
+        questNote:SetText(DA.Hint(dataStatus))
+      else
+        questNote:SetText(L[#(inst.q or {}) == 0 and "instances.quests.none" or "instances.quests.noneFaction"])
+      end
       questNote.fgOn = questList.count == 0
       access:SetInstance(inst, faction)
       infoText:SetText(ns.InstanceInfoText(inst))
@@ -656,12 +731,20 @@ local function build(container)
     paintTabs()
     facDd.Refresh()
     sortToggle.Refresh()
+    groupBox.Refresh()
     relayout()
     if scrollToDetail then
       scrollToDetail = false
       revealDetail()
     end
   end
+
+  -- The quest data came in after a fight: the open page shows the quests.
+  ns.On("FG_INSTANCE_DATA", function()
+    if view.area:IsVisible() then
+      refresh()
+    end
+  end)
 
   -- A kill or a reset: the header count and the marks of the boss rows follow while the page is open.
   ns.On("FG_BOSS_PROGRESS", function()

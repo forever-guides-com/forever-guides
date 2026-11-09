@@ -136,18 +136,18 @@ add("crestMark", { "Guild and communities", "Gilde und Communitys" }, {
   "Sie halten es nur im Arbeitsspeicher. Es ist beim nächsten Login weg, wenn sie Empfangen ausschalten oder wenn du widerrufst.",
 })
 add("linkShare", { "Chat links", "Chat-Links" }, {
-  "Notes, drawings, builds and lists as a chat link.",
-  "Notizen, Zeichnungen, Skillungen und Listen als Chat-Link.",
+  "Notes, drawings, builds, lists and layouts as a chat link.",
+  "Notizen, Zeichnungen, Skillungen, Listen und Layouts als Chat-Link.",
 }, {
   "Sent: the content you pick, in the link or by whisper.",
   "Gesendet wird: der Inhalt, den du wählst, im Link oder per Flüstern.",
 }, {
-  "the note, drawing, build or list you pick. Short content sits in the link, larger content goes by whisper to whoever opens the link, only until /reload or logout. It can contain anything you wrote.",
+  "the note, drawing, build, list, layout, element or group you pick. Short content sits in the link, larger content goes by whisper to whoever opens the link, only until /reload or logout. It can contain anything you wrote.",
   "everyone who sees the link in the chat you send it to, and everyone who opens it. Receiving: links of others become clickable and opening one asks the sender by whisper.",
   "others open your content in the add-on instead of copying text by hand.",
   "Whoever opens it sees the content and can keep a copy. Nobody gets an answer for content you did not share.",
 }, {
-  "die Notiz, Zeichnung, Skillung oder Liste, die du wählst. Kurzer Inhalt steckt im Link, größerer geht per Flüstern an jeden, der den Link öffnet, nur bis /reload oder Logout. Der Inhalt kann alles enthalten, was du geschrieben hast.",
+  "die Notiz, Zeichnung, Skillung, Liste, das Layout, Element oder die Gruppe, die du wählst. Kurzer Inhalt steckt im Link, größerer geht per Flüstern an jeden, der den Link öffnet, nur bis /reload oder Logout. Der Inhalt kann alles enthalten, was du geschrieben hast.",
   "alle, die den Link in dem Chat sehen, in den du ihn sendest, und alle, die ihn öffnen. Empfangen: Links anderer werden klickbar, beim Öffnen fragt das Addon den Absender per Flüstern.",
   "andere öffnen deinen Inhalt im Addon, statt Text von Hand zu kopieren.",
   "Wer ihn öffnet, sieht den Inhalt und kann eine Kopie behalten. Für Inhalt, den du nicht geteilt hast, bekommt niemand eine Antwort.",

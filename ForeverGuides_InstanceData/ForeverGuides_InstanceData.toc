@@ -1,0 +1,18 @@
+## Interface: 16001
+## Title: Forever Guides: Instance data
+## Title-deDE: Forever Guides: Instanzdaten
+## Notes: Quests and quest chains of the dungeons and raids. Loads by itself when you open the instances page.
+## Notes-deDE: Quests und Questketten der Dungeons und Raids. Wird von selbst geladen, sobald du die Instanzen-Seite öffnest.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.6.0
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+InstanceQuests_1.lua
+InstanceQuests_2.lua

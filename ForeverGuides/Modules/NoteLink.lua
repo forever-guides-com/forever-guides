@@ -116,7 +116,7 @@ end
 -- Kinds -------------------------------------------------------------------------------
 
 -- spec = { token, link, label (locale key), prefix (locale key prefix for
--- "<prefix>.gone|badData|tooLarge|timeout|loading"), untitled (locale key),
+-- "<prefix>.gone|badData|tooLarge|timeout|loading", plus ".wrongType" with `wrongType` set), untitled (locale key),
 -- decode(code, hash) -> result | nil, reason, show(sender, result) }.
 local KINDS, BY_LINK = {}, {}
 NL.kinds = KINDS
@@ -481,8 +481,15 @@ local function arm(p)
   )
 end
 
+-- A kind with `wrongType` names a link whose content is of another kind than its label said.
 local function decodeFailure(spec, sender, why)
-  ns.Notify(fmt(spec.prefix .. (why == "too-large" and ".tooLarge" or ".badData"), sender), "warning")
+  local key = ".badData"
+  if why == "too-large" then
+    key = ".tooLarge"
+  elseif why == "type" and spec.wrongType then
+    key = ".wrongType"
+  end
+  ns.Notify(fmt(spec.prefix .. key, sender), "warning")
 end
 
 local function finish(p)

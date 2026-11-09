@@ -56,8 +56,14 @@ Store.defaults = {
     trainersView = "list",
     weaponsView = "list",
     instancesSort = "name",
+    -- Collapsed faction groups of the instance list (sort by faction): { A = true, H = true, B = true }.
+    instancesClosed = {},
+    -- Instance list grouped by faction (Alliance, Horde, both).
+    instancesGroup = false,
     -- Items tab of the instances page: "boss" (accordion by boss) or "all" (one list).
     instancesItemsView = "boss",
+    -- Quests tab of the instances page: faction filter "all", "A", "H" or "B".
+    instancesQuestFilter = "all",
     mapTab = "azeroth",
     -- Map page: places the filters hide are dimmed instead of dropped.
     mapDimFiltered = false,
@@ -238,7 +244,7 @@ Store.defaults = {
     -- of the first version are carried into `load` by Cursor.Apply.
     cursorRing = {
       enabled = false,
-      strata = "TOOLTIP",
+      strata = "FULLSCREEN",
       mouselook = "hide",
       layoutId = "standard",
       layouts = {},

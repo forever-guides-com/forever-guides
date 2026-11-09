@@ -12,6 +12,8 @@ G.KEYS = {
   "name",
   "level",
   "levelRange",
+  "levelTo",
+  "levelFrom",
   "entrance",
   "map",
   "bosses",
@@ -70,8 +72,13 @@ function G.Of(inst)
   if not (inst.n and inst.n.de) then
     add("name")
   end
-  if inst.lv == nil then
+  local from, to = ns.InstanceLevelLogic.Parse(inst.lv)
+  if from == nil and to == nil then
     add(inst.rl == nil and "level" or "levelRange")
+  elseif to == nil then
+    add("levelTo")
+  elseif from == nil then
+    add("levelFrom")
   end
   if not hasEntrance(inst) then
     add("entrance")
