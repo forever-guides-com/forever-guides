@@ -797,7 +797,9 @@ local function create()
     ns.Wrap("xpbar-hide", function(self)
       self:SetScript("OnUpdate", nil)
       closeMenu()
-      if not auto then
+      -- A hidden ancestor (UIParent on the hide-UI key) runs OnHide while the frame stays shown itself, and no
+      -- player decision stands behind that: the wish is kept and the bar returns with its parent.
+      if not auto and not self:IsShown() then
         set("shown", false)
         forced = false
       end

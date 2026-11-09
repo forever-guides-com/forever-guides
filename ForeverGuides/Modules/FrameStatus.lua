@@ -288,7 +288,7 @@ end
 
 function D.Print()
   for _, line in ipairs(D.Lines()) do
-    ns.Print(line)
+    ns.Notify.chat(line)
   end
 end
 

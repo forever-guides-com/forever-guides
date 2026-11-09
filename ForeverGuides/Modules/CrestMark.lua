@@ -335,7 +335,7 @@ local function schedule(kind, trigger, delay)
   if not old or PL.GAPS[trigger] < PL.GAPS[old] then
     due[kind] = trigger
   end
-  arm(kind, delay or PL.Delay(CM.random))
+  arm(kind, delay or (trigger == "enable" and PL.SwitchDelay(CM.random) or PL.Delay(CM.random)))
 end
 
 local function renew()
@@ -377,6 +377,31 @@ armRenew = function(delay)
   if not ok then
     renewArmed = false
   end
+end
+
+-- The answer to a probe. With the presence mark on the line the logos ride in its message, so that one is the
+-- answer (it may have gone out for a probe of its own a moment ago); else the logos go out in a message of their own.
+-- Returns true, or false and why.
+function CM.Answer()
+  local kind = "guild"
+  if not active or not Consent.Allows(FN, "send", kind) then
+    return false, "consent"
+  end
+  if merged(kind) then
+    if not CM.MergedBody(kind) then
+      return false, "empty"
+    end
+    if ns.ShareSync.AnsweredWithin("presenceMark", 30) then
+      return true
+    end
+    return ns.Presence.Answer(kind)
+  end
+  local moved = plan.Moved(kind)
+  local ok, why = announce(kind, "ask")
+  if ok then
+    armRenew(PL.RenewIn(moved, CM.random))
+  end
+  return ok, why
 end
 
 -- Receiving -----------------------------------------------------------------------------------------------
@@ -495,6 +520,12 @@ ns.On("PLAYER_GUILD_UPDATE", function(_, unit)
     changed()
   end
 end)
+-- The guild showed up after login (late status, join): the logos that the login could not send go out now.
+ns.On("FG_SHARE_GUILD_READY", function()
+  if plan.LastAt("guild") == nil and not due.guild then
+    schedule("guild", "login")
+  end
+end)
 ns.On("ZONE_CHANGED_NEW_AREA", function()
   for _, kind in ipairs(ORDER) do
     plan.Touch(kind)
@@ -552,12 +583,29 @@ ns.On("FG_CONSENT_WITHDRAWN", function(_, fn)
   end
 end)
 
-local ok, why = Comm.Register(FN, {
-  version = 1,
-  audiences = ORDER,
-  on = { C = onCrest, R = onFarewell },
-  farewell = "R",
-})
+local ok, why = Comm.Register(
+  FN,
+  ns.ShareSync.Attach(FN, {
+    version = 1,
+    audiences = ORDER,
+    on = { C = onCrest, R = onFarewell },
+    farewell = "R",
+  }, {
+    ready = function()
+      if not active then
+        return false, "inactive"
+      end
+      if not AUDIENCES.guild.channel() then
+        return false, "noguild"
+      end
+      if locked() then
+        return false, "combat"
+      end
+      return true
+    end,
+    answer = CM.Answer,
+  })
+)
 active = ok
 if not ok then
   ns.Log.warn("crestmark: not registered (%s)", tostring(why))

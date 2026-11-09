@@ -18,6 +18,14 @@ local TAIL = {
     "Freiwillig: Das Datum deiner Entscheidung wird nur auf diesem Rechner gespeichert.",
   },
 }
+-- The sentence about the probe ("who is there?") of the guild functions, added to the line "to whom".
+local PROBE = {
+  enUS = "Who is there: receivers ask the guild on switch-on and login, senders answer, at most once per minute.",
+  deDE = "Nachfrage: Empfänger fragen beim Einschalten und Login die Gilde, Sender antworten (einmal je Minute).",
+}
+-- Functions that ask and answer this way (ShareSync).
+local PROBES = { peerStats = true, professions = true, presenceMark = true, crestMark = true, guildMap = true, crafting = true }
+
 local LABEL = {
   enUS = { "Data: ", "To whom: ", "Purpose: ", "Receiver: " },
   deDE = { "Daten: ", "An wen: ", "Zweck: ", "Empfänger: " },
@@ -28,10 +36,14 @@ local READ = {
 }
 
 -- rows: { data, to, purpose, receiver } of one language; reads = false when the line "to" says it itself.
-local function info(lang, rows, reads)
+local function info(lang, rows, reads, probe)
   local out = {}
   for i = 1, 4 do
     out[i] = LABEL[lang][i] .. rows[i] .. (i == 2 and reads ~= false and READ[lang] or "")
+  end
+  if probe then
+    -- Same line as "to whom": the information text keeps its seven lines.
+    out[2] = out[2] .. " " .. PROBE[lang]
   end
   for _, line in ipairs(TAIL[lang]) do
     out[#out + 1] = line
@@ -50,8 +62,8 @@ local function add(id, label, hint, fields, enRows, deRows, reads)
   en["consent." .. id .. ".label"], de["consent." .. id .. ".label"] = label[1], label[2]
   en["consent." .. id .. ".hint"], de["consent." .. id .. ".hint"] = hint[1], hint[2]
   en["consent." .. id .. ".fields"], de["consent." .. id .. ".fields"] = fields[1], fields[2]
-  en["consent." .. id .. ".info"] = info("enUS", enRows, reads)
-  de["consent." .. id .. ".info"] = info("deDE", deRows, reads)
+  en["consent." .. id .. ".info"] = info("enUS", enRows, reads, PROBES[id])
+  de["consent." .. id .. ".info"] = info("deDE", deRows, reads, PROBES[id])
 end
 
 add(
@@ -164,15 +176,15 @@ add("crafting", { "Recipes", "Rezepte" }, {
   "Sent: professions, skill levels and the recipes you know.",
   "Gesendet wird: Berufe, Skillstufen und die Rezepte, die du kennst.",
 }, {
-  "your professions with skill level and maximum, and the recipes you know in them as numbers. Only the character you play, never your other characters. A profession appears once you opened its window.",
-  "guild members with the add-on who switched receiving on. Asked who can make a recipe, you whisper an answer to the asker, and only if you know it. Nothing goes to group, friends or strangers. When you open a crafter list, your add-on asks the guild.",
+  "your professions with skill and maximum and the recipes you know in them as numbers. Only the character you play. A profession appears once you opened its window.",
+  "guild members with the add-on who switched receiving on. Asked who can make a recipe, you whisper an answer to the asker, and only if you know it. Nothing goes to group, friends or strangers. Opening a crafter list asks the guild.",
   "they find out who in the guild can craft an item.",
   "They keep your list for up to 14 days or until they delete it. Withdrawing makes everyone online delete it, members who are offline keep it until it expires.",
 }, {
-  "deine Berufe mit Skillstufe und Maximum und die Rezepte, die du darin kennst, als Zahlen. Nur der Charakter, den du spielst, nie deine anderen Charaktere. Ein Beruf erscheint, sobald du sein Fenster öffnest.",
-  "Gildenmitglieder mit Addon und eingeschaltetem Empfangen. Bei einer Rezept-Frage flüsterst du nur dem Fragenden, und nur wenn du es kennst. Nichts geht an Gruppe, Freunde oder Fremde. Beim Öffnen von Hersteller-Listen fragt dein Addon die Gilde.",
+  "deine Berufe mit Stufe und Maximum und die dort bekannten Rezepte als Zahlen. Nur der Charakter, den du spielst. Ein Beruf erscheint, sobald du sein Fenster öffnest.",
+  "Gildenmitglieder mit Addon und Empfangen an. Bei einer Rezept-Frage flüsterst du nur dem Fragenden, nur bei bekanntem Rezept. Nichts geht an Gruppe, Freunde oder Fremde. Eine Hersteller-Liste fragt die Gilde.",
   "sie sehen, wer in der Gilde einen Gegenstand herstellen kann.",
-  "Sie behalten deine Liste bis zu 14 Tage oder bis zum Löschen. Beim Widerruf löschen alle, die online sind, sie sofort, wer offline ist, behält sie bis zum Ablauf.",
+  "Sie behalten deine Liste bis zu 14 Tage oder bis zum Löschen. Beim Widerruf löschen Online-Spieler sie sofort, Offline-Spieler bis Ablauf.",
 })
 add("gmShare", { "Share GildenManager", "GildenManager teilen" }, {
   "Join dates, marks and notes to your officers.",
@@ -293,11 +305,13 @@ local shared = {
     "Sharing with other addon users is off until you switch it on, per function, direction and audience. Sending and receiving are separate.\n"
       .. "Data goes from player to player through the chat servers of Blizzard. Nothing is sent to the author of the add-on or to a website.\n"
       .. "Other players in the channel and their addons can read the messages. Receivers store names, realms and values on their computer.\n"
+      .. "Whoever receives a guild function sends one small question to the guild (who is there?) with no data about themselves. Whoever has sending on answers it, at most once per function and minute.\n"
       .. "You can switch off at any time, it takes effect at once. Copies others have stored stay with them.\n"
       .. "This text describes what the add-on does. It is not legal advice.",
     "Teilen mit anderen Addon-Nutzern ist aus, bis du es einschaltest, je Funktion, Richtung und Zielgruppe. Senden und Empfangen sind getrennt.\n"
       .. "Die Daten gehen von Spieler zu Spieler über die Chat-Server von Blizzard. Sie gehen nie an den Entwickler des Addons oder an eine Website.\n"
       .. "Andere Spieler im Kanal und ihre Addons können die Nachrichten mitlesen. Empfänger speichern Namen, Realms und Werte auf ihrem Rechner.\n"
+      .. "Wer eine Gildenfunktion empfängt, schickt einmal eine kleine Frage an die Gilde (wer ist da?), ohne Daten über sich. Wer Senden an hat, antwortet darauf, höchstens einmal je Funktion und Minute.\n"
       .. "Du kannst jederzeit ausschalten, es wirkt sofort. Kopien, die andere gespeichert haben, bleiben bei ihnen.\n"
       .. "Dieser Text beschreibt, was das Addon tut. Er ist keine Rechtsberatung.",
   },
@@ -325,6 +339,60 @@ local shared = {
   ["consent.bulk.off"] = { "All off", "Alle aus" },
   ["consent.bulk.count.send"] = { "Sending on: %d of %d", "Senden aktiv: %d von %d" },
   ["consent.bulk.count.receive"] = { "Receiving on: %d of %d", "Empfangen aktiv: %d von %d" },
+  ["consent.bulk.scope"] = {
+    "%d functions have an own setting for this character: the switch changes this character only there. For all others it changes the account, so every character that follows the account is affected.",
+    "%d Funktionen haben eine eigene Einstellung für diesen Charakter: Dort ändert der Schalter nur diesen Charakter. Bei allen anderen ändert er das Konto, jeder Charakter, der dem Konto folgt, ist betroffen.",
+  },
+  -- Status line of a function card: switches, last sent, last heard, players heard, and the reason when nothing happens.
+  ["consent.status.line"] = {
+    "Send %s, receive %s. Last sent %s, last heard %s, %d players heard.",
+    "Senden %s, Empfangen %s. Zuletzt gesendet %s, zuletzt gehört %s, %d Mitspieler gehört.",
+  },
+  ["consent.status.ago"] = { "%d s ago", "vor %d s" },
+  ["consent.status.never"] = { "never", "noch nie" },
+  ["consent.status.why"] = { "Why nothing happens: %s", "Warum nichts passiert: %s" },
+  ["consent.why.off"] = {
+    "Sending and receiving are off for this function.",
+    "Senden und Empfangen sind für diese Funktion aus.",
+  },
+  ["consent.why.noguild"] = {
+    "You are not in a guild, or the game has not reported it yet.",
+    "Du bist in keiner Gilde, oder das Spiel hat sie noch nicht gemeldet.",
+  },
+  ["consent.why.unregistered"] = {
+    "The function has not started yet. It starts with the first switch.",
+    "Die Funktion ist noch nicht gestartet. Sie startet mit dem ersten Schalter.",
+  },
+  ["consent.why.roster"] = {
+    "The guild list is still loading, the add-on waits for it.",
+    "Die Gildenliste lädt noch, das Addon wartet darauf.",
+  },
+  ["consent.why.trial"] = {
+    "This looks like a trial account. Trial accounts cannot send add-on messages, and the game reports no error.",
+    "Das sieht nach einem Probekonto aus. Probekonten können keine Addon-Nachrichten senden, das Spiel meldet dabei keinen Fehler.",
+  },
+  ["consent.why.combat"] = { "Paused in combat.", "Pausiert im Kampf." },
+  ["consent.why.instance"] = { "Paused in an instance.", "Pausiert in einer Instanz." },
+  ["consent.why.afk"] = { "Paused while you are away.", "Pausiert, solange du abwesend bist." },
+  ["consent.why.hidden"] = { "You are hidden, nothing is sent.", "Du bist unsichtbar, es wird nichts gesendet." },
+  ["consent.why.restricted"] = {
+    "The game blocks add-on messages right now (restriction).",
+    "Das Spiel sperrt Addon-Nachrichten gerade (Einschränkung).",
+  },
+  ["consent.why.throttle"] = {
+    "Send limit reached, the add-on waits.",
+    "Sendegrenze erreicht, das Addon wartet.",
+  },
+  ["consent.why.refused"] = {
+    "The game refused the last message. /fg diag share names the code.",
+    "Das Spiel hat die letzte Nachricht abgelehnt. /fg diag share nennt den Code.",
+  },
+  ["consent.why.silent"] = {
+    "Nobody with the add-on has answered yet. Either nobody in the guild sends this function, or they play on trial accounts.",
+    "Noch hat niemand mit dem Addon geantwortet. Entweder sendet niemand in der Gilde diese Funktion, oder es sind Probekonten.",
+  },
+  ["consent.why.inactive"] = { "Not active right now.", "Gerade nicht aktiv." },
+  ["consent.why.empty"] = { "There is nothing to send yet.", "Es gibt noch nichts zu senden." },
   ["consent.bulk.title"] = { "Switch on all", "Alle einschalten" },
   ["consent.bulk.confirm.send"] = {
     "Switch on sending for %d functions?\nOther add-on users in the matching channels can then receive your data.\nDetails: Privacy info. You can switch off at any time.",

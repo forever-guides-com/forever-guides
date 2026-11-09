@@ -275,12 +275,21 @@ local seenCount = {}
 
 ns.On("CHAT_MSG_LOOT", function(_, message, ...)
   -- Group members' loot fires this too; only count our own (arg12 = GUID).
-  local guid = select(11, ...)
+  -- A secret line or GUID is skipped: it can be neither read nor compared.
+  local guard = ns.AutoGuard
+  if not guard then
+    return
+  end
+  local rawGuid = select(11, ...)
+  local guid, text = guard.Safe(rawGuid), guard.Safe(message)
+  if rawGuid ~= nil and guid == nil then
+    return
+  end
   if guid and UnitGUID and guid ~= UnitGUID("player") then
     return
   end
   local chars = ns.db and ns.db.chars
-  local itemId = type(message) == "string" and tonumber(message:match("item:(%d+)"))
+  local itemId = type(text) == "string" and tonumber(text:match("item:(%d+)"))
   if not chars or not itemId then
     return
   end

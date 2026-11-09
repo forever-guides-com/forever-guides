@@ -8,6 +8,9 @@
 --              number of senders heard lately; whoever only receives stays silent. The pace is checked
 --              once a second by a timer that runs only while sending is possible at all.
 --              settings.guildMapAccuracy: "exact", "grid" (rounded to 5 percent of the map) or "zone".
+--   Switching  send goes on: the first message follows after 1 to 3 seconds (SWITCH_SPREAD), still inside the send
+--              grid. A probe of a listening member (ShareSync, type Q) is answered with the position now after
+--              a random wait, once per minute, still inside the grid and the pause rules.
 --   Receiving  intake gate (flood, rate per sender), sender must be on the guild roster, plausible map,
 --              then GuildMapStore. Receiving never sends anything.
 --   Withdrawal one end message X after the last position: when the player turns invisible, enters an
@@ -16,6 +19,7 @@
 --              a position that really went out before (Comm.lua, head).
 local _, ns = ...
 local Comm, Consent, PN, L, G = ns.Comm, ns.Consent, ns.PlayerName, ns.GuildSyncLogic, ns.GuildSyncCodec
+local Sync = ns.ShareSync
 
 local GM = {}
 ns.GuildMapComm = GM
@@ -25,6 +29,10 @@ GM.FN = "guildMap"
 -- after login, a switch or an area change, so a guild does not speak in one second.
 GM.TICK = 1
 GM.SPREAD = 4
+-- Seconds after the send switch went on until the first message: GM.SWITCH_MIN plus a random part of
+-- GM.SWITCH_SPREAD (1 to 3 seconds), so a switch is felt at once and a bulk switch still does not speak in one second.
+GM.SWITCH_MIN = 1
+GM.SWITCH_SPREAD = 2
 -- Maps of these types are no place: Cosmic and World (UIMapType 0 and 1).
 GM.MAX_NO_PLACE_TYPE = 1
 -- Replaceable in tests: random number from 0 to 1.
@@ -266,6 +274,52 @@ local function delayed()
   resumeAt = clock() + L.CONFIG.move.resume + math.floor(GM.random() * GM.SPREAD)
 end
 
+-- The send switch went on: the first message follows within a few seconds.
+local function soon()
+  if GM.Active() then
+    last = nil
+    resumeAt = clock() + GM.SWITCH_MIN + GM.random() * GM.SWITCH_SPREAD
+    arm()
+  end
+end
+
+-- Answer to a probe: the position now, whatever the pace says, but not past the pause rules or the send grid.
+-- Returns true, or false and why (inactive, hidden, combat, instance, afk, empty, payload, throttle, or the line).
+function GM.Answer()
+  if not Consent.Allows(GM.FN, "send", "guild") then
+    return false, "consent"
+  end
+  if GM.Hidden() then
+    return false, "hidden"
+  end
+  if not inGuild() then
+    return false, "inactive"
+  end
+  local why = pauseReason()
+  if why then
+    return false, why
+  end
+  local map, x, y = readPosition()
+  if not map then
+    return false, "empty"
+  end
+  local payload, cur = prepare(map, x, y)
+  if not payload then
+    return false, "payload"
+  end
+  if not grid.Allow("P") then
+    return false, "throttle"
+  end
+  local t = clock()
+  local sent, reason = Comm.Send(GM.FN, "P", payload, "guild", nil, { priority = "reply" })
+  if not sent then
+    return false, reason
+  end
+  cur.at, cur.beatIn = t, nextBeat()
+  last, announced = cur, true
+  return true
+end
+
 -- Starts the pace (switched on, login, left the hidden state). The first message is spread.
 local function start()
   if GM.Active() then
@@ -369,6 +423,14 @@ ns.On("PLAYER_GUILD_UPDATE", function()
   if not inGuild() then
     announced = false
     stop()
+  elseif not ticking then
+    -- The guild became known after login: the pace starts now, not with the next loading screen.
+    start()
+  end
+end)
+ns.On("FG_SHARE_GUILD_READY", function()
+  if not ticking then
+    start()
   end
 end)
 ns.On("FG_CONSENT_CHANGED", function(_, fn, dir, aud, value)
@@ -377,7 +439,7 @@ ns.On("FG_CONSENT_CHANGED", function(_, fn, dir, aud, value)
   end
   if dir == "send" then
     if value == true then
-      start()
+      soon()
     else
       -- The consent is already false here: the end message goes out as a farewell of the line.
       GM.Retract("w", true)
@@ -413,13 +475,37 @@ end)
 
 -- Registration ----------------------------------------------------------------------------------------
 
-Comm.Register(GM.FN, {
-  version = 1,
-  audiences = { "guild" },
-  on = { P = onPosition, X = onEnd },
-  decode = decode,
-  farewell = "X",
-})
+Comm.Register(
+  GM.FN,
+  Sync.Attach(GM.FN, {
+    version = 1,
+    audiences = { "guild" },
+    on = { P = onPosition, X = onEnd },
+    decode = decode,
+    farewell = "X",
+  }, {
+    ready = function()
+      if GM.Hidden() then
+        return false, "hidden"
+      end
+      if not GM.Active() then
+        return false, "inactive"
+      end
+      local why = pauseReason()
+      if why then
+        return false, why
+      end
+      return true
+    end,
+    answer = GM.Answer,
+    pause = function()
+      if GM.Hidden() then
+        return "hidden"
+      end
+      return pauseReason()
+    end,
+  })
+)
 
 if Consent.MarkAvailable then
   Consent.MarkAvailable(GM.FN)

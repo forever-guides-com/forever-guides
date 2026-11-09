@@ -400,7 +400,11 @@ end
 local ORDER = { "fill", "quest", "rested" }
 local PRIORITY = { fill = 1, quest = 2, rested = 3 }
 
-local function paintLayer(tex, p, color, frac, innerW, innerH, bw, sub)
+-- The rested layer is a strip along the bottom (or the left side of a vertical bar), so the quest layer above it
+-- stays whole: both measure from the current XP and overlap, the rested pool is not part of the quest sum.
+local RESTED_STRIP = 0.4
+
+local function paintLayer(tex, p, color, frac, innerW, innerH, bw, sub, strip)
   if frac <= 0 then
     tex:Hide()
     return
@@ -409,10 +413,10 @@ local function paintLayer(tex, p, color, frac, innerW, innerH, bw, sub)
   tex:ClearAllPoints()
   if p.orient == "vertical" then
     tex:SetPoint("BOTTOMLEFT", bw, bw)
-    tex:SetSize(innerW, math.max(1, innerH * frac))
+    tex:SetSize(strip and math.max(1, math.floor(innerW * RESTED_STRIP)) or innerW, math.max(1, innerH * frac))
   else
     tex:SetPoint("BOTTOMLEFT", bw, bw)
-    tex:SetSize(math.max(1, innerW * frac), innerH)
+    tex:SetSize(math.max(1, innerW * frac), strip and math.max(1, math.floor(innerH * RESTED_STRIP)) or innerH)
   end
   local path = XB.TEXTURE_PATH[p.texture]
   if path then
@@ -441,7 +445,7 @@ local function renderBar(frame, el, ctx)
     return PRIORITY[a] > PRIORITY[b]
   end)
   for sub, name in ipairs(rank) do
-    paintLayer(state.layers[name], p, p[name], fractions[name], innerW, innerH, bw, sub)
+    paintLayer(state.layers[name], p, p[name], fractions[name], innerW, innerH, bw, sub, name == "rested")
   end
   if p.spark and fractions.fill > 0 and fractions.fill < 1 then
     state.spark:ClearAllPoints()

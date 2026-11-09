@@ -271,23 +271,6 @@ local function playerLevel()
   return ok and type(level) == "number" and level > 0 and level or nil
 end
 
--- Slug of the player's race in Data.Races, nil when unknown.
-local function playerRace()
-  if not UnitRace then
-    return nil
-  end
-  local ok, _, token = pcall(UnitRace, "player")
-  if not ok or type(token) ~= "string" then
-    return nil
-  end
-  local flat = token:lower()
-  for _, r in ipairs((ns.Data and ns.Data.Races) or {}) do
-    if flat == (r.slug:gsub("%-", "")) or (flat == "scourge" and r.slug == "undead") then
-      return r.slug
-    end
-  end
-end
-
 -- Saved area states live in the account settings, { [area id] = true (collapsed)
 -- | false (open) }. A missing or non-boolean entry (older versions only stored
 -- true) falls back to the default: learned collapsed, every other area open.
@@ -506,7 +489,7 @@ function V.Create(view, o)
       fromLevel = state.from,
       isKnown = level and LV.IsKnown or nil,
       playerLevel = level,
-      race = own and playerRace() or nil,
+      race = own and K.PlayerRaceSlug() or nil,
       nameOf = itemName,
     })
     local searching = state.search:find("%S") ~= nil

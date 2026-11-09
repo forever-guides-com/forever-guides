@@ -334,6 +334,10 @@ ns.On("FG_ERROR_NEW", function(_, e)
 end)
 
 function EC.OnLink(link)
+  local guard = ns.AutoGuard
+  if guard then
+    link = guard.Safe(link)
+  end
   if link == LINK and ns.Main then
     ns.Main.Show("errors")
   end

@@ -41,6 +41,8 @@ PL.LIMITS = {
   ONLINE_SPREAD_MAX = 90,
   DELAY_MIN = 2,
   DELAY_MAX = 8,
+  SWITCH_MIN = 1,
+  SWITCH_MAX = 3,
   MAX_KEY = 64,
   MIN_SIZE = 8,
   MAX_SIZE = 64,
@@ -56,7 +58,9 @@ local KNOWN_FLAGS = 4
 -- spaced like the guild announcement of PeerComm so a reload does not repeat it.
 -- "online" is a guild member who came online (a local event, no message was heard): at least 120 seconds
 -- apart, more in a big guild (PL.OnlineGap).
-PL.GAPS = { login = 1800, enable = 60, join = 60, grow = 60, change = 600, renew = 600, online = 120 }
+-- ask: the answer to a probe of ShareSync, which holds its own minute per function; this only keeps two messages of
+-- one audience apart.
+PL.GAPS = { login = 1800, enable = 60, join = 60, grow = 60, change = 600, renew = 600, online = 120, ask = 10 }
 -- Seconds until the next renewal: while something moved (zone, group) and while nothing did. Both stay
 -- below TTL, also with the 20 percent of spread (2880 seconds at most), so a quiet player does not drop out of
 -- the register of others.
@@ -247,6 +251,16 @@ function PL.Delay(random)
     return L.DELAY_MIN
   end
   return math.max(L.DELAY_MIN, math.min(L.DELAY_MAX, r))
+end
+
+-- Seconds before the mark goes out after the player switched it on: 1 to 3, so the switch is felt at once.
+-- random(lo, hi) returns an integer.
+function PL.SwitchDelay(random)
+  local r = tonumber((random or math.random)(L.SWITCH_MIN, L.SWITCH_MAX))
+  if not r or r ~= r then
+    return L.SWITCH_MIN
+  end
+  return math.max(L.SWITCH_MIN, math.min(L.SWITCH_MAX, r))
 end
 
 -- Seconds before the answer to a guild member who came online goes out: 5 up to a spread that grows with the

@@ -310,9 +310,10 @@ function D.Text()
   return table.concat(D.Lines(), "\n")
 end
 
--- The same lines in the chat window.
+-- The same lines in the chat window, straight to the chat: the answer to a typed command must show with the
+-- default feedback "off" too.
 function D.Print()
   for _, line in ipairs(D.Lines()) do
-    ns.Print(line)
+    ns.Notify.chat(line)
   end
 end

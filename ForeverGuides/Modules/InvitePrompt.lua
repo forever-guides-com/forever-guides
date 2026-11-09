@@ -309,7 +309,8 @@ end
 -- Widths of the two buttons: the label and a margin, at least BTN_MIN_W, shrunk together when they do not fit.
 local function buttonWidths(row, room)
   local invite = math.max(BTN_MIN_W, textWidth(row.measureUi, L["invite.prompt.button"]) + BTN_PAD)
-  local copy = math.max(BTN_MIN_W, textWidth(row.measureUi, L["invite.prompt.copy"]) + BTN_PAD)
+  -- The copy button opens the copy box, so its width includes the "opens" mark.
+  local copy = math.max(BTN_MIN_W, row.copy:FullWidth())
   if invite + copy + GAP > room then
     local factor = math.max(0, room - GAP) / (invite + copy)
     invite, copy = math.floor(invite * factor), math.floor(copy * factor)
@@ -710,6 +711,7 @@ local function newRow()
     key = "invite.prompt.copy",
     width = BTN_MIN_W,
     height = 24,
+    opens = true,
     onClick = function()
       P.OpenCopy(row.name)
     end,

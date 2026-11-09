@@ -77,6 +77,49 @@ local function counts()
   return active, total
 end
 
+-- Functions of the tab whose switches write for this character only.
+function S.CharModeCount()
+  local n = 0
+  for _, def in ipairs(availableList()) do
+    if mode(def.id) == "char" then
+      n = n + 1
+    end
+  end
+  return n
+end
+
+local function onOff(on)
+  return L[on and "common.on" or "common.off"]
+end
+
+-- "Send on, receive off. Last sent ..." and the reason below it, as text. "" for a function that does not report.
+function S.StatusText(fn)
+  local sync = rawget(ns, "ShareSync")
+  local st = sync and sync.Status(fn)
+  if not st then
+    return ""
+  end
+  local function ago(value)
+    if not value then
+      return L["consent.status.never"]
+    end
+    return string.format(L["consent.status.ago"], math.floor(value + 0.5))
+  end
+  local text = string.format(
+    L["consent.status.line"],
+    onOff(st.send):lower(),
+    onOff(st.receive):lower(),
+    ago(st.lastSent),
+    ago(st.lastHeard),
+    st.heard
+  )
+  local why = st.reason and L["consent.why." .. st.reason]
+  if why then
+    text = text .. "\n" .. string.format(L["consent.status.why"], why)
+  end
+  return text
+end
+
 -- The text of the privacy info: the general part, then the information text of each function.
 function S.PrivacyText()
   local parts = { L["consent.privacy.body"] }
@@ -208,6 +251,12 @@ local function bulkRows(view)
     track(line, function()
       local _, on, total = S.BulkCounts(S.BulkTargets(dir), dir)
       line:SetText(string.format(L["consent.bulk.count." .. dir], on, total))
+    end)
+    local scopeNote = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 4 })
+    scopeNote.fgId = "consent-bulk-scope-" .. dir
+    track(scopeNote, function()
+      local n = S.CharModeCount()
+      scopeNote:SetText(n > 0 and string.format(L["consent.bulk.scope"], n) or "")
     end)
   end
 end
@@ -342,6 +391,11 @@ local function functionCard(card, def)
     end
   end
   ns.AddParagraph(card, "consent." .. def.id .. ".fields", { role = "micro", color = "textMuted", gap = 8 })
+  local status = ns.AddParagraph(card, nil, { role = "micro", color = "textMuted", gap = 4 })
+  status.fgId = "consent-" .. def.id .. "-status"
+  track(status, function()
+    status:SetText(S.StatusText(def.id))
+  end)
   for _, build in ipairs(extras[def.id] or {}) do
     ns.Safe("consent-extra", build, card)
   end
@@ -388,10 +442,6 @@ local function functionCard(card, def)
 end
 
 -- Chat lines ------------------------------------------------------------------------------------------
-
-local function onOff(on)
-  return L[on and "common.on" or "common.off"]
-end
 
 local function names(list)
   return #list > 0 and table.concat(list, ", ") or L["consent.chat.none"]
@@ -468,5 +518,6 @@ function S.Add(view)
 end
 
 ns.On("FG_CRAFT_UPDATE", refreshAll)
+ns.On("FG_SHARE_STATUS", refreshAll)
 ns.On("FG_CONSENT_CHANGED", refreshAll)
 ns.On("FG_CONSENT_WITHDRAWN", refreshAll)

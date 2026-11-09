@@ -786,6 +786,11 @@ end
 -- sender percent-encoded (links from before the encoding hold the plain name). `text`
 -- (second SetItemRef argument) is the shown link text, it carries the title.
 function NL.OnLink(link, text)
+  -- A secret link or label is never indexed.
+  local guard = ns.AutoGuard
+  if guard then
+    link, text = guard.Safe(link), guard.Safe(text)
+  end
   if type(link) ~= "string" then
     return
   end

@@ -203,6 +203,10 @@ function ns.DiagReport()
     local okCursor, text = pcall(ns.Cursor.DiagLine)
     out[#out + 1] = okCursor and text or "cursor ring: ?"
   end
+  if ns.ShareSync then
+    local okShare, text = pcall(ns.ShareSync.Text)
+    out[#out + 1] = okShare and text or "share: ?"
+  end
   if ns.LogoStatus then
     local okLogo, text = pcall(ns.LogoStatus.Text)
     out[#out + 1] = okLogo and text or "logo chain: ?"

@@ -4,6 +4,41 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.5.5] - 2026-11-09
+
+### Added
+
+- Item count: a new element for the mouse ring and HUD windows shows how many of an item you carry, with an optional goal and a color change when the number is low.
+- Item count: new templates "Consumable with count" for the ring and "One item count" for HUD windows.
+- Sharing: the new command /fg diag share opens a window to copy from and lists per function what was sent, heard and dropped, for bug reports.
+
+### Changed
+
+- Sharing: when you switch on receiving for a guild function, the add-on asks the guild once who is there and shows the senders' data within seconds. The question contains nothing about you.
+- Sharing: switching on sending now sends the first message after 1 to 3 seconds. Item level and professions no longer wait up to 30 minutes.
+- Sharing: each function shows a status line on the Share page and names the reason when nothing can happen, such as no guild, combat or the send limit.
+- Sharing: the bulk switches show for how many functions this character has its own setting, and there the switch changes only this character.
+- Consent texts and the privacy info now state plainly that the add-on asks the guild who is there, and the privacy sentence in the crafter text is back.
+
+### Fixed
+
+- Chat and sharing: a chat text that the game hides no longer causes errors, for example on the "No player named" answer, in loot capture, on invite whispers and on links.
+- Lists with drag to reorder: holding a row for a moment no longer raises an error, and the list scrolls correctly at its edge.
+- Hiding the interface (Alt+Z): the experience bar no longer stays gone for good, it comes back with the interface.
+- Hiding the interface (Alt+Z): the small chat window keeps its chat, and the main window no longer ends the navigation edit mode or a running tour.
+- Experience bar: the rested XP layer is now a strip along the bottom, so completed quests keep their full length behind your current XP.
+- Classes and races: the Horde Skyborne (Windshaper) can no longer be picked as a mage, both Skyborne races now match character creation.
+- Skyborne racials: Read Leyline and Skysight are active abilities (50% health and mana regeneration for 15 sec, 15% movement speed for 30 sec), Wind Blessed gives 2% haste.
+- Skyborne: weapon skills and the levels overview recognize a Skyborne character as its own race, and the weapons page preselects it.
+- Map: the Skyborne race switch starts on for a Skyborne character.
+- Sharing: when the guild became known only after login, the guild functions stayed silent until a loading screen. They now start as soon as the guild and its member list are ready.
+- Sharing: a registration that the game refuses is repeated at the next switch, login and loading screen.
+- Sharing: switching on receiving later no longer means waiting for the next beat of the senders, which could take up to 40 minutes.
+- Guild invite request: the "Copy command" button now carries the Open symbol like the other buttons that open a window.
+- Levels overview: Dual Wield, Mail, Plate Mail and Blessing of Kings were missing although the class trainer teaches them. They now appear at the right level with the trainer price.
+- Levels overview: the warlock spell Bane of Doom now shows the name used in the game and is recognized as learned.
+- The commands /fg diag share and /fg diag chat showed nothing with feedback off. They now open a window you can copy the text from.
+
 ## [0.5.4] - 2026-11-06
 
 ### Changed
@@ -333,6 +368,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.5.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.1...v0.5.2

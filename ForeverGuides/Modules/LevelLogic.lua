@@ -1,6 +1,6 @@
 -- Learn list: what a class can learn at a class trainer at which level
--- (abilities and ranks). Weapon skills and the talents themselves are not listed,
--- weapons live on the weapon masters page. Of an ability that comes through a
+-- (abilities and ranks) plus the skills it teaches (Dual Wield, Parry, armor). Talents
+-- and the weapons of the weapon masters are not listed, weapons live on their own page. Of an ability that comes through a
 -- talent only the ranks above the talent rank are taught.
 -- Pure logic over the generated data (Abilities, Spells, LevelSources).
 local _, ns = ...
@@ -67,8 +67,11 @@ local function rankChains(class)
   end
   for _, s in ipairs((data().Spells and data().Spells[class]) or {}) do
     local name = s.n and s.n.en and s.n.en:lower()
-    if name and (s.l or 0) > 0 and (s.c == nil or #s.c == 1) then
+    -- A spell without a client level (Sense Undead) still owns its name: no rename candidate.
+    if name and (s.c == nil or #s.c == 1) then
       named[name] = true
+    end
+    if name and (s.l or 0) > 0 and (s.c == nil or #s.c == 1) then
       local rank = s.rk or 0
       if s.k ~= "weapon" and (s.k ~= "talent" or rank >= 2) and not skills[s.id] and priced(class, s.id) then
         local chain = chains[name] or { key = name, n = s.n, i = s.i, ranks = {} }
@@ -242,6 +245,39 @@ local function clampLevel(level)
   return math.min(LV.CAP, math.max(1, level))
 end
 
+-- Skills the class trainer teaches (Dual Wield, Parry, armor): the weapons data says how a
+-- class acquires a skill and from which level (tests compare them with the client's
+-- SkillRaceClassInfo). A skill without a level (Parry of most classes) is not listed:
+-- the spell level 1 of the client is only the default. Weapons taught by weapon masters
+-- have their own page.
+local function addSkills(class, add)
+  local weapons = data().Weapons
+  if not (ns.RefLogic and weapons and weapons.skills) then
+    return
+  end
+  local spells = {}
+  for _, s in ipairs((data().Spells and data().Spells[class]) or {}) do
+    spells[s.id] = s
+  end
+  for _, row in ipairs(ns.RefLogic.Weapons(class)) do
+    local sid = LV.SKILL_SPELLS[row.skill]
+    local skill = weapons.skills[row.skill]
+    if row.a == "classTrainer" and sid and skill then
+      local spell = spells[sid]
+      local level = row.l or (spell and (spell.l or 0) > 1 and spell.l) or nil
+      if level and level > 0 then
+        add(level, {
+          kind = "skill",
+          skill = row.skill,
+          n = { de = skill.de, en = skill.en },
+          sid = sid,
+          i = (spell and spell.i) or LV.SKILL_ICONS[row.skill],
+        })
+      end
+    end
+  end
+end
+
 -- levels[1..CAP] = { level, items = { { kind = "ability", n, rank, sid, sp, i } } }.
 function LV.Build(class)
   local levels = {}
@@ -324,6 +360,7 @@ function LV.Build(class)
     local a = byKey[chain.key]
     addChain(chainRanks(chain, 0), chain, chain.n, a and a.sp, (a and a.i) or chain.i)
   end
+  addSkills(class, add)
   for _, lv in ipairs(levels) do
     table.sort(lv.items, function(x, y)
       local nx, ny = (x.n and x.n.en) or "", (y.n and y.n.en) or ""
@@ -466,6 +503,16 @@ LV.SKILL_SPELLS = {
   sword2h = 202,
   thrown = 2567,
   wand = 5009,
+}
+
+-- Icon file names for the skills of the learn list when the spell data has none.
+LV.SKILL_ICONS = {
+  dualwield = "Ability_DualWield",
+  leather = "INV_Chest_Leather_01",
+  mail = "INV_Chest_Chain_01",
+  parry = "Ability_Parry",
+  plate = "INV_Chest_Plate01",
+  shield = "INV_Shield_04",
 }
 
 local function spellKnown(id)

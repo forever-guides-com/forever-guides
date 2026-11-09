@@ -309,12 +309,8 @@ local function filterApi()
 end
 
 local function notFoundName(text)
-  local guard = FG.AutoGuard
-  local readable = guard and guard.Safe and guard.Safe(text) or text
-  if type(readable) ~= "string" then
-    return nil
-  end
-  return SL.NotFoundName(readable, g("ERR_CHAT_PLAYER_NOT_FOUND_S"))
+  -- NotFoundName drops a secret text itself: the raw value must never be the fallback here.
+  return SL.NotFoundName(text, g("ERR_CHAT_PLAYER_NOT_FOUND_S"))
 end
 
 -- True when a "not found" line is the answer to a packet of ours (and not to a whisper of the user).

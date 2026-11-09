@@ -385,6 +385,10 @@ local function build(index)
       slot.input:SaveDraft()
       slot.input.edit:ClearFocus()
       save(slot)
+      -- A hidden ancestor (UIParent on the hide-UI key) leaves the frame shown: the window keeps its chat.
+      if f:IsShown() then
+        return
+      end
       slot.input:SetConversation(nil, true)
       slot.thread:Clear()
       slot.key = nil

@@ -30,6 +30,10 @@
 --             receive action when sent (it asks for what others share), a service when heard (needs the send
 --             consent). The answers come back as whispers with the id of the question; they are welcome from
 --             anybody for OPEN_WAIT idle seconds (one shared window per question, at most OPEN_MAX answers).
+-- Probe     A function may declare one probe (Register def.probe = "Q", guild only): a message with an empty payload that
+--             says "who is there?". It is a receive action when sent (needs the receive consent) and a service when heard
+--             (needs the send consent), carries nothing besides the function and the protocol version of the envelope,
+--             opens no whisper window and is never decoded by the function. ShareSync paces it and answers it.
 -- Whisper peers: a function that talks to chat partners (def.whisperPeer(name) -> true for a name that has an
 --             open chat with us) takes unrequested whispers from exactly those names, inside the receive
 --             bucket; everything else stays dropped. Its farewell goes to one whisper target at a time: it needs
@@ -256,15 +260,22 @@ local function chatApi()
   return type(api) == "table" and api or nil
 end
 
--- Registers a prefix with the game once. Returns whether the client knows it.
+-- Registers a prefix with the game once. Returns whether the client knows it. The answer of the game counts: false
+-- (old clients) and the codes of Enum.RegisterAddonMessagePrefixResult above "duplicate" (invalid, too many) leave
+-- the prefix open, so the next call tries again.
+local prefixFailed = {}
 local function ensurePrefix(prefix)
   if prefixes[prefix] then
     return true
   end
   local api = chatApi()
-  if api and type(api.RegisterAddonMessagePrefix) == "function" and pcall(api.RegisterAddonMessagePrefix, prefix) then
-    prefixes[prefix] = true
-    return true
+  if api and type(api.RegisterAddonMessagePrefix) == "function" then
+    local ok, result = pcall(api.RegisterAddonMessagePrefix, prefix)
+    if ok and result ~= false and not (type(result) == "number" and result > 1) then
+      prefixes[prefix], prefixFailed[prefix] = true, nil
+      return true
+    end
+    prefixFailed[prefix] = ok and tostring(result) or "error"
   end
   return false
 end
@@ -302,7 +313,8 @@ end
 -- decode(payload) -> value or nil (optional), prefix (default FGCOMM), farewell (optional type letter
 -- of a message that withdraws the sender: it carries at most FAREWELL_MAX characters and may still be
 -- sent after the send consent went off, to say goodbye to a channel that was told something before,
--- see the head of this file), ask (optional type letter of a guild-wide question), whisperAud (optional
+-- see the head of this file), ask (optional type letter of a guild-wide question), probe (optional type letter of the
+-- empty message "who is there?", see Probe above), whisperAud (optional
 -- consent audience of the whispers), request (optional type letter of a whisper request: sent with the receive
 -- consent, opens the answer window), service (optional, needs request, on[request] and decode:
 -- service(value) -> the content id a whisper request asks for, see the head of this file), whisperPeer (optional
@@ -348,6 +360,20 @@ function Comm.Register(fn, def)
   then
     return false, "ask"
   end
+  if
+    def.probe ~= nil
+    and (
+      type(def.probe) ~= "string"
+      or not def.probe:find("^%u$")
+      or not on[def.probe]
+      or def.probe == def.farewell
+      or def.probe == def.ask
+      or def.probe == def.request
+      or not kinds.guild
+    )
+  then
+    return false, "probe"
+  end
   local whisperAud = def.whisperAud
   if whisperAud ~= nil then
     local known = false
@@ -390,12 +416,44 @@ function Comm.Register(fn, def)
     request = def.request,
     service = def.service,
     ask = def.ask,
+    probe = def.probe,
     whisperAud = whisperAud,
     whisperPeer = def.whisperPeer,
     gate = def.gate,
   }
   ensurePrefix(prefix)
   return true
+end
+
+-- True while the function is registered with the line.
+function Comm.IsRegistered(fn)
+  return functions[fn] ~= nil
+end
+
+-- Registers every claimed prefix that the game does not know yet: a function that switches on late, a client that
+-- answered a registration with a refusal. Returns the number of prefixes still unknown.
+function Comm.EnsurePrefixes()
+  local open = 0
+  for prefix in pairs(prefixOwner) do
+    if not ensurePrefix(prefix) then
+      open = open + 1
+    end
+  end
+  return open
+end
+
+-- Prefixes of the line: { known, open, failed = { prefix = answer of the game } }.
+function Comm.PrefixState()
+  local out = { known = 0, open = 0, failed = {} }
+  for prefix in pairs(prefixOwner) do
+    if prefixes[prefix] then
+      out.known = out.known + 1
+    else
+      out.open = out.open + 1
+      out.failed[prefix] = prefixFailed[prefix] or "no-api"
+    end
+  end
+  return out
 end
 
 -- Takes a function out again (tests, a sub-addon that unloads); its owner hears FG_COMM_UNREGISTERED(fn).
@@ -497,6 +555,43 @@ local function before(a, b)
     return a.prio < b.prio
   end
   return a.seq < b.seq
+end
+
+-- The last refusal of the game per function (name and code of Comm.Result, when) and how often each name came.
+local lastError = {}
+
+local function noteError(fn, res, now)
+  local e = lastError[fn]
+  if not e then
+    e = { names = {} }
+    lastError[fn] = e
+  end
+  e.name, e.code, e.at = res.name, res.code, now
+  e.names[res.name] = (e.names[res.name] or 0) + 1
+end
+
+-- Why the game locks add-on messages right now: "combat", "restricted", or nil.
+function Comm.Lock()
+  return lockReason()
+end
+
+-- Packets of a function that arrived in this session from other players, before any rule was applied.
+function Comm.Received(fn)
+  local e = fnStats[fn]
+  return e and e.received or 0
+end
+
+-- The last refusal of the game for a function: { name, code, ago (seconds), names = { name = count } }, or nil.
+function Comm.LastError(fn)
+  local e = lastError[fn]
+  if not e then
+    return nil
+  end
+  local names = {}
+  for name, n in pairs(e.names) do
+    names[name] = n
+  end
+  return { name = e.name, code = e.code, ago = math.max(0, Comm.clock() - e.at), names = names }
 end
 
 -- How the line treats a normalized result: "ok", "throttle" (try again later), "restricted" (the game locked add-on
@@ -673,6 +768,9 @@ local function deliver(item, now)
   local ok, result = pcall(api.SendAddonMessage, item.prefix, text, channel, item.target)
   local res = ok and Comm.Result(result) or Comm.Result(9)
   local code = sendCode(res)
+  if code ~= "ok" then
+    noteError(fn, res, now)
+  end
   if code == "ok" then
     stats.sent = stats.sent + 1
     local e = fnAdd(fn, "sent")
@@ -885,6 +983,14 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
   if ask and aud ~= "guild" then
     return false, "audience"
   end
+  -- A probe is a receive action too: it asks who shares, goes to the guild only and carries no payload.
+  local probe = reg.probe ~= nil and typ == reg.probe
+  if probe and aud ~= "guild" then
+    return false, "audience"
+  end
+  if probe and payload ~= "" then
+    return false, "payload"
+  end
   local allowed
   if farewell then
     if type(payload) ~= "string" or #payload > Comm.FAREWELL_MAX then
@@ -893,7 +999,7 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
     allowed = sentTo[fn] ~= nil and sentTo[fn][sentKey(aud, target)] == true
     opts = { priority = "reply", id = type(opts) == "table" and opts.id or nil }
   else
-    allowed = Consent.Allows(fn, (request or ask) and "receive" or "send", audOf(fn, aud))
+    allowed = Consent.Allows(fn, (request or ask or probe) and "receive" or "send", audOf(fn, aud))
   end
   local prio, why = admit(fn, aud, target, opts, allowed)
   if not prio then
@@ -921,6 +1027,8 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
       items[i].dir, items[i].request, items[i].id = "receive", true, id
     elseif ask then
       items[i].dir, items[i].ask, items[i].id = "receive", true, id
+    elseif probe then
+      items[i].dir = "receive"
     end
   end
   if farewell then
@@ -1252,7 +1360,9 @@ function Comm.OnAddon(prefix, text, channel, sender)
   local asked = kind == "whisper" and reg.service ~= nil and block.typ == reg.request
   -- The guild-wide question is a service: heard with the send consent.
   local asking = kind ~= "whisper" and reg.ask ~= nil and block.typ == reg.ask
-  local dir = (asked or asking) and "send" or "receive"
+  -- The probe is heard the same way, from the guild only.
+  local probing = kind == "guild" and reg.probe ~= nil and block.typ == reg.probe
+  local dir = (asked or asking or probing) and "send" or "receive"
   if not Consent.Allows(block.fn, dir, audOf(block.fn, kind)) then
     return drop("consent", fnName)
   end
@@ -1288,7 +1398,12 @@ function Comm.OnAddon(prefix, text, channel, sender)
     return
   end
   local value = done.payload
-  if reg.decode then
+  if probing then
+    -- Nothing to decode: the message is the question.
+    if value ~= "" then
+      return drop("envelope", fnName)
+    end
+  elseif reg.decode then
     local ok, decoded = pcall(reg.decode, value, block.typ)
     if not ok or decoded == nil then
       return drop("decode", fnName)
@@ -1318,13 +1433,12 @@ ns.On("PLAYER_REGEN_ENABLED", function()
     Comm.Pump()
   end
 end)
-ns.On("PLAYER_LOGIN", function()
-  for prefix in pairs(prefixOwner) do
-    ensurePrefix(prefix)
-  end
-end)
+ns.On("PLAYER_LOGIN", Comm.EnsurePrefixes)
+ns.On("PLAYER_ENTERING_WORLD", Comm.EnsurePrefixes)
 -- A switch that goes off stops what waits for it at once.
 ns.On("FG_CONSENT_CHANGED", function(_, fn, dir, aud, value)
+  -- A switch that goes on late finds its prefix known already; one the game refused earlier is tried again.
+  Comm.EnsurePrefixes()
   if dir == "send" and value ~= true then
     Comm.Purge(fn, aud, "send")
   elseif dir == "receive" and value ~= true then

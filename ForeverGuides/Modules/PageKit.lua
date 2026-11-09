@@ -62,6 +62,19 @@ function K.PlayerFaction()
   return f == "Alliance" and "A" or f == "Horde" and "H" or nil
 end
 
+-- Data.Races slug of the player's race, nil when unknown. The faction is needed because
+-- both Skyborne races share one UnitRace token.
+function K.PlayerRaceSlug()
+  if not UnitRace or not ns.CharRoster then
+    return nil
+  end
+  local ok, name, token = pcall(UnitRace, "player")
+  if not ok then
+    return nil
+  end
+  return ns.CharRoster.RaceSlug(token, name, K.PlayerFaction())
+end
+
 function K.PlayerClass()
   local _, class = UnitClass("player")
   return class

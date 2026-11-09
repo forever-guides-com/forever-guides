@@ -56,9 +56,14 @@ register("reset", function()
 end)
 register("diag", function(rest)
   local arg = U.trim(rest or ""):lower()
-  -- "/fg diag chat": only the lines of the logo chain, in the chat window.
+  -- "/fg diag chat": only the lines of the logo chain, in the copy window.
   if arg == "chat" and ns.LogoStatus then
-    ns.LogoStatus.Print()
+    ns.Dialogs.Copy("help.section.diag", table.concat(ns.LogoStatus.Lines(), "\n"), "help.diagCopyHint")
+    return
+  end
+  -- "/fg diag share": the sharing functions with their numbers, in the copy window.
+  if arg == "share" and ns.ShareSync then
+    ns.Dialogs.Copy("help.section.diag", table.concat(ns.ShareSync.Lines(), "\n"), "help.diagCopyHint")
     return
   end
   -- "/fg diag frame": the measurement of the metal window frame, in the copy window.

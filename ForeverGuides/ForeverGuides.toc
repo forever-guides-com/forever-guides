@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.5.4
+## Version: 0.5.5
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -264,6 +264,8 @@ Modules\SetupWizardDiag.lua
 Modules\PlayerName.lua
 Modules\CommLogic.lua
 Modules\Comm.lua
+Modules\ShareSyncLogic.lua
+Modules\ShareSync.lua
 Modules\ChatHistoryLimits.lua
 Modules\ChatHistoryLogic.lua
 Modules\Share.lua
@@ -409,6 +411,8 @@ Modules\TimeFormat.lua
 Modules\CursorCooldowns.lua
 Modules\AuraNative.lua
 Modules\CursorAuras.lua
+Modules\ItemCountLogic.lua
+Modules\CursorItemCount.lua
 Modules\GroupOccupancy.lua
 Modules\GroupRuntime.lua
 Modules\AreaLogic.lua

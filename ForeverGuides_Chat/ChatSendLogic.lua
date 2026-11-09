@@ -369,6 +369,9 @@ end
 -- The name in the game's "no player named X" message (template: ERR_CHAT_PLAYER_NOT_FOUND_S), nil for any
 -- other text.
 function SL.NotFoundName(text, template)
+  -- A secret string has the type "string" and raises on any use: it is dropped before the first look.
+  local guard = FG.AutoGuard
+  text = guard and guard.Safe and guard.Safe(text) or nil
   if type(text) ~= "string" then
     return nil
   end

@@ -322,7 +322,7 @@ local function build(container)
   local state = {
     faction = K.PlayerFaction() or "A",
     useLevel = true,
-    skyborne = false,
+    skyborne = (K.PlayerRaceSlug() or ""):find("skyborne$") ~= nil,
     mount = true,
     preferFlight = true,
     stops = {},

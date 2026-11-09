@@ -68,7 +68,7 @@ add({
   area = "general",
   public = false,
   names = { "diag" },
-  usage = "/fg diag [chat | frame]",
+  usage = "/fg diag [chat | share | frame]",
   page = "help",
   control = "help.diagButton",
   exec = "diag",

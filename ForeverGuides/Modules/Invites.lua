@@ -734,6 +734,10 @@ function I.OnWhisper(text, sender, guid)
   if not ns.db or type(text) ~= "string" or isSecret(text) or isSecret(sender) then
     return
   end
+  -- A secret GUID is dropped: the lookups compare it.
+  if isSecret(guid) then
+    guid = nil
+  end
   for _, kind in ipairs({ "group", "guild" }) do
     process(kind, text, sender, guid)
   end
@@ -769,6 +773,10 @@ end
 function I.OnBattleNetWhisper(text, label, id)
   if not ns.db or type(text) ~= "string" or isSecret(text) then
     return
+  end
+  -- A secret account id cannot resolve a character and is never passed on or compared.
+  if isSecret(id) then
+    id = nil
   end
   local name, code = resolveBattleNet(id)
   for _, kind in ipairs({ "group", "guild" }) do

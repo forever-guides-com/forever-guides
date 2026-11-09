@@ -174,6 +174,10 @@ function H.FillText(kind, id)
 end
 
 function H.OnLink(target)
+  local guard = ns.AutoGuard
+  if guard then
+    target = guard.Safe(target)
+  end
   if type(target) ~= "string" then
     return
   end

@@ -41,11 +41,17 @@ local function scrollbar(parent, onScroll)
     thumb:SetPoint("TOP", 0, -(h - th) * pos)
   end
   bar:EnableMouse(true)
+  -- nil while the game gives no usable cursor position.
   local function fracAtCursor(self)
     local _, cy = GetCursorPosition()
-    local scale = self:GetEffectiveScale()
-    local top = self:GetTop()
-    return U.clamp((top - cy / scale) / self:GetHeight(), 0, 1)
+    local scale, top, height = self:GetEffectiveScale(), self:GetTop(), self:GetHeight()
+    if type(cy) ~= "number" or type(scale) ~= "number" or scale <= 0 or type(top) ~= "number" then
+      return nil
+    end
+    if type(height) ~= "number" or height <= 0 then
+      return nil
+    end
+    return U.clamp((top - cy / scale) / height, 0, 1)
   end
   -- Click jumps to that position; holding the button down and moving the
   -- mouse keeps dragging it from wherever the cursor currently is, same as
@@ -53,13 +59,19 @@ local function scrollbar(parent, onScroll)
   -- Frame-type widgets have no OnDragStart/OnMouseUp drag gesture, only
   -- Button-type ones do.
   bar:SetScript("OnMouseDown", function(self)
-    onScroll(fracAtCursor(self))
+    local frac = fracAtCursor(self)
+    if frac then
+      onScroll(frac)
+    end
     self:SetScript("OnUpdate", function(bar2)
       if not IsMouseButtonDown("LeftButton") then
         bar2:SetScript("OnUpdate", nil)
         return
       end
-      onScroll(fracAtCursor(bar2))
+      local now = fracAtCursor(bar2)
+      if now then
+        onScroll(now)
+      end
     end)
   end)
   bar:SetScript("OnMouseUp", function(self)
@@ -139,14 +151,22 @@ local function hscrollbar(parent, onDrag, onPage)
     thumb:SetPoint("LEFT", (w - thumbW) * pos, 0)
   end
   bar:EnableMouse(true)
+  -- nil while the game gives no usable cursor position.
   local function cursorX(self)
     local cx = GetCursorPosition()
-    return cx / self:GetEffectiveScale() - self:GetLeft()
+    local scale, left = self:GetEffectiveScale(), self:GetLeft()
+    if type(cx) ~= "number" or type(scale) ~= "number" or scale <= 0 or type(left) ~= "number" then
+      return nil
+    end
+    return cx / scale - left
   end
   -- A press on the thumb drags it from where it was grabbed, a press beside it moves one page that way.
   -- OnUpdate polls IsMouseButtonDown, like the vertical bar.
   bar:SetScript("OnMouseDown", function(self)
     local x, left = cursorX(self), (self:GetWidth() - thumbW) * pos
+    if not x then
+      return
+    end
     if x < left or x > left + thumbW then
       onPage(x < left and -1 or 1)
       return
@@ -157,7 +177,10 @@ local function hscrollbar(parent, onDrag, onPage)
         bar2:SetScript("OnUpdate", nil)
         return
       end
-      onDrag(room > 0 and U.clamp((cursorX(bar2) - grab) / room, 0, 1) or 0)
+      local at = cursorX(bar2)
+      if at then
+        onDrag(room > 0 and U.clamp((at - grab) / room, 0, 1) or 0)
+      end
     end)
   end)
   bar:SetScript("OnMouseUp", function(self)
@@ -409,10 +432,14 @@ function W.ScrollList(parent, opts)
   -- Drag and drop reordering. The row frames are pooled, so the dragged item
   -- is remembered here and not read from the row again.
   local drag, marker
-  -- Distance of the cursor below the list top, in list units.
+  -- Distance of the cursor below the list top, in list units, and whether the cursor is far beside the list.
+  -- Both are nil and true while the game gives no usable position, so a caller never sees a non-number.
   local function cursorRel()
     local cx, cy = GetCursorPosition()
     local scale = f:GetEffectiveScale()
+    if type(cx) ~= "number" or type(cy) ~= "number" or type(scale) ~= "number" or scale <= 0 then
+      return nil, true
+    end
     local left, right = f:GetLeft() or 0, f:GetRight() or 0
     local x = cx / scale
     local out = x < left - 24 or x > right + 24
@@ -423,7 +450,7 @@ function W.ScrollList(parent, opts)
   local function gapAtCursor()
     local rel, outside = cursorRel()
     local h = f:GetHeight()
-    if outside or rel < -2 * rowH or rel > h + 2 * rowH then
+    if outside or not rel or rel < -2 * rowH or rel > h + 2 * rowH then
       return nil, rel
     end
     local shown = math.min(visibleCount(), #data - offset)
@@ -498,9 +525,9 @@ function W.ScrollList(parent, opts)
       endDrag(true)
       return
     end
-    local _, rel = cursorRel()
+    local rel = cursorRel()
     drag.wait = drag.wait + elapsed
-    if drag.wait >= 0.12 then
+    if rel and drag.wait >= 0.12 then
       local step = (rel < rowH * 0.4 and -1) or (rel > f:GetHeight() - rowH * 0.4 and 1) or 0
       if step ~= 0 then
         drag.wait = 0

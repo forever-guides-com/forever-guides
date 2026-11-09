@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-04.
 -- Learn list of WARLOCK.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -471,6 +471,14 @@ ns.Data.Abilities.WARLOCK = {
     sp="warlock-demonology",
   },
   {
+    i="spell_shadow_auraofdarkness",
+    l=60,
+    n={de="Omen der Verdammnis",en="Bane of Doom"},
+    rk={60},
+    sid=603,
+    sp="warlock-affliction",
+  },
+  {
     i="spell_shadow_soulgem",
     l=60,
     n={en="Create Soulstone (Major)"},
@@ -483,13 +491,6 @@ ns.Data.Abilities.WARLOCK = {
     n={en="Create Spellstone (Major)"},
     rk={60},
     sp="warlock-demonology",
-  },
-  {
-    i="spell_shadow_auraofdarkness",
-    l=60,
-    n={en="Curse of Doom"},
-    rk={60},
-    sp="warlock-affliction",
   },
   {
     i="spell_shadow_antimagicshell",

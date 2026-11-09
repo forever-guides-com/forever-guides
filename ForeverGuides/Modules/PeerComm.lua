@@ -33,6 +33,11 @@ C.ANNOUNCE_GAP = 60
 C.ASK_WINDOW = 15
 C.DELAY_MIN = 2
 C.DELAY_MAX = 8
+-- After the player switched sending on: 1 to 3 seconds, and the guild gap shrinks to SWITCH_GAP seconds (the
+-- bucket of the line still paces the messages).
+C.SWITCH_MIN = 1
+C.SWITCH_MAX = 3
+C.SWITCH_GAP = 10
 -- A sender whose v2 message came in the last seconds is not read a second time in the old format.
 C.V1_QUIET = 30
 -- Replaceable in tests: random integer from lo to hi.
@@ -207,9 +212,10 @@ local function channelOf(aud)
 end
 
 -- The own data to one audience: what each function may send, v2 first, then the old format for
--- users of older versions. Unchanged data is not repeated unless `force`. Returns true when something
--- was queued, else false, the reason and for "wait" the seconds left.
-local function announce(aud, force, priority, gap)
+-- users of older versions. Unchanged data is not repeated unless `force`. `only` names one function: the answer
+-- to its probe sends that one alone and no old format. Returns true when something was queued, else false,
+-- the reason and for "wait" the seconds left.
+local function announce(aud, force, priority, gap, only)
   local channel = channelOf(aud)
   if not channel then
     return false, "no-channel"
@@ -232,7 +238,7 @@ local function announce(aud, force, priority, gap)
   local queued = false
   for _, fn in ipairs(FUNCS) do
     local data, key = payload[fn], channel .. fn
-    if data and Consent.Allows(fn, "send", aud) and (force or lastText[key] ~= data) then
+    if data and (only == nil or only == fn) and Consent.Allows(fn, "send", aud) and (force or lastText[key] ~= data) then
       if Comm.Send(fn, "D", data, aud, nil, { priority = priority }) then
         lastText[key], queued = data, true
       end
@@ -242,11 +248,22 @@ local function announce(aud, force, priority, gap)
     return false, "nothing"
   end
   lastAt[channel] = now
+  if only then
+    return true
+  end
   Comm.SendLegacy(C.PREFIX, aud, FUNCS, function(allowed)
     local oldIlvl, oldJobs = ownData()
     return C.Encode(allowed.peerStats and oldIlvl or nil, allowed.professions and oldJobs or nil)
   end, { priority = priority })
   return true
+end
+
+-- The answer to a probe of one function: its data to the guild now. Returns true, or false and why.
+function C.Answer(fn)
+  if not Consent.Allows(fn, "send", "guild") then
+    return false, "consent"
+  end
+  return announce("guild", true, "reply", 0, fn)
 end
 
 local arm
@@ -257,7 +274,7 @@ local function fire(aud)
   if not mode then
     return
   end
-  local ok, why, left = announce(aud, mode == "force", "background")
+  local ok, why, left = announce(aud, mode ~= "change", "background", mode == "switch" and C.SWITCH_GAP or nil)
   if not ok and why == "wait" and left then
     due[aud] = mode
     arm(aud, left + 1)
@@ -288,11 +305,19 @@ arm = function(aud, delay)
   end
 end
 
+-- Modes by weight: "change" (only what differs), "force" (everything, long gap), "switch" (everything, short gap,
+-- after the player switched sending on).
+local WEIGHT = { change = 1, force = 2, switch = 3 }
+
 local function schedule(aud, mode)
-  if due[aud] ~= "force" then
+  if (WEIGHT[due[aud]] or 0) < WEIGHT[mode] then
     due[aud] = mode
   end
-  arm(aud, C.random(C.DELAY_MIN, C.DELAY_MAX))
+  if mode == "switch" then
+    arm(aud, C.random(C.SWITCH_MIN, C.SWITCH_MAX))
+  else
+    arm(aud, C.random(C.DELAY_MIN, C.DELAY_MAX))
+  end
 end
 
 -- Button "Refresh": announces the own data again, only with the presence switch for the audience.
@@ -428,6 +453,12 @@ ns.On("PLAYER_ENTERING_WORLD", function(_, initial, reloading)
     schedule("guild", "force")
   end
 end)
+-- The guild showed up after login (late status, join): the data that the login could not send goes out now.
+ns.On("FG_SHARE_GUILD_READY", function()
+  if lastAt.GUILD == nil and not due.guild then
+    schedule("guild", "force")
+  end
+end)
 ns.On("PLAYER_EQUIPMENT_CHANGED", onDataChanged)
 ns.On("SKILL_LINES_CHANGED", onDataChanged)
 ns.On("FG_CONSENT_CHANGED", function(_, fn, dir, aud, value)
@@ -436,7 +467,7 @@ ns.On("FG_CONSENT_CHANGED", function(_, fn, dir, aud, value)
   end
   if dir == "send" and value == true and (aud == "group" or aud == "guild") then
     if channelOf(aud) then
-      schedule(aud, "force")
+      schedule(aud, "switch")
     end
   elseif dir == "receive" and value ~= true then
     purge(fn)
@@ -450,18 +481,32 @@ end)
 
 -- Registration ----------------------------------------------------------------------------------
 
-Comm.Register("peerStats", {
-  version = 1,
-  audiences = AUDIENCES,
-  on = { D = onStats },
-  decode = C.DecodeStats,
-})
-Comm.Register("professions", {
-  version = 1,
-  audiences = AUDIENCES,
-  on = { D = onJobs },
-  decode = C.DecodeJobs,
-})
+Comm.Register(
+  "peerStats",
+  ns.ShareSync.Attach("peerStats", {
+    version = 1,
+    audiences = AUDIENCES,
+    on = { D = onStats },
+    decode = C.DecodeStats,
+  }, {
+    answer = function()
+      return C.Answer("peerStats")
+    end,
+  })
+)
+Comm.Register(
+  "professions",
+  ns.ShareSync.Attach("professions", {
+    version = 1,
+    audiences = AUDIENCES,
+    on = { D = onJobs },
+    decode = C.DecodeJobs,
+  }, {
+    answer = function()
+      return C.Answer("professions")
+    end,
+  })
+)
 Comm.RegisterLegacy(C.PREFIX, { audiences = AUDIENCES, functions = FUNCS, handler = onLegacy })
 -- The settings tab "Share" lists these two functions from now on.
 for _, fn in ipairs(FUNCS) do

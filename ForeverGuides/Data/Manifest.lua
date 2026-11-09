@@ -12,7 +12,7 @@ ns.Data.Manifest = {
     ["Abilities_PRIEST.lua"]={bytes=7220,hash="a766b87172bf4e22"},
     ["Abilities_ROGUE.lua"]={bytes=5193,hash="f02348fc9b0bdb11"},
     ["Abilities_SHAMAN.lua"]={bytes=8682,hash="d4924a9eaceee1bb"},
-    ["Abilities_WARLOCK.lua"]={bytes=10145,hash="f9db96794a4e299c"},
+    ["Abilities_WARLOCK.lua"]={bytes=10182,hash="a006eda95458da25"},
     ["Abilities_WARRIOR.lua"]={bytes=5691,hash="4b037f6a845802dc"},
     ["Builds.lua"]={bytes=4857,hash="c56ac0b6b6d3c9cd"},
     ["Instances.lua"]={bytes=89897,hash="65981f1992bad66c"},

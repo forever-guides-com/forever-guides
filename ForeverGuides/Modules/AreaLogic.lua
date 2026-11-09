@@ -348,6 +348,15 @@ function AL.Presets()
       name = L["areas.preset.aura"],
       layout = build("aura", L["areas.preset.aura"], { element("aura", "aura", L["areas.el.aura"]) }),
     },
+    {
+      id = "itemcount",
+      name = L["areas.preset.itemcount"],
+      layout = build(
+        "itemcount",
+        L["areas.preset.itemcount"],
+        { element("itemcount", "itemcount", L["areas.el.itemcount"]) }
+      ),
+    },
   }
 end
 
@@ -402,8 +411,10 @@ ns.AddLocale(
     ["areas.defaultName"] = "Window %d",
     ["areas.el.cooldown"] = "Cooldown",
     ["areas.el.aura"] = "Aura",
+    ["areas.el.itemcount"] = "Item count",
     ["areas.preset.cooldown"] = "One cooldown",
     ["areas.preset.aura"] = "One aura",
+    ["areas.preset.itemcount"] = "One item count",
   })
 )
 ns.AddLocale(
@@ -412,7 +423,9 @@ ns.AddLocale(
     ["areas.defaultName"] = "Fenster %d",
     ["areas.el.cooldown"] = "Abklingzeit",
     ["areas.el.aura"] = "Aura",
+    ["areas.el.itemcount"] = "Gegenstandsanzahl",
     ["areas.preset.cooldown"] = "Eine Abklingzeit",
     ["areas.preset.aura"] = "Eine Aura",
+    ["areas.preset.itemcount"] = "Eine Gegenstandsanzahl",
   })
 )

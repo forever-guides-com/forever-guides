@@ -688,7 +688,13 @@ end
 -- player with ERR_CHAT_PLAYER_NOT_FOUND_S. The send stops and the dialog says so.
 function Share.OnSystem(msg)
   local listen = dlg and dlg.listen
-  if not listen or type(msg) ~= "string" or now() - listen.at > NOT_FOUND_WINDOW then
+  if not listen or now() - listen.at > NOT_FOUND_WINDOW then
+    return false
+  end
+  -- A secret text has the type "string" and raises on any use.
+  local guard = ns.AutoGuard
+  msg = guard and guard.Safe(msg) or nil
+  if type(msg) ~= "string" then
     return false
   end
   local who = msg:match(notFoundPattern())

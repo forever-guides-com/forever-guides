@@ -1192,13 +1192,22 @@ local function create()
       ns.Router:goForward()
     end
   end)
+  -- A hidden ancestor (UIParent on the hide-UI key) leaves the frame shown: that is no close to announce, and the
+  -- return of the ancestor no open, so the tour and the edit mode of the navigation go on.
+  local announcedOpen = false
   frame:SetScript("OnHide", function()
     ns.Popups.close()
     ns.Focus.clear()
-    ns.Emit("FG_MAIN_HIDDEN")
+    if not frame:IsShown() then
+      announcedOpen = false
+      ns.Emit("FG_MAIN_HIDDEN")
+    end
   end)
   frame:SetScript("OnShow", function()
-    ns.Emit("FG_MAIN_SHOWN")
+    if not announcedOpen then
+      announcedOpen = true
+      ns.Emit("FG_MAIN_SHOWN")
+    end
   end)
   -- After the own OnShow/OnHide above, so no SetScript can replace the hooks of the Esc stack.
   -- Esc ends a drag or the navigation edit mode first, then leaves a keyboard focus of the window.

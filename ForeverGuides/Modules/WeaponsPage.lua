@@ -99,29 +99,8 @@ local SKILL_ICONS = {
   wand = "INV_Wand_01",
 }
 
--- UnitRace's second return value to the WeaponRaces slug. The Skyborne
--- tokens are unknown, those players pick their race by hand.
-local RACE_TOKEN_SLUG = {
-  Human = "human",
-  Dwarf = "dwarf",
-  NightElf = "night-elf",
-  Gnome = "gnome",
-  Orc = "orc",
-  Scourge = "undead",
-  Tauren = "tauren",
-  Troll = "troll",
-}
-
 local function skillIcon(skill)
   return SKILL_ICONS[skill] and ("Interface\\Icons\\" .. SKILL_ICONS[skill]) or ns.ICONS.weapons
-end
-
-local function playerRaceSlug()
-  if not UnitRace then
-    return nil
-  end
-  local _, token = UnitRace("player")
-  return RACE_TOKEN_SLUG[token]
 end
 
 -- True when the skill needs no teacher: either the selected race knows it from
@@ -399,7 +378,7 @@ local function build(container)
   local state = {
     class = K.PlayerClass() or "WARRIOR",
     faction = K.PlayerFaction() or "A",
-    race = playerRaceSlug(),
+    race = K.PlayerRaceSlug(),
     view = ns.db.settings.weaponsView or "list",
   }
   local function raceAllowed(slug, faction)

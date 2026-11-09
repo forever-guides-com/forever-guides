@@ -1,12 +1,12 @@
 -- Level overview page: per class, which abilities and ranks the class trainer
 -- teaches at which level, one card per level with icon chips (same idea as the
--- website's "Stufenliste" view, without talents and weapon skills).
+-- website's "Stufenliste" view, without talents and weapons).
 -- Data: ns.Data.Abilities, LevelSources. Logic: ns.LevelLogic.
 local _, ns = ...
 local R, K = ns.RefLogic, ns.PageKit
 
 ns.AddLocale("enUS", {
-  ["levels.intro"] = "What your class gets at which level: new abilities and ranks you can learn at your class trainer. Talents and weapon skills are not listed here, weapon skills have their own page. Abilities marked as quest abilities are taught by the trainer too, you just need a quest first.",
+  ["levels.intro"] = "What your class gets at which level: new abilities and ranks you can learn at your class trainer. Talents and the weapons of the weapon masters are not listed here, weapon skills have their own page. Abilities marked as quest abilities are taught by the trainer too, you just need a quest first.",
   ["levels.basis"] = "Levels from website data (Classic values, not all confirmed for Forever)\nNo trainer costs in the data",
   ["levels.search"] = "Search (ability)",
   ["levels.fromMe"] = "From level",
@@ -30,7 +30,7 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["levels.intro"] = 'Was deine Klasse bei welcher Stufe bekommt: neue Fähigkeiten und Ränge, die du beim Klassenlehrer lernen kannst. Talente und Waffenfertigkeiten stehen hier nicht, Waffenfertigkeiten haben eine eigene Seite. Fähigkeiten mit dem Hinweis "über Quest" lehrt der Lehrer ebenfalls, dafür brauchst du vorher eine Quest.',
+  ["levels.intro"] = 'Was deine Klasse bei welcher Stufe bekommt: neue Fähigkeiten und Ränge, die du beim Klassenlehrer lernen kannst. Talente und die Waffen der Waffenmeister stehen hier nicht, Waffenfertigkeiten haben eine eigene Seite. Fähigkeiten mit dem Hinweis "über Quest" lehrt der Lehrer ebenfalls, dafür brauchst du vorher eine Quest.',
   ["levels.basis"] = "Stufen aus Website-Daten (Classic-Werte, nicht alle für Forever bestätigt)\nKeine Lehrerkosten in den Daten",
   ["levels.search"] = "Suchen (Fähigkeit)",
   ["levels.fromMe"] = "Ab Stufe",

@@ -2,6 +2,8 @@
 -- Abgeleitet aus der Live-Seite forever-guides.com/de/wow-forever/races
 -- (availableClassIds und newClassIds, Stand 2026-10-06), bis der Web-Generator
 -- diese Datei selbst ausgibt. Schluessel sind die Rassen-Slugs aus Meta.lua.
+-- Die beiden Skyborne-Rassen sind gegen die Clienttabelle CharBaseInfo (Build 1.60.1.70790)
+-- korrigiert, tests/test_race_classes_client.py haelt sie dort fest.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.RaceClasses = {
@@ -16,7 +18,7 @@ ns.Data.RaceClasses = {
     ["undead"] = {WARRIOR=true,PALADIN=true,ROGUE=true,PRIEST=true,MAGE=true,WARLOCK=true},
     ["tauren"] = {WARRIOR=true,HUNTER=true,SHAMAN=true,DRUID=true},
     ["troll"] = {WARRIOR=true,HUNTER=true,ROGUE=true,PRIEST=true,SHAMAN=true,MAGE=true,WARLOCK=true},
-    ["windshaper-skyborne"] = {WARRIOR=true,HUNTER=true,ROGUE=true,SHAMAN=true,MAGE=true,DRUID=true},
+    ["windshaper-skyborne"] = {WARRIOR=true,HUNTER=true,ROGUE=true,SHAMAN=true,DRUID=true},
   },
   -- Davon die Kombinationen, die in Forever neu sind (nicht im klassischen WoW).
   new = {
@@ -29,6 +31,6 @@ ns.Data.RaceClasses = {
     ["undead"] = {PALADIN=true},
     ["tauren"] = {},
     ["troll"] = {WARLOCK=true},
-    ["windshaper-skyborne"] = {WARRIOR=true,HUNTER=true,ROGUE=true,SHAMAN=true,MAGE=true,DRUID=true},
+    ["windshaper-skyborne"] = {WARRIOR=true,HUNTER=true,ROGUE=true,SHAMAN=true,DRUID=true},
   },
 }

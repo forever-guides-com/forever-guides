@@ -41,7 +41,7 @@ ns.CraftShare = CS
 
 CS.FN = "crafting"
 -- Seconds: { lowest, highest } of the random wait before the first J, and the fixed wait after a change.
-CS.DELAY = { login = { 15, 75 }, consent = { 3, 13 }, change = 60 }
+CS.DELAY = { login = { 15, 75 }, consent = { 1, 3 }, change = 60 }
 -- Seconds between two J without a change, the spread around it, and the wait after a lock or a refusal.
 CS.REFRESH = 1800
 CS.JITTER = 0.2
@@ -199,10 +199,19 @@ function CS.Announce()
   return ok, why
 end
 
-local function fire() end
+local fire, schedule
+
+-- The answer to a probe: J now, the regular refresh goes on from there. Returns true, or false and why.
+function CS.Answer()
+  local ok, why = CS.Announce()
+  if ok then
+    schedule(L.Jitter(CS.REFRESH, CS.JITTER, CS.random))
+  end
+  return ok, why
+end
 
 -- One timer at a time: a later request keeps an earlier due time.
-local function schedule(delay)
+schedule = function(delay)
   local timer = g("C_Timer")
   if type(timer) ~= "table" or type(timer.After) ~= "function" then
     return
@@ -408,26 +417,45 @@ function CS.Allow(typ, cost)
   return grid.Allow(typ, cost)
 end
 
+-- Known to the Share tab and the diagnosis from the start, although the line registers it with the first consent.
+ns.ShareSync.Declare(CS.FN, {
+  ready = function()
+    if not CS.Active() then
+      return false, "inactive"
+    end
+    local why = pauseReason()
+    if why then
+      return false, why
+    end
+    return true
+  end,
+  answer = CS.Answer,
+  pause = pauseReason,
+})
+
 -- The line needs one registration for all types: the handlers of W and R are here, the others go to the
 -- receiver.
 function CS.Register()
   if not registered then
-    registered = Comm.Register(CS.FN, {
-      version = 1,
-      audiences = { "guild", "whisper" },
-      whisperAud = "guild",
-      on = { J = dispatch("J"), W = onAsk, K = dispatch("K"), R = onFetch, C = dispatch("C"), X = dispatch("X") },
-      decode = function(payload, typ)
-        return G.Decode(CS.FN, typ, payload)
-      end,
-      farewell = "X",
-      request = "R",
-      ask = "W",
-      -- R is answered for a profession announced in this session (Comm.NoteShared in Announce).
-      service = function(msg)
-        return tostring(msg.job)
-      end,
-    }) == true
+    registered = Comm.Register(
+      CS.FN,
+      ns.ShareSync.Attach(CS.FN, {
+        version = 1,
+        audiences = { "guild", "whisper" },
+        whisperAud = "guild",
+        on = { J = dispatch("J"), W = onAsk, K = dispatch("K"), R = onFetch, C = dispatch("C"), X = dispatch("X") },
+        decode = function(payload, typ)
+          return G.Decode(CS.FN, typ, payload)
+        end,
+        farewell = "X",
+        request = "R",
+        ask = "W",
+        -- R is answered for a profession announced in this session (Comm.NoteShared in Announce).
+        service = function(msg)
+          return tostring(msg.job)
+        end,
+      })
+    ) == true
   end
   return registered
 end
@@ -470,6 +498,12 @@ ns.On("PLAYER_GUILD_UPDATE", function()
   if not inGuild() then
     announced = false
     stop()
+  end
+end)
+-- The guild showed up after login (late status, join): the first J is planned now, not with the next loading screen.
+ns.On("FG_SHARE_GUILD_READY", function()
+  if not pending and not announced then
+    start("login")
   end
 end)
 ns.On("FG_RECIPES_CHANGED", function()

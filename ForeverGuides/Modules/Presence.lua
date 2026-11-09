@@ -289,7 +289,7 @@ schedule = function(kind, trigger, delay)
   if not old or PL.GAPS[trigger] < PL.GAPS[old] then
     due[kind] = trigger
   end
-  arm(kind, delay or PL.Delay(P.random))
+  arm(kind, delay or (trigger == "enable" and PL.SwitchDelay(P.random) or PL.Delay(P.random)))
 end
 
 local function renew()
@@ -394,6 +394,17 @@ local function onFarewell(sender, payload, info)
   end
 end
 
+-- The answer to a probe: the mark to one audience now (the plan keeps two messages apart), the renewal goes on from
+-- there. Returns true, or false and why.
+function P.Answer(kind)
+  local moved = plan.Moved(kind)
+  local ok, why = announce(kind, "ask")
+  if ok then
+    armRenew(PL.RenewIn(moved, P.random))
+  end
+  return ok, why
+end
+
 -- Events -------------------------------------------------------------------------------------------------
 
 -- Group size changes: the step from alone to grouped is the join, a bigger group is told again.
@@ -464,6 +475,12 @@ ns.On("PLAYER_ENTERING_WORLD", function(_, initial, reloading)
     schedule("guild", "login")
   end
 end)
+-- The guild showed up after login (late status, join): the mark that the login could not send goes out now.
+ns.On("FG_SHARE_GUILD_READY", function()
+  if plan.LastAt("guild") == nil and not due.guild then
+    schedule("guild", "login")
+  end
+end)
 ns.On("ZONE_CHANGED_NEW_AREA", function()
   for _, kind in ipairs(ORDER) do
     plan.Touch(kind)
@@ -512,12 +529,31 @@ ns.On("FG_CONSENT_WITHDRAWN", function(_, fn)
   end
 end)
 
-local ok, why = Comm.Register(FN, {
-  version = 1,
-  audiences = ORDER,
-  on = { P = onMark, R = onFarewell },
-  farewell = "R",
-})
+local ok, why = Comm.Register(
+  FN,
+  ns.ShareSync.Attach(FN, {
+    version = 1,
+    audiences = ORDER,
+    on = { P = onMark, R = onFarewell },
+    farewell = "R",
+  }, {
+    ready = function()
+      if not (active and Consent.Allows(FN, "send", "guild")) then
+        return false, "inactive"
+      end
+      if not AUDIENCES.guild.channel() then
+        return false, "noguild"
+      end
+      if locked() then
+        return false, "combat"
+      end
+      return true
+    end,
+    answer = function()
+      return P.Answer("guild")
+    end,
+  })
+)
 active = ok
 if not ok then
   ns.Log.warn("presence: not registered (%s)", tostring(why))
