@@ -58,27 +58,26 @@ local function setting(key)
 end
 
 function S.Add(view)
-  local s = view.stack
   ns.AddHeading(view, "ilvl.heading")
   ns.AddParagraph(view, "ilvl.hint", { role = "micro", color = "textMuted" })
-  for _, item in ipairs({
-    { "itemLevel", "ilvl.enable" },
-    { "itemLevelCharacter", "ilvl.character" },
-    { "itemLevelBags", "ilvl.bags" },
-    { "itemLevelInspect", "ilvl.inspect" },
-  }) do
+  local function toggle(target, item)
     local get, set = setting(item[1])
-    s:Add(
-      W.Toggle(view.content, {
-        key = item[2],
-        get = function()
-          return get() ~= false
-        end,
-        set = set,
-      }),
-      { height = 24, gap = 6 }
-    )
+    local control = W.Toggle(target.content, {
+      key = item[2],
+      get = function()
+        return get() ~= false
+      end,
+      set = set,
+    })
+    control.fgId = "ilvl-" .. item[1]
+    target.stack:Add(control, { height = 24, gap = 6 })
   end
+  toggle(view, { "itemLevel", "ilvl.enable" })
+  toggle(view, { "itemLevelCharacter", "ilvl.character" })
+  toggle(view, { "itemLevelBags", "ilvl.bags" })
+  -- Where else it shows, the corner, the size and the enchant overlay: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "items.itemlevel" })
+  toggle(more, { "itemLevelInspect", "ilvl.inspect" })
   local corners, qualities = {}, {}
   for _, name in ipairs(CORNERS) do
     corners[#corners + 1] = { value = name, key = "ilvl.corner." .. name }
@@ -87,32 +86,50 @@ function S.Add(view)
     qualities[#qualities + 1] = { value = quality, key = "ilvl.quality." .. quality, quality = quality }
   end
   local getCorner, setCorner = setting("itemLevelCorner")
-  s:Add(
-    W.Dropdown(view.content, { key = "ilvl.corner", width = 240, options = corners, get = getCorner, set = setCorner }),
-    { height = 46, width = 240 }
-  )
+  local corner =
+    W.Dropdown(more.content, { key = "ilvl.corner", width = 240, options = corners, get = getCorner, set = setCorner })
+  corner.fgId = "ilvl-itemLevelCorner"
+  more.stack:Add(corner, { height = 46, width = 240 })
   local getQuality, setQuality = setting("itemLevelMinQuality")
-  s:Add(
-    W.Dropdown(
-      view.content,
-      { key = "ilvl.minQuality", width = 240, options = qualities, get = getQuality, set = setQuality }
-    ),
-    { height = 46, width = 240 }
+  local minQuality = W.Dropdown(
+    more.content,
+    { key = "ilvl.minQuality", width = 240, options = qualities, get = getQuality, set = setQuality }
   )
+  minQuality.fgId = "ilvl-itemLevelMinQuality"
+  more.stack:Add(minQuality, { height = 46, width = 240 })
   local getSize, setSize = setting("itemLevelSize")
-  s:Add(
-    W.Slider(view.content, {
-      key = "ilvl.size",
-      min = O.SIZE_MIN,
-      max = O.SIZE_MAX,
-      step = 1,
-      get = getSize,
-      set = setSize,
-      format = function(v)
-        return string.format("%d px", math.floor(v + 0.5))
-      end,
-    }),
-    { height = 42, width = 320 }
-  )
-  ns.ItemEnchantSettings.Add(view)
+  local size = W.Slider(more.content, {
+    key = "ilvl.size",
+    min = O.SIZE_MIN,
+    max = O.SIZE_MAX,
+    step = 1,
+    get = getSize,
+    set = setSize,
+    format = function(v)
+      return string.format("%d px", math.floor(v + 0.5))
+    end,
+  })
+  size.fgId = "ilvl-itemLevelSize"
+  more.stack:Add(size, { height = 42, width = 320 })
+  -- The overlays of the game's equipment slots: what we draw while another add-on draws there as well.
+  local slotOverlays = W.Dropdown(more.content, {
+    key = "settings.slotOverlays",
+    width = 280,
+    options = {
+      { value = "auto", key = "settings.slotOverlays.auto" },
+      { value = "ours", key = "settings.slotOverlays.ours" },
+      { value = "none", key = "settings.slotOverlays.none" },
+    },
+    get = function()
+      return ns.db.settings.slotOverlays
+    end,
+    set = function(v)
+      Store.set("settings.slotOverlays", v)
+      ns.RefreshUI()
+    end,
+  })
+  slotOverlays.fgId = "slot-overlays"
+  more.stack:Add(slotOverlays, { height = 46, width = 280 })
+  ns.AddParagraph(more, "settings.slotOverlaysHint", { role = "micro", color = "textMuted" })
+  ns.ItemEnchantSettings.Add(more)
 end

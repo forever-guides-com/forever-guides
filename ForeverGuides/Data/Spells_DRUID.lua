@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-09.
 -- Spell catalog of DRUID: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -283,12 +283,6 @@ ns.Data.Spells.DRUID = {
     n={de="Spurt",en="Dash"},
     rk=2,
     sup=1850,
-  },
-  {
-    fid=132124,
-    id=436956,
-    k="passive",
-    n={de="Tiefe Wildnis",en="Deeper Wilds"},
   },
   {
     fid=132121,

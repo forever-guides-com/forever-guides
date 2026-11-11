@@ -37,35 +37,33 @@ function S.Add(view)
     { "enchantGems", "ench.gems" },
     { "enchantInspect", "ench.inspect" },
   }) do
-    s:Add(
-      W.Toggle(view.content, {
-        key = item[2],
-        get = function()
-          return E.Option(item[1]) ~= false
-        end,
-        set = function(v)
-          Store.set("settings." .. item[1], v)
-        end,
-      }),
-      { height = 24, gap = 6 }
-    )
-  end
-  s:Add(
-    W.Slider(view.content, {
-      key = "ench.size",
-      min = E.SIZE_MIN,
-      max = E.SIZE_MAX,
-      step = 1,
+    local toggle = W.Toggle(view.content, {
+      key = item[2],
       get = function()
-        return E.Size()
+        return E.Option(item[1]) ~= false
       end,
       set = function(v)
-        Store.set("settings.enchantSize", v)
+        Store.set("settings." .. item[1], v)
       end,
-      format = function(v)
-        return string.format("%d px", math.floor(v + 0.5))
-      end,
-    }),
-    { height = 42, width = 320 }
-  )
+    })
+    toggle.fgId = "ench-" .. item[1]
+    s:Add(toggle, { height = 24, gap = 6 })
+  end
+  local size = W.Slider(view.content, {
+    key = "ench.size",
+    min = E.SIZE_MIN,
+    max = E.SIZE_MAX,
+    step = 1,
+    get = function()
+      return E.Size()
+    end,
+    set = function(v)
+      Store.set("settings.enchantSize", v)
+    end,
+    format = function(v)
+      return string.format("%d px", math.floor(v + 0.5))
+    end,
+  })
+  size.fgId = "ench-size"
+  s:Add(size, { height = 42, width = 320 })
 end

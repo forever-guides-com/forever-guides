@@ -19,6 +19,7 @@ local EI = {
     trail = "play",
     click = "play",
     aura = "tag",
+    weapon = "star-outline",
     spellcd = "history",
     itemcount = "tag",
   },
@@ -56,10 +57,9 @@ end
 -- { kind = "slot", slot } | { kind = "glyph", glyph }. Nothing chosen gives the glyph of the type.
 function EI.Target(kind, props)
   local p = type(props) == "table" and props or {}
-  if kind == "aura" then
-    if p.source == "weapon" then
-      return { kind = "slot", slot = EI.WEAPON_SLOT[p.weaponHand == "off" and "off" or "main"] }
-    end
+  if kind == "weapon" or (kind == "aura" and p.source == "weapon") then
+    return { kind = "slot", slot = EI.WEAPON_SLOT[p.weaponHand == "off" and "off" or "main"] }
+  elseif kind == "aura" then
     local id = spellOf(p, whole(p.procAuraId))
     if id > 0 then
       return { kind = "spell", id = id }

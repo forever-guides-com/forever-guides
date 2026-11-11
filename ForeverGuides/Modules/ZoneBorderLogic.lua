@@ -13,10 +13,10 @@ local MP = ns.MapPoly
 ns.AddLocale("enUS", {
   ["zb.levels"] = "Levels %d-%d",
   ["zb.hint"] = "Click: switch map",
-  ["zb.hint.addon"] = "Click: open add-on map",
   ["zb.legend"] = "Zone transition",
   ["zb.legend.guess"] = "Zone transition, estimated",
   ["zb.failed"] = "The map could not be switched.",
+  ["zb.combat"] = "The map cannot be switched in combat.",
   ["zb.set.world"] = "Show zone transitions in the world map",
   ["zb.set.addon"] = "Show zone transitions on the add-on map",
   ["zb.set.guess"] = "Show estimated zone transitions",
@@ -29,10 +29,10 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["zb.levels"] = "Stufen %d-%d",
   ["zb.hint"] = "Klicken: Karte wechseln",
-  ["zb.hint.addon"] = "Klicken: Addon-Karte öffnen",
   ["zb.legend"] = "Zonenübergang",
   ["zb.legend.guess"] = "Zonenübergang, geschätzt",
   ["zb.failed"] = "Die Karte ließ sich nicht wechseln.",
+  ["zb.combat"] = "Im Kampf lässt sich die Karte nicht wechseln.",
   ["zb.set.world"] = "Zonenübergänge in der Weltkarte anzeigen",
   ["zb.set.addon"] = "Zonenübergänge auf der Addon-Karte anzeigen",
   ["zb.set.guess"] = "Geschätzte Zonenübergänge zeigen",
@@ -608,4 +608,20 @@ function ZBL.TooltipLines(arrow, L, T, hintKey)
   end
   lines[#lines + 1] = L[hintKey or "zb.hint"]
   return title, lines
+end
+
+-- What a click on an arrow of Blizzard's world map does with the map the window shows: "switch" (the neighbour
+-- becomes the shown map), "same" (it is shown already), "combat" and "blocked" (the client does not let this
+-- add-on touch the map now, nothing is called) or "invalid" (the arrow has no usable UiMapID).
+function ZBL.WorldClickPlan(target, shown, inCombat, allowed)
+  if type(target) ~= "number" or target ~= target or target <= 0 or target % 1 ~= 0 then
+    return "invalid"
+  end
+  if inCombat then
+    return "combat"
+  end
+  if not allowed then
+    return "blocked"
+  end
+  return target == shown and "same" or "switch"
 end

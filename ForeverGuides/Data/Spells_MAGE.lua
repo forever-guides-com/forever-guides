@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-09.
 -- Spell catalog of MAGE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -856,16 +856,6 @@ ns.Data.Spells.MAGE = {
     sup=10139,
   },
   {
-    b=5504,
-    fid=132830,
-    id=468766,
-    k="spell",
-    l=60,
-    n={de="Wasser herbeizaubern",en="Conjure Water"},
-    rk=8,
-    sup=10140,
-  },
-  {
     fid=135856,
     i="spell_frost_iceshock",
     id=2139,
@@ -956,12 +946,6 @@ ns.Data.Spells.MAGE = {
     k="spell",
     l=20,
     n={de="Hervorrufung",en="Evocation"},
-  },
-  {
-    fid=236513,
-    id=436949,
-    k="passive",
-    n={de="Erweiterte Intelligenz",en="Expanded Intellect"},
   },
   {
     c={"MAGE","PRIEST","WARLOCK"},

@@ -44,6 +44,7 @@ function ML.Items(ctx)
   if ctx.invite then
     add("invite", "chat.menu.invite", "edit")
   end
+  add("copyAll", "chat.menu.copyAll", "edit")
   add("clear", "chat.menu.clear", "danger")
   return items
 end
@@ -101,6 +102,8 @@ function ML.Run(id, env)
     return stored(Store.Set(db, "muted", key, value, env.now))
   elseif id == "nickname" or id == "note" then
     return false, "prompt"
+  elseif id == "copyAll" then
+    return false, "copyAll"
   elseif id == "clear" then
     return false, "confirm"
   else

@@ -141,8 +141,10 @@ local function slug(name)
 end
 
 -- Pet trainers of the overlay whose zone is in the trainer zone list, shaped like
--- data trainers of class HUNTER. They carry no coordinates (nothing to put on a
--- map) and confidence 1. Names stay English, the overlay has no verified German ones.
+-- data trainers of class HUNTER. Entries with a position (x, y in zone percent in the
+-- overlay) carry npc, x and y (zone fraction 0-1) like data trainers, the others have
+-- no coordinates (nothing to put on a map). Confidence 1. Names stay English, the
+-- overlay has no verified German ones.
 function TR.Entries(class, faction)
   local out = {}
   if class and class ~= "HUNTER" then
@@ -152,6 +154,7 @@ function TR.Entries(class, faction)
   for _, p in ipairs(data().petNames or {}) do
     local z = zoneIndex(p.zone)
     if z and (not faction or faction == "all" or p.f == faction) then
+      local located = type(p.x) == "number" and type(p.y) == "number"
       out[#out + 1] = {
         id = "pet-" .. slug(p.en),
         c = "HUNTER",
@@ -159,10 +162,13 @@ function TR.Entries(class, faction)
         k = zones[z].m and "capital" or "town",
         role = "pet",
         n = { de = p.en, en = p.en },
+        npc = located and p.npc or nil,
         p = p.p,
+        x = located and p.x / 100 or nil,
+        y = located and p.y / 100 or nil,
         z = z,
         cf = 1,
-        nt = {
+        nt = located and TR.NOTE_PET or {
           de = TR.NOTE_PET.de .. " " .. TR.NOTE_LIST.de .. ".",
           en = TR.NOTE_PET.en .. " " .. TR.NOTE_LIST.en .. ".",
         },

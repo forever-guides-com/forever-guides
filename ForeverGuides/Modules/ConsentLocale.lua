@@ -9,12 +9,12 @@ local _, ns = ...
 local TAIL = {
   enUS = {
     "Transfer: through the chat servers of Blizzard, never through a server of the add-on or its website.",
-    "Withdraw: Settings > Share, it takes effect at once. Copies that others have already stored cannot be fetched back.",
+    "Withdraw: Settings > Consents, it takes effect at once. Copies that others have already stored cannot be fetched back.",
     "Voluntary: the date of your choice is stored on this computer only.",
   },
   deDE = {
     "Übertragung: über die Chat-Server von Blizzard, nie über einen Server des Addons oder der Website.",
-    "Widerruf: Einstellungen > Teilen, wirkt sofort. Kopien, die andere schon gespeichert haben, kannst du nicht zurückholen.",
+    "Widerruf: Einstellungen > Zustimmungen, wirkt sofort. Schon gespeicherte Kopien anderer holst du nicht zurück.",
     "Freiwillig: Das Datum deiner Entscheidung wird nur auf diesem Rechner gespeichert.",
   },
 }
@@ -24,7 +24,8 @@ local PROBE = {
   deDE = "Nachfrage: Empfänger fragen beim Einschalten und Login die Gilde, Sender antworten (einmal je Minute).",
 }
 -- Functions that ask and answer this way (ShareSync).
-local PROBES = { peerStats = true, professions = true, presenceMark = true, crestMark = true, guildMap = true, crafting = true }
+local PROBES =
+  { peerStats = true, professions = true, presenceMark = true, crestMark = true, guildMap = true, crafting = true }
 
 local LABEL = {
   enUS = { "Data: ", "To whom: ", "Purpose: ", "Receiver: " },
@@ -159,12 +160,12 @@ add("guildMap", { "Guild map", "Gildenkarte" }, {
   "Sent: map and position, exact by default (you can change it).",
   "Gesendet wird: Karte und Position, Standard genau (einstellbar).",
 }, {
-  "your map and position on it. Default: exact. Under Settings > Map and travel > Your own position you can switch to a grid (5 percent of the map) or zone only. It is a live track of where you are.",
+  "your map and position on it. Default: exact. Under Settings > Map > Guild members on the maps > Your own position you can switch to a grid (5 percent of the map) or zone only. It is a live track of where you are.",
   "guild members who use the add-on.",
   "they see you as a dot on the world map and the minimap. Switch Invisible on to stop it at once. Nothing goes out in combat, instances, battlegrounds or while AFK.",
   "They keep it in memory only and show it while it is current. It is never saved.",
 }, {
-  "deine Karte und Position darauf. Standard: genau. Unter Einstellungen > Karte und Reise > Deine eigene Position stellst du auf ein Raster (5 Prozent der Karte) oder nur die Zone um. Es ist eine Live-Spur dessen, wo du bist.",
+  "deine Karte und Position darauf. Standard: genau. Unter Einstellungen > Karte > Gildenmitglieder auf den Karten > Deine eigene Position stellst du auf ein Raster (5 Prozent der Karte) oder nur die Zone um. Es ist eine Live-Spur dessen, wo du bist.",
   "Gildenmitglieder, die das Addon nutzen.",
   "sie sehen dich als Punkt auf der Weltkarte und der Minikarte. Mit Unsichtbar stoppst du es sofort. Im Kampf, in Instanzen, Schlachtfeldern und bei AFK geht nichts raus.",
   "Sie halten sie nur im Arbeitsspeicher und zeigen sie, solange sie aktuell ist. Sie wird nie gespeichert.",
@@ -428,7 +429,6 @@ local shared = {
 for key, pair in pairs(shared) do
   en[key], de[key] = pair[1], pair[2]
 end
-en["settings.tab.sharing"], de["settings.tab.sharing"] = "Share", "Teilen"
 
 ns.AddLocale("enUS", en)
 ns.AddLocale("deDE", de)

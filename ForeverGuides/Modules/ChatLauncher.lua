@@ -11,7 +11,7 @@ ns.ChatLauncher = CL
 local ID = "chat"
 
 ns.AddLocale("enUS", {
-  ["chatlaunch.off"] = "Forever Chat is off. Switch it on under Settings > Addons.",
+  ["chatlaunch.off"] = "Forever Chat is off. Switch it on under Settings > Forever Chat.",
   ["chatlaunch.dock.title"] = "Forever Chat",
   ["chatlaunch.dock.tip"] = "Open or close the messenger",
   ["chatlaunch.dock.unread"] = "%d unread",
@@ -19,7 +19,7 @@ ns.AddLocale("enUS", {
   ["chatlaunch.usage.fg"] = "/fg chat [toggle | open | close]",
 })
 ns.AddLocale("deDE", {
-  ["chatlaunch.off"] = "Forever Chat ist aus. Einschalten unter Einstellungen > Addons.",
+  ["chatlaunch.off"] = "Forever Chat ist aus. Einschalten unter Einstellungen > Forever Chat.",
   ["chatlaunch.dock.title"] = "Forever Chat",
   ["chatlaunch.dock.tip"] = "Messenger öffnen oder schließen",
   ["chatlaunch.dock.unread"] = "%d ungelesen",
@@ -103,7 +103,7 @@ local function explain(showSwitch)
   if state == "off" then
     ns.Notify.chat(L["chatlaunch.off"])
     if showSwitch then
-      ns.SettingsPage.Select("addons")
+      ns.SettingsPage.Select("foreverchat", "foreverchat.enable")
       ns.Main.Show("settings")
     end
   elseif state == "active" then

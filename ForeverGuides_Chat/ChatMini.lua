@@ -532,7 +532,7 @@ FG.On("FG_SETTING_CHANGED", function(_, path)
   end
 end)
 FG.On("FG_CHAT_SETTING", function(_, id)
-  if id == "opacity" or id == "timeFormat" or id == "timeSeconds" then
+  if id == "opacity" or id == "timeFormat" or id == "timeSeconds" or id == "classColors" then
     for _, slot in ipairs(slots) do
       applyLook(slot)
       if slot.key and slot.frame:IsShown() then

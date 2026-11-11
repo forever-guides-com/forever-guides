@@ -17,12 +17,16 @@ ns.AddLocale("enUS", {
   ["subaddon.guildmanager.desc"] = "Guild tools for officers: main and alt links, inactivity list and guild actions with preview.",
   ["subaddon.chat.title"] = "Forever Chat",
   ["subaddon.chat.desc"] = "Messenger window for chat and whispers. Work in progress.",
+  ["subaddon.fishing.title"] = "Fishing helper",
+  ["subaddon.fishing.desc"] = "Cast and reel in with one key or a double click, louder sound, hidden names and automatic looting while you fish. Every function stays off until you switch it on.",
 })
 ns.AddLocale("deDE", {
   ["subaddon.guildmanager.title"] = "GildenManager",
   ["subaddon.guildmanager.desc"] = "Gildenwerkzeuge für Offiziere: Main und Alt, Inaktivitätsliste und Gildenaktionen mit Vorschau.",
   ["subaddon.chat.title"] = "Forever Chat",
   ["subaddon.chat.desc"] = "Messenger-Fenster für Chat und Flüstern. In Arbeit.",
+  ["subaddon.fishing.title"] = "Angelhilfe",
+  ["subaddon.fishing.desc"] = "Auswerfen und Einholen mit einer Taste oder einem Doppelklick, lauterer Ton, ausgeblendete Namen und automatisches Plündern beim Angeln. Jede Funktion bleibt aus, bis du sie einschaltest.",
 })
 
 -- id: switch key and value of the TOC field X-Forever-Guides-Addon. addon: folder name.
@@ -43,6 +47,13 @@ local MANIFEST = {
     addon = "ForeverGuides_Chat",
     titleKey = "subaddon.chat.title",
     descKey = "subaddon.chat.desc",
+    defaultOn = false,
+  },
+  {
+    id = "fishing",
+    addon = "ForeverGuides_Fishing",
+    titleKey = "subaddon.fishing.title",
+    descKey = "subaddon.fishing.desc",
     defaultOn = false,
   },
 }

@@ -180,27 +180,20 @@ end
 local function keywords(view)
   local label = W.Text(view.content, { key = "chat.set.keywords", role = "ui", color = "textMuted" })
   view.stack:Add(label, { gap = 2 })
-  local box = W.EditBox(view.content, { placeholder = "chat.set.keywords.placeholder", height = 26 })
+  local box = W.EditBox(view.content, {
+    placeholder = "chat.set.keywords.placeholder",
+    height = 26,
+    maxLetters = chat.Store.MAX_KEYWORDS * (chat.Store.KEYWORD_BYTES + 2),
+    get = function()
+      return SL.KeywordText(chat.db.options.keywords)
+    end,
+    set = function(text)
+      chat.db.options.keywords = SL.ParseKeywords(text)
+      FG.Emit("FG_CHAT_SETTING", "keywords", chat.db.options.keywords)
+    end,
+  })
   box.fgId = "chat-set-keywords"
   chat.List.FitPlaceholder(box)
-  local edit = box.edit
-  edit:SetMaxLetters(chat.Store.MAX_KEYWORDS * (chat.Store.KEYWORD_BYTES + 2))
-  local function show()
-    edit:SetText(SL.KeywordText(chat.db.options.keywords))
-  end
-  local function commit()
-    chat.db.options.keywords = SL.ParseKeywords(edit:GetText())
-    show()
-    FG.Emit("FG_CHAT_SETTING", "keywords", chat.db.options.keywords)
-  end
-  edit:HookScript("OnEnterPressed", FG.Wrap("chat-set-keywords", commit))
-  edit:HookScript("OnEditFocusLost", FG.Wrap("chat-set-keywords", commit))
-  box.Refresh = function()
-    if not edit:HasFocus() then
-      show()
-    end
-  end
-  box.Refresh()
   live[box] = true
   view.stack:Add(box, { height = 26, gap = 4 })
   local hint = FG.AddParagraph(view, nil, { text = " ", role = "micro", color = "textMuted", gap = 8 })
@@ -223,10 +216,10 @@ local function button(view, key, id, onClick, tip, opens)
   view.stack:Add(b, { height = 26, width = 220, gap = 6 })
 end
 
--- Opens a tab of the main settings (the font size, the history card).
-local function openMain(tab)
+-- Opens a card of the main settings (the font size, the history card).
+local function openMain(feature, card)
   if FG.SettingsPage then
-    FG.SettingsPage.Select(tab)
+    FG.SettingsPage.Select(feature, card)
   end
   if FG.Main and FG.Main.Show then
     FG.Main.Show("settings")
@@ -234,51 +227,92 @@ local function openMain(tab)
 end
 S.OpenMain = openMain
 
--- Fills a card or a page view (view.content, view.stack). opts.window: the pane of the messenger window, which
--- also offers the way to the history card (the main card sits next to it already).
-function S.Build(view, opts)
-  FG.AddHeading(view, "chat.set.heading")
+-- Options that stay visible on the card of the main settings: the intake switch, auto open for whispers and
+-- the sound. Everything else sits behind "More settings".
+local OPEN_ON_CARD = { intake = true, autoOpen = true, sound = true }
+
+-- Builds the options of the registry that pass include(def) into view, grouped. A group split over two passes
+-- gets its heading in both. skipFooter(group): a footer that waits for a later pass.
+local function fillGroups(view, include, skipFooter)
   local seen, current = {}, nil
   local function closeGroup()
-    if current and footers[current] then
+    if current and footers[current] and not (skipFooter and skipFooter(current)) then
       footers[current](view)
     end
   end
   for _, def in ipairs(SL.List()) do
-    if not seen[def.group] then
-      closeGroup()
-      seen[def.group] = true
-      current = def.group
-      local key = def.groupLabel or ("chat.set.group." .. def.group)
-      if hasText(key) then
-        FG.AddHeading(view, key, { role = "ui", gap = 4 })
+    if include(def) then
+      if not seen[def.group] then
+        closeGroup()
+        seen[def.group] = true
+        current = def.group
+        local key = def.groupLabel or ("chat.set.group." .. def.group)
+        if hasText(key) then
+          FG.AddHeading(view, key, { role = "ui", gap = 4 })
+        end
+        if notices[def.group] then
+          notices[def.group](view)
+        end
       end
-      if notices[def.group] then
-        notices[def.group](view)
+      control(view, def)
+      if def.id == "mentionBreaksMute" then
+        keywords(view)
       end
-    end
-    control(view, def)
-    if def.id == "mentionBreaksMute" then
-      keywords(view)
     end
   end
   closeGroup()
+end
+
+local function fontButton(view)
+  FG.AddParagraph(view, "chat.set.font.hint", { role = "micro", color = "textMuted", gap = 4 })
+  button(view, "chat.set.font.open", "chat-set-font", function()
+    openMain("fonts", "fonts.main")
+  end, nil, true)
+end
+
+local function resetViewsButton(view)
   button(view, "chat.set.resetViews", "chat-set-reset-views", function()
     for key in pairs(chat.db.view.chats) do
       chat.db.view.chats[key] = nil
     end
     FG.Emit("FG_CHAT_SETTING", "views", true)
   end, "chat.set.resetViews.tip")
-  FG.AddParagraph(view, "chat.set.font.hint", { role = "micro", color = "textMuted", gap = 4 })
-  button(view, "chat.set.font.open", "chat-set-font", function()
-    openMain("general")
-  end, nil, true)
+end
+
+-- Fills a card or a page view (view.content, view.stack). opts.window: the pane of the messenger window, which
+-- shows everything in one list and also offers the way to the history card (the main card sits next to it
+-- already). The card of the main settings keeps a few options open and puts the rest behind an accordion.
+function S.Build(view, opts)
+  FG.AddHeading(view, "chat.set.heading")
   if opts and opts.window then
+    fillGroups(view, function()
+      return true
+    end)
+    resetViewsButton(view)
+    fontButton(view)
     FG.AddParagraph(view, "chat.set.history.hint", { role = "micro", color = "textMuted", gap = 4 })
     button(view, "chat.set.history.open", "chat-set-history", function()
-      openMain("social")
+      openMain("chathistory", "chathistory.main")
     end, nil, true)
+    return
   end
+  local later = {}
+  for _, def in ipairs(SL.List()) do
+    if not OPEN_ON_CARD[def.id] then
+      later[def.group] = true
+    end
+  end
+  fillGroups(view, function(def)
+    return OPEN_ON_CARD[def.id]
+  end, function(group)
+    return later[group]
+  end)
+  fontButton(view)
+  local more = W.Accordion(view, { id = view.id or "foreverchat.options" })
+  fillGroups(more, function(def)
+    return not OPEN_ON_CARD[def.id]
+  end)
+  resetViewsButton(more)
 end
 
 -- The pane for the messenger window: a scrolling view inside parent, filled once. Returns { frame, view }.
@@ -294,5 +328,5 @@ end
 if FG.SettingsPage and FG.SettingsPage.Add then
   FG.SettingsPage.Add(function(view)
     S.Build(view)
-  end, "social")
+  end, "social", "foreverchat.options")
 end

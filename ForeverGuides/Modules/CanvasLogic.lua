@@ -41,11 +41,14 @@ local CL = {
   HOSTS = { xpbar = "bar", cursor = "cursor", area = "area" },
   DEFAULT_HOST = "xpbar",
   HOT_DEFAULT = 0.5,
-  -- Highest envelope version Import reads. The envelope is 2 only for a layout with groups (Export), so older
-  -- versions refuse such a string instead of drawing the children in the wrong place.
-  MAX_ENVELOPE = 2,
+  -- Highest envelope version Import reads. The envelope is 2 only for a layout with groups and 3 only for one with
+  -- an element type of TYPE_FORMAT (Export), so older versions refuse such a string instead of drawing the children
+  -- in the wrong place or dropping an element they do not know.
+  MAX_ENVELOPE = 3,
   -- `fmt` of the exchange data of a layout that needs a version with groups.
   FORMAT = 2,
+  -- Element types a reader needs a newer envelope for, by the version that introduced them.
+  TYPE_FORMAT = { weapon = 3 },
   -- Row by row, as the 3 x 3 grid of the editor shows them.
   POINTS = { "TOPLEFT", "TOP", "TOPRIGHT", "LEFT", "CENTER", "RIGHT", "BOTTOMLEFT", "BOTTOM", "BOTTOMRIGHT" },
   ALIGN = { "left", "hcenter", "right", "top", "vcenter", "bottom" },
@@ -370,11 +373,48 @@ function CL.HotPoint(layout)
 end
 
 local validators = {}
+local upgraders = {}
 
 -- Adds fn(layout, problems): it runs at the end of every Validate on the repaired layout and may change it and
 -- append to the problem list (GroupLogic checks the group references there).
 function CL.OnValidate(fn)
   validators[#validators + 1] = fn
+end
+
+-- Adds fn(element) -> element?: it brings an element of an older version to the current model (a type that was
+-- split off, a prop that moved) and returns a changed copy, or nothing when the element is fine. Runs on every
+-- element of every Validate, so a saved layout, a pasted string and an imported layout all pass through it.
+function CL.OnUpgrade(fn)
+  upgraders[#upgraders + 1] = fn
+end
+
+-- The element as the current version keeps it: the element itself when no upgrade applies, else the changed copy.
+-- An upgrade that raises is skipped.
+function CL.Upgrade(item)
+  if type(item) ~= "table" then
+    return item
+  end
+  local out = item
+  for _, fn in ipairs(upgraders) do
+    local ok, changed = pcall(fn, out)
+    if ok and type(changed) == "table" then
+      out = changed
+    end
+  end
+  return out
+end
+
+-- Upgrades the elements of a layout table in place (the stored one), returns how many changed.
+function CL.UpgradeElements(layout)
+  local n = 0
+  for i, item in ipairs(type(layout) == "table" and type(layout.elements) == "table" and layout.elements or {}) do
+    local up = CL.Upgrade(item)
+    if up ~= item then
+      layout.elements[i] = up
+      n = n + 1
+    end
+  end
+  return n
 end
 
 -- Repairs any value into a usable layout and lists what had to change (keys such as
@@ -425,7 +465,7 @@ function CL.Validate(raw)
         problems[#problems + 1] = "elements"
         break
       end
-      local el = cleanElement(item, used, problems, "elements[" .. i .. "].")
+      local el = cleanElement(CL.Upgrade(item), used, problems, "elements[" .. i .. "].")
       if el then
         out.elements[#out.elements + 1] = el
       end
@@ -465,6 +505,21 @@ end
 
 function CL.Copy(layout)
   return U.copy(layout)
+end
+
+-- The lowest envelope version that reads these elements: 1, 2 with a group or a child of one, 3 with an element of
+-- a type in TYPE_FORMAT (the highest of them counts).
+function CL.RequiredVersion(elements)
+  local need = 1
+  for _, el in ipairs(type(elements) == "table" and elements or {}) do
+    if type(el) == "table" then
+      if el.type == "group" or el.group ~= nil then
+        need = math.max(need, CL.FORMAT)
+      end
+      need = math.max(need, CL.TYPE_FORMAT[el.type] or 1)
+    end
+  end
+  return need
 end
 
 -- Whether a layout has a group or a child of one.
@@ -1067,13 +1122,18 @@ end
 -- envelope names the host (default: by the canvas kind) so another display can refuse it.
 function CL.Export(layout, host)
   local clean = CL.Pack(layout)
-  -- Only a layout with groups needs a newer reader: the others stay exactly as before.
-  local groups = CL.HasGroups(clean)
-  if groups then
-    clean.fmt = CL.FORMAT
+  -- Only a layout with groups or a newer element type needs a newer reader: the others stay exactly as before.
+  local need = CL.RequiredVersion(clean.elements)
+  if need > 1 then
+    clean.fmt = need
   end
-  local s, why =
-    ns.Strings.encode(CL.KIND, clean, nil, type(host) == "string" and host or CL.HostOf(clean), groups and 2 or nil)
+  local s, why = ns.Strings.encode(
+    CL.KIND,
+    clean,
+    nil,
+    type(host) == "string" and host or CL.HostOf(clean),
+    need > 1 and need or nil
+  )
   if s and #s > ns.Strings.MAX_INPUT then
     return nil, "too-large"
   end

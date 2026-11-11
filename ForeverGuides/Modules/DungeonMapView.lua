@@ -7,10 +7,14 @@
 -- without a map shows a dimmed loading screen with "map coming soon". Players have no position inside
 -- instances, so there is no player marker, only the optional rough area marker (SetMarker). Hosts:
 -- Modules/InstancesPage.lua and Modules/DungeonWorldMap.lua (which uses the hooks onFloorPick and
--- onMapClick and the height limit maxHeight). Tiles and pins come from pools and go back (textures
--- cleared) when the widget hides.
+-- onMapClick, the height limit maxHeight and zoomBlocked). Tiles and pins come from pools and go back
+-- (textures cleared) when the widget hides.
+-- Zoom: the picture sits on a canvas that grows with the zoom (100 to 400 percent, MapMagnify) inside a
+-- clipping viewport. Pins keep their pixel size (scaled by the pin size setting) and are placed by fractions
+-- of the canvas, so data, clicks and the marker are independent of the zoom.
 local _, ns = ...
 local W, L, Theme, P, PD = ns.W, ns.L, ns.Theme, ns.PinLogic, ns.DungeonPinDialogs
+local MG = ns.MapMagnify
 
 local DMV = {}
 ns.DungeonMapView = DMV
@@ -24,8 +28,12 @@ DMV.MAX_W = 720
 -- Tallest and lowest the picture gets; a host can lower the top with view.maxHeight (height of the widget).
 DMV.MAX_H, DMV.MIN_H = 600, 120
 DMV.PIN = 20
+-- The entrance pin is bigger than the others; "show entrance" zooms in to at least this many percent.
+DMV.ENTRANCE_SCALE, DMV.ENTRANCE_ZOOM = 1.25, 200
+DMV.FLOOR_VIEW = "floor"
 
 local GAP, CTRL_H, DROP_W, DROP_H, MARKER = 6, 24, 170, 46, 22
+local PIN_GROUP_W, PIN_SLIDER_W, PIN_VALUE_W = 250, 90, 40
 
 -- Visible part of a floor in texture pixels: { cols, rows, w, h }. A minimap crop (floor.cols and
 -- floor.rows) shows every tile whole, any other floor is the 4 by 3 grid cut to 3:2.
@@ -57,7 +65,8 @@ ns.AddLocale("enUS", {
   ["dmap.export"] = "Export",
   ["dmap.import"] = "Import",
   ["dmap.noInstance"] = "Select an instance to see its map.",
-  ["dmap.soon"] = "Map coming soon",
+  ["dmap.surface"] = "Dungeon map",
+  ["dmap.soon"] = "Map to follow",
   ["dmap.pins.none"] = "No pins on this floor yet.",
   ["dmap.pins.bosses"] = "Bosses on this floor: %s",
   ["dmap.pins.noBosses"] = "No bosses set on this floor yet.",
@@ -68,6 +77,15 @@ ns.AddLocale("enUS", {
   ["dmap.delete.title"] = "Delete pin",
   ["dmap.delete.text"] = "Delete this pin?",
   ["dmap.error"] = "Pin not saved: %s",
+  ["dmap.entrance"] = "Show entrance",
+  ["dmap.entrance.tip"] = "Zooms in and centers the map on the entrance.",
+  ["dmap.entrance.none"] = "No entrance set on this floor.",
+  ["dmap.pinSize"] = "Pin size",
+  ["dmap.pinSize.tip"] = "Changes the size of all pins on the map.",
+  ["dmap.legend"] = "Legend: %s",
+  ["dmap.legend.entrance"] = "E Entrance",
+  ["dmap.legend.boss"] = "Skull Boss",
+  ["dmap.legend.link"] = "Number Passage to that floor",
 })
 ns.AddLocale("deDE", {
   ["dmap.floor"] = "Ebene wählen",
@@ -76,7 +94,8 @@ ns.AddLocale("deDE", {
   ["dmap.export"] = "Exportieren",
   ["dmap.import"] = "Importieren",
   ["dmap.noInstance"] = "Wähle eine Instanz, um ihre Karte zu sehen.",
-  ["dmap.soon"] = "Karte kommt bald",
+  ["dmap.surface"] = "Dungeon-Karte",
+  ["dmap.soon"] = "Karte folgt",
   ["dmap.pins.none"] = "Auf dieser Ebene sind noch keine Pins gesetzt.",
   ["dmap.pins.bosses"] = "Bosse auf dieser Ebene: %s",
   ["dmap.pins.noBosses"] = "Auf dieser Ebene sind noch keine Bosse gesetzt.",
@@ -87,6 +106,15 @@ ns.AddLocale("deDE", {
   ["dmap.delete.title"] = "Pin löschen",
   ["dmap.delete.text"] = "Diesen Pin löschen?",
   ["dmap.error"] = "Pin nicht gespeichert: %s",
+  ["dmap.entrance"] = "Eingang zeigen",
+  ["dmap.entrance.tip"] = "Zoomt hinein und zentriert die Karte auf den Eingang.",
+  ["dmap.entrance.none"] = "Auf dieser Ebene ist kein Eingang gesetzt.",
+  ["dmap.pinSize"] = "Pin-Größe",
+  ["dmap.pinSize.tip"] = "Ändert die Größe aller Pins auf der Karte.",
+  ["dmap.legend"] = "Legende: %s",
+  ["dmap.legend.entrance"] = "E Eingang",
+  ["dmap.legend.boss"] = "Totenkopf Boss",
+  ["dmap.legend.link"] = "Zahl Übergang zu dieser Ebene",
 })
 
 local function maps()
@@ -145,6 +173,7 @@ function DMV.Create(parent)
   f.tiles, f.pinFrames = {}, {}
   f.tilesUsed, f.pinsUsed = 0, 0
   local floorDrop, floorOptions, editToggle, exportButton, importButton, map, hint, info, marker, soon
+  local view, mag, entranceButton, pinGroup
   local pins = {}
 
   -- Called after a click changed what the widget needs in height (the page lays out again).
@@ -177,6 +206,16 @@ function DMV.Create(parent)
     local x = ((cx or 0) / scale - (map:GetLeft() or 0)) / w
     local y = ((map:GetTop() or 0) - (cy or 0) / scale) / h
     return round3(math.min(1, math.max(0, x))), round3(math.min(1, math.max(0, y)))
+  end
+
+  -- Pixel size of a pin: the base size times the pin size setting, the entrance a bit bigger.
+  local function pinPixels(pin)
+    local D = ns.InstanceDisplay
+    local size = DMV.PIN * (D and D.PinFactor() or 1)
+    if pin.kind == "entrance" then
+      size = size * DMV.ENTRANCE_SCALE
+    end
+    return math.floor(size + 0.5)
   end
 
   local function bossLabel(pin)
@@ -420,10 +459,39 @@ function DMV.Create(parent)
     end
     for i = 1, f.pinsUsed do
       local frame = f.pinFrames[i]
+      local px = pinPixels(frame.pin)
+      frame:SetSize(px, px)
       frame:ClearAllPoints()
       frame:SetPoint("CENTER", map, "TOPLEFT", frame.pin.x * state.mapW, -frame.pin.y * state.mapH)
     end
     placeMarker()
+  end
+
+  -- The entrance pin of the shown floor, if the data has one.
+  local function entrancePin()
+    for _, p in ipairs(pins) do
+      if p.kind == "entrance" and p.floor == state.floor then
+        return p
+      end
+    end
+  end
+
+  -- The zoom controls follow the state: the entrance button needs a pin and a free zoom.
+  local function paintZoomControls()
+    mag.Refresh()
+    entranceButton:SetEnabled(entrancePin() ~= nil and mag.Blocked() == nil)
+  end
+
+  -- The canvas follows the zoom of the viewport: same picture, new size, pins stay as big as they are.
+  local function applyZoom()
+    if not state.viewW then
+      return
+    end
+    mag.Place(state.viewW, state.viewH)
+    local level = mag.Percent() / 100
+    state.mapW, state.mapH = state.viewW * level, state.viewH * level
+    placeAll()
+    paintZoomControls()
   end
 
   -- Release and fill -----------------------------------------------------------------------------
@@ -457,6 +525,18 @@ function DMV.Create(parent)
       lines[1] = L["dmap.pins.noBosses"]
     else
       lines[1] = string.format(L["dmap.pins.bosses"], table.concat(names, ", "))
+    end
+    local legend = {}
+    for _, kind in ipairs({ "entrance", "boss", "link" }) do
+      for _, p in ipairs(onFloor) do
+        if p.kind == kind then
+          legend[#legend + 1] = L["dmap.legend." .. kind]
+          break
+        end
+      end
+    end
+    if #legend > 0 then
+      lines[#lines + 1] = string.format(L["dmap.legend"], table.concat(legend, ", "))
     end
     if state.edit then
       lines[#lines + 1] = L["dmap.editHint"]
@@ -497,8 +577,11 @@ function DMV.Create(parent)
     releaseAll()
     local hasMap = state.floors > 0
     local waiting = not hasMap and state.requested ~= nil
+    view:SetShown(hasMap)
     map:SetShown(hasMap)
     info:SetShown(hasMap)
+    entranceButton:SetShown(hasMap)
+    pinGroup:SetShown(hasMap)
     soon:SetShown(waiting)
     hint:SetShown(not hasMap and not waiting)
     editToggle:SetShown(hasMap)
@@ -507,6 +590,7 @@ function DMV.Create(parent)
     W.SetText(hint, "dmap.noInstance")
     if not hasMap then
       state.geo = nil
+      mag.Refresh()
       paintFloors()
       if waiting and f:IsVisible() then
         paintSoon()
@@ -524,6 +608,8 @@ function DMV.Create(parent)
     state.geo = DMV.Geometry(floor)
     paintFloors()
     editToggle.Refresh()
+    pinGroup.Refresh()
+    paintZoomControls()
     W.SetText(info, nil, infoText(onFloor))
     -- Hidden pages keep no textures, OnShow paints again.
     if not f:IsVisible() then
@@ -616,6 +702,8 @@ function DMV.Create(parent)
     if state.floors > 0 then
       local items = {
         { frame = floorDrop, w = math.min(DROP_W, width), h = DROP_H },
+        { frame = entranceButton, w = 150, h = CTRL_H, low = true },
+        { frame = pinGroup, w = math.min(PIN_GROUP_W, width), h = 22, low = true },
         { frame = editToggle, w = 170, h = 22, low = true },
         { frame = exportButton, w = 110, h = CTRL_H, low = true },
         { frame = importButton, w = 110, h = CTRL_H, low = true },
@@ -624,11 +712,12 @@ function DMV.Create(parent)
       info:SetWidth(width)
       local infoH = info:GetStringHeight()
       local x0, w, h = DMV.MapSize(width, state.geo, pictureLimit(y + GAP + infoH))
-      state.mapW, state.mapH = w, h
-      map:ClearAllPoints()
-      map:SetPoint("TOPLEFT", f, "TOPLEFT", x0, -y)
-      map:SetSize(w, h)
-      placeAll()
+      state.viewW, state.viewH = w, h
+      view:ClearAllPoints()
+      view:SetPoint("TOPLEFT", f, "TOPLEFT", x0, -y)
+      view:SetSize(w, h)
+      mag.SetMax(DMV.FLOOR_VIEW, MG.MaxPercent(state.geo.w, w))
+      applyZoom()
       y = y + h + GAP
       info:ClearAllPoints()
       info:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
@@ -668,6 +757,9 @@ function DMV.Create(parent)
   -- true when it has a map.
   function f:SetInstance(key)
     local entry = key and maps()[key] or nil
+    if key ~= state.requested then
+      mag.ResetView(DMV.FLOOR_VIEW)
+    end
     state.requested = key
     state.entry = entry
     state.floors = entry and entry.floors and #entry.floors or 0
@@ -689,6 +781,9 @@ function DMV.Create(parent)
     if type(n) ~= "number" or n < 1 or n > state.floors then
       return false
     end
+    if n ~= state.floor then
+      mag.ResetView(DMV.FLOOR_VIEW)
+    end
     state.floor = n
     render()
     if state.width then
@@ -701,6 +796,13 @@ function DMV.Create(parent)
   function f:SetMarker(spec)
     state.marker = spec
     placeMarker()
+  end
+
+  -- The zoom bar and the entrance button follow the host's block (combat).
+  function f:RefreshZoom()
+    if mag then
+      paintZoomControls()
+    end
   end
 
   function f:Refresh()
@@ -765,12 +867,105 @@ function DMV.Create(parent)
       end)
     end,
   })
-  map = CreateFrame("Button", nil, f)
+  entranceButton = W.Action(f, {
+    label = "dmap.entrance",
+    icon = "marker",
+    tooltip = "dmap.entrance",
+    tooltipText = "dmap.entrance.tip",
+    width = 150,
+    height = CTRL_H,
+    onClick = function()
+      local pin = entrancePin()
+      if pin then
+        mag.CenterOn(pin.x, pin.y, math.max(DMV.ENTRANCE_ZOOM, mag.Percent()))
+        applyZoom()
+      end
+    end,
+  })
+  entranceButton:HookScript("OnEnter", function(self)
+    if not entrancePin() then
+      ns.ShowTooltip(self, L["dmap.entrance"], L["dmap.entrance.none"])
+    end
+  end)
+  pinGroup = CreateFrame("Frame", nil, f)
+  pinGroup:SetSize(PIN_GROUP_W, 22)
+  local pinLabel = W.Text(pinGroup, { key = "dmap.pinSize", role = "ui", color = "textSecondary" })
+  pinLabel:SetPoint("LEFT", pinGroup, "LEFT", 0, 0)
+  local pinValue = W.Text(pinGroup, { role = "ui", color = "text", justify = "RIGHT" })
+  local pinSlider = W.CompactSlider(pinGroup, {
+    min = ns.InstanceDisplay.PIN_MIN,
+    max = ns.InstanceDisplay.PIN_MAX,
+    step = ns.InstanceDisplay.PIN_STEP,
+    width = PIN_SLIDER_W,
+    applyOn = "release",
+    preview = function(v)
+      pinValue:SetText(string.format("%d %%", v))
+    end,
+    set = function(v)
+      pinValue:SetText(string.format("%d %%", ns.InstanceDisplay.SetPinScale(v)))
+      placeAll()
+    end,
+    tooltip = "dmap.pinSize",
+    tooltipText = "dmap.pinSize.tip",
+  })
+  pinSlider.fgName = function()
+    return L["dmap.pinSize"]
+  end
+  pinSlider:SetPoint("LEFT", pinLabel, "RIGHT", GAP, 0)
+  pinValue:SetPoint("LEFT", pinSlider, "RIGHT", GAP, 0)
+  pinValue:SetWidth(PIN_VALUE_W)
+  function pinGroup.Refresh()
+    local percent = ns.InstanceDisplay.PinScale()
+    pinSlider:Sync(percent)
+    pinValue:SetText(string.format("%d %%", percent))
+  end
+  view = CreateFrame("Frame", nil, f)
+  map = CreateFrame("Button", nil, view)
+  map.fgName = function()
+    return L["dmap.surface"]
+  end
   W.Fill(map, "surface", 1)
   map:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  mag = MG.Attach({
+    viewport = view,
+    canvas = map,
+    barParent = map,
+    views = { DMV.FLOOR_VIEW },
+    view = function()
+      return state.floors > 0 and DMV.FLOOR_VIEW or nil
+    end,
+    blocked = function()
+      return f.zoomBlocked and f.zoomBlocked() or nil
+    end,
+    changed = applyZoom,
+    moved = function() end,
+  })
+  f.mag = mag
+  -- The keys go to the picture only while the pointer is on it and no text field has the focus.
+  local keys = CreateFrame("Frame", nil, view)
+  ns.PropagateKeys(keys, true)
+  keys:SetScript("OnKeyDown", function(self, key)
+    if InCombatLockdown() then
+      return
+    end
+    local over = view:IsMouseOver() and not (GetCurrentKeyBoardFocus and GetCurrentKeyBoardFocus())
+    local _, handled = ns.Safe("dmap-key", function()
+      return over and mag.Key(key)
+    end)
+    ns.PropagateKeys(self, not handled)
+  end)
+  keys:EnableKeyboard(true)
+  f.keys = keys
+  ns.On("PLAYER_REGEN_DISABLED", function()
+    ns.PropagateKeys(keys, true)
+  end)
   map:SetScript(
     "OnClick",
     ns.Wrap("dmap-map", function(_, button)
+      -- The click that ends a drag of the picture is no click on the map.
+      if mag.WasDrag() then
+        return
+      end
       -- A host can take the click (true = used) before the editor sees it.
       if f.onMapClick and f.onMapClick(button, cursorFraction()) then
         return
@@ -798,7 +993,8 @@ function DMV.Create(parent)
   W.Fill(soon.plate, "surface", 0.92)
   W.Border(soon.plate, "accent2", 1, 1)
   soon.text = W.Text(soon.plate, { key = "dmap.soon", role = "h3", color = "text", justify = "CENTER", wrap = true })
-  f.map, f.info, f.hint, f.soon, f.floorDrop = map, info, hint, soon, floorDrop
+  f.map, f.view, f.info, f.hint, f.soon, f.floorDrop = map, view, info, hint, soon, floorDrop
+  f.entranceButton, f.pinSlider, f.pinGroup = entranceButton, pinSlider, pinGroup
   f.exportButton, f.importButton, f.editToggle = exportButton, importButton, editToggle
 
   f:SetScript(

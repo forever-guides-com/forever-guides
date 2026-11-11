@@ -705,8 +705,10 @@ local function collectSquashed(idx, q, order)
         local flat = f.joined:gsub(" ", "")
         local at = find(flat, needle, 1, true)
         if at then
-          local points = ((at == 1 and POINTS.prefix or POINTS.substring)
-            - math.min(LENGTH_PENALTY_MAX, LENGTH_PENALTY * (#flat - #needle))) * f.weight
+          local points = (
+            (at == 1 and POINTS.prefix or POINTS.substring)
+            - math.min(LENGTH_PENALTY_MAX, LENGTH_PENALTY * (#flat - #needle))
+          ) * f.weight
           if f.former then
             if not bestOld or points > bestOld then
               bestOld, oldText = points, f.former

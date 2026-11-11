@@ -1,6 +1,6 @@
 -- Settings card "Ores and herbs" on the map tab: where the spots show (the addon map, Blizzard's world map,
--- the minimap), the explored look of the world map and the choice of materials (ns.GatherFilterUI). The
--- switches write through Store.set, WorldMapGather.lua listens to FG_SETTING_CHANGED.
+-- the minimap), the explored look of the world map and the choice of materials, treasures and fishing schools
+-- (ns.GatherFilterUI). The switches write through Store.set, WorldMapGather.lua listens to FG_SETTING_CHANGED.
 local _, ns = ...
 local W, Store = ns.W, ns.Store
 
@@ -9,9 +9,11 @@ ns.GatheringSettings = S
 
 ns.AddLocale("enUS", {
   ["gather.set.heading"] = "Ores and herbs",
-  ["gather.set.hint"] = "Shows where ore veins and herbs grow. Every ore and herb of a zone shows by default. The choice of materials below counts for both maps and is the same in every zone.",
-  ["gather.set.forever"] = "Show on the addon map",
+  ["gather.set.hint"] = "Shows where ore veins and herbs grow, and where chests and fishing schools are. Every ore and herb of a zone shows by default. The choice of materials, chests and schools below counts for both maps and is the same in every zone.",
+  ["gather.set.forever"] = "Show ores and herbs on the addon map",
   ["gather.set.foreverHint"] = "The page Ores and herbs narrows the items down per zone.",
+  ["gather.set.foreverObjects"] = "Show chests and fishing schools on the addon map",
+  ["gather.set.foreverObjectsHint"] = "Chests, clams and other finds and fishing schools of the zone. The choice of kinds is in the list below.",
   ["gather.set.worldmap"] = "Show on Blizzard's world map",
   ["gather.set.worldmapHint"] = "Spots of the zone the map window shows, in the big and the small window.",
   ["gather.set.minimap"] = "Show on the minimap",
@@ -33,14 +35,16 @@ ns.AddLocale("enUS", {
   ["gather.set.minimapEmpty"] = "Ores and herbs are switched off in the filter, so the minimap stays empty.",
   ["gather.set.minimapEmptyButton"] = "Switch on",
   ["gather.set.reveal"] = "Show Blizzard's world map as explored",
-  ["gather.set.revealHint"] = "Draws every area of a zone map as if you had explored it. Needs the data add-on Map data and the switch for the world map above. Off puts the normal look back.",
+  ["gather.set.revealHint"] = "Draws every area of a zone map as if you had explored it. Needs the data add-on Map data, works on its own without the spots. Off puts the normal look back.",
   ["gather.set.materials"] = "Materials",
 })
 ns.AddLocale("deDE", {
   ["gather.set.heading"] = "Erze und Kräuter",
-  ["gather.set.hint"] = "Zeigt, wo Erzadern und Kräuter wachsen. Standardmäßig erscheinen alle Erze und Kräuter eines Gebiets. Die Auswahl der Materialien unten gilt für beide Karten und ist in jedem Gebiet gleich.",
-  ["gather.set.forever"] = "Auf der Addon-Karte zeigen",
+  ["gather.set.hint"] = "Zeigt, wo Erzadern und Kräuter wachsen und wo Truhen und Fischschwärme liegen. Standardmäßig erscheinen alle Erze und Kräuter eines Gebiets. Die Auswahl der Materialien, Truhen und Schwärme unten gilt für beide Karten und ist in jedem Gebiet gleich.",
+  ["gather.set.forever"] = "Erze und Kräuter auf der Addon-Karte zeigen",
   ["gather.set.foreverHint"] = "Die Seite Erze und Kräuter schränkt die Items je Gebiet ein.",
+  ["gather.set.foreverObjects"] = "Truhen und Fischschwärme auf der Addon-Karte zeigen",
+  ["gather.set.foreverObjectsHint"] = "Truhen, Muscheln und weitere Fundstücke sowie Fischschwärme des Gebiets. Die Auswahl der Arten steht in der Liste unten.",
   ["gather.set.worldmap"] = "Auf der Blizzard-Weltkarte zeigen",
   ["gather.set.worldmapHint"] = "Fundorte des Gebiets, das das Kartenfenster zeigt, im großen und im kleinen Fenster.",
   ["gather.set.minimap"] = "Auf der Minimap zeigen",
@@ -62,7 +66,7 @@ ns.AddLocale("deDE", {
   ["gather.set.minimapEmpty"] = "Erze und Kräuter sind im Filter ausgeschaltet, deshalb bleibt die Minimap leer.",
   ["gather.set.minimapEmptyButton"] = "Einschalten",
   ["gather.set.reveal"] = "Blizzard-Weltkarte als erkundet zeigen",
-  ["gather.set.revealHint"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Braucht das Daten-Addon Kartendaten und den Schalter für die Weltkarte darüber. Aus stellt die normale Darstellung wieder her.",
+  ["gather.set.revealHint"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Braucht das Daten-Addon Kartendaten, wirkt für sich allein ohne die Fundorte. Aus stellt die normale Darstellung wieder her.",
   ["gather.set.materials"] = "Materialien",
 })
 
@@ -200,35 +204,37 @@ function S.Add(view)
   ns.AddHeading(view, "gather.set.heading")
   ns.AddParagraph(view, "gather.set.hint", { role = "micro", color = "textMuted" })
   toggle(view, "forever", "settings.gather.forever")
+  toggle(view, "foreverObjects", "settings.gather.foreverObjects")
   toggle(view, "worldmap", "settings.gather.worldmap")
   toggle(view, "minimap", "settings.gather.minimap")
-  minimapOptions(view)
   emptyNotice(view)
+  ns.AddHeading(view, "gather.set.materials")
+  local filter = ns.GatherFilterUI.Build(view.content)
+  filter:SetListHeight(LIST_H)
+  view.stack:Add(filter, { gap = 8 })
 
+  -- The look of the minimap pins and the revealed world map are set once and then left alone.
+  local more = W.Accordion(view, { id = view.id or "gathering.pins" })
+  minimapOptions(more)
   local RV = ns.MapReveal
   local banner
   local function wanted()
     return on("settings.worldMapReveal") and RV.BannerWanted(false)
   end
-  toggle(view, "reveal", "settings.worldMapReveal", function()
+  toggle(more, "reveal", "settings.worldMapReveal", function()
     banner:Update(wanted())
-    view.stack:Layout()
+    view:Layout()
   end)
-  banner = ns.PackageUI.Banner(view.content, RV.ADDON, {
+  banner = ns.PackageUI.Banner(more.content, RV.ADDON, {
     labelKey = "map.reveal.pkg",
     onLoaded = function()
       ns.WorldMapGather.Refresh()
-      view.stack:Layout()
+      view:Layout()
     end,
     onResize = function()
-      view.stack:Layout()
+      view:Layout()
     end,
   })
   banner:Update(wanted())
-  view.stack:Add(banner, { gap = 8 })
-
-  ns.AddHeading(view, "gather.set.materials")
-  local filter = ns.GatherFilterUI.Build(view.content)
-  filter:SetListHeight(LIST_H)
-  view.stack:Add(filter, { gap = 8 })
+  more.stack:Add(banner, { gap = 8 })
 end

@@ -333,7 +333,8 @@ local function newFrame()
   end
   f.bg = f:CreateTexture(nil, "BACKGROUND")
   f.bg:SetAllPoints()
-  f.shell = ns.WindowShell.Attach(f, { titleHeight = HEAD_H, shadow = true })
+  -- esc = false: a pinned drawing stays open on Esc, the pin state toggles its place in the Esc stack (Shell.SetEsc).
+  f.shell = ns.WindowShell.Attach(f, { titleHeight = HEAD_H, shadow = true, esc = false })
   f.border, f.bar, f.barBg, f.title = f.shell.border, f.shell.titleBar, f.shell.barFill, f.shell.titleText
 
   f.view = V.New(f, { scale = 1, kind = "window" })

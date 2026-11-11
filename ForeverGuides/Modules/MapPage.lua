@@ -339,7 +339,7 @@ local function build(container)
   local byslug, zoneOf = {}, {}
   local data, world, layout, island, estimated
   local refresh, layoutPanes, followTab, intro, paintCanvas
-  local markers, zoom, pins, instancePins, zoneArrows, places, legend, route, routeList, showStep, mag, stopsList, gather, player, guild
+  local markers, zoom, pins, instancePins, zoneArrows, places, legend, route, routeList, showStep, mag, stopsList, gather, objects, player, guild
   local exploredCache = {}
   -- True while the map pane is laid out: a banner that changes its height then must not start another layout.
   local laying = false
@@ -423,6 +423,10 @@ local function build(container)
 
   local function gatherOn()
     return ns.Store.get("settings.gather.forever") ~= false
+  end
+
+  local function objectsOn()
+    return ns.Store.get("settings.gather.foreverObjects") ~= false
   end
 
   local function playerOn()
@@ -583,6 +587,14 @@ local function build(container)
       storeItem("symbols", "map.symbols", "settings.mapSymbols", symbolsOn, "pin"),
       storeItem("names", "map.names", "settings.mapNames", namesOn, "tag"),
       storeItem("gather", "map.gather", "settings.gather.forever", gatherOn, "search", "map.gather.tip"),
+      storeItem(
+        "gatherObjects",
+        "map.gatherObjects",
+        "settings.gather.foreverObjects",
+        objectsOn,
+        "star",
+        "map.gatherObjects.tip"
+      ),
       storeItem("player", "map.player", "settings.mapPlayerMarker", playerOn, "marker", "map.player.tip"),
     },
   })
@@ -664,6 +676,7 @@ local function build(container)
   paintSize()
   -- Ore and herb spots of the open zone: what is shown, and the way to choose or clear the items.
   local gatherText = W.Text(displayBox, { role = "ui", color = "textSecondary", wrap = true })
+  local objectsText = W.Text(displayBox, { role = "ui", color = "textSecondary", wrap = true })
   local gatherHide = W.Button(displayBox, {
     key = "map.gather.hide",
     tooltip = "map.gather.hide",
@@ -708,9 +721,23 @@ local function build(container)
     gatherHide:SetShown(button == gatherHide)
     gatherChoose:SetShown(button == gatherChoose)
     displayBox.gatherButton = button
+    -- Chests and schools: one line, the choice of kinds is in the settings.
+    local objectsShown = objectsOn()
+    objectsText:SetShown(objectsShown)
+    if objectsShown then
+      local info = objects.Info()
+      if info.state == "shown" then
+        objectsText:SetText(string.format(L["map.gatherObjects.spots"], info.points, info.items))
+      elseif info.state == "data" then
+        objectsText:SetText(ns.GatherDataAccess.Hint(info.status))
+      else
+        objectsText:SetText(L["map.gatherObjects." .. info.state])
+      end
+    end
   end
   displayBox.smaller, displayBox.sizeValue, displayBox.bigger = smaller, sizeValue, bigger
   displayBox.gatherText, displayBox.gatherHide, displayBox.gatherChoose = gatherText, gatherHide, gatherChoose
+  displayBox.objectsText = objectsText
   function displayBox:fgGridLayout(width)
     local rowH = math.max(Theme.lineHeight(24), math.ceil(sizeLabel:GetStringHeight()) + 2)
     local mid = math.floor(rowH / 2)
@@ -738,6 +765,13 @@ local function build(container)
         button:SetSize(math.min(width, math.max(170, math.ceil(button.label:GetStringWidth()) + 24)), h)
         y = y + h
       end
+    end
+    if objectsOn() then
+      y = y + 8
+      objectsText:ClearAllPoints()
+      objectsText:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+      objectsText:SetWidth(width)
+      y = y + math.ceil(objectsText:GetStringHeight())
     end
     self:SetHeight(y)
     return y
@@ -1237,6 +1271,7 @@ local function build(container)
     moved = function()
       pins.Paint()
       gather.Paint(false)
+      objects.Paint(false)
     end,
   })
   canvas.mag = mag
@@ -1434,6 +1469,27 @@ local function build(container)
   })
   canvas.gather = gather
 
+  objects = GMap.Attach({
+    canvas = canvas,
+    mapId = function()
+      local zv = zoom.View()
+      return zv and zv.mapId
+    end,
+    enabled = objectsOn,
+    feed = ns.GatherObjects.Feed,
+    scale = symbolScale,
+    window = function()
+      return mag.Window()
+    end,
+    cursor = function()
+      local fx, fy = MM.CursorFraction(viewport)
+      if fx and fx >= 0 and fx <= 1 and fy >= 0 and fy <= 1 and canvas:IsMouseOver() then
+        return fx, fy
+      end
+    end,
+  })
+  canvas.objects = objects
+
   player = PM.Attach({
     canvas = canvas,
     view = activeView,
@@ -1586,6 +1642,7 @@ local function build(container)
     ns.Safe("map-island", paintPanel, canvas, (onIsland and not zoomed) and island.panel or nil, panelTitle(), zoneOf)
     zoom.Paint()
     gather.Paint(true)
+    objects.Paint(true)
     ns.Safe("map-instance-pins", instancePins.Paint)
     ns.Safe("map-zone-arrows", zoneArrows.Paint)
     pins.Paint()

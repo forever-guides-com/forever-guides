@@ -6,7 +6,7 @@ local U = ns.U
 local Store = {}
 ns.Store = Store
 
-Store.SCHEMA = 6
+Store.SCHEMA = 7
 Store.CHAR_SCHEMA = 1
 
 Store.defaults = {
@@ -37,7 +37,7 @@ Store.defaults = {
     sidebarCollapsed = false,
     -- Account default of the optional sub-addons by manifest id (Core/SubAddons.lua); a character
     -- overrides it in ForeverGuidesCharDB.subaddons. The key must exist so the controls can bind.
-    subaddons = { guildmanager = false, chat = false },
+    subaddons = { guildmanager = false, chat = false, fishing = false },
     -- settings.nav (navigation layout for all characters, Modules/NavLayoutLogic.lua) has no default on
     -- purpose: an absent key is the default menu.
     -- Accordion state per sidebar group (UI/Sidebar.lua). A group id missing here (older saves)
@@ -60,10 +60,13 @@ Store.defaults = {
     instancesClosed = {},
     -- Instance list grouped by faction (Alliance, Horde, both).
     instancesGroup = false,
+    -- Favorite instances as a set of slugs { ["gnomeregan"] = true } and the pin size of the dungeon map in
+    -- percent, 60 to 200 (Modules/InstanceDisplayLogic.lua).
+    instanceFavorites = {},
+    dungeonPinScale = 100,
     -- Items tab of the instances page: "boss" (accordion by boss) or "all" (one list).
     instancesItemsView = "boss",
-    -- Quests tab of the instances page: faction filter "all", "A", "H" or "B".
-    instancesQuestFilter = "all",
+    -- Quests tab of the instances page: faction filter "all", "A" or "H". Not set: the faction of the player.
     mapTab = "azeroth",
     -- Map page: places the filters hide are dimmed instead of dropped.
     mapDimFiltered = false,
@@ -81,9 +84,14 @@ Store.defaults = {
     -- narrowed it on the page of the items (session choice, ns.GatherSelection). The minimap pins
     -- (Modules/MinimapLayer.lua) have an edge mode ("clamp" pulls spots just beyond the edge onto it, "hide"
     -- drops them), a pin size in px and an opacity in percent. Spots within minimapNear yards (0 = off) are
-    -- drawn as a circle (minimapRingSize px, line minimapRingWidth px) instead of the symbol.
+    -- drawn as a circle (minimapRingSize px, line minimapRingWidth px) instead of the symbol. Spots without an
+    -- item (chests and other finds, fishing schools; Modules/GatherObjects.lua) have their own switch on the
+    -- Forever map (foreverObjects), a switch per category (treasure, schools) and a list of the kinds switched
+    -- off (hiddenKinds, { [kindId] = true }); the Blizzard world map shows them under its main switch (worldmap).
+    -- placesOpen: the section with the fishing places of the zone in the tab Gather of the map panel is open.
     gather = {
       forever = true,
+      foreverObjects = true,
       worldmap = true,
       minimap = true,
       minimapEdge = "clamp",
@@ -95,6 +103,10 @@ Store.defaults = {
       herbs = true,
       mining = true,
       hidden = {},
+      treasure = true,
+      schools = true,
+      hiddenKinds = {},
+      placesOpen = false,
     },
     -- Farm HUD (Modules/FarmHud.lua): the real minimap enlarged over the screen, on demand only (the switch is
     -- not stored). scale = share of the smaller screen side, strata of the HUD, terrain variant (auto, ground,
@@ -217,6 +229,10 @@ Store.defaults = {
       barHeight = 8,
       barColor = "c9a670",
     },
+    -- Sleeping bag display (Modules/SleepBag.lua): on, message when the run ends, locked position.
+    sleepBag = false,
+    sleepBagMessage = true,
+    sleepBagLocked = false,
     -- Experience bar (Modules/XpBarWindow.lua): window shown and pinned, chosen layout, saved layouts
     -- (seeded from the presets on first use), opacity, then the tracker options (Modules/XpTracker.lua).
     xpBar = {
@@ -347,6 +363,9 @@ Store.defaults = {
     autoQuestWeekly = true,
     autoQuestItems = false,
     autoQuestNeedKey = false,
+    autoQuestNotice = true,
+    -- One chat line when a quest of the log turns ready to hand in (Modules/QuestReady.lua).
+    questReadyNotice = false,
     autoQuestIgnoreQuests = "",
     autoQuestIgnoreNpcs = "",
     autoSocial = false,
@@ -483,6 +502,32 @@ Store.defaults = {
     },
     chatBadgeSelf = false,
     chatBadgeOtherAddons = false,
+    -- Chat name (Modules/ChatName.lua): the own name in front of the own chat messages, everything off by default.
+    -- This is the profile of the account; a character that deviates keeps a full copy in ForeverGuidesCharDB.chatName
+    -- (absent = follows the account). Shape and repair: Modules/ChatNameProfile.lua, which must list the same
+    -- defaults (tests/test_chatnameprofile.lua checks it). Style round, square, angle or none (no brackets), match off, starts, contains
+    -- or ends, channels = one switch per chat group, custom = comma list of channel names, recent = earlier names.
+    chatName = {
+      v = 1,
+      enabled = false,
+      name = "",
+      style = "round",
+      classColor = false,
+      hideSame = true,
+      match = "off",
+      channels = {
+        guild = false,
+        party = false,
+        dungeon = false,
+        raid = false,
+        battleground = false,
+        arena = false,
+        world = false,
+        community = false,
+      },
+      custom = "",
+      recent = {},
+    },
     -- Guild and community logos (Modules/CrestMark.lua), the consent is crestMark: how many logos follow the add-on
     -- logo in a chat line (0 to 8), show the own guild logo to others, and the ids of the own communities.
     chatCrestCount = 3,
@@ -496,8 +541,15 @@ Store.defaults = {
     -- logo at the own plate.
     plateBadge = false,
     plateBadgeSize = 16,
-    plateBadgeSide = "left",
+    plateBadgeSide = "center",
     plateBadgeSelf = false,
+    -- Which pictures the plate row holds: the add-on logo, the guild symbol and the community symbols (as in the
+    -- chat, they need the logos of the group and guild or the local recognition), and the values of the two plate
+    -- settings of the game from before "names only" was switched on (empty while nothing was changed).
+    plateShowLogo = true,
+    plateCrestGuild = true,
+    plateCrestCommunity = true,
+    plateNamesSaved = {},
     -- Hidden columns of the guild page per tab, id = false hides it (Modules/GuildPage.lua).
     guildCols = { guild = {}, social = {} },
     -- Durability window (Modules/DurabilityView.lua): percent limits of the colors (below yellow
@@ -652,6 +704,8 @@ Store.defaults = {
   calc = { history = {}, input = "", ans = "", rulesOpen = false, group = false },
   -- Measured flight times per route key "fromId>toId": { n, sum, last, min, max } (Modules/FlightLogic.lua).
   flightTimes = {},
+  -- Seconds from lying down to the aura "Gut erholt" of the last runs, at most 5 (Modules/SleepBagLogic.lua), cleaned on load.
+  sleepBagTimes = {},
   -- Floors and rough area centres the player taught the dungeon map (Modules/DungeonAreaLogic.lua), cleaned on first read.
   dungeonAreas = { v = 1, items = {} },
   -- Aura durations seen on readable auras, per spell id: { duration, base, seen }, at most 200 (Modules/AuraTrackLogic.lua),
@@ -803,6 +857,28 @@ end
 Store.migrations[6] = function(db)
   if type(db.settings) == "table" then
     db.settings.chatBadge = true
+  end
+end
+
+-- Schema 7: the weapon enchantment is an element of its own. Every stored layout (the mouse cursor ring, the HUD
+-- windows and the experience bar keep theirs apart) turns the aura elements with the source "weapon" into weapon
+-- elements once (CursorWeapon.lua registers the upgrade). Position, size, group and settings stay.
+Store.migrations[7] = function(db)
+  local CL = ns.CanvasLogic
+  local settings = type(db.settings) == "table" and db.settings or nil
+  if not (CL and settings) then
+    return
+  end
+  for _, node in ipairs({ settings.cursorRing, settings.areas, settings.xpBar }) do
+    local layouts = type(node) == "table" and type(node.layouts) == "table" and node.layouts or {}
+    for _, layout in pairs(layouts) do
+      CL.UpgradeElements(layout)
+    end
+  end
+  -- A window of the first model still carries its layout in the window itself until AreaLayouts.Migrate moves it.
+  local items = type(settings.areas) == "table" and type(settings.areas.items) == "table" and settings.areas.items or {}
+  for _, item in pairs(items) do
+    CL.UpgradeElements(type(item) == "table" and item.layout or nil)
   end
 end
 
@@ -971,6 +1047,14 @@ function Store.cleanChat(account, char)
   end
 end
 
+-- Chat name: both profiles are repaired in place (a hand edited name with a pipe, a wrong style). Runs before the
+-- defaults are filled in; the module is loaded by ADDON_LOADED.
+function Store.cleanChatName(account, char)
+  if ns.ChatNameProfile then
+    ns.ChatNameProfile.CleanStores(account, char)
+  end
+end
+
 function Store.init(account, char)
   account = type(account) == "table" and account or {}
   char = type(char) == "table" and char or {}
@@ -988,10 +1072,13 @@ function Store.init(account, char)
     ns.Consent.Migrate(account)
   end
   Store.cleanChat(account, char)
+  Store.cleanChatName(account, char)
   U.applyDefaults(account, Store.defaults)
   Store.seedSellProtect(account)
   if isNew then
     account.setup.fresh = true
+    -- Only a database that never existed gets the game look, an installed one keeps its choice.
+    account.settings.skin = "forever"
   end
   char.schema = char.schema or Store.CHAR_SCHEMA
   U.applyDefaults(char, Store.charDefaults)

@@ -1006,7 +1006,7 @@ local function classify(el, caps)
   local p = CU and CU.Has(el.type) and CU.Props(el.type, el.props, { el.w, el.h }) or el.props or {}
   if p.showWhen == "below" then
     return "secret"
-  elseif el.type == "aura" then
+  elseif el.type == "aura" or el.type == "weapon" then
     local NL = ns.AuraNativeLogic
     return NL and NL.Plan(p, caps).mode == "native" and "secret" or "calc"
   end

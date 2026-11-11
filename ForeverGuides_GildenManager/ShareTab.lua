@@ -226,7 +226,7 @@ function ST.Build(card, api)
     return nil, line
   end)
   local open = addButton(card, "gm-share-open", "gm.share.open", function()
-    FG.SettingsPage.Select("sharing")
+    FG.SettingsPage.Select("privacy")
     FG.Main.Show("settings")
   end, true)
 

@@ -1,9 +1,9 @@
--- Generated data, do not edit. Data as of 2026-11-04.
+-- Generated data, do not edit. Data as of 2026-11-10.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.WeaponEnchants = {
   v = 1,
-  build = "1.60.1.70790",
+  build = "1.60.1.70888",
   e = {
     [1] = { de = "Waffe des Felsbeißers", en = "Rockbiter Weapon", s = 8019, d = 3600, i = 136086 },
     [2] = { de = "Waffe des Frostbrands", en = "Frostbrand Weapon", s = 8033, d = 3600, i = 135847 },

@@ -43,6 +43,35 @@ function CLL.Source(entry)
   return entry.path and "directory" or "game"
 end
 
+-- The logos of `entries` (what a player sends: guild first, then communities) that the viewer shares with him: his
+-- guild only when it is the guild of the viewer, only those of his communities the viewer is in as well. mine is
+-- { guildIds = { id = true }, guildKey = normalized guild name, communityIds = { id = true } } of the viewer (directory
+-- logos only, a neutral symbol names no guild by its id), nil or empty when that is not known: then nothing is shown,
+-- never a guess. Entries that are not tables or carry no id are dropped.
+function CLL.Shared(entries, mine)
+  local out = {}
+  if type(entries) ~= "table" or type(mine) ~= "table" then
+    return out
+  end
+  local guilds, clubs = mine.guildIds or {}, mine.communityIds or {}
+  local key = type(mine.guildKey) == "string" and mine.guildKey or ""
+  local hasGuild = false
+  for _, entry in ipairs(entries) do
+    if type(entry) == "table" and entry.id ~= nil then
+      if entry.kind == "guild" and not hasGuild then
+        local sameName = key ~= "" and type(entry.name) == "string" and CRL.NormalizeName(entry.name) == key
+        if guilds[entry.id] or sameName then
+          hasGuild = true
+          out[#out + 1] = entry
+        end
+      elseif entry.kind == "community" and clubs[entry.id] then
+        out[#out + 1] = entry
+      end
+    end
+  end
+  return out
+end
+
 -- The neutral shield for the guild the game names, nil for a name that is no plain text.
 function CLL.NeutralGuild(name)
   return CRL.NeutralEntry("guild", "guild", name)

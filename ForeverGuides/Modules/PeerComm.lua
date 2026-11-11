@@ -238,7 +238,12 @@ local function announce(aud, force, priority, gap, only)
   local queued = false
   for _, fn in ipairs(FUNCS) do
     local data, key = payload[fn], channel .. fn
-    if data and (only == nil or only == fn) and Consent.Allows(fn, "send", aud) and (force or lastText[key] ~= data) then
+    if
+      data
+      and (only == nil or only == fn)
+      and Consent.Allows(fn, "send", aud)
+      and (force or lastText[key] ~= data)
+    then
       if Comm.Send(fn, "D", data, aud, nil, { priority = priority }) then
         lastText[key], queued = data, true
       end

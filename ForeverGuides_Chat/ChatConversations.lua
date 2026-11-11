@@ -6,7 +6,7 @@
 --
 -- state = { convs = { [key] = conversation }, count, limits, pins, own }
 -- conversation = { key, kind, name, lines, seq, readSeq, marked, last }   (readSeq and marked: ChatUnread.lua)
--- line = { seq, time, dir, sender, text, type, hidden, id, reply, reactions, unread, mention }
+-- line = { seq, time, dir, sender, text, type, hidden, id, reply, reactions, unread, mention, class }
 --   seq       counts up per conversation and never repeats, so a position survives dropped lines
 --   dir       ChatHistoryLogic.DIR_IN or DIR_OUT
 --   type      ChatHistoryLogic.TYPES id
@@ -113,6 +113,12 @@ local function readText(value, chars)
     return "", true
   end
   return text, false
+end
+
+-- The class token of a writer when it is one of the known classes (the color of the name), else nil.
+local function knownClass(value)
+  local kit = FG.GuildKit
+  return type(value) == "string" and kit and kit.KNOWN_CLASS and kit.KNOWN_CLASS[value] and value or nil
 end
 
 local function readSender(value)
@@ -356,6 +362,7 @@ function Conv.AddLine(state, target, input)
     type = Logic.TYPE_NAMES[input.type] and input.type or Conv.DEFAULT_TYPE[kind],
     hidden = hidden or nil,
     id = isNumber(id) and id or nil,
+    class = knownClass(input.class),
   }
   local conv = state.convs[key]
   if conv and isDuplicate(conv.lines, line, selfChat) then

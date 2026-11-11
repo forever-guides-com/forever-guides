@@ -4,7 +4,7 @@
 ## Notes-deDE: Messenger-Fenster für Chat und Flüstern. Standardmäßig aus, alles bleibt auf diesem PC. In Arbeit.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 0.6.0
+## Version: 0.7.0
 ## Dependencies: ForeverGuides
 ## DefaultState: disabled
 ## LoadOnDemand: 1
@@ -23,6 +23,7 @@ LocaleInput.lua
 LocaleHooks.lua
 LocaleSettings2.lua
 LocaleExtras.lua
+LocaleLines.lua
 LocaleOpen.lua
 LocaleTeams.lua
 LocaleTeamsUI.lua
@@ -34,9 +35,13 @@ ChatArchive.lua
 ChatIconLogic.lua
 ChatOpenLogic.lua
 ChatSearch.lua
+ChatClassLogic.lua
+ChatClass.lua
 ChatIngestLogic.lua
 ChatIngest.lua
+ChatTextLogic.lua
 ChatSendLogic.lua
+ChatWayLogic.lua
 ChatQueue.lua
 ChatSend.lua
 ChatSettingsLogic.lua
@@ -51,7 +56,9 @@ ChatTeamsLogic.lua
 ChatTeamsPacerLogic.lua
 ChatTeamsUILogic.lua
 ChatIconPickerLogic.lua
+ChatSecure.lua
 ChatList.lua
+ChatLineActions.lua
 ChatThread.lua
 ChatInput.lua
 ChatMenu.lua

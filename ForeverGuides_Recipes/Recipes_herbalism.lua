@@ -1,6 +1,6 @@
 -- Forever Guides: Rezepte "herbalism" (generiert, nicht von Hand bearbeiten)
--- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70124)
--- Generated data, do not edit. Data as of 2026-10-11.
+-- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70888)
+-- Generated data, do not edit. Data as of 2026-11-11.
 
 ForeverGuides.RecipeData = ForeverGuides.RecipeData or {}
 ForeverGuides.RecipeData["herbalism"] = {
@@ -20,7 +20,7 @@ ForeverGuides.RecipeData["herbalism"] = {
   },
   list={
     {g=2716,i=279962,mats={{2447,1},{765,1}},n={"Räucherkerze","Incense Candle"},s=1229705,sk={0,20,23,25},src="t"},
-    {g=2716,i=279964,mats={{4470,2},{8836,1},{8831,1}},n={"Gewächshaus","Greenhouse"},pat={273106},s=1262980,sk={140,140,143,145},src="i"},
+    {bd={{n="Shadetooth",zone={de="Ausgrabungsstätte: Sumpfland",en="Excavation Site: Wetlands"}}},g=2716,i=279964,mats={{4470,2},{8836,1},{8831,1}},n={"Gewächshaus","Greenhouse"},pat={273106},s=1262980,sk={140,140,143,145},src="i"},
     {g=2716,i=279947,mats={{13465,4},{8925,1},{14047,2}},n={"Saatenkreuzer","Seed Hybridizer"},pat={273120},s=1263070,sk={300,300,300,300},src="i"},
   },
   v=1,

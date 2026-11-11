@@ -210,26 +210,17 @@ local function textField(view, opts)
   local s = view.stack
   local label = W.Text(view.content, { key = opts.label, role = "ui", color = "textSecondary" })
   s:Add(label, { gap = 4 })
-  local box
-  box = W.EditBox(view.content, {
+  local box = W.EditBox(view.content, {
     placeholder = opts.placeholder,
-    onChange = function(text)
-      Store.set("settings." .. opts.key, text)
+    maxLetters = opts.max,
+    get = function()
+      return ns.db.settings[opts.key] or ""
     end,
-    onEnter = function(text)
-      local clean = opts.clean(text)
-      Store.set("settings." .. opts.key, clean)
-      box.edit:SetText(clean)
+    set = function(text)
+      Store.set("settings." .. opts.key, opts.clean(text))
     end,
   })
-  box.edit:SetMaxLetters(opts.max)
   box.fgId = opts.id
-  function box:Refresh()
-    if not self.edit:HasFocus() then
-      self.edit:SetText(ns.db.settings[opts.key] or "")
-    end
-  end
-  box:Refresh()
   s:Add(box, { height = 26, width = FIELD_WIDTH, gap = 10 })
   return box, label
 end
@@ -248,26 +239,27 @@ local function modeOptions(kind)
   return out
 end
 
--- One block; returns the frames that are dimmed without the right to invite.
+-- One block; returns the frames that are dimmed without the right to invite and a function that builds the
+-- rest of the block into the section "More settings". The switch and the key words go into view right away.
 local function section(view, kind)
-  local s, w = view.stack, view.content
   local p = "invite" .. (kind == "group" and "Group" or "Guild")
   local id = "invite-" .. kind .. "-"
   local frames = {}
-  local function add(frame, opts, fgId)
+  local function add(target, frame, opts, fgId)
     frame.fgId = fgId and (id .. fgId) or frame.fgId
-    s:Add(frame, opts)
+    target.stack:Add(frame, opts)
     frames[#frames + 1] = frame
     return frame
   end
-  local function field(opts)
-    local box, label = textField(view, opts)
+  local function field(target, opts)
+    local box, label = textField(target, opts)
     frames[#frames + 1] = box
     frames[#frames + 1] = label
   end
-  local function toggle(key, label, fgId, default)
+  local function toggle(target, key, label, fgId, default)
     return add(
-      W.Toggle(w, {
+      target,
+      W.Toggle(target.content, {
         key = label,
         get = function()
           local v = ns.db.settings[key]
@@ -284,68 +276,73 @@ local function section(view, kind)
       fgId
     )
   end
-  toggle(p, "invite.set.enable", "enable")
-  field({
+  toggle(view, p, "invite.set.enable", "enable")
+  field(view, {
     label = "invite.set.words",
     key = p .. "Words",
     clean = cleanWords,
     max = IL.MAX_WORDS * (IL.MAX_WORD + 2),
     id = id .. "words",
   })
-  add(
-    W.Dropdown(w, {
-      key = "invite.set.mode",
-      options = modeOptions(kind),
-      width = 240,
-      get = function()
-        return IL.CleanMode(ns.db.settings[p .. "Mode"])
+  local function buildMore(more)
+    ns.AddHeading(more, "invite.set." .. kind .. "Heading", { role = "ui" })
+    add(
+      more,
+      W.Dropdown(more.content, {
+        key = "invite.set.mode",
+        options = modeOptions(kind),
+        width = 240,
+        get = function()
+          return IL.CleanMode(ns.db.settings[p .. "Mode"])
+        end,
+        set = function(v)
+          if v == "communities" and not Inv.CommunitiesAvailable() then
+            return
+          end
+          Store.set("settings." .. p .. "Mode", v)
+        end,
+      }),
+      { height = 46, width = 240 },
+      "mode"
+    )
+    add(
+      more,
+      W.Slider(more.content, {
+        key = "invite.set.minLevel",
+        min = 0,
+        max = IL.MAX_LEVEL,
+        step = 1,
+        get = function()
+          return IL.CleanLevel(ns.db.settings[p .. "MinLevel"])
+        end,
+        set = function(v)
+          Store.set("settings." .. p .. "MinLevel", IL.CleanLevel(v))
+        end,
+        format = function(v)
+          v = math.floor(v + 0.5)
+          return v == 0 and ns.L["invite.set.anyLevel"] or tostring(v)
+        end,
+      }),
+      { height = 42, width = FIELD_WIDTH },
+      "level"
+    )
+    toggle(more, p .. "ReplyOn", "invite.set.replyOn", "reply-on")
+    field(more, {
+      label = "invite.set.reply",
+      placeholder = "invite.reply." .. kind,
+      key = p .. "Reply",
+      clean = function(text)
+        return IL.Reply(text, "%s") or ""
       end,
-      set = function(v)
-        if v == "communities" and not Inv.CommunitiesAvailable() then
-          return
-        end
-        Store.set("settings." .. p .. "Mode", v)
-      end,
-    }),
-    { height = 46, width = 240 },
-    "mode"
-  )
-  add(
-    W.Slider(w, {
-      key = "invite.set.minLevel",
-      min = 0,
-      max = IL.MAX_LEVEL,
-      step = 1,
-      get = function()
-        return IL.CleanLevel(ns.db.settings[p .. "MinLevel"])
-      end,
-      set = function(v)
-        Store.set("settings." .. p .. "MinLevel", IL.CleanLevel(v))
-      end,
-      format = function(v)
-        v = math.floor(v + 0.5)
-        return v == 0 and ns.L["invite.set.anyLevel"] or tostring(v)
-      end,
-    }),
-    { height = 42, width = FIELD_WIDTH },
-    "level"
-  )
-  toggle(p .. "ReplyOn", "invite.set.replyOn", "reply-on")
-  field({
-    label = "invite.set.reply",
-    placeholder = "invite.reply." .. kind,
-    key = p .. "Reply",
-    clean = function(text)
-      return IL.Reply(text, "%s") or ""
-    end,
-    max = IL.MAX_REPLY,
-    id = id .. "reply",
-  })
-  toggle(p .. "Notify", "invite.set.notify", "notify", true)
-  if kind == "guild" and Inv.GuildCallReserved() then
-    toggle("inviteGuildCopyBox", "invite.set.copyBox", "copybox")
+      max = IL.MAX_REPLY,
+      id = id .. "reply",
+    })
+    toggle(more, p .. "Notify", "invite.set.notify", "notify", true)
+    if kind == "guild" and Inv.GuildCallReserved() then
+      toggle(more, "inviteGuildCopyBox", "invite.set.copyBox", "copybox")
+    end
   end
-  return frames
+  return frames, buildMore
 end
 
 local current
@@ -377,18 +374,23 @@ function S.Add(view)
   ns.AddParagraph(view, "invite.set.hint", { role = "micro", color = "textMuted" })
 
   ns.AddHeading(view, "invite.set.groupHeading", { role = "ui" })
-  section(view, "group")
+  local _, groupMore = section(view, "group")
 
   ns.AddHeading(view, "invite.set.guildHeading", { role = "ui" })
   local right = W.Text(view.content, { key = "invite.set.noRight", role = "micro", color = "textMuted" })
   s:Add(right, { gap = 6 })
-  local guildFrames = section(view, "guild")
+  local guildFrames, guildMore = section(view, "guild")
+
+  -- Visible: the switches and key words of both blocks. Everything else is rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "invites.whisper" })
+  groupMore(more)
+  guildMore(more)
 
   local keyOptions = {}
   for _, key in ipairs(ns.InvitePromptLogic.KEYS) do
     keyOptions[#keyOptions + 1] = { value = key, key = key == "" and "invite.key.off" or ("invite.key." .. key) }
   end
-  local keyChoice = W.Dropdown(view.content, {
+  local keyChoice = W.Dropdown(more.content, {
     key = "invite.set.confirmKey",
     tooltip = "invite.set.confirmKey",
     tooltipText = "invite.set.confirmKeyTip",
@@ -402,12 +404,12 @@ function S.Add(view)
     end,
   })
   keyChoice.fgId = "invite-confirmKey"
-  s:Add(keyChoice, { height = 46, width = 240 })
+  more.stack:Add(keyChoice, { height = 46, width = 240 })
   local keyHint =
-    W.Text(view.content, { key = "invite.set.confirmKeyHint", role = "micro", color = "textMuted", wrap = true })
-  s:Add(keyHint, { gap = 4 })
-  local keyTaken = W.Text(view.content, { text = "", role = "micro", color = "warning", wrap = true })
-  s:Add(keyTaken, { gap = 6 })
+    W.Text(more.content, { key = "invite.set.confirmKeyHint", role = "micro", color = "textMuted", wrap = true })
+  more.stack:Add(keyHint, { gap = 4 })
+  local keyTaken = W.Text(more.content, { text = "", role = "micro", color = "warning", wrap = true })
+  more.stack:Add(keyTaken, { gap = 6 })
   guildFrames[#guildFrames + 1] = keyChoice
   guildFrames[#guildFrames + 1] = keyHint
   guildFrames[#guildFrames + 1] = keyTaken
@@ -417,7 +419,7 @@ function S.Add(view)
   for _, style in ipairs(ns.InvitePromptLogic.STYLES) do
     styleOptions[#styleOptions + 1] = { value = style, key = "invite.style." .. style }
   end
-  local styleChoice = W.Dropdown(view.content, {
+  local styleChoice = W.Dropdown(more.content, {
     key = "invite.set.style",
     options = styleOptions,
     width = 240,
@@ -429,8 +431,8 @@ function S.Add(view)
     end,
   })
   styleChoice.fgId = "invite-style"
-  s:Add(styleChoice, { height = 46, width = 240, gap = 4 })
-  local preview = W.Button(view.content, {
+  more.stack:Add(styleChoice, { height = 46, width = 240, gap = 4 })
+  local preview = W.Button(more.content, {
     key = "invite.set.preview",
     width = 150,
     height = 24,
@@ -443,24 +445,24 @@ function S.Add(view)
     end,
   })
   preview.fgId = "invite-preview"
-  s:Add(preview, { height = 24, width = 150, gap = 10 })
+  more.stack:Add(preview, { height = 24, width = 150, gap = 10 })
 
-  ns.AddHeading(view, "invite.set.shared", { role = "ui" })
-  textField(view, {
+  ns.AddHeading(more, "invite.set.shared", { role = "ui" })
+  textField(more, {
     label = "invite.set.allow",
     key = "inviteAllow",
     clean = cleanNames,
     max = 400,
     id = "invite-allow",
   })
-  textField(view, {
+  textField(more, {
     label = "invite.set.block",
     key = "inviteBlock",
     clean = cleanNames,
     max = 400,
     id = "invite-block",
   })
-  local away = W.Toggle(view.content, {
+  local away = W.Toggle(more.content, {
     key = "invite.set.skipAway",
     get = function()
       return ns.db.settings.inviteSkipAway == true
@@ -470,7 +472,7 @@ function S.Add(view)
     end,
   })
   away.fgId = "invite-skipAway"
-  s:Add(away, { height = 24, gap = 6 })
+  more.stack:Add(away, { height = 24, gap = 6 })
 
   -- Wait per sender and the limit over all senders (Modules/InviteLogic.lua).
   local function choice(spec)
@@ -478,7 +480,7 @@ function S.Add(view)
     for _, value in ipairs(spec.values) do
       options[#options + 1] = { value = value, key = spec.prefix .. value }
     end
-    local dropdown = W.Dropdown(view.content, {
+    local dropdown = W.Dropdown(more.content, {
       key = spec.label,
       tooltip = spec.label,
       tooltipText = spec.label .. "Tip",
@@ -492,10 +494,13 @@ function S.Add(view)
       end,
     })
     dropdown.fgId = spec.id
-    s:Add(dropdown, { height = 46, width = 240, gap = 4 })
-    s:Add(W.Text(view.content, { key = spec.label .. "Hint", role = "micro", color = "textMuted", wrap = true }), {
-      gap = 6,
-    })
+    more.stack:Add(dropdown, { height = 46, width = 240, gap = 4 })
+    more.stack:Add(
+      W.Text(more.content, { key = spec.label .. "Hint", role = "micro", color = "textMuted", wrap = true }),
+      {
+        gap = 6,
+      }
+    )
   end
   choice({
     label = "invite.set.cooldown",
@@ -514,9 +519,9 @@ function S.Add(view)
     clean = IL.CleanGlobalLimit,
   })
 
-  ns.AddHeading(view, "invite.set.log", { role = "ui" })
-  local log = W.Text(view.content, { role = "micro", color = "textSecondary", wrap = true })
-  s:Add(log)
+  ns.AddHeading(more, "invite.set.log", { role = "ui" })
+  local log = W.Text(more.content, { role = "micro", color = "textSecondary", wrap = true })
+  more.stack:Add(log)
 
   local function paint()
     local can = Inv.CanGuild()
@@ -533,7 +538,7 @@ function S.Add(view)
     paint()
   end
   paint()
-  current = { paint = paint, view = view, log = log }
+  current = { paint = paint, view = view, log = log, right = right }
 end
 
 ns.On("FG_SETTING_CHANGED", function(_, path)
@@ -545,18 +550,23 @@ end)
 
 -- A new log line while the page is open.
 ns.On("FG_INVITE_LOG", function()
-  if current and current.log:IsVisible() then
-    current.paint()
+  if not current then
+    return
+  end
+  -- Painted also while the section is folded, so the log is right when it opens.
+  current.paint()
+  if current.log:IsVisible() then
     current.view.stack:Layout()
   end
 end)
 ns.On("PLAYER_GUILD_UPDATE", function()
-  if current and current.log:IsVisible() then
+  -- The note about the right stays on the card while the section with the log is collapsed.
+  if current and current.right:IsVisible() then
     current.paint()
   end
 end)
 ns.On("GUILD_RANKS_UPDATE", function()
-  if current and current.log:IsVisible() then
+  if current and current.right:IsVisible() then
     current.paint()
   end
 end)

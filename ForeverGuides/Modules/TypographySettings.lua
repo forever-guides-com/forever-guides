@@ -148,6 +148,7 @@ local function addPresets(view)
     }
   end
   local row = FL.ButtonRow(view.content, defs)
+  row.fgId = "typo-presets"
   view.stack:Add(row, { gap = 10 })
   return function()
     local active = TS.ActivePreset()
@@ -208,19 +209,20 @@ function TS.Add(view)
   local paintPresets = addPresets(view)
   ns.AddParagraph(view, "typo.presetsHint", { role = "micro", color = "textMuted" })
   addPreview(view)
-  local sliders = addSliders(view)
-  s:Add(
-    W.Action(view.content, {
-      label = "act.reset",
-      icon = "reset",
-      tooltip = "typo.reset",
-      tooltipText = "typo.resetHint",
-      width = 220,
-      height = 28,
-      onClick = TS.Reset,
-    }),
-    { height = 28, width = 220 }
-  )
+  -- The size of each kind of text and the reset: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "fonts.main" })
+  local sliders = addSliders(more)
+  local reset = W.Action(more.content, {
+    label = "act.reset",
+    icon = "reset",
+    tooltip = "typo.reset",
+    tooltipText = "typo.resetHint",
+    width = 220,
+    height = 28,
+    onClick = TS.Reset,
+  })
+  reset.fgId = "typo-reset"
+  more.stack:Add(reset, { height = 28, width = 220 })
   paintPresets()
   ns.On("FG_SETTING_CHANGED", function(_, path)
     if type(path) == "string" and path:find("^settings%.fontScales") then

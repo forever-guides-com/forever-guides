@@ -142,7 +142,7 @@ function GM.Plan(points, geo, max)
     if x >= extent.l and x <= extent.r and y >= extent.t and y <= extent.b then
       total = total + 1
       if total <= cap then
-        pins[total] = { x = x, y = y, itemId = p.itemId, own = p.own }
+        pins[total] = { x = x, y = y, itemId = p.itemId, own = p.own, kind = p.kind, kinds = p.kinds }
       end
     end
   end

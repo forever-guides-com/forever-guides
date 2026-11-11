@@ -101,7 +101,7 @@ add({
   example = { en = "/fg setup", de = "/fg einrichtung" },
   public = true,
   names = { "setup", "einrichtung", "install", "installer", "assistent" },
-  usage = "/fg setup [new | close | skip | diag]",
+  usage = "/fg setup [close | skip | diag]",
   page = "settings",
   control = "setup.start",
   exec = "setup",
@@ -298,7 +298,7 @@ add({
   example = { en = "/fg autoquest list", de = "/fg autoquest list" },
   public = true,
   names = { "autoquest", "autoquests" },
-  usage = "/fg autoquest ignore <questID> | ignore npc <npcID> | list",
+  usage = "/fg autoquest ignore <questID> | ignore npc <npcID> | list | log [on|off|show|clear]",
   page = "settings",
   control = "auto.set.ignoreQuests",
   exec = "autoquest list",
@@ -315,6 +315,17 @@ add({
   exec = "chatverlauf",
 })
 add({
+  id = "chatname",
+  area = "guild",
+  example = { en = "/fg chatname name Ana", de = "/fg chatname name Ana" },
+  public = true,
+  names = { "chatname" },
+  usage = "/fg chatname [name <name> | on|an | off|aus | status | log | help|hilfe]",
+  page = "settings",
+  control = "chatname.heading",
+  exec = "chatname",
+})
+add({
   id = "chat",
   area = "guild",
   example = { en = "/fg chat", de = "/fg nachrichten" },
@@ -323,6 +334,16 @@ add({
   usage = "/fg chat [toggle | open | close] (also /fgchat)",
   page = "settings",
   control = "subaddon.chat.title",
+})
+add({
+  id = "fishing",
+  area = "tools",
+  example = { en = "/fg fishing journal", de = "/fg angeln journal" },
+  public = true,
+  names = { "angeln", "fishing" },
+  usage = "/fg angeln [status|journal]",
+  page = "settings",
+  control = "subaddon.fishing.title",
 })
 add({
   id = "fenster",
@@ -580,6 +601,17 @@ add({
   exec = "proftrainers",
 })
 add({
+  id = "vendors",
+  area = "professions",
+  example = { en = "/fg vendors cooking", de = "/fg haendler kochkunst" },
+  public = true,
+  names = { "haendler", "händler", "vendors", "vendor" },
+  usage = "/fg vendors [profession]",
+  page = "vendors",
+  control = "page.vendors",
+  exec = "vendors",
+})
+add({
   id = "gathering",
   area = "professions",
   example = { en = "/fg ore copper", de = "/fg erze kupfer" },
@@ -626,10 +658,10 @@ add({
 add({
   id = "settings",
   area = "general",
-  example = { en = "/fg settings", de = "/fg einstellungen" },
+  example = { en = "/fg settings gathering", de = "/fg einstellungen sammeln" },
   public = true,
   names = { "einstellungen", "settings", "optionen", "options" },
-  usage = "/fg settings",
+  usage = "/fg settings [text]",
   page = "settings",
   control = "page.settings",
   exec = "settings",
@@ -700,6 +732,7 @@ C.PAGE_AREA = {
   professionroute = "professions",
   proftrainers = "professions",
   gathering = "professions",
+  vendors = "professions",
   chars = "character",
   character = "character",
   inspect = "character",
@@ -773,6 +806,7 @@ C.bindings.FOREVERGUIDES_DURABILITY = { page = "durability", control = "page.dur
 C.bindings.FOREVERGUIDES_XPBAR = { page = "xpbar", control = "xpbar.set.show" }
 C.bindings.FOREVERGUIDES_CURSORRING = { page = "cursor", control = "cursor.set.enabled" }
 C.bindings.FOREVERGUIDES_FARMHUD = { page = "settings", control = "farmhud.set.enabled" }
+C.bindings.FOREVERGUIDES_FISHING_CAST = { page = "settings", control = "subaddon.fishing.title" }
 
 local EN = {}
 local DE = {}
@@ -860,9 +894,19 @@ desc(
   "Chat-Verlauf: Zeilen je Fenster, Flüstern, Größe. loeschen löscht den Verlauf nach Rückfrage."
 )
 desc(
+  "chatname",
+  "Chat name: puts your own name in front of your messages. Without arguments the settings. Also name <name>, on, off, status, log (last decisions), help.",
+  "Chat-Name: setzt deinen Namen vor deine Nachrichten. Ohne Angabe die Einstellungen. Auch name <Name>, an, aus, status, log (letzte Entscheidungen), hilfe."
+)
+desc(
   "chat",
-  "Open, close or toggle Forever Chat (messenger), also /fgchat and /click FGChatToggleButton. Off by default, switch it on under Settings > Addons.",
-  "Forever Chat (Messenger) öffnen, schließen oder umschalten, auch /fgchat und /click FGChatToggleButton. Standardmäßig aus, Einschalten unter Einstellungen > Addons."
+  "Open, close or toggle Forever Chat (messenger), also /fgchat and /click FGChatToggleButton. Off by default, switch it on under Settings > Forever Chat.",
+  "Forever Chat (Messenger) öffnen, schließen oder umschalten, auch /fgchat und /click FGChatToggleButton. Standardmäßig aus, Einschalten unter Einstellungen > Forever Chat."
+)
+desc(
+  "fishing",
+  "Opens the settings of the fishing helper. With status it says in chat whether fishing is possible now and why not, with journal it opens the catch journal My catches. Off by default, switch it on under Settings > Forever Chat.",
+  "Öffnet die Einstellungen der Angelhilfe. Mit status sagt sie im Chat, ob Angeln jetzt möglich ist und warum nicht, mit journal öffnet sie das Fangjournal Meine Fänge. Standardmäßig aus, Einschalten unter Einstellungen > Forever Chat."
 )
 desc(
   "flighttimer",
@@ -899,8 +943,8 @@ desc(
 )
 desc(
   "setup",
-  "Open the setup wizard, new: only new steps, close/skip: close it without the mouse, diag: report.",
-  "Öffnet die Einrichtung, new: nur neue Schritte, close/skip: ohne Maus schließen, diag: Bericht."
+  "Open the setup wizard from the first step, close/skip: close it without the mouse, diag: report.",
+  "Öffnet die Einrichtung ab dem ersten Schritt, close/skip: ohne Maus schließen, diag: Bericht."
 )
 desc("note", "Manage notes, without arguments the notes page.", "Notizen verwalten, ohne Angabe die Notizen-Seite.")
 desc(
@@ -940,6 +984,11 @@ desc(
   "Berufslehrer mit Standorten, optional Beruf."
 )
 desc(
+  "vendors",
+  "Vendors for the professions with positions, optional profession.",
+  "Händler für die Berufe mit Standorten, optional Beruf."
+)
+desc(
   "gathering",
   "Ores and herbs page with zones for the map, optional item.",
   "Erze und Kräuter mit Gebieten für die Karte, optional Item."
@@ -947,7 +996,11 @@ desc(
 desc("guild", "Open the guild page.", "Öffnet die Gildenseite.")
 desc("social", "Open the contacts: players you have met.", "Öffnet die Kontakte: Spieler, die du getroffen hast.")
 desc("macros", "Open the macro editor.", "Öffnet den Makro-Editor.")
-desc("settings", "Open the settings.", "Öffnet die Einstellungen.")
+desc(
+  "settings",
+  "Open the settings. With a word (a tab, a card or any part of a name) it jumps there or searches the settings.",
+  "Öffnet die Einstellungen. Mit einem Wort (Reiter, Karte oder Teil eines Namens) springt er dorthin oder durchsucht die Einstellungen."
+)
 desc("about", "Version, data status, website, license.", "Version, Datenstand, Website, Lizenz.")
 local AREA_TITLES = {
   general = { "General", "Allgemein" },

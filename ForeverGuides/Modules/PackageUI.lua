@@ -23,6 +23,8 @@ ns.AddLocale("enUS", {
   ["pkg.copy"] = "Copy link",
   ["pkg.copy.title"] = "Download",
   ["pkg.copy.hint"] = "Open the link in your browser",
+  ["pkg.tip.title"] = "Data add-on",
+  ["pkg.tip.text"] = "Installs or loads the data add-on this view needs.",
 })
 ns.AddLocale("deDE", {
   ["pkg.missing"] = "Nicht installiert",
@@ -39,6 +41,8 @@ ns.AddLocale("deDE", {
   ["pkg.copy"] = "Link kopieren",
   ["pkg.copy.title"] = "Download",
   ["pkg.copy.hint"] = "Link im Browser öffnen",
+  ["pkg.tip.title"] = "Daten-Addon",
+  ["pkg.tip.text"] = "Installiert oder lädt das Daten-Addon dieser Ansicht.",
 })
 
 -- Reason of a failed U.Enable -> locale key of the hint (NOT_DEMAND_LOADED and MISSING have their own states).
@@ -207,6 +211,8 @@ function U.Banner(parent, name, opts)
   local b
   b = ns.ActionBanner.New(parent, {
     buttonKey = "pkg.enable",
+    tooltip = "pkg.tip.title",
+    tooltipText = "pkg.tip.text",
     opens = false,
     onClick = function()
       press(b)

@@ -20,6 +20,7 @@
 --   bnetUnknownName  name of a Battle.net partner the game gives no readable name or BattleTag for
 --   community   function(channelString) -> name of a community channel, nil when unknown (optional)
 --   restrictedName  name of the conversation that holds lines whose partner or channel is a secret value
+--   classOf     function(sender, guid) -> class token of the writer, nil when unknown (optional)
 -- }
 local _, chat = ...
 local FG = chat.FG
@@ -297,6 +298,14 @@ function IL.Build(ctx, event, args)
     local sender = text(args[ARG.SENDER])
     if sender and own ~= "" and FG.PlayerName.Equal(sender, own) then
       input.sender = own
+    end
+  end
+  -- The class of the writer, for the color of the name (Battle.net partners have none).
+  if type(ctx.classOf) == "function" and kind ~= "bnet" and not input.hidden then
+    local sender = text(args[ARG.SENDER])
+    if sender then
+      local ok, class = pcall(ctx.classOf, sender, text(args[ARG.GUID]))
+      input.class = ok and type(class) == "string" and class or nil
     end
   end
   return target, input, extra

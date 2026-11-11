@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.6.0
+## Version: 0.7.0
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -65,6 +65,7 @@ Data\BossModels.lua
 Data\BossPins.lua
 Data\Travel.lua
 Data\FlightLengths.lua
+Data\FlightTimes.lua
 Data\WeaponEnchants.lua
 Data\WellFed.lua
 Data\FlightPoints.lua
@@ -103,6 +104,7 @@ UI\DesktopIcons.lua
 UI\Icons.lua
 UI\Desktop.lua
 UI\CheckDropdown.lua
+UI\Accordion.lua
 UI\DesktopRibbon.lua
 UI\Toast.lua
 UI\Page.lua
@@ -141,6 +143,9 @@ Modules\CalcParser.lua
 Modules\CalcLogic.lua
 Modules\TrainerLog.lua
 Modules\SearchLogic.lua
+Data\StatsCategories.lua
+Modules\StatsStore.lua
+Modules\StatsLogic.lua
 Modules\LevelLogic.lua
 Modules\CostLogic.lua
 Modules\CostCapture.lua
@@ -156,6 +161,9 @@ Modules\MapWorld.lua
 Modules\MapMarkers.lua
 Modules\MapZoom.lua
 Modules\MapMagnify.lua
+Modules\InstanceArtLogic.lua
+Modules\InstanceArt.lua
+Modules\InstanceDisplayLogic.lua
 Modules\MapIcons.lua
 Modules\MapMarkerLogic.lua
 Modules\MapPins.lua
@@ -181,11 +189,17 @@ Modules\LevelPage.lua
 Modules\DungeonPinDialogs.lua
 Modules\DungeonMapView.lua
 Modules\InstanceDataAccess.lua
+Modules\InstanceListLogic.lua
+Modules\InstanceCards.lua
 Modules\InstanceView.lua
 Modules\QuestChainLogic.lua
+Modules\QuestText.lua
 Modules\InstanceItemsLogic.lua
+Modules\InstanceLootRow.lua
+Modules\InstanceBossView.lua
 Modules\InstanceItemsView.lua
 Modules\QuestChainWindow.lua
+Modules\InstanceQuestPanel.lua
 Modules\QuestChainView.lua
 Modules\InstancesPage.lua
 Modules\LootCapture.lua
@@ -254,8 +268,17 @@ Modules\ErrorCatcherLogic.lua
 Modules\ErrorCatcher.lua
 Modules\ActionBanner.lua
 Modules\PackageUI.lua
+Modules\SettingsFeatureLogic.lua
+Modules\SettingsFeatures.lua
+Modules\SettingsFeatureLocale.lua
+Modules\SettingsIndexData.lua
+Modules\SettingsSearchLogic.lua
+Modules\SettingsJump.lua
 Modules\SettingsGrid.lua
+Modules\SettingsNav.lua
 Modules\Settings.lua
+Modules\SettingsSearch.lua
+Modules\SettingsSuggest.lua
 Modules\ConsentLocale.lua
 Modules\ConsentSettings.lua
 Modules\KeysSettings.lua
@@ -265,9 +288,14 @@ Modules\SaveStateLogic.lua
 Modules\SaveState.lua
 Modules\TutorialsPage.lua
 Modules\Help.lua
+Modules\SetupFeatureData.lua
+Modules\SetupFeatureLogic.lua
 Modules\SetupWizardLogic.lua
+Modules\SetupWizardLocale.lua
 Modules\SetupWizardSteps.lua
+Modules\SetupWizardRows.lua
 Modules\SetupWizard.lua
+Modules\SetupWizardMenu.lua
 Modules\SetupWizardDiag.lua
 Modules\PlayerName.lua
 Modules\CommLogic.lua
@@ -283,6 +311,8 @@ Modules\TalentLink.lua
 Modules\ErrorsPage.lua
 Modules\ChangelogLogic.lua
 Modules\ChangelogPage.lua
+Modules\AddonCategoryLogic.lua
+Modules\AddonCategory.lua
 Modules\BlizzardScan.lua
 Modules\HostSkin.lua
 Modules\SpellbookPanel.lua
@@ -298,6 +328,7 @@ Modules\FlightPointsLogic.lua
 Modules\FlightKnown.lua
 Modules\FlightPointList.lua
 Modules\FlightTimerLogic.lua
+Modules\SleepBagLogic.lua
 Modules\FlightLabels.lua
 Modules\FlightPanel.lua
 Modules\CharScopeLogic.lua
@@ -335,6 +366,9 @@ Modules\GearStatsLogic.lua
 Modules\InspectPage.lua
 Modules\InventoryLogic.lua
 Modules\Inventory.lua
+Modules\ItemSource.lua
+Modules\VendorLogic.lua
+Modules\VendorSource.lua
 Modules\InventoryTooltip.lua
 Modules\InventoryDiag.lua
 Modules\InventorySettings.lua
@@ -356,8 +390,12 @@ Modules\AutoGuard.lua
 Modules\AutoRepair.lua
 Modules\AutoSummon.lua
 Modules\AutoResurrect.lua
+Modules\AutoQuestLog.lua
 Modules\AutoQuestLogic.lua
 Modules\AutoQuest.lua
+Modules\AutoQuestReport.lua
+Modules\QuestReadyLogic.lua
+Modules\QuestReady.lua
 Modules\AutoSocial.lua
 Modules\AutoRoleCheck.lua
 Modules\AutoRelease.lua
@@ -388,12 +426,14 @@ Modules\FrameTweaksPage.lua
 Modules\AssetFiles.lua
 Modules\WaypointArrow.lua
 Modules\FlightTimer.lua
+Modules\SleepBag.lua
 Modules\WaypointList.lua
 Modules\WorldMapLinks.lua
 Modules\WorldMapInstancePins.lua
 Modules\WorldMapFlightPins.lua
 Modules\WorldMapZoneArrows.lua
 Modules\ZoneCrossingRecorder.lua
+Modules\WorldMapBarLogic.lua
 Modules\WorldMapBar.lua
 Modules\CalcKeys.lua
 Modules\CalcView.lua
@@ -403,6 +443,7 @@ Modules\DurabilityLogic.lua
 Modules\DurabilityView.lua
 Modules\DurabilityWindow.lua
 Modules\DurabilitySettings.lua
+Modules\SleepBagSettings.lua
 Modules\XpLogic.lua
 Modules\XpTracker.lua
 Modules\LayoutSet.lua
@@ -430,6 +471,7 @@ Modules\TimeFormat.lua
 Modules\CursorCooldowns.lua
 Modules\AuraNative.lua
 Modules\CursorAuras.lua
+Modules\CursorWeapon.lua
 Modules\ItemCountLogic.lua
 Modules\CursorItemCount.lua
 Modules\ElementIcon.lua
@@ -463,6 +505,7 @@ Modules\ProfessionRoutePage.lua
 Modules\TrainerSearchLogic.lua
 Modules\ProfessionTrainersLogic.lua
 Modules\ProfessionTrainersPage.lua
+Modules\VendorsPage.lua
 Modules\GatheringPage.lua
 Modules\RecipeLogic.lua
 Modules\RecipeData.lua
@@ -480,7 +523,10 @@ Modules\BossPortrait.lua
 Modules\BossModelWindow.lua
 Modules\DungeonWorldMap.lua
 Modules\GatheringFilter.lua
+Modules\GatherObjects.lua
 Modules\GatheringFilterUI.lua
+Modules\WorldMapFishingLogic.lua
+Modules\WorldMapFishing.lua
 Modules\WorldMapGatherLogic.lua
 Modules\WorldMapGatherTab.lua
 Modules\WorldMapGather.lua
@@ -492,6 +538,7 @@ Modules\FarmHud.lua
 Modules\FarmHudSettings.lua
 Modules\InstanceResetLogic.lua
 Modules\InstanceReset.lua
+Modules\InstanceDisplaySettings.lua
 Modules\LfgFilterLogic.lua
 Modules\LfgFilter.lua
 Modules\LfgBrowseFilterLogic.lua
@@ -536,8 +583,16 @@ Modules\ChatHistoryFormat.lua
 Modules\ChatHistory.lua
 Modules\ChatHistorySettings.lua
 Modules\ChatLauncher.lua
+Modules\FishingLauncher.lua
+Modules\ChatNameLogic.lua
+Modules\ChatNameProfile.lua
+Modules\ChatNameLocale.lua
+Modules\ChatName.lua
+Modules\ChatNameColor.lua
+Modules\ChatNameSettings.lua
 Modules\PlateBadgeLogic.lua
 Modules\PlateBadge.lua
+Modules\PlateNames.lua
 Modules\PlateBadgeSettings.lua
 Modules\RecipeUniverse.lua
 Modules\CraftShare.lua

@@ -1,6 +1,9 @@
 -- Level display of instances: the range from to, the entry level and the named gap. Pure logic, no game access.
--- The sources are an instance of Data.Instances or a map marker built from one (fields lv, ml, rl). lv is
+-- The sources are an instance of Data.Instances or a map marker built from one (fields lv, ml, rl, rd). lv is
 -- "a-b" (both sides), "a" (the start only) or "-b" (the end only); a missing lv is a gap, never an empty spot.
+-- rd is the day an instance becomes reachable (YYYY-MM-DD): until then the display names it ("from 9.12.2026"),
+-- from that day on the instance looks like any other. The calendar day comes in as a parameter (LL.Clock is the
+-- one place that reads the clock), so every rule is testable with a fixed date.
 local _, ns = ...
 
 ns.AddLocale("enUS", {
@@ -12,6 +15,8 @@ ns.AddLocale("enUS", {
   ["instances.level.recommended"] = "recommended from level %d",
   ["instances.announced"] = "announced",
   ["instances.announced.tip"] = "Announced, not reachable in the game yet.",
+  ["instances.release.from"] = "from {monthName} {day}, {year}",
+  ["instances.release.months"] = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec",
   ["instances.level.gap.to"] = "Upper level not recorded.",
   ["instances.level.gap.from"] = "Lower level not recorded.",
   ["instances.level.gap.both"] = "Level range not recorded.",
@@ -27,6 +32,8 @@ ns.AddLocale("deDE", {
   ["instances.level.recommended"] = "empfohlen ab Stufe %d",
   ["instances.announced"] = "angekündigt",
   ["instances.announced.tip"] = "Angekündigt, im Spiel noch nicht erreichbar.",
+  ["instances.release.from"] = "ab {day}.{month}.{year}",
+  ["instances.release.months"] = "Jan Feb Mär Apr Mai Jun Jul Aug Sep Okt Nov Dez",
   ["instances.level.gap.to"] = "Obergrenze der Stufe nicht erfasst.",
   ["instances.level.gap.from"] = "Untergrenze der Stufe nicht erfasst.",
   ["instances.level.gap.both"] = "Stufenbereich nicht erfasst.",
@@ -40,23 +47,59 @@ ns.InstanceLevelLogic = LL
 LL.FACTIONS = { "A", "H", "B" }
 local RANK = { A = 1, H = 2, B = 3 }
 
--- Instances announced without any confirmed number: independent of what the generated data holds.
-local ANNOUNCED = { ["Barrow Deeps"] = true }
-
 -- True for an instance the data lists but nobody can reach yet and whose numbers are not confirmed: the flag
--- `announced` of the data or the list above. Such an instance has no level range and no map pin.
+-- `announced` of the data. Such an instance has no level range and no map pin. No instance carries it today.
 function LL.Unconfirmed(src)
-  if type(src) ~= "table" then
-    return false
-  end
-  local name = src.n and src.n.en or type(src.name) == "table" and src.name.en
-  return src.announced == true or (name ~= nil and ANNOUNCED[name] == true)
+  return type(src) == "table" and src.announced == true
 end
 
 -- True for an instance that is announced only (status "announced", or unconfirmed): it gets the mark and no
 -- entry level.
 function LL.Announced(src)
   return type(src) == "table" and (src.st == "announced" or LL.Unconfirmed(src))
+end
+
+-- year, month, day of a text YYYY-MM-DD that names a real calendar day, else nil.
+function LL.ParseDate(text)
+  if type(text) ~= "string" then
+    return nil
+  end
+  local y, m, d = text:match("^(%d%d%d%d)-(%d%d)-(%d%d)$")
+  if not y then
+    return nil
+  end
+  y, m, d = tonumber(y), tonumber(m), tonumber(d)
+  local leap = y % 4 == 0 and (y % 100 ~= 0 or y % 400 == 0)
+  local days = { 31, leap and 29 or 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 }
+  if m < 1 or m > 12 or d < 1 or d > days[m] then
+    return nil
+  end
+  return y, m, d
+end
+
+-- The local calendar day of the computer as YYYY-MM-DD. The only read of the clock in this file; a test replaces it.
+function LL.Clock()
+  local format = rawget(_G, "date") or (os and os.date)
+  return type(format) == "function" and format("%Y-%m-%d") or nil
+end
+
+-- "ab 9.12.2026" (German) or "from Dec 9, 2026" (English) while `rd` lies after `today` (both YYYY-MM-DD), else
+-- nil: no date, a bad date on either side and a reached or past date show nothing. Never raises.
+function LL.Release(rd, today, L)
+  local y, m, d = LL.ParseDate(rd)
+  if not y or not LL.ParseDate(today) or rd <= today then
+    return nil
+  end
+  L = L or ns.L
+  local months = {}
+  for name in tostring(L["instances.release.months"]):gmatch("%S+") do
+    months[#months + 1] = name
+  end
+  local parts = { day = d, month = m, monthName = months[m] or m, year = y }
+  local text = tostring(L["instances.release.from"]):gsub("{(%a+)}", function(key)
+    return tostring(parts[key] or "")
+  end)
+  return text
 end
 
 local function whole(value)
@@ -96,7 +139,7 @@ function LL.Parse(value)
 end
 
 -- { from, to, entry, recommended, estimated, gap, text, gapText, entryText, recommendedText, announced,
--- announcedText, announcedTip } of a source.
+-- announcedText, announcedTip, releaseText } of a source. today (YYYY-MM-DD) defaults to LL.Clock().
 -- gap is nil for a full range, else "to" (end missing), "from" (start missing) or "both". Without lv the
 -- recommended level (rl) stands in as the start and `estimated` is true. L defaults to ns.L.
 local function read(src)
@@ -117,7 +160,7 @@ local function read(src)
   return from, to, entry, rl, estimated
 end
 
-function LL.Of(src, L)
+function LL.Of(src, L, today)
   L = L or ns.L
   local from, to, entry, rl, estimated = read(src)
   local out = { from = from, to = to, entry = entry, estimated = estimated }
@@ -125,6 +168,9 @@ function LL.Of(src, L)
     out.announced = true
     out.announcedText = L["instances.announced"]
     out.announcedTip = L["instances.announced.tip"]
+  end
+  if type(src) == "table" and src.rd ~= nil then
+    out.releaseText = LL.Release(src.rd, today or LL.Clock(), L)
   end
   if from and to then
     out.text = string.format(L["instances.level.range"], from, to)

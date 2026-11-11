@@ -1,7 +1,7 @@
 -- Flight times without WoW API: name matching of flight masters (game name to ns.Data.Travel
 -- node), duration of a hop from the travel data, from the length of its direction
--- (ns.Data.FlightLengths) or from times measured in game (ns.db.flightTimes), and the sum over the
--- hops of a route. Missing hops are never guessed, the result then says "at least". The game side
+-- (ns.Data.FlightLengths), from flown times of the Forever client (ns.Data.FlightTimes) or from times
+-- measured by the player (ns.db.flightTimes), and the sum over the hops of a route. Missing hops are never guessed, the result then says "at least". The game side
 -- lives in Modules/FlightRoute.lua.
 local _, ns = ...
 local L = ns.L
@@ -341,6 +341,47 @@ local function belongsTo(seconds, ownYards, otherYards)
   return "none"
 end
 
+-- Flown times -----------------------------------------------------------------------------------
+
+-- Lookup "from>to" per table of ns.Data.FlightTimes (t shared, a Alliance, h Horde), built once per data table.
+local flownCache = setmetatable({}, { __mode = "k" })
+
+local function flownIndex(data)
+  local idx = flownCache[data]
+  if idx then
+    return idx
+  end
+  idx = {}
+  local nodes = type(data.n) == "table" and data.n or {}
+  for name in pairs({ t = true, a = true, h = true }) do
+    local keys = {}
+    for from, list in pairs(type(data[name]) == "table" and data[name] or {}) do
+      for i = 1, #list - 1, 2 do
+        local a, b = nodes[from], nodes[list[i]]
+        if a and b and type(list[i + 1]) == "number" then
+          keys[a .. ">" .. b] = list[i + 1]
+        end
+      end
+    end
+    idx[name] = keys
+  end
+  flownCache[data] = idx
+  return idx
+end
+
+-- Seconds a flight from node id to node id takes in the Forever client, or nil. A pair whose time differs
+-- between the factions needs the faction ("A" or "H"), without it the pair is unknown.
+function FL.flown(from, to, faction, data)
+  data = data or (ns.Data and ns.Data.FlightTimes)
+  if type(data) ~= "table" or not (from and to) then
+    return nil
+  end
+  local idx = flownIndex(data)
+  local key = from .. ">" .. to
+  local own = faction == "A" and idx.a or faction == "H" and idx.h
+  return (own and own[key]) or idx.t[key]
+end
+
 -- Durations -------------------------------------------------------------------------------------
 
 -- Links of one faction ("A" or "H") that win over the other faction's link of the same pair.
@@ -400,7 +441,7 @@ end
 
 -- Returns a function (from, to) -> { seconds, source, n } or nil for many hops over the same data:
 -- the index and the measured speed are looked up once. Order of trust: official data, measured mean
--- of this direction, the stored link when its duration fits this direction (classic or reported
+-- of this direction, the flown time of the Forever client (source "flown"), the stored link when its duration fits this direction (classic or reported
 -- data), the length of this direction divided by the flight speed (estimate). Without a length the
 -- stored link counts as it is, without a link and a length the hop is unknown. faction ("A" or "H",
 -- optional) picks the link of that faction where both factions have one for the same pair.
@@ -420,6 +461,10 @@ function FL.hopper(data, times, faction)
     local mean, n = FL.learned(key, times)
     if mean then
       return { seconds = mean, source = "learned", n = n }
+    end
+    local flown = FL.flown(from, to, faction)
+    if flown then
+      return { seconds = flown, source = "flown" }
     end
     return direction(ctx, from, to, link, mirrored)
   end
@@ -501,8 +546,14 @@ function FL.shortText(route)
   return text
 end
 
-local SOURCE_KIND =
-  { learned = "measured", official = "classic", classic = "classic", reported = "estimate", estimate = "estimate" }
+local SOURCE_KIND = {
+  learned = "measured",
+  flown = "measured",
+  official = "classic",
+  classic = "classic",
+  reported = "estimate",
+  estimate = "estimate",
+}
 local KIND_RANK = { measured = 3, classic = 2, estimate = 1 }
 
 -- Weakest source of the known hops: "measured", "classic" or "estimate", nil without a known hop.

@@ -532,7 +532,7 @@ function K.ViewToggle(parent, opts)
   local views = opts.views or { "list", "cards" }
   local f = CreateFrame("Frame", nil, parent)
   f:SetSize((width + gap) * #views - gap, 22)
-  local rings = {}
+  local rings, buttons = {}, {}
   local prev
   for _, view in ipairs(views) do
     local btn = W.Button(f, {
@@ -547,9 +547,21 @@ function K.ViewToggle(parent, opts)
     btn:SetPoint("LEFT", prev or f, prev and "RIGHT" or "LEFT", prev and gap or 0, 0)
     rings[view] = W.Border(btn, "accent2", 1, 2)
     rings[view].show(false)
+    buttons[#buttons + 1] = btn
     prev = btn
   end
+  -- A label wider than the button (large font, German words) widens it.
+  local function fit()
+    local total = 0
+    for _, btn in ipairs(buttons) do
+      local w = math.max(width, math.ceil(btn.label:GetStringWidth()) + 16)
+      btn:SetWidth(w)
+      total = total + w
+    end
+    f:SetWidth(total + gap * (#buttons - 1))
+  end
   function f.Refresh()
+    fit()
     local current = opts.get()
     for view, ring in pairs(rings) do
       ring.show(view == current)
@@ -996,7 +1008,8 @@ local FACTION_VALUES = { "A", "H", "all" }
 
 -- Faction choice (Alliance, Horde, optionally both) with the crest as icon, the
 -- faction color as label and as selected border. opts: get() -> "A"|"H"|"all",
--- set(value), withAll (bool, adds "both factions"), labelKey (default
+-- set(value), withAll (bool, adds "both factions"), allKey (locale key for the label of that choice, default
+-- "kit.faction.all"), labelKey (default
 -- "kit.filterFaction", false = no caption).
 function K.FactionButtons(parent, opts)
   local items = {}
@@ -1004,7 +1017,7 @@ function K.FactionButtons(parent, opts)
     if value ~= "all" or opts.withAll then
       items[#items + 1] = {
         value = value,
-        label = L["kit.faction." .. value],
+        label = value == "all" and L[opts.allKey or "kit.faction.all"] or L["kit.faction." .. value],
         labelColor = value == "all" and "text" or FACTION_RING[value],
         ring = FACTION_RING[value],
         icon = K.FactionIconSpec(value),
@@ -1252,7 +1265,13 @@ local function newChip(parent, colors)
   chip.meta:SetPoint("LEFT", chip.name, "RIGHT", 6, 0)
   chip:SetScript("OnEnter", showChipTooltip)
   chip:SetScript("OnLeave", ns.HideTooltip)
-  ns.Focus.register(chip, function() end)
+  -- A chip with data.onClick acts on click (waypoint at a vendor), the others only show their tooltip.
+  ns.Focus.register(chip, function(self)
+    local d = self.data
+    if d and d.onClick then
+      d.onClick()
+    end
+  end)
   return chip
 end
 
@@ -1270,6 +1289,9 @@ function K.ChipRow(parent, colors)
         pool[i] = chip
       end
       chip.data = d
+      chip:SetScript("OnClick", d.onClick and function()
+        d.onClick()
+      end or nil)
       chip.icon:SetTexture(d.icon)
       chip.name:SetText(d.name or "")
       chip.meta:SetText(d.meta or "")
@@ -1277,6 +1299,7 @@ function K.ChipRow(parent, colors)
     end
     for i = #list + 1, #pool do
       pool[i].data = nil
+      pool[i]:SetScript("OnClick", nil)
       pool[i]:Hide()
     end
     shown = #list

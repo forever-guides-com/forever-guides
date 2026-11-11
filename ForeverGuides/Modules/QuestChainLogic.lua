@@ -145,6 +145,50 @@ local function entry(q, owner, direct)
   }
 end
 
+-- Lower-case name without a leading article, so "The Hall of Thanes" equals "Hall of Thanes".
+local function plain(s)
+  if type(s) ~= "string" then
+    return nil
+  end
+  s = s:lower():gsub("^%s+", ""):gsub("%s+$", ""):gsub("^the ", ""):gsub("^die ", ""):gsub("^der ", "")
+  return s ~= "" and s or nil
+end
+
+-- Whether the giver of a quest stands inside the instance: true, false (the zone is another place), nil when
+-- the quest has no zone. The zone counts as inside when it is a name of the instance (en, de or an alias),
+-- alone, followed by a part after a comma ("Hall of Thanes, Reliquary of Kings") or the common part of a
+-- wing name (zone "Dire Maul" for "Dire Maul - East").
+function QC.StartsInside(inst, item)
+  local zone = item and item.zone
+  if type(zone) ~= "table" or not inst then
+    return nil
+  end
+  local names = {}
+  for _, v in ipairs({ inst.n and inst.n.en, inst.n and inst.n.de }) do
+    names[#names + 1] = plain(v)
+  end
+  for _, v in ipairs(inst.al or {}) do
+    names[#names + 1] = plain(v)
+  end
+  local seen
+  for _, lang in ipairs({ "en", "de" }) do
+    local z = plain(zone[lang])
+    if z then
+      seen = true
+      local head = plain(z:match("^([^,]+)"))
+      for _, name in ipairs(names) do
+        if z == name or head == name or name:sub(1, #head + 3) == head .. " - " then
+          return true
+        end
+      end
+    end
+  end
+  if seen then
+    return false
+  end
+  return nil
+end
+
 -- The chain of prequests behind a quest, first quest first, the chosen quest last.
 -- opts.instances: all instances to look prequests up in (default the data); opts.byId: the index of them
 -- (QC.Index), built once by a caller that asks for many chains.
@@ -331,4 +375,21 @@ function QC.StepsAbove(chain, level)
     end
   end
   return n
+end
+
+-- What a prerequisite or follow-up link of the detail panel points to: a quest of this instance ("select", the
+-- list can show it) or of another one ("open", it opens the chain window). nil when the id is not in the data.
+function QC.Reference(inst, byId, id)
+  local hit = byId and byId[id]
+  if not hit then
+    return nil
+  end
+  local name = ns.T and ns.T(hit.quest.n)
+  return {
+    id = id,
+    name = (name and name ~= "") and name or ("#" .. id),
+    kind = hit.inst == inst and "select" or "open",
+    quest = hit.quest,
+    inst = hit.inst,
+  }
 end

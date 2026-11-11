@@ -527,7 +527,8 @@ local function paintDetail(d, r, ctx)
         b.id, b.label, b.link, b.entry = id, label, nil, { id = id }
         b.icon:SetTexture(itemIcon(id) or FALLBACK_ICON)
         b.name:SetText(ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(id)))
-        b.right:SetText("")
+        local best = ns.VendorSource and ns.VendorSource.Best(id)
+        b.right:SetText(best and best.seller.vendor.name or "")
         b:Show()
         d.layout.patterns[#d.layout.patterns + 1] = b
       end

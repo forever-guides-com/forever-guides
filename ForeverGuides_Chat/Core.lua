@@ -28,6 +28,9 @@ chat.FG, chat.hook, chat.name = FG, hook, ADDON_NAME
 --       <id>: the options of the settings registry (ChatSettingsLogic.lua), plain values only; the reader of
 --       an option clamps it, Clean only keeps what is a boolean, a number or a short text
 --     view = { mode, chats = { [key] = mode } },
+--     sendWays = { build, ways = { [chat type] = { direct|secure|securekey = "ok"|"blocked" } } },
+--       what the client allowed this add-on to send, per chat type, for one build (WayLogic.lua). A new build
+--       starts empty.
 --     teams = { v = 1, chars = { [character key] = { teams, history, counters, invites, blocked } } },
 --     archive = { v = 1, legacy, chars = { [character "Name-Realm"] = section }, acct = section }
 --       archive: the saved conversations (ChatArchiveLogic.lua has the format, ChatArchive.lua reads and writes it).
@@ -86,6 +89,7 @@ function Store.New()
     view = { mode = Store.DEFAULT_MODE, chats = {} },
     teams = { v = 1, chars = {} },
     archive = { v = 1, chars = {} },
+    sendWays = { ways = {} },
   }
 end
 
@@ -272,6 +276,7 @@ function Store.Clean(raw, now)
   out.view.chats = cleanMap(view.chats, acceptMode)
   out.teams = Store.CleanTeams(raw.teams, now)
   out.archive = shapeHistory(raw.archive)
+  out.sendWays = chat.WayLogic and chat.WayLogic.CleanMemory(raw.sendWays) or { ways = {} }
   if lift then
     out.options.archive = nil -- the default is on
   end

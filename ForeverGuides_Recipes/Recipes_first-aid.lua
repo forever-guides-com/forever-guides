@@ -1,6 +1,6 @@
 -- Forever Guides: Rezepte "first-aid" (generiert, nicht von Hand bearbeiten)
--- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70124)
--- Generated data, do not edit. Data as of 2026-10-11.
+-- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70888)
+-- Generated data, do not edit. Data as of 2026-11-11.
 
 ForeverGuides.RecipeData = ForeverGuides.RecipeData or {}
 ForeverGuides.RecipeData["first-aid"] = {
@@ -69,7 +69,7 @@ ForeverGuides.RecipeData["first-aid"] = {
     {ch=true,g=2533,i=6453,mats={{1288,1}},n={"Starkes Gegengift","Strong Anti-Venom"},pat={6454},s=7935,sk={130,130,165,200},src="i"},
     {g=2531,i=929,mats={{3372,1},{2692,1},{2453,1}},n={"Heiltrank","Healing Potion"},rank="journeyman",s=1244433,sk={0,135,155,175},src="t"},
     {g=2533,i=255717,mats={{1468,1},{3713,1},{2686,1}},n={"Schlaue Schlammpackung","Clever Poultice"},pat={255724},s=1259343,sk={140,160,190,220},src="i"},
-    {g=2535,i=279940,mats={{6452,1},{8544,2},{4470,2}},n={"Studierzimmer für Gifte","Toxin Study"},pat={273105},s=1262996,sk={140,140,143,145},src="i"},
+    {bd={{n="Commander Springvale",npc=4278,zone={de="Burg Shadowfang",en="Shadowfang Keep"}}},g=2535,i=279940,mats={{6452,1},{8544,2},{4470,2}},n={"Studierzimmer für Gifte","Toxin Study"},pat={273105},s=1262996,sk={140,140,143,145},src="i"},
     {g=2530,i=6450,mats={{4306,1}},n={"Seidenverband","Silk Bandage"},rank="expert",s=7928,sk={0,150,180,210},src="t"},
     {g=2531,i=1710,mats={{3372,1},{2692,3},{3357,1}},n={"Großer Heiltrank","Greater Healing Potion"},pat={255723},s=1244434,sk={155,175,195,215},src="i"},
     {g=2530,i=6451,mats={{4306,2}},n={"Schwerer Seidenverband","Heavy Silk Bandage"},pat={16112},s=7929,sk={180,180,210,240},src="i"},

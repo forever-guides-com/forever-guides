@@ -486,4 +486,4 @@ function S.AddSettings(view)
   )
 end
 
-ns.SettingsPage.Add(S.AddSettings, "general")
+ns.SettingsPage.Add(S.AddSettings, "general", "saving.main")

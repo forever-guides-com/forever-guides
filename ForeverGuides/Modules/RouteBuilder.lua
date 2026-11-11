@@ -477,6 +477,8 @@ local function create()
       frameDb().shown = false
     end)
   )
+  -- Again after the scripts above: the shell hooked its Esc handling before them.
+  ns.WindowShell.RegisterEsc(f)
   f:Hide()
   return f
 end

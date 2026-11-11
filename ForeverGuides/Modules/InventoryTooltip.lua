@@ -229,6 +229,32 @@ function T.Append(tooltip, itemId, data)
     end
     added = true
   end
+  -- Where the item drops (instance data), only from stored data.
+  local source = ns.ItemSource and ns.ItemSource.Enabled() and ns.ItemSource.Lines(itemId)
+  if source then
+    tooltip:AddLine(" ")
+    for i, text in ipairs(source) do
+      if i == 1 then
+        tooltip:AddLine(text, ns.Theme.rgb("accent"))
+      else
+        tooltip:AddLine(text, 0.8, 0.8, 0.8, false)
+      end
+    end
+    added = true
+  end
+  -- Which vendors sell the item (vendor data), only from stored data.
+  local vendors = ns.VendorSource and ns.VendorSource.Enabled() and ns.VendorSource.Lines(itemId)
+  if vendors then
+    tooltip:AddLine(" ")
+    for i, text in ipairs(vendors) do
+      if i == 1 then
+        tooltip:AddLine(text, ns.Theme.rgb("accent"))
+      else
+        tooltip:AddLine(text, 0.8, 0.8, 0.8, false)
+      end
+    end
+    added = true
+  end
   local counted, stack = pcall(T.StackCountOf, tooltip, data)
   local prices = T.PriceLines(itemId, counted and tonumber(stack) or nil)
   if prices then

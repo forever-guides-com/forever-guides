@@ -55,8 +55,8 @@ R.roleOf = roleOf
 -- Class trainers for a class token and faction ("A"/"H"/nil = all), sorted by role (pet trainers
 -- last), kind, zone, name. Trainers the player recorded in game (ns.TrainerLog) are merged in,
 -- flagged own = true. A data trainer wins over a recorded one with the same NPC id. The pet
--- trainers of the overlay (ns.TrainerRoles, no coordinates) join unless a recorded pet trainer of
--- the same name already has a position.
+-- trainers of the overlay (ns.TrainerRoles) join unless a recorded pet trainer of the same name
+-- or NPC id is there already (recorded sightings win).
 function R.Trainers(class, faction)
   local out, known = {}, {}
   for _, t in ipairs((data().Trainers and data().Trainers.trainers) or {}) do
@@ -72,18 +72,21 @@ function R.Trainers(class, faction)
   if log and log.Entries then
     okLog, own = pcall(log.Entries, class, faction)
   end
-  local ownPets = {}
+  local ownPets, ownPetIds = {}, {}
   for _, t in ipairs(okLog and type(own) == "table" and own or {}) do
     if not known[t.npc] then
       out[#out + 1] = t
       if roleOf(t) == "pet" and t.n and t.n.en then
         ownPets[t.n.en:lower()] = true
+        if t.npc then
+          ownPetIds[t.npc] = true
+        end
       end
     end
   end
   if ns.TrainerRoles then
     for _, t in ipairs(ns.TrainerRoles.Entries(class, faction)) do
-      if not ownPets[t.n.en:lower()] then
+      if not (ownPets[t.n.en:lower()] or (t.npc and ownPetIds[t.npc])) then
         out[#out + 1] = t
       end
     end

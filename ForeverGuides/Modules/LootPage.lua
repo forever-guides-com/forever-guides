@@ -85,7 +85,7 @@ local function bindItem(row)
     -- The client's item tooltip with our drop data below; name and data stand in while it is not cached.
     local lines = { { text = sub, color = "textSecondary" } }
     if rate then
-      lines[2] = { text = string.format(L["loot.item.rate"], rate), color = "textSecondary" }
+      lines[2] = { text = string.format(L["loot.item.rate"], rate, row.kills), color = "textSecondary" }
     end
     tooltip = {
       link = "item:" .. row.id,

@@ -87,5 +87,7 @@ end
 
 GL.RegisterOccupancy("spellcd", cooldownPlace)
 GL.RegisterOccupancy("aura", auraPlace)
+GL.RegisterOccupancy("weapon", auraPlace)
 GL.RegisterReading("spellcd", cooldownReading)
 GL.RegisterReading("aura", auraReading)
+GL.RegisterReading("weapon", auraReading)

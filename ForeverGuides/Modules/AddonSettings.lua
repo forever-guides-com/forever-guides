@@ -7,11 +7,24 @@ local W, S = ns.W, ns.SubAddons
 local AS = {}
 ns.AddonSettings = AS
 
+-- Stable card id of the switch of each add-on. A later add-on without an entry gets "setup.addon.<id>".
+local ENABLE_CARDS = { guildmanager = "guild.enable", chat = "foreverchat.enable", fishing = "fishing.enable" }
+
+-- The feature (tab) of each add-on and the card that exists once its options are loaded.
+local FEATURES = { guildmanager = "guild", chat = "foreverchat", fishing = "fishing" }
+local OPTION_CARDS = { chat = "foreverchat.options", fishing = "fishing.status" }
+
+function AS.CardId(addonId)
+  return ENABLE_CARDS[addonId] or ("setup.addon." .. tostring(addonId))
+end
+
 ns.AddLocale("enUS", {
-  ["settings.tab.addons"] = "Addons",
   ["addons.set.heading"] = "Optional add-ons",
   ["addons.set.intro"] = "Each add-on has a default for all your characters. A single character can differ.",
   ["addons.set.hint"] = "Switching off takes effect after /reload or a restart, switching on loads it right away.",
+  ["addons.set.optionsHint"] = "The options of %s appear here as soon as the add-on is on.",
+  ["addons.set.goto"] = "Open tab",
+  ["addons.set.overviewRow"] = "%s: %s",
   ["addons.set.default"] = "Default for all characters",
   ["addons.set.char"] = "This character",
   ["addons.set.sameOn"] = "Same as default (on)",
@@ -34,10 +47,12 @@ ns.AddLocale("enUS", {
   ["addons.loaded.no"] = "Loaded: no.",
 })
 ns.AddLocale("deDE", {
-  ["settings.tab.addons"] = "Addons",
   ["addons.set.heading"] = "Optionale Addons",
   ["addons.set.intro"] = "Jedes Addon hat einen Standard für alle deine Charaktere. Ein einzelner Charakter kann abweichen.",
   ["addons.set.hint"] = "Ausschalten wirkt nach /reload oder einem Neustart, Einschalten lädt sofort.",
+  ["addons.set.optionsHint"] = "Die Optionen von %s erscheinen hier, sobald das Addon an ist.",
+  ["addons.set.goto"] = "Reiter öffnen",
+  ["addons.set.overviewRow"] = "%s: %s",
   ["addons.set.default"] = "Standard für alle Charaktere",
   ["addons.set.char"] = "Dieser Charakter",
   ["addons.set.sameOn"] = "Wie Standard (an)",
@@ -139,8 +154,9 @@ local function override(id)
   end
 end
 
--- Cards of the page that was built last; a rebuilt page replaces the list.
+-- The switch card built last for each add-on (a rebuilt page replaces its entry).
 local built = {}
+local overview = {}
 local clientLine
 
 local function addCard(card, entry)
@@ -207,19 +223,68 @@ local function addCard(card, entry)
   ns.Bind(list, paintList)
   list.Refresh = paintList
   s:Add(list, { gap = 2 })
-  built[#built + 1] = { card = card, status = status }
+
+  -- The options card of the add-on stands below this one once the add-on runs.
+  local optionsCard = OPTION_CARDS[id]
+  if optionsCard then
+    local hint = W.Text(card.content, { role = "micro", color = "textMuted", wrap = true })
+    hint.fgId = "addons-" .. id .. "-options"
+    local function paintHint()
+      hint:SetText(string.format(ns.L["addons.set.optionsHint"], ns.L[entry.titleKey]))
+      hint:SetShown(not ns.SettingsPage.HasCard(optionsCard))
+    end
+    ns.Bind(hint, paintHint)
+    hint.Refresh = paintHint
+    s:Add(hint, { gap = 2 })
+  end
+  built[id] = { card = card, status = status }
 end
 
--- Fills the card it gets with the explanation and adds one more card per add-on to its grid.
-function AS.AddSettings(view)
-  built = {}
+-- The explanation card: what the switches do, the client line. The switches are in AS.AddEnable.
+function AS.AddOverview(view)
   ns.AddHeading(view, "addons.set.heading")
   ns.AddParagraph(view, "addons.set.intro", { role = "micro", color = "textMuted" })
   ns.AddParagraph(view, "addons.set.hint", { role = "micro", color = "textSecondary" })
   clientLine = ns.AddParagraph(view, nil, { text = ns.Client.Line(), role = "micro", color = "textMuted" })
+  -- One line per add-on, read only: the switch itself sits in the tab of the add-on.
   for _, entry in ipairs(S.List()) do
-    addCard(view.grid:Card(), entry)
+    local feature = FEATURES[entry.id]
+    local row = W.Text(view.content, { role = "ui", color = "text", wrap = true })
+    row.fgId = "addons-" .. entry.id .. "-overview"
+    local function paintRow()
+      local text, color = AS.StatusText(entry.id)
+      row:SetText(string.format(ns.L["addons.set.overviewRow"], ns.L[entry.titleKey], text))
+      W.SetColor(row, color)
+    end
+    ns.Bind(row, paintRow)
+    row.Refresh = paintRow
+    view.stack:Add(row, { gap = 4 })
+    if feature then
+      local open = W.Action(view.content, {
+        key = "addons.set.goto",
+        width = 160,
+        height = 26,
+        opens = true,
+        onClick = function()
+          ns.SettingsPage.Select(feature, AS.CardId(entry.id))
+        end,
+      })
+      open.fgId = "addons-" .. entry.id .. "-goto"
+      view.stack:Add(open, { height = 26, width = 160, gap = 8 })
+    end
+    overview[entry.id] = { card = view, row = row }
   end
+end
+
+-- The switch card of one add-on (id of Core/SubAddons.lua) in the card it is given.
+function AS.AddEnable(view, addonId)
+  for _, entry in ipairs(S.List()) do
+    if entry.id == addonId then
+      addCard(view, entry)
+      return true
+    end
+  end
+  return false
 end
 
 -- The client override changed (/fg dev client): the line shows the new client.
@@ -231,7 +296,13 @@ end)
 
 -- A switch changed (here, in the wizard or on the guild page): every card reads its state again.
 ns.On("FG_SUBADDON_CHANGED", function()
-  for _, item in ipairs(built) do
+  for _, item in pairs(overview) do
+    item.card:Refresh()
+    if item.row:IsVisible() then
+      item.card:Layout()
+    end
+  end
+  for _, item in pairs(built) do
     item.card:Refresh()
     if item.status:IsVisible() then
       item.card:Layout()

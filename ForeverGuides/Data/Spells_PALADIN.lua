@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-09.
 -- Spell catalog of PALADIN: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -490,12 +490,6 @@ ns.Data.Spells.PALADIN = {
     n={de="Göttliche Stärke",en="Divine Strength"},
   },
   {
-    fid=236248,
-    id=435984,
-    k="passive",
-    n={de="Verbesserte Segen",en="Enhanced Blessings"},
-  },
-  {
     fid=135903,
     i="spell_holy_excorcism_02",
     id=879,
@@ -558,12 +552,6 @@ ns.Data.Spells.PALADIN = {
     n={de="Exorzismus",en="Exorcism"},
     rk=6,
     sup=10313,
-  },
-  {
-    fid=135956,
-    id=415076,
-    k="passive",
-    n={de="Exorzist",en="Exorcist"},
   },
   {
     fid=135904,

@@ -6,7 +6,8 @@
 -- Spots: the pool and the hover test are ns.GatheringMap (one frame without mouse, textures from a pool,
 -- one throttled poll of the cursor). Here it draws for the map the window shows, not the zone of the
 -- player, the items come from ns.GatherFilter.ZoneItems like on the addon map and a symbol keeps its size on the screen while the canvas
--- zooms.
+-- zooms. Spots without an item (chests, fishing schools, ns.GatherObjects) are a second layer of the same
+-- kind under the same main switch, with their own filter.
 --
 -- Explored look: a frame under the spots draws every overlay picture of the zone (ns.MapReveal.Draw, data
 -- of ForeverGuides_MapData) over the canvas. The client draws the explored pieces itself from the same
@@ -21,7 +22,7 @@ ns.WorldMapGather = WG
 -- The scale and size hooks fire on every step of the zoom animation; one repaint per interval is enough.
 local REPAINT = 0.05
 
-local ctl, host
+local ctl, octl, host
 local lastMode = "off"
 local artCache = {}
 
@@ -54,31 +55,36 @@ local function pinsSwitch()
   return type(gather) ~= "table" or gather.worldmap ~= false
 end
 
--- The explored look is part of the world map display: the main switch of the world map gates it too.
+-- The explored look has its own switch, independent of the spots.
 local function revealSwitch()
-  return pinsSwitch() and ns.Store.get("settings.worldMapReveal") ~= false
+  return ns.Store.get("settings.worldMapReveal") ~= false
 end
 
--- Which parts the map shows now, for the tests and the panel: { pins = number of symbols, reveal = mode,
--- pieces = number of overlay textures }.
-function WG.State()
-  local pins = 0
-  for _, s in ipairs(ctl and ctl.pool or {}) do
+local function shownSymbols(layer)
+  local count = 0
+  for _, s in ipairs(layer and layer.pool or {}) do
     if s.icon:IsShown() then
-      pins = pins + 1
+      count = count + 1
     end
   end
+  return count
+end
+
+-- Which parts the map shows now, for the tests and the panel: { pins = number of ore and herb symbols,
+-- objects = number of symbols of chests and schools, reveal = mode, pieces = number of overlay textures }.
+function WG.State()
+  local pins = shownSymbols(ctl)
   local pieces = 0
   for _, tex in ipairs(host and host.overlayTiles or {}) do
     if tex:IsShown() then
       pieces = pieces + 1
     end
   end
-  return { pins = pins, reveal = lastMode, pieces = pieces }
+  return { pins = pins, objects = shownSymbols(octl), reveal = lastMode, pieces = pieces }
 end
 
 function WG.Parts()
-  return { gather = ctl, reveal = host }
+  return { gather = ctl, objects = octl, reveal = host }
 end
 
 -- Forgets the cached art layers (tests).
@@ -98,17 +104,25 @@ local function wantedItems(id)
   return data and ns.GatherFilter.ZoneItems(data, id) or nil
 end
 
-local function ensurePins(canvas)
-  if ctl then
-    return ctl
+-- The set of kinds without an item to draw for the map, same rules as above.
+local function wantedKinds(id)
+  if not WL.PinsWanted(pinsSwitch(), id, ns.WorldMapLinks.MapType(id)) then
+    return nil
   end
+  local data = ns.GatherDataAccess.Get()
+  return data and ns.GatherObjects.ZoneKinds(data, id) or nil
+end
+
+-- One layer of the symbols on the canvas: feed (nil: the ores and herbs) and the set of what to draw.
+local function attachLayer(canvas, feed, items)
   local WLinks = ns.WorldMapLinks
   local container = WLinks.Container()
-  ctl = ns.GatheringMap.Attach({
+  local layer = ns.GatheringMap.Attach({
     canvas = canvas,
     mapId = mapId,
     enabled = pinsSwitch,
-    items = wantedItems,
+    items = items,
+    feed = feed,
     window = function()
       return 0, 0, canvas:GetWidth(), canvas:GetHeight()
     end,
@@ -129,7 +143,17 @@ local function ensurePins(canvas)
       return target == canvas or target == container
     end,
   })
-  ctl.layer:SetFrameLevel(WLinks.CanvasLevel(canvas, "spots"))
+  layer.layer:SetFrameLevel(WLinks.CanvasLevel(canvas, "spots"))
+  return layer
+end
+
+local function ensurePins(canvas)
+  if not ctl then
+    ctl = attachLayer(canvas, nil, wantedItems)
+  end
+  if not octl then
+    octl = attachLayer(canvas, ns.GatherObjects.Feed, wantedKinds)
+  end
   return ctl
 end
 
@@ -156,6 +180,11 @@ function WG.Debug()
     end
     out.computed = #GM.Points(data, id, set)
   end
+  local kinds = id and wantedKinds(id)
+  out.objectsDrawn = state.objects
+  if kinds and data then
+    out.objects = #ns.GatherObjects.Points(data, id, kinds)
+  end
   return out
 end
 
@@ -176,8 +205,10 @@ function WG.PaintPins(force)
   ensurePins(canvas)
   if shown(m) then
     ctl.Paint(force)
+    octl.Paint(force)
   else
     ctl.Clear()
+    octl.Clear()
   end
 end
 
@@ -252,6 +283,7 @@ local function clearAll()
   clearReveal()
   if ctl then
     ctl.Clear()
+    octl.Clear()
   end
 end
 
@@ -288,7 +320,6 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
     WG.PaintReveal()
   elseif path == "settings.gather.worldmap" then
     WG.PaintPins(true)
-    WG.PaintReveal()
   end
 end)
 

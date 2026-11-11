@@ -329,6 +329,11 @@ function Logic.EntryText(e, L, current)
     out[#out + 1] = L["errcatch.ops"]
     out[#out + 1] = e.ops
   end
+  if e.info and e.info ~= "" then
+    out[#out + 1] = ""
+    out[#out + 1] = L["errcatch.info"]
+    out[#out + 1] = e.info
+  end
   return table.concat(out, "\n")
 end
 

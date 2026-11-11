@@ -10,6 +10,7 @@ ns.OptInNotice = N
 
 ns.AddLocale("enUS", {
   ["optin.button"] = "Switch on sharing",
+  ["optin.button.tip"] = "Opens a dialog that says what is shared. Nothing is switched on before you confirm.",
   ["optin.dialog.title"] = "Switch on sharing",
   ["optin.dialog.yes"] = "Switch on",
   ["optin.dialog.lead"] = "Switch on: %s (%s)",
@@ -19,6 +20,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["optin.button"] = "Teilen einschalten",
+  ["optin.button.tip"] = "Öffnet einen Dialog, der sagt, was geteilt wird. Erst deine Bestätigung schaltet es ein.",
   ["optin.dialog.title"] = "Teilen einschalten",
   ["optin.dialog.yes"] = "Einschalten",
   ["optin.dialog.lead"] = "Einschalten: %s (%s)",
@@ -67,6 +69,8 @@ function N.Banner(parent, opts)
   local b
   b = ns.ActionBanner.New(parent, {
     buttonKey = "optin.button",
+    tooltip = "optin.button",
+    tooltipText = "optin.button.tip",
     opens = true,
     onClick = function()
       ask(b)

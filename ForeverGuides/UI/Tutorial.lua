@@ -291,9 +291,14 @@ ns.On("FG_MAIN_HIDDEN", function()
   end
 end)
 
--- First open: offer the start tour instead of forcing it.
+-- First open: offer the start tour instead of forcing it. Not while the setup wizard is open: its buttons open the
+-- main window, and a question (or a tour that dims the screen) on top of the setup is not what the player asked for.
+-- The offer waits for the next opening of the main window.
 ns.On("FG_MAIN_SHOWN", function()
   if UI.offered or active or not ns.Tutorials.shouldOffer("addon-start") then
+    return
+  end
+  if ns.SetupWizardUI and ns.SetupWizardUI.IsOpen() then
     return
   end
   UI.offered = true

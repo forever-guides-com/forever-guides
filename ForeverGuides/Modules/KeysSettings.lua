@@ -103,6 +103,9 @@ local function addRow(view, id, onChange)
   return row
 end
 
+-- Number of rows that stay visible, the others sit in the "More settings" section.
+KS.OPEN_ROWS = 3
+
 -- Fills a card: heading, hint, rows grouped by area, reset of all.
 function KS.Add(view)
   ns.AddHeading(view, "keys.set.heading")
@@ -120,21 +123,26 @@ function KS.Add(view)
     end
   end
   local area
-  for _, id in ipairs(K.List()) do
+  -- The first rows stay visible, the rest and the reset sit behind "More settings".
+  local target = view
+  for index, id in ipairs(K.List()) do
+    if index == KS.OPEN_ROWS + 1 then
+      target = W.Accordion(view, { id = view.id or "mouse.main" })
+    end
     local def = K.Def(id)
     if def.area ~= area then
       area = def.area
-      view.stack:Add(
-        W.Text(view.content, { key = "keys.area." .. area, role = "ui", color = "accent2", wrap = true }),
+      target.stack:Add(
+        W.Text(target.content, { key = "keys.area." .. area, role = "ui", color = "accent2", wrap = true }),
         { gap = 4 }
       )
     end
-    rows[#rows + 1] = addRow(view, id, repaint)
+    rows[#rows + 1] = addRow(target, id, repaint)
   end
   for _, row in ipairs(rows) do
     row.paint()
   end
-  local all = W.Action(view.content, {
+  local all = W.Action(target.content, {
     label = "keys.set.resetAll",
     icon = "reset",
     tooltip = "keys.set.resetAll",
@@ -149,5 +157,5 @@ function KS.Add(view)
     end,
   })
   all.fgId = "keys-reset-all"
-  view.stack:Add(all, { height = 28, width = 220 })
+  target.stack:Add(all, { height = 28, width = 220 })
 end

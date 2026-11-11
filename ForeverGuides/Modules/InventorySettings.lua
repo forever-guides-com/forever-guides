@@ -55,12 +55,11 @@ local TOGGLES = {
 }
 
 function S.Add(view)
-  local s = view.stack
   ns.AddHeading(view, "inv.set.heading")
   ns.AddParagraph(view, "inv.set.hint", { role = "micro", color = "textMuted" })
-  for _, item in ipairs(TOGGLES) do
+  local function toggle(target, item)
     local key = item[1]
-    local toggle = W.Toggle(view.content, {
+    local control = W.Toggle(target.content, {
       key = item[2],
       get = function()
         return Inv.Option(key) ~= false
@@ -69,10 +68,18 @@ function S.Add(view)
         Store.set("settings." .. key, v)
       end,
     })
-    toggle.fgId = "inventory-" .. key
-    s:Add(toggle, { height = 24, gap = 6 })
+    control.fgId = "inventory-" .. key
+    target.stack:Add(control, { height = 24, gap = 6 })
   end
-  local price = W.Toggle(view.content, {
+  for i = 1, 3 do
+    toggle(view, TOGGLES[i])
+  end
+  -- The other stores, the look of the tooltip and the buttons: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "inventory.stock" })
+  for i = 4, #TOGGLES do
+    toggle(more, TOGGLES[i])
+  end
+  local price = W.Toggle(more.content, {
     key = "inv.set.priceTooltip",
     get = function()
       return Store.get("settings.priceDb.tooltip") ~= false
@@ -82,33 +89,31 @@ function S.Add(view)
     end,
   })
   price.fgId = "inventory-priceTooltip"
-  s:Add(price, { height = 24, gap = 6 })
-  s:Add(
-    W.Action(view.content, {
-      label = "act.refresh",
-      icon = "refresh",
-      tooltip = "inv.set.rescan",
-      width = 220,
-      onClick = function()
-        Inv.Rescan()
-        ns.Notify(ns.L["inv.set.rescanned"], "success")
-      end,
-    }),
-    { height = 26, width = 220 }
-  )
-  s:Add(
-    W.Action(view.content, {
-      label = "act.clear",
-      icon = "trash",
-      tooltip = "inv.set.clear",
-      width = 220,
-      onClick = function()
-        ns.Dialogs.Confirm("inv.set.clearTitle", "inv.set.clearText", function()
-          Inv.Clear()
-          ns.Notify(ns.L["inv.set.cleared"], "success")
-        end)
-      end,
-    }),
-    { height = 26, width = 220 }
-  )
+  more.stack:Add(price, { height = 24, gap = 6 })
+  local rescan = W.Action(more.content, {
+    label = "act.refresh",
+    icon = "refresh",
+    tooltip = "inv.set.rescan",
+    width = 220,
+    onClick = function()
+      Inv.Rescan()
+      ns.Notify(ns.L["inv.set.rescanned"], "success")
+    end,
+  })
+  rescan.fgId = "inventory-rescan"
+  more.stack:Add(rescan, { height = 26, width = 220 })
+  local clear = W.Action(more.content, {
+    label = "act.clear",
+    icon = "trash",
+    tooltip = "inv.set.clear",
+    width = 220,
+    onClick = function()
+      ns.Dialogs.Confirm("inv.set.clearTitle", "inv.set.clearText", function()
+        Inv.Clear()
+        ns.Notify(ns.L["inv.set.cleared"], "success")
+      end)
+    end,
+  })
+  clear.fgId = "inventory-clear"
+  more.stack:Add(clear, { height = 26, width = 220 })
 end

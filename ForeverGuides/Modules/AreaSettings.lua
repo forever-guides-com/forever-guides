@@ -98,24 +98,17 @@ end
 -- A name field that renames in place: Enter and leaving the field both store it, an empty or refused name puts
 -- the old one back. commit(id, text) returns true when it stored the name.
 local function nameBox(parent, max, owner, commit)
-  local box = W.EditBox(parent, {
-    onEnter = function(text)
-      owner.commit(text)
+  return W.EditBox(parent, {
+    maxLetters = max,
+    get = function()
+      return owner.shownName or ""
+    end,
+    set = function(text)
+      if owner.id then
+        commit(owner.id, text)
+      end
     end,
   })
-  box.edit:SetMaxLetters(max)
-  box.edit:HookScript("OnEditFocusLost", function()
-    owner.commit(box.edit:GetText())
-  end)
-  function owner.commit(text)
-    if not owner.id then
-      return
-    end
-    if not commit(owner.id, text) then
-      box.edit:SetText(owner.shownName or "")
-    end
-  end
-  return box
 end
 
 local function iconButton(row, icon, tip, tipText, onClick)
@@ -242,9 +235,7 @@ end
 local function bindWindowCard(row, entry)
   row.id = entry.id
   row.shownName = entry.name
-  if not row.name.edit:HasFocus() then
-    row.name.edit:SetText(entry.name)
-  end
+  row.name:Refresh()
   row.shown.Refresh()
   row.locked.Refresh()
   row.audience.Update()

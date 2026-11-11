@@ -34,6 +34,11 @@
 --   Shell.RegisterEsc(frame, onEscape)   the window closes on Esc while shown, alone and newest first
 --                            (ns.EscStack), never over UISpecialFrames: the client would close the vendor and
 --                            the bags with it. Shell.SetEsc(frame, on) toggles it (pinned note).
+--                            Attach registers every window itself, so a window with a shell needs no call of its
+--                            own. `esc = false` in the Attach options is the only way out and needs a reason in
+--                            the comment next to it (a window that never closes on Esc, or that takes the key in
+--                            its own handler and calls ns.EscStack.Close); tests/test_escwindows.lua keeps the
+--                            list. A panel without a shell calls RegisterEsc itself.
 --
 -- Window style (UI/Skins.lua): in the skin "forever" the shell shows a metal frame around the edge
 -- overlay, a tiled stone background, a gold title in the display font and the red close button.
@@ -646,8 +651,12 @@ end
 -- instead of the close (return true).
 function Shell.RegisterEsc(frame, onEscape)
   escHandlers[frame] = onEscape
-  if not escHooked[frame] then
-    escHooked[frame] = true
+  -- A later SetScript may have replaced the show and hide scripts (and with them, on some clients, our hooks):
+  -- hook again whenever the scripts are not the ones seen last time.
+  local seen = escHooked[frame]
+  local onShow, onHide = frame:GetScript("OnShow"), frame:GetScript("OnHide")
+  if not seen or seen.show ~= onShow or seen.hide ~= onHide then
+    escHooked[frame] = { show = onShow, hide = onHide }
     frame:HookScript("OnShow", function()
       Shell.SetEsc(frame, true)
     end)
@@ -733,5 +742,8 @@ function Shell.Attach(frame, opts)
     restyleBar(shell)
     restyleBack(shell)
   end)
+  if opts.esc ~= false then
+    Shell.RegisterEsc(frame)
+  end
   return shell
 end

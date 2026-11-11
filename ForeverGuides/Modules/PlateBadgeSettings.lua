@@ -14,13 +14,21 @@ ns.AddLocale("enUS", {
   ["platebadge.show"] = "Logos on nameplates",
   ["platebadge.show.tip"] = "Only for group and guild members who allowed it.",
   ["platebadge.notice"] = "Logos of others need sharing.",
-  ["platebadge.plates"] = "Needs nameplates for players (Shift+V).",
-  ["platebadge.who"] = "Only players who sent a presence message (guild, group).",
+  ["platebadge.plates"] = "Needs the friendly player nameplates of the game (Shift+V). Without them the game shows no plate over guild and group members.",
+  ["platebadge.who"] = "Only members of your guild or group who sent a presence message. Other community members are not recognized.",
   ["platebadge.size"] = "Size",
   ["platebadge.size.px"] = "%d px",
   ["platebadge.side"] = "Side",
+  ["platebadge.side.center"] = "Centered",
   ["platebadge.side.left"] = "Left",
   ["platebadge.side.right"] = "Right",
+  ["platebadge.logo"] = "Forever Guides logo",
+  ["platebadge.logo.tip"] = "The add-on logo of players who use it.",
+  ["platebadge.guild"] = "Guild symbol",
+  ["platebadge.guild.tip"] = "The symbol of the guild of the player, next to the logo.",
+  ["platebadge.community"] = "Community symbols",
+  ["platebadge.community.tip"] = "The symbols of the communities of the player, after the guild symbol.",
+  ["platebadge.symbols"] = "Forever Guides shows guild and community symbols only for players you share a guild or community with. They come from the logos of your group and guild and from the local recognition (Share).",
   ["platebadge.self"] = "Show my own logo",
   ["platebadge.self.tip"] = "On your own nameplate, only on your screen.",
   ["platebadge.preview"] = "Preview",
@@ -35,13 +43,21 @@ ns.AddLocale("deDE", {
   ["platebadge.show"] = "Logos an Plaketten",
   ["platebadge.show.tip"] = "Nur für Gruppe und Gilde, wenn erlaubt.",
   ["platebadge.notice"] = "Logos anderer brauchen Teilen.",
-  ["platebadge.plates"] = "Braucht Plaketten für Spieler (Umschalt+V).",
-  ["platebadge.who"] = "Nur Spieler mit Präsenz-Nachricht (Gilde, Gruppe).",
+  ["platebadge.plates"] = "Braucht die freundlichen Spieler-Plaketten des Spiels (Umschalt+V). Ohne sie zeigt das Spiel keine Plakette über Gilden- und Gruppenmitgliedern.",
+  ["platebadge.who"] = "Nur Mitglieder deiner Gilde oder Gruppe mit Präsenz-Nachricht. Andere Community-Mitglieder werden nicht erkannt.",
   ["platebadge.size"] = "Größe",
   ["platebadge.size.px"] = "%d px",
   ["platebadge.side"] = "Seite",
+  ["platebadge.side.center"] = "Mittig",
   ["platebadge.side.left"] = "Links",
   ["platebadge.side.right"] = "Rechts",
+  ["platebadge.logo"] = "Forever-Guides-Logo",
+  ["platebadge.logo.tip"] = "Das Addon-Logo von Spielern, die es nutzen.",
+  ["platebadge.guild"] = "Gildensymbol",
+  ["platebadge.guild.tip"] = "Das Symbol der Gilde des Spielers, neben dem Logo.",
+  ["platebadge.community"] = "Community-Symbole",
+  ["platebadge.community.tip"] = "Die Symbole der Communitys des Spielers, hinter dem Gildensymbol.",
+  ["platebadge.symbols"] = "Gilden- und Community-Symbole zeigt Forever Guides nur bei Spielern, mit denen du Gilde oder Community teilst. Sie kommen aus den Logos deiner Gruppe und Gilde und aus der lokalen Erkennung (Teilen).",
   ["platebadge.self"] = "Mein Logo zeigen",
   ["platebadge.self.tip"] = "An deiner Plakette, nur auf deinem Bildschirm.",
   ["platebadge.preview"] = "Vorschau",
@@ -116,6 +132,7 @@ local function sideDropdown(view)
     key = "platebadge.side",
     width = 200,
     options = {
+      { value = "center", key = "platebadge.side.center" },
       { value = "left", key = "platebadge.side.left" },
       { value = "right", key = "platebadge.side.right" },
     },
@@ -133,13 +150,13 @@ local function sideDropdown(view)
 end
 
 -- Paints the logo of the preview where the settings put it on a real plate.
-function S.PlacePreview(logo, plate)
+function S.PlacePreview(logo, anchor)
   local size = PBL.CleanSize(get("plateBadgeSize"))
   local pos = PBL.Position(get("plateBadgeSide"))
   logo:SetSize(size, size)
   logo:SetTexture(ns.BadgeAssets.Path(size))
   logo:ClearAllPoints()
-  logo:SetPoint(pos.point, plate, pos.relPoint, pos.x, pos.y)
+  logo:SetPoint(pos.point, anchor, pos.relPoint, pos.x, pos.y)
 end
 
 local function previewPlate(view)
@@ -159,10 +176,86 @@ local function previewPlate(view)
   box.logo = logo
   view.stack:Add(box, { height = PREVIEW_HEIGHT, width = PREVIEW_WIDTH, gap = 6 })
   box.Refresh = function()
-    S.PlacePreview(logo, plate)
+    S.PlacePreview(logo, name)
   end
   live[box] = true
   return box
+end
+
+-- State of the friendly player plates of the game and the button that switches them on (only a click changes
+-- the game's setting). Same texts and function as the contacts page, so the wording stays one.
+local function platesSwitch(view)
+  local state = W.Text(view.content, { role = "ui", color = "textSecondary", wrap = true })
+  state.fgId = "platebadge-plates-state"
+  local function paint()
+    state:SetText(string.format(L["guild.plates.state"], L["guild.plates." .. ns.NearbyContacts.PlatesState()]))
+  end
+  state.Refresh = paint
+  view.stack:Add(state, { gap = 4 })
+  live[state] = true
+  local row = ns.FlowLayout.ButtonRow(view.content, {
+    {
+      id = "plates",
+      label = "act.enable",
+      icon = "check",
+      tooltip = "guild.plates.enable",
+      fgId = "platebadge-plates",
+      onClick = function()
+        local ok, reason = ns.NearbyContacts.EnablePlates()
+        ns.Notify(L[ok and "guild.plates.done" or "guild.plates." .. reason], ok and "success" or "warning")
+        paint()
+      end,
+    },
+  })
+  view.stack:Add(row, { gap = 6 })
+end
+
+-- Names only: one click switches the friendly plates on and the health bar off, the second puts the old values back.
+local function namesOnly(view)
+  local PNames = ns.PlateNames
+  local state = W.Text(view.content, { role = "ui", color = "textSecondary", wrap = true })
+  state.fgId = "platebadge-names-state"
+  local function paint()
+    state:SetText(
+      string.format(
+        L["platenames.state"],
+        L["guild.plates." .. ns.NearbyContacts.PlatesState()],
+        L["platenames.bar." .. PNames.BarState()]
+      )
+    )
+  end
+  state.Refresh = paint
+  view.stack:Add(state, { gap = 4 })
+  live[state] = true
+  local function run(action, done)
+    local ok, reason, wrong = action()
+    local text, level = PNames.Message(ok, reason, wrong, done)
+    ns.Notify(text, level)
+    refreshAll()
+  end
+  local row = ns.FlowLayout.ButtonRow(view.content, {
+    {
+      id = "names",
+      label = "platenames.enable",
+      icon = "check",
+      tooltip = "platenames.enable.tip",
+      fgId = "platebadge-names",
+      onClick = function()
+        run(PNames.Enable, "platenames.done")
+      end,
+    },
+    {
+      id = "restore",
+      label = "platenames.restore",
+      tooltip = "platenames.restore.tip",
+      fgId = "platebadge-names-restore",
+      onClick = function()
+        run(PNames.Restore, "platenames.restored")
+      end,
+    },
+  })
+  view.stack:Add(row, { gap = 4 })
+  ns.AddParagraph(view, "platenames.hint", { role = "micro", color = "textMuted", gap = 6 })
 end
 
 function S.Add(view)
@@ -183,20 +276,35 @@ function S.Add(view)
     notice:Update(not PB.Allowed())
   end
   live[notice] = true
-  ns.AddParagraph(view, "platebadge.plates", { role = "micro", color = "textMuted", gap = 2 })
-  ns.AddParagraph(view, "platebadge.who", { role = "micro", color = "textMuted", gap = 6 })
-  sizeSlider(view)
-  sideDropdown(view)
-  settingToggle(view, "plateBadgeSelf", "platebadge.self", "platebadge.self.tip")
-  ns.AddParagraph(view, "platebadge.preview", { role = "micro", color = "textMuted", gap = 2 })
-  previewPlate(view)
-  ns.AddParagraph(view, "platebadge.other", { role = "micro", color = "textMuted", gap = 2 })
-  ns.AddParagraph(view, "platebadge.locked", { role = "micro", color = "textMuted", gap = 2 })
+  -- The consent notice stays visible, everything else is rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "logos.plates" })
+  ns.AddParagraph(more, "platebadge.plates", { role = "micro", color = "textMuted", gap = 2 })
+  platesSwitch(more)
+  namesOnly(more)
+  ns.AddParagraph(more, "platebadge.who", { role = "micro", color = "textMuted", gap = 6 })
+  settingToggle(more, "plateShowLogo", "platebadge.logo", "platebadge.logo.tip")
+  settingToggle(more, "plateCrestGuild", "platebadge.guild", "platebadge.guild.tip")
+  settingToggle(more, "plateCrestCommunity", "platebadge.community", "platebadge.community.tip")
+  ns.AddParagraph(more, "platebadge.symbols", { role = "micro", color = "textMuted", gap = 6 })
+  sizeSlider(more)
+  sideDropdown(more)
+  settingToggle(more, "plateBadgeSelf", "platebadge.self", "platebadge.self.tip")
+  ns.AddParagraph(more, "platebadge.preview", { role = "micro", color = "textMuted", gap = 2 })
+  previewPlate(more)
+  ns.AddParagraph(more, "platebadge.other", { role = "micro", color = "textMuted", gap = 2 })
+  ns.AddParagraph(more, "platebadge.locked", { role = "micro", color = "textMuted", gap = 2 })
   refreshAll()
 end
 
 ns.On("FG_SETTING_CHANGED", function(_, path)
-  if type(path) == "string" and path:find("^settings%.plateBadge") then
+  if
+    type(path) == "string"
+    and (
+      path:find("^settings%.plateBadge")
+      or path:find("^settings%.plateShowLogo")
+      or path:find("^settings%.plateCrest")
+    )
+  then
     refreshAll()
   end
 end)
@@ -204,4 +312,4 @@ ns.On("FG_CONSENT_CHANGED", refreshAll)
 ns.On("FG_CONSENT_WITHDRAWN", refreshAll)
 
 -- Later than the built-in sections of the tab (Modules/Settings.lua appends in this order).
-ns.SettingsPage.Add(S.Add, "sharing")
+ns.SettingsPage.Add(S.Add, "sharing", "logos.plates")

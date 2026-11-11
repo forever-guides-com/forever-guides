@@ -13,6 +13,7 @@ ns.SidebarEdit = SE
 
 ns.AddLocale("enUS", {
   ["nav.edit.toggle"] = "Edit navigation",
+  ["nav.edit.toggleHint"] = "Shows hidden areas of the menu again.",
   ["nav.edit.title"] = "Editing the navigation",
   ["nav.edit.hint"] = "Drag entries and groups to move them. With the keyboard: select one and press Shift+Up or Shift+Down.",
   ["nav.edit.dragHint"] = "Drag to move. Shift+Up or Shift+Down moves it with the keyboard.",
@@ -34,6 +35,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["nav.edit.toggle"] = "Navigation bearbeiten",
+  ["nav.edit.toggleHint"] = "Blendet ausgeblendete Bereiche des Menüs wieder ein.",
   ["nav.edit.title"] = "Navigation wird bearbeitet",
   ["nav.edit.hint"] = "Einträge und Gruppen ziehen, um sie zu verschieben. Mit der Tastatur: einen auswählen und Umschalt+Hoch oder Umschalt+Runter drücken.",
   ["nav.edit.dragHint"] = "Ziehen zum Verschieben. Umschalt+Hoch oder Umschalt+Runter verschiebt per Tastatur.",
@@ -620,6 +622,60 @@ function SE.Place(f, collapsed)
   return bannerHeight, barHeight
 end
 
+-- Pencil hint: a soft glow around the pencil while the setup wizard points at it (steps start, menu, done). It
+-- pulses, and stands still with "Reduce motion". Only textures and an animation group of our own button, no
+-- protected frame is touched.
+local hintOn = false
+
+function SE.PaintHint(button)
+  if not button then
+    local f = sidebar()
+    button = f and f.fgEdit and f.fgEdit.toggle
+  end
+  if not button then
+    return
+  end
+  if not button.fgHint then
+    local glow = button:CreateTexture(nil, "BACKGROUND")
+    glow:SetPoint("TOPLEFT", -9, 9)
+    glow:SetPoint("BOTTOMRIGHT", 9, -9)
+    glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+    glow:SetBlendMode("ADD")
+    glow:SetVertexColor(ns.Theme.rgb("accent2"))
+    local pulse = glow:CreateAnimationGroup()
+    pulse:SetLooping("BOUNCE")
+    local alpha = pulse:CreateAnimation("Alpha")
+    alpha:SetFromAlpha(0.3)
+    alpha:SetToAlpha(0.95)
+    alpha:SetDuration(1.1)
+    button.fgHint = { glow = glow, pulse = pulse }
+  end
+  local hint = button.fgHint
+  hint.glow:SetShown(hintOn)
+  if hintOn and not ns.Theme.reduceMotion() then
+    hint.glow:SetAlpha(0.3)
+    hint.pulse:Play()
+  else
+    hint.pulse:Stop()
+    hint.glow:SetAlpha(hintOn and 0.85 or 0)
+  end
+end
+
+function SE.SetHint(on)
+  hintOn = on == true
+  SE.PaintHint()
+end
+
+function SE.HintActive()
+  return hintOn
+end
+
+ns.On("FG_SETTING_CHANGED", function(_, path)
+  if hintOn and path == "settings.reduceMotion" then
+    SE.PaintHint()
+  end
+end)
+
 -- The pencil in the header strip of the sidebar; the rest is built when the mode starts.
 function SE.Attach(f)
   local e = {}
@@ -632,12 +688,14 @@ function SE.Attach(f)
     iconSize = 16,
     boxed = true,
     tooltip = "nav.edit.toggle",
+    tooltipText = "nav.edit.toggleHint",
     onClick = function()
       SE.Toggle()
     end,
   })
   e.toggle.fgId = "nav-edit-toggle"
   e.toggle:SetPoint("TOPRIGHT", -38, -6)
+  SE.PaintHint(e.toggle)
   -- Target of the start tour; hidden on the icon rail, where the tour skips the step.
   ns.Anchors["FG.Sidebar.Edit"] = e.toggle
 end

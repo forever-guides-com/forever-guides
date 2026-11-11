@@ -236,7 +236,7 @@ function BR.AddSettings(view)
 end
 
 -- On the map tab, next to the dungeon map setting.
-ns.SettingsPage.Add(BR.AddSettings, "map")
+ns.SettingsPage.Add(BR.AddSettings, "map", "bosses.progress")
 
 -- Events --------------------------------------------------------------------------------------------
 

@@ -19,6 +19,7 @@ local MRL, PL, MW, MM = ns.MapRouteList, ns.MapPlaceList, ns.MapWorld, ns.MapMar
 local FP, MI = ns.FlightPointsLogic, ns.MapIcons
 local WP = ns.Waypoints
 local B = ns.BlizzardLinks
+local BL = ns.WorldMapBarLogic
 
 local Bar = {}
 ns.WorldMapBar = Bar
@@ -108,7 +109,8 @@ end
 function Bar.Create(map)
   local WML = ns.WorldMapLinks
   local f = CreateFrame("Frame", "ForeverGuidesWorldMapBar", map)
-  f:SetFrameLevel(WML.UILevel())
+  ns.Layer.Own(f)
+  WML.Lift(f)
   f:EnableMouse(true)
   W.Fill(f, "bg", 0.94)
   W.Border(f, "accentDim", 1)
@@ -352,13 +354,14 @@ function Bar.Create(map)
 
   local tabs = {}
   local gt, gu
-  local function newTab(id, key, tooltip)
+  local function newTab(id, key, tooltip, tooltipText)
     local b = button(f, {
       key = key,
       variant = "ghost",
       width = TAB_W,
       height = TAB_H,
-      tooltip = tooltip,
+      tooltip = tooltip or key,
+      tooltipText = tooltipText,
       onClick = function()
         ns.Store.set("settings.worldMapPanelTab", id)
         r.picking = nil
@@ -375,10 +378,10 @@ function Bar.Create(map)
     tabs[id] = b
     return b
   end
-  newTab("markers", "map.marker.heading")
-  newTab("route", "map.route")
-  newTab("flights", "fp.tab", "fp.list.title")
-  newTab("gather", "wm.gather.tab")
+  newTab("markers", "map.marker.heading", nil, "wm.tip.tab.markers")
+  newTab("route", "map.route", nil, "wm.tip.tab.route")
+  newTab("flights", "fp.tab", "fp.list.title", "wm.tip.tab.flights")
+  newTab("gather", "wm.gather.tab", nil, "wm.tip.tab.gather")
   do
     local b = W.Action(f, {
       texture = HEXAGON,
@@ -414,14 +417,21 @@ function Bar.Create(map)
     tabs.guild = b
   end
 
+  -- The pages sit in one scroll area: a page taller than the room down to the edge of the map window
+  -- scrolls instead of reaching over the frame. The gutter at the right holds the scroll bar.
+  local scroll = W.ScrollArea(f, { gutter = PAD })
+  local pageParent = scroll.content
+
   -- Markers --------------------------------------------------------------------------------
-  local mk = CreateFrame("Frame", nil, f)
+  local mk = CreateFrame("Frame", nil, pageParent)
   mk.rows = {}
   mk.place = button(mk, {
     key = "wm.place",
     variant = "primary",
     width = INNER,
     height = 26,
+    tooltip = "wm.place",
+    tooltipText = "wm.place.tip",
     onClick = function()
       WML.SetPlacing(not WML.Placing())
     end,
@@ -536,7 +546,7 @@ function Bar.Create(map)
   end
 
   -- Route ----------------------------------------------------------------------------------
-  local rt = CreateFrame("Frame", nil, f)
+  local rt = CreateFrame("Frame", nil, pageParent)
   rt.picks, rt.steps = {}, {}
 
   local function newEndButton(which)
@@ -545,6 +555,8 @@ function Bar.Create(map)
       variant = "secondary",
       width = INNER,
       height = BTN_H,
+      tooltip = "wm." .. which .. ".title",
+      tooltipText = "wm." .. which .. ".tip",
       onClick = function()
         r.picking = r.picking ~= which and which or nil
         r.query = ""
@@ -603,8 +615,23 @@ function Bar.Create(map)
   end
 
   local HALF_W = (INNER - BTN_H - 2 * GAP) / 2
-  rt.swap = button(rt, { key = "wm.swap", width = HALF_W, height = BTN_H, onClick = swap })
-  rt.calc = button(rt, { key = "wm.calc", variant = "primary", width = HALF_W, height = BTN_H, onClick = calculate })
+  rt.swap = button(rt, {
+    key = "wm.swap",
+    width = HALF_W,
+    height = BTN_H,
+    tooltip = "wm.swap",
+    tooltipText = "wm.swap.tip",
+    onClick = swap,
+  })
+  rt.calc = button(rt, {
+    key = "wm.calc",
+    variant = "primary",
+    width = HALF_W,
+    height = BTN_H,
+    tooltip = "wm.calc",
+    tooltipText = "wm.calc.tip",
+    onClick = calculate,
+  })
   rt.reset = W.Action(rt, {
     icon = "reset",
     boxed = true,
@@ -639,6 +666,8 @@ function Bar.Create(map)
 
   rt.search = W.EditBox(rt, {
     placeholder = "wm.search",
+    tooltip = "wm.search",
+    tooltipText = "wm.search.tip",
     onChange = function(text)
       r.query = text
       f:Layout()
@@ -667,6 +696,12 @@ function Bar.Create(map)
     row.zone = W.Text(row, { role = "micro", color = "textMuted", justify = "RIGHT" })
     row.zone:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row.zone:SetWidth(ZONE_W)
+    -- The row cuts long names: the tooltip has the whole name and the zone.
+    row:HookScript("OnEnter", function(self)
+      if self.pickName then
+        ns.ShowTooltip(self, self.pickName, (self.pickZone ~= "" and self.pickZone .. "\n" or "") .. L["wm.pick.tip"])
+      end
+    end)
     row:SetScript(
       "OnClick",
       ns.Wrap("wm-pick", function(self)
@@ -688,10 +723,17 @@ function Bar.Create(map)
     return row
   end
 
-  local function action(key, handler)
-    return button(rt, { key = key, width = INNER, height = ACTION_H, onClick = handler })
+  local function action(key, tip, handler)
+    return button(rt, {
+      key = key,
+      width = INNER,
+      height = ACTION_H,
+      tooltip = key,
+      tooltipText = tip,
+      onClick = handler,
+    })
   end
-  rt.show = action("wm.route.show", function()
+  rt.show = action("wm.route.show", "wm.route.showTip", function()
     local e = engine()
     if e and ns.MapRequest then
       ns.MapRequest.Open({
@@ -703,13 +745,13 @@ function Bar.Create(map)
       B.RaiseMain(map)
     end
   end)
-  rt.next = action("map.route.next", function()
+  rt.next = action("map.route.next", "map.route.next.tip", function()
     local e = engine()
     if e then
       e.list.NextStop()
     end
   end)
-  rt.adopt = action("map.route.adopt", function()
+  rt.adopt = action("map.route.adopt", "map.route.adopt.tip", function()
     local e = engine()
     if e then
       e.list.Adopt()
@@ -767,6 +809,7 @@ function Bar.Create(map)
         row.slug = entries[i].node.s
         W.SetText(row.name, nil, entries[i].name)
         W.SetText(row.zone, nil, e.zoneName[entries[i].node.z] or "")
+        row.pickName, row.pickZone = entries[i].name, e.zoneName[entries[i].node.z] or ""
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
         row:Show()
@@ -839,7 +882,7 @@ function Bar.Create(map)
   end
 
   -- Flights --------------------------------------------------------------------------------
-  local fl = CreateFrame("Frame", nil, f)
+  local fl = CreateFrame("Frame", nil, pageParent)
   fl.rows = {}
   fl.msg = W.Text(fl, { role = "micro", color = "textMuted", wrap = true })
 
@@ -942,7 +985,7 @@ function Bar.Create(map)
   -- Gather: built when the tab is first used, so the data add-on of the materials is not touched before.
   local function gatherPage()
     if not gt then
-      gt = ns.WorldMapGatherTab.Create(f, INNER, {
+      gt = ns.WorldMapGatherTab.Create(pageParent, INNER, {
         relayout = function()
           f:Refresh()
         end,
@@ -955,7 +998,7 @@ function Bar.Create(map)
   -- Guild: built when the tab is first used.
   local function guildPage()
     if not gu then
-      gu = ns.WorldMapGuildTab.Create(f, INNER, {
+      gu = ns.WorldMapGuildTab.Create(pageParent, INNER, {
         relayout = function()
           f:Refresh()
         end,
@@ -968,6 +1011,7 @@ function Bar.Create(map)
   -- Layout -------------------------------------------------------------------------------------
   -- Header at the canvas edge the bar is anchored on, content on the inner side of it.
   function f:Layout()
+    WML.Lift(f)
     local lift, _, mapHeight = WML.BarSpace()
     local corner, _, dy = position()
     local up = corner:find("^BOTTOM") ~= nil
@@ -984,18 +1028,20 @@ function Bar.Create(map)
     for _, b in ipairs(head.corners) do
       b:SetShown(open)
     end
-    for _, page in ipairs({ mk, rt, fl }) do
-      page:Hide()
-    end
-    if gt then
-      gt:Hide()
-    end
-    if gu then
-      gu:Hide()
+    -- Only the pages that are not on show are hidden. A Layout runs on every typed letter of the place search,
+    -- and hiding the page that holds the focused box takes the focus away (the client clears it on hide).
+    local current = open and currentTab() or nil
+    local pages = { markers = mk, route = rt, flights = fl, gather = gt, guild = gu }
+    for tabId, page in pairs(pages) do
+      if tabId ~= current then
+        page:Hide()
+      end
     end
     for _, tab in pairs(tabs) do
       tab:SetShown(open)
     end
+    -- Shown and hidden with the bar only: a hide on every layout would take the focus from a typed box.
+    scroll:SetShown(open)
     if not open then
       r.w, r.h = CLOSED_W, HEAD_H
       f:SetSize(r.w, r.h)
@@ -1006,7 +1052,7 @@ function Bar.Create(map)
     local pageTop = top + TAB_H + PAD
     -- Content keeps clear of the overlays at the far end: the bottom ones, or the floor dropdown on top.
     local reserve = up and TOP_RESERVE or lift
-    local avail = math.max(60, mapHeight - dy - MARGIN - reserve - pageTop - PAD)
+    local avail = BL.Space(mapHeight, dy, MARGIN, reserve, pageTop, PAD)
     local id = currentTab()
     local x = PAD
     for _, tabId in ipairs(TAB_IDS) do
@@ -1024,7 +1070,7 @@ function Bar.Create(map)
     local lazy = id == "gather" and gatherPage or id == "guild" and guildPage or nil
     local page = lazy and lazy() or ({ markers = mk, route = rt, flights = fl })[id]
     page:ClearAllPoints()
-    page:SetPoint(edge .. "LEFT", f, edge .. "LEFT", PAD, up and pageTop or -pageTop)
+    page:SetPoint("TOPLEFT", pageParent, "TOPLEFT")
     local height
     if lazy then
       height = page:Layout(avail)
@@ -1033,12 +1079,23 @@ function Bar.Create(map)
     end
     page:SetSize(INNER, height)
     page:Show()
-    r.w, r.h = OPEN_W, pageTop + height + PAD
+    local view, scrolls = BL.Fit(height, avail)
+    scroll:ClearAllPoints()
+    scroll:SetPoint(edge .. "LEFT", f, edge .. "LEFT", PAD, up and pageTop or -pageTop)
+    scroll:SetSize(INNER + PAD, view)
+    pageParent:SetWidth(INNER)
+    scroll:SetContentHeight(height)
+    scroll:EnableMouseWheel(scrolls)
+    if id ~= r.pageId then
+      r.pageId = id
+      scroll:ScrollTo(0)
+    end
+    r.w, r.h = OPEN_W, pageTop + view + PAD
     f:SetSize(r.w, r.h)
     place()
   end
 
-  f.parts = { head = head, tabs = tabs, markers = mk, route = rt, flights = fl }
+  f.parts = { head = head, tabs = tabs, markers = mk, route = rt, flights = fl, scroll = scroll }
 
   function f:Refresh()
     if f:IsShown() then

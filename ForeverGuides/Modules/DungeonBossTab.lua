@@ -140,11 +140,12 @@ function DBT.Create(parent)
       W.SetText(self.head, "bosstab.unavailable")
     end
     state.hasPortrait = false
-    local fids, kinds, displays = {}, {}, {}
+    local fids, kinds, displays, creatures = {}, {}, {}, {}
     for i, boss in ipairs(bosses) do
       fids[i], kinds[i] = IV.Portrait(inst, boss)
       displays[i] = kinds[i] ~= "own" and ns.BossModelWindow.DisplayId(inst, boss) or nil
-      state.hasPortrait = state.hasPortrait or kinds[i] == "own" or displays[i] ~= nil
+      creatures[i] = kinds[i] ~= "own" and ns.BossModelWindow.CreatureId(inst, boss) or nil
+      state.hasPortrait = state.hasPortrait or kinds[i] == "own" or displays[i] ~= nil or creatures[i] ~= nil
     end
     -- Without any own symbol or 3D portrait the column stays away, with one every other boss shows the placeholder.
     if not state.hasPortrait then
@@ -163,8 +164,8 @@ function DBT.Create(parent)
       row.name:SetText(text)
       row.hasPicture = fids[i] ~= nil
       row.portrait:SetTexture(fids[i])
-      if displays[i] and row.hasPicture then
-        ns.BossPortrait.Bind(row.portraitHost, displays[i], row.portrait)
+      if (displays[i] or creatures[i]) and row.hasPicture then
+        ns.BossPortrait.Bind(row.portraitHost, displays[i], row.portrait, creatures[i])
       else
         ns.BossPortrait.Unbind(row.portraitHost)
         row.portrait:SetAlpha(1)

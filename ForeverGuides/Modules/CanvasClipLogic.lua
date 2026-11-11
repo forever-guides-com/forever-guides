@@ -69,8 +69,9 @@ function CC.Pack(layout, ref)
     root = clean.elements[1] and clean.elements[1].id,
     elements = clean.elements,
   }
-  if head.type == GL.TYPE then
-    data.fmt = CC.FORMAT
+  local need = CL.RequiredVersion(clean.elements)
+  if need > 1 then
+    data.fmt = need
   end
   return data
 end
@@ -82,9 +83,7 @@ function CC.Export(layout, ref, host)
   if not data then
     return nil, why
   end
-  local group = data.elements[1].type == GL.TYPE
-  local s, err =
-    ns.Strings.encode(CC.KIND, data, nil, type(host) == "string" and host or CL.HostOf(layout), group and 2 or nil)
+  local s, err = ns.Strings.encode(CC.KIND, data, nil, type(host) == "string" and host or CL.HostOf(layout), data.fmt)
   if s and #s > ns.Strings.MAX_INPUT then
     return nil, "too-large"
   end
@@ -98,7 +97,7 @@ function CC.Unpack(data)
   if type(data) ~= "table" or type(data.elements) ~= "table" then
     return nil, "shape"
   end
-  local head = data.elements[1]
+  local head = CL.Upgrade(data.elements[1])
   if type(head) ~= "table" or type(head.type) ~= "string" or head.type == "" then
     return nil, "shape"
   end

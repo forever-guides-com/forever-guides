@@ -1,5 +1,5 @@
 -- Small 3D portraits for the boss rows (instance page, boss tab of the dungeon map). A row that has no symbol file
--- but a creature display ID (boss.dp) binds its portrait frame here. A few PlayerModel frames are pooled and handed
+-- but a creature display ID (boss.dp), or only a creature ID (boss.npc), binds its portrait frame here. A few PlayerModel frames are pooled and handed
 -- to the bound frames that are visible inside their scroll area, at most MAX_MODELS at a time, so a long boss list
 -- costs the same as a short one. Models load only while a bound frame is shown: when the page is left or hidden
 -- every model goes back to the pool and the tick stops. A display the client cannot load keeps the placeholder
@@ -13,7 +13,7 @@ ns.BossPortrait = BP
 BP.MAX_MODELS = 12
 local TICK = 0.2
 
-local hosts = {} -- host frame -> { display, symbol }
+local hosts = {} -- host frame -> { display or creature, symbol }
 local models = {} -- every model made so far
 local free = {} -- the models that are not on a host
 local ticker
@@ -83,7 +83,11 @@ local function attach(host, entry)
   model.fgHost = host
   local ok = pcall(function()
     model:ClearModel()
-    model:SetDisplayInfo(entry.display)
+    if entry.display then
+      model:SetDisplayInfo(entry.display)
+    else
+      model:SetCreature(entry.creature)
+    end
   end)
   if not ok then
     model.fgHost = nil
@@ -175,21 +179,26 @@ local function ensureTicker()
   end
 end
 
--- Binds a frame to a display ID. symbol is the texture of the row that shows the placeholder meanwhile. Returns
--- false when this client has no 3D models (the row keeps its symbol).
-function BP.Bind(host, display, symbol)
-  if type(display) ~= "number" or display <= 0 then
+-- Binds a frame to a display ID, or to a creature ID when the boss has no display ID (the client looks the model up).
+-- symbol is the texture of the row that shows the placeholder meanwhile. Returns false when this client has no 3D
+-- models (the row keeps its symbol).
+function BP.Bind(host, display, symbol, creature)
+  local hasDisplay = type(display) == "number" and display > 0
+  local hasCreature = not hasDisplay and type(creature) == "number" and creature > 0
+  if not (hasDisplay or hasCreature) then
     BP.Unbind(host)
     return false
   end
   ensureTicker()
+  display = hasDisplay and display or nil
+  creature = hasCreature and creature or nil
   local entry = hosts[host]
-  if entry and entry.display ~= display then
+  if entry and (entry.display ~= display or entry.creature ~= creature) then
     release(host)
     entry = nil
   end
   if not entry then
-    entry = { display = display }
+    entry = { display = display, creature = creature }
     hosts[host] = entry
   end
   entry.symbol = symbol

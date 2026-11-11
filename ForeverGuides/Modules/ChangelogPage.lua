@@ -30,6 +30,8 @@ ns.AddLocale("enUS", {
   ["changelog.toggleHint"] = "Click or press Enter to show or hide this version.",
   ["changelog.badgeHint"] = "New entries",
   ["changelog.empty"] = "This build has no changelog data.",
+  ["changelog.opens"] = "Opens: %s",
+  ["changelog.opensHint"] = "Click or press Enter to open it.",
 })
 ns.AddLocale("deDE", {
   ["page.changelog"] = "Changelog",
@@ -52,6 +54,8 @@ ns.AddLocale("deDE", {
   ["changelog.toggleHint"] = "Klicken oder Enter drücken, um diese Version ein- oder auszublenden.",
   ["changelog.badgeHint"] = "Neue Einträge",
   ["changelog.empty"] = "Dieser Stand enthält keine Changelog-Daten.",
+  ["changelog.opens"] = "Öffnet: %s",
+  ["changelog.opensHint"] = "Klicken oder Enter drücken, um es zu öffnen.",
 })
 
 -- Header: padding around the text, the arrow column and the gap between lines.
@@ -73,6 +77,10 @@ local ENTRY_GAP = 10
 local SECTION_GAP = 8
 local SECTION_SPACE = 20
 local ENTRY_INDENT = 12
+-- Linked rows: the arrow at the right end, the room it takes from the text and the smallest click target height.
+local JUMP_ARROW = 14
+local JUMP_ROOM = JUMP_ARROW + 12
+local JUMP_MIN = 20
 
 -- Public state: the newest version the player has seen (account wide, ns.db.meta.changelogSeen).
 local Changelog = {}
@@ -108,6 +116,69 @@ local function wrapped(fs, width)
   return math.ceil(fs:GetStringHeight())
 end
 
+-- The name of the page or setting a link target opens, nil when it does not exist in this build (a sub-addon that
+-- is off): such a row stays plain text.
+local function targetName(go)
+  local _, kind, id = Logic.Target(go)
+  if kind == "page" then
+    local page = ns.Router:get(id)
+    return page and L[page.title]
+  elseif kind == "settings" then
+    local SFL = ns.SettingsFeatureLogic
+    local feature, cardId = SFL.Target(id)
+    if not feature then
+      return nil
+    end
+    local card = cardId and SFL.Card(cardId)
+    return (card and card.titleKey and L[card.titleKey]) or L["settings.feature." .. feature]
+  end
+end
+
+-- Opens the target through the router, so the back and forward arrows of the window follow it.
+local function openTarget(go)
+  local path = Logic.Target(go)
+  if path and targetName(go) then
+    ns.Main.Show(path)
+  end
+end
+
+-- The click area over a row that links somewhere: hover mark, an arrow at the right end (so the link is not
+-- only a color), a tooltip with the name of the target and one focus target for the whole row.
+local function newJump(row)
+  local jump = CreateFrame("Button", nil, row)
+  local hover = jump:CreateTexture(nil, "HIGHLIGHT")
+  hover:SetAllPoints()
+  ns.Bind(hover, function(t)
+    t:SetColorTexture(1, 1, 1, 0.08)
+  end)
+  jump.arrow = W.Glyph(jump, "chevron-right", JUMP_ARROW, "accent2")
+  jump.arrow:SetPoint("RIGHT", jump, "RIGHT", -4, 0)
+  jump:Hide()
+  -- Sets the target; a target without a page or setting in this build leaves the row plain.
+  function jump:SetGo(go)
+    self.go = go and targetName(go) and go or nil
+    self.fgNameText = self.go and string.format(L["changelog.opens"], targetName(self.go)) or nil
+    return self.go ~= nil
+  end
+  function jump.fgName()
+    return jump.fgNameText
+  end
+  local function activate()
+    openTarget(jump.go)
+  end
+  jump:SetScript("OnClick", ns.Wrap("changelog-jump", activate))
+  jump:SetScript("OnEnter", function(self)
+    if self.fgNameText then
+      ns.ShowTooltip(self, self.fgNameText, L["changelog.opensHint"])
+    end
+  end)
+  jump:SetScript("OnLeave", function()
+    ns.HideTooltip()
+  end)
+  ns.Focus.register(jump, activate)
+  return jump
+end
+
 -- The header of one version: arrow, version, date with the "New" mark and, while the version is closed, the
 -- headlines of its highlights. Its height follows the text, so nothing is cut off at a large font or a narrow
 -- window.
@@ -136,7 +207,13 @@ local function newHeader(content, onToggle)
     self.label:ClearAllPoints()
     self.label:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y)
     self.arrow:ClearAllPoints()
-    self.arrow:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -(y + math.max(0, math.floor((math.min(titleH, 24) - ARROW) / 2))))
+    self.arrow:SetPoint(
+      "TOPLEFT",
+      self,
+      "TOPLEFT",
+      PAD,
+      -(y + math.max(0, math.floor((math.min(titleH, 24) - ARROW) / 2)))
+    )
     y = y + titleH
     local dateW = math.ceil(self.date:GetStringWidth())
     local hasDate = (self.date:GetText() or "") ~= ""
@@ -152,7 +229,13 @@ local function newHeader(content, onToggle)
     if hasDate or badgeOn then
       y = y + LINE_GAP
       self.date:ClearAllPoints()
-      self.date:SetPoint("TOPLEFT", self, "TOPLEFT", left, -(y + math.floor((metaH - math.ceil(self.date:GetStringHeight())) / 2)))
+      self.date:SetPoint(
+        "TOPLEFT",
+        self,
+        "TOPLEFT",
+        left,
+        -(y + math.floor((metaH - math.ceil(self.date:GetStringHeight())) / 2))
+      )
       self.badge:ClearAllPoints()
       self.badge:SetPoint("TOPLEFT", self, "TOPLEFT", left + (hasDate and (dateW + ARROW_GAP) or 0), -y)
       y = y + metaH
@@ -188,12 +271,16 @@ local function newSummary(content, count)
   ns.Bind(summary.rail, function(t)
     t:SetColorTexture(ns.Theme.color("accent2", 0.7))
   end)
-  summary.title = W.Text(summary, { role = "small", family = "heading", color = "textSecondary", wrap = true, key = "changelog.highlights" })
+  summary.title = W.Text(
+    summary,
+    { role = "small", family = "heading", color = "textSecondary", wrap = true, key = "changelog.highlights" }
+  )
   summary.items = {}
   for index = 1, count do
     summary.items[index] = {
       head = W.Text(summary, { role = "text", family = "heading", color = "accent2", wrap = true }),
       text = W.Text(summary, { role = "text", color = "text", wrap = true }),
+      jump = newJump(summary),
     }
   end
 
@@ -209,14 +296,26 @@ local function newSummary(content, count)
     for _, item in ipairs(self.items) do
       if item.head:IsShown() then
         shown = shown + 1
-        local headH = wrapped(item.head, room)
+        local linked = item.jump.go ~= nil
+        local textRoom = linked and (room - JUMP_ROOM) or room
+        local top = y
+        local headH = wrapped(item.head, textRoom)
         item.head:ClearAllPoints()
         item.head:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y)
         y = y + headH + HEAD_GAP
-        local textH = wrapped(item.text, room)
+        local textH = wrapped(item.text, textRoom)
         item.text:ClearAllPoints()
         item.text:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y)
-        y = y + textH + HIGHLIGHT_GAP
+        y = y + textH
+        item.jump:SetShown(linked)
+        if linked then
+          item.jump:ClearAllPoints()
+          item.jump:SetPoint("TOPLEFT", self, "TOPLEFT", left - 4, -top)
+          item.jump:SetSize(room + 4, math.max(JUMP_MIN, y - top))
+        end
+        y = y + HIGHLIGHT_GAP
+      else
+        item.jump:Hide()
       end
     end
     local bottom = shown > 0 and (y - HIGHLIGHT_GAP) or railTop
@@ -242,8 +341,11 @@ local function newEntry(content)
   end)
   entry.head = W.Text(entry, { role = "text", family = "heading", color = "accent2", wrap = true })
   entry.text = W.Text(entry, { role = "small", color = "textSecondary", wrap = true })
+  entry.jump = newJump(entry)
+  entry.jump:SetAllPoints(entry)
 
-  function entry:SetEntry(line)
+  function entry:SetEntry(line, go)
+    self.jump:SetShown(self.jump:SetGo(go))
     local head, rest = Logic.SplitEntry(line)
     self.head:SetShown(head ~= nil)
     self.head:SetText(head or "")
@@ -252,7 +354,7 @@ local function newEntry(content)
 
   function entry:fgGridLayout(width)
     local left = RAIL + RAIL_GAP
-    local room = width - left
+    local room = width - left - (self.jump.go and JUMP_ROOM or 0)
     local y = 0
     if self.head:IsShown() then
       local headH = wrapped(self.head, room)
@@ -264,6 +366,9 @@ local function newEntry(content)
     self.text:ClearAllPoints()
     self.text:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y)
     local height = y + textH
+    if self.jump.go then
+      height = math.max(height, JUMP_MIN)
+    end
     self.rail:ClearAllPoints()
     self.rail:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
     self.rail:SetSize(RAIL, math.max(1, height))
@@ -276,7 +381,10 @@ end
 -- The button that opens and closes the long list: icon (arrow), text with the number of changes. The text may
 -- need two lines at a large font, so the button grows with it.
 local function newToggle(content, onClick)
-  local button = W.Action(content, { key = "changelog.showAll", icon = "chevron-down", variant = "primary", size = TOGGLE_MIN, onClick = onClick })
+  local button = W.Action(
+    content,
+    { key = "changelog.showAll", icon = "chevron-down", variant = "primary", size = TOGGLE_MIN, onClick = onClick }
+  )
   button.label:SetWordWrap(true)
   button.label:SetJustifyH("LEFT")
   button.fgName = function()
@@ -322,7 +430,8 @@ local function build(container)
     }),
     { height = 26, width = 240, gap = 14 }
   )
-  empty = add(W.Text(content, { key = "changelog.empty", role = "text", color = "textMuted", wrap = true }), { gap = 10 })
+  empty =
+    add(W.Text(content, { key = "changelog.empty", role = "text", color = "textMuted", wrap = true }), { gap = 10 })
   empty:SetShown(#versions == 0)
 
   -- The toggle names the action it does next; the number of changes stays in the text.
@@ -364,7 +473,8 @@ local function build(container)
   end
 
   for index, item in ipairs(versions) do
-    local block = { version = item.version, body = {}, texts = {}, hasSummary = #item.highlights > 0, count = item.count }
+    local block =
+      { version = item.version, body = {}, texts = {}, hasSummary = #item.highlights > 0, count = item.count }
     block.header = newHeader(content, function()
       setOpen(block, not open[block.version])
       view:Layout()
@@ -430,6 +540,7 @@ local function build(container)
           pair.text:SetShown(highlight ~= nil)
           pair.head:SetText(highlight and highlight.head or "")
           pair.text:SetText(highlight and highlight.text or "")
+          pair.jump:SetGo(highlight and highlight.go)
         end
         block.count = item.count
         paintToggle(block)
@@ -441,7 +552,7 @@ local function build(container)
             end
           end
           if entry.line and section then
-            entry.item:SetEntry(section.lines[entry.line] or "")
+            entry.item:SetEntry(section.lines[entry.line] or "", section.go[entry.line])
           elseif section then
             entry.item:SetText(string.format("%s (%d)", L["changelog.section." .. entry.section], #section.lines))
           end

@@ -15,6 +15,8 @@ ns.AddLocale("enUS", {
   ["instances.head.quests.other"] = "%d quests",
   ["instances.pick.text"] = "Pick a dungeon or raid from the list to see its bosses, quests, rewards and entrance.",
   ["instances.abilities"] = "Abilities",
+  ["instances.abilities.none"] = "Abilities: not recorded yet",
+  ["instances.abilities.summary"] = "Abilities are recorded for %d of %d bosses.",
   ["instances.spell.unknown"] = "Spell %d",
   ["instances.spell.unknownMeta"] = "not known to this client",
   ["instances.items.loot"] = "No loot tables in the data yet.\nItems you find yourself are recorded by the loot capture.",
@@ -52,6 +54,8 @@ ns.AddLocale("deDE", {
   ["instances.head.quests.other"] = "%d Quests",
   ["instances.pick.text"] = "Wähle einen Dungeon oder Raid aus der Liste, dann siehst du Bosse, Quests, Belohnungen und Eingang.",
   ["instances.abilities"] = "Fähigkeiten",
+  ["instances.abilities.none"] = "Fähigkeiten: noch nicht erfasst",
+  ["instances.abilities.summary"] = "Bei %d von %d Bossen sind Fähigkeiten erfasst.",
   ["instances.spell.unknown"] = "Zauber %d",
   ["instances.spell.unknownMeta"] = "dem Client unbekannt",
   ["instances.items.loot"] = "Noch keine Beutetabellen in den Daten.\nWas du selbst findest, erfasst die Beute-Erfassung.",
@@ -194,8 +198,11 @@ function IV.HeadText(inst, faction)
   lines[1] = info.text
   if info.announced then
     -- The mark names the state in words, so it never depends on color.
-    local mark = info.announcedText .. (inst.rd and (" · " .. string.format(L["instances.release"], inst.rd)) or "")
+    local mark = info.announcedText .. (info.releaseText and (" · " .. info.releaseText) or "")
     lines[#lines + 1] = Theme.hexText("warning", mark)
+  elseif info.releaseText then
+    -- Plain words in the muted text color: a date, not a warning.
+    lines[#lines + 1] = Theme.hexText("textMuted", info.releaseText)
   end
   -- Entry and recommended level stand apart from the range: they answer "may I go in" and "how strong should I be".
   local second = {}
@@ -406,10 +413,36 @@ function IV.Portrait(inst, boss)
   return IV.PLACEHOLDER, "placeholder"
 end
 
+-- What a boss shows as its picture: { fid, kind, display, creature }. fid and kind come from IV.Portrait (the symbol
+-- file, else the generic image or the placeholder symbol). display is the creature display ID of the 3D portrait that
+-- goes over the fallback symbol, creature the creature ID that stands in for a missing display ID. Both are nil when
+-- the boss has a symbol file or no model in the data.
+function IV.BossImage(inst, boss)
+  local fid, kind = IV.Portrait(inst, boss)
+  local display = kind ~= "own" and ns.BossModelWindow.DisplayId(inst, boss) or nil
+  local creature = kind ~= "own" and ns.BossModelWindow.CreatureId(inst, boss) or nil
+  return { fid = fid, kind = kind, display = display, creature = creature }
+end
+
+-- Paints the picture of a boss into `pic` (a texture of the frame `host`). A boss without a symbol file keeps the
+-- fallback symbol until its small 3D portrait has loaded. Used by the boss row, the Items group header and the
+-- boss mark of an item row, so every place shows the same image. Returns the image.
+function IV.PaintBossImage(host, pic, inst, boss)
+  local image = IV.BossImage(inst, boss)
+  pic:SetTexture(image.fid)
+  if image.display or image.creature then
+    ns.BossPortrait.Bind(host, image.display, pic, image.creature)
+  else
+    ns.BossPortrait.Unbind(host)
+    pic:SetAlpha(1)
+  end
+  return image
+end
+
 -- Header ------------------------------------------------------------------------------------------
 
-local IMG_W, IMG_H = 192, 108
-local SIDE_MIN = 440 -- the picture sits beside the text from this width on
+local BAND_H = 120 -- height of the loading screen band, the name sits on a dark strip at its foot
+local STRIP_PAD = 8
 local BUTTON_H = 26
 
 -- Map button with the icon and the short label (W.Action). Without a place it stays focusable but
@@ -472,18 +505,23 @@ local function newGapButton(parent)
   return b
 end
 
--- Picture, name with second name, numbers and the map button of the chosen instance.
--- fgGridLayout(width) places everything and returns the height, so a page Stack can hold it.
+-- Band with the loading screen and the name on a dark strip, below it the numbers and the buttons of the chosen
+-- instance. fgGridLayout(width) places everything and returns the height, so a page Stack can hold it.
 function IV.Header(parent)
   local f = CreateFrame("Frame", nil, parent)
-  f.box = CreateFrame("Frame", nil, f)
-  W.Fill(f.box, "surface", 1)
-  W.Border(f.box, "white")
-  f.picture = f.box:CreateTexture(nil, "ARTWORK")
-  f.picture:SetPoint("TOPLEFT", 1, -1)
-  f.picture:SetPoint("BOTTOMRIGHT", -1, 1)
-  f.name = W.Text(f, { role = "h2", family = "heading", color = "accent2", wrap = true })
-  f.alt = W.Text(f, { role = "ui", color = "textMuted", wrap = true })
+  f.art = ns.InstanceArt.Create(f)
+  -- A child frame draws above the art, so the strip and the names live in one frame over it.
+  f.over = CreateFrame("Frame", nil, f)
+  f.over:SetFrameLevel(f.art:GetFrameLevel() + 2)
+  f.strip = f.over:CreateTexture(nil, "BACKGROUND")
+  f.strip:SetPoint("BOTTOMLEFT")
+  f.strip:SetPoint("BOTTOMRIGHT")
+  ns.Bind(f.strip, function(t)
+    -- At least 70 percent black behind the text (contrast on any picture), more in high contrast.
+    t:SetColorTexture(0, 0, 0, Theme.highContrast() and 0.92 or 0.78)
+  end)
+  f.name = W.Text(f.over, { role = "h2", family = "heading", color = "accent2", wrap = true })
+  f.alt = W.Text(f.over, { role = "ui", color = "textSecondary", wrap = true })
   f.meta = W.Text(f, { role = "ui", color = "textSecondary", wrap = true })
   f.mapButton = newMapButton(f, function()
     local place = f.mapButton.fgPlace
@@ -494,11 +532,12 @@ function IV.Header(parent)
   f.gapButton = newGapButton(f)
 
   function f:SetInstance(inst, faction)
-    self.inst, self.image = inst, nil
     self:SetShown(inst ~= nil)
     if not inst then
       return
     end
+    -- self.inst keeps the last instance shown while the cards are on screen.
+    self.inst = inst
     local name, other = R.Names(inst.n)
     self.name:SetText(name or "?")
     self.alt:SetText(other or "")
@@ -510,57 +549,54 @@ function IV.Header(parent)
     )
     self.gapButton.fgLines = IV.GapLines(inst)
     self.gapButton:SetShown(#self.gapButton.fgLines > 0)
-    self.image = IV.LoadingImage(inst)
-    self.picture:SetTexture(self.image and self.image.fid or nil)
-    self.box:SetShown(self.image ~= nil)
+    self.art:SetInstance(inst)
   end
 
   function f:fgGridLayout(width)
-    local side = width >= SIDE_MIN
-    local textX, textW, y = 0, width, 0
-    if self.image then
-      local boxW = side and IMG_W or width
-      self.box:ClearAllPoints()
-      self.box:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-      self.box:SetSize(boxW, IMG_H)
-      local P = ns.AssetFiles
-      local info = P.cache[self.image.fid]
-      self.picture:SetTexCoord(IV.Crop(self.image.src, boxW - 2, IMG_H - 2, info and info.w, info and info.h))
-      if side then
-        textX, textW = IMG_W + 12, width - IMG_W - 12
-      else
-        y = IMG_H + 8
-      end
-    end
-    local function place(item, gap)
-      item:ClearAllPoints()
-      item:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
-      item:SetWidth(textW)
-      y = y + math.ceil(item:GetStringHeight()) + gap
-    end
-    place(self.name, 2)
+    -- The strip grows with the text (font size, second line), the band with the strip.
+    self.name:SetWidth(math.max(1, width - 2 * STRIP_PAD))
+    self.alt:SetWidth(math.max(1, width - 2 * STRIP_PAD))
+    local textH = math.ceil(self.name:GetStringHeight())
     if self.alt:IsShown() then
-      place(self.alt, 4)
+      textH = textH + 2 + math.ceil(self.alt:GetStringHeight())
     end
-    place(self.meta, 8)
+    local stripH = textH + 2 * STRIP_PAD
+    local bandH = math.max(BAND_H, stripH + 16)
+    self.art:ClearAllPoints()
+    self.art:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    self.art:Layout(width, bandH)
+    self.over:ClearAllPoints()
+    self.over:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    self.over:SetSize(width, bandH)
+    self.strip:SetHeight(stripH)
+    self.name:ClearAllPoints()
+    self.name:SetPoint("TOPLEFT", self.over, "BOTTOMLEFT", STRIP_PAD, stripH - STRIP_PAD)
+    if self.alt:IsShown() then
+      self.alt:ClearAllPoints()
+      self.alt:SetPoint("TOPLEFT", self.name, "BOTTOMLEFT", 0, -2)
+    end
+    local y = bandH + 8
+    self.meta:ClearAllPoints()
+    self.meta:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+    self.meta:SetWidth(width)
+    y = y + math.ceil(self.meta:GetStringHeight()) + 8
     self.mapButton:SetWidth(self.mapButton:Fit())
     self.mapButton:ClearAllPoints()
-    self.mapButton:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
+    self.mapButton:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
     if self.gapButton:IsShown() then
-      local gapW = math.min(self.gapButton:Fit(textW), textW)
+      local gapW = math.min(self.gapButton:Fit(width), width)
       self.gapButton:SetWidth(gapW)
       self.gapButton:ClearAllPoints()
-      if self.mapButton:GetWidth() + 8 + gapW <= textW then
+      if self.mapButton:GetWidth() + 8 + gapW <= width then
         self.gapButton:SetPoint("LEFT", self.mapButton, "RIGHT", 8, 0)
       else
         y = y + BUTTON_H + 6
-        self.gapButton:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
+        self.gapButton:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
       end
     end
     y = y + BUTTON_H
-    local height = math.max(y, self.image and side and IMG_H or 0)
-    self:SetHeight(height)
-    return height
+    self:SetHeight(y)
+    return y
   end
 
   return f
@@ -588,6 +624,8 @@ local function makeBossRow(parent)
   row.name = W.Text(row, { role = "text", color = "text", wrap = true })
   row.abLabel = W.Text(row, { key = "instances.abilities", role = "micro", color = "textMuted" })
   row.chips = K.ChipRow(row)
+  -- Shown instead of the abilities when the data has none for this boss, so a gap reads as "not recorded".
+  row.abNone = W.Text(row, { key = "instances.abilities.none", role = "micro", color = "textSecondary", wrap = true })
   -- Abilities known by name only (no spell ID): a plain line, no chips without a symbol.
   row.names = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
   newLine(row)
@@ -606,7 +644,12 @@ local function makeBossRow(parent)
     -- An explicit height gives the click area over the name its size.
     self.name:SetHeight(math.max(1, math.ceil(self.name:GetStringHeight())))
     local y = PAD + math.ceil(self.name:GetStringHeight()) + 4
-    if self.hasAbilities then
+    if self.abMissing then
+      self.abNone:ClearAllPoints()
+      self.abNone:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
+      self.abNone:SetWidth(textW)
+      y = y + math.ceil(self.abNone:GetStringHeight()) + 2
+    elseif self.hasAbilities then
       self.abLabel:ClearAllPoints()
       self.abLabel:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
       y = y + math.ceil(self.abLabel:GetStringHeight()) + 2
@@ -669,20 +712,13 @@ local function paintBossRow(row, item)
   row.name:SetText(text)
   row.modelPic:SetBoss(item.inst, boss)
   row.modelName:SetBoss(item.inst, boss)
-  local fid, kind = IV.Portrait(item.inst, boss)
-  row.portraitKind = kind
-  row.pic:SetTexture(fid)
-  -- No symbol of its own: a 3D portrait from the display ID, the placeholder stays until the model has loaded.
-  local display = kind ~= "own" and ns.BossModelWindow.DisplayId(item.inst, boss) or nil
-  if display then
-    ns.BossPortrait.Bind(row.portrait, display, row.pic)
-  else
-    ns.BossPortrait.Unbind(row.portrait)
-    row.pic:SetAlpha(1)
-  end
-  row.hasPortrait = display ~= nil
+  local image = IV.PaintBossImage(row.portrait, row.pic, item.inst, boss)
+  row.portraitKind = image.kind
+  row.hasPortrait = image.display ~= nil
   local chips, names = abilityChips(boss.ab)
   row.hasAbilities = #chips > 0 or #names > 0
+  row.abMissing = not ns.InstanceGaps.HasAbilities(boss)
+  row.abNone:SetShown(row.abMissing)
   row.abLabel:SetShown(row.hasAbilities)
   row.chips:SetShown(#chips > 0)
   row.chips:SetChips(chips)

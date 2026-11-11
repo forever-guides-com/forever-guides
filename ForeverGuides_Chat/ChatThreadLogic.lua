@@ -3,7 +3,8 @@
 -- links in a text, delivery marks, the mode of a conversation. ChatThread.lua draws what this returns; the
 -- caller passes every clock value, the date function and the text measure.
 --
--- item = { type = "day"|"new"|"line", top, h, key (day), seq, index, line, first, own, delivery, links, voice }
+-- item = { type = "day"|"new"|"line", top, h, key (day), seq, index, line, first, own, delivery, links, voice,
+--           actions }
 local _, chat = ...
 local FG = chat.FG
 if not FG then
@@ -16,12 +17,10 @@ chat.ThreadLogic = TL
 local Logic = FG.ChatHistoryLogic
 
 TL.GROUP_SECONDS = 300
-TL.MAX_CHIPS = 3
-TL.CHIP_LABEL_CHARS = 28
 TL.MAX_LINK_BYTES = 240
 TL.POOL_MAX = 60
 TL.END_SLACK = 4
--- Links the thread may open (item tooltips and SetItemRef). Player links and anything else stay text.
+-- Links the thread makes clickable (item tooltips and SetItemRef). Player links and anything else stay text.
 TL.LINK_KINDS = {
   item = true,
   spell = true,
@@ -30,6 +29,8 @@ TL.LINK_KINDS = {
   currency = true,
   enchant = true,
   talent = true,
+  -- The quote head of a reply jumps to the quoted line (payload "fgjump:<seq>").
+  fgjump = true,
 }
 TL.DELIVERY = { queued = true, sent = true, waiting = true, failed = true }
 -- The voices of the conversation "local" with the entry of the game's ChatTypeInfo and the color that is used
@@ -47,46 +48,198 @@ TL.SPEC = {
   gap = 6,
   groupGap = 2,
   head = 15,
-  chip = 18,
-  chipGap = 4,
-  chipPad = 12,
   day = 22,
   minLine = 14,
   share = 0.86,
   minCard = 140,
-  -- The compact look: lines close together, a thin divider, small chips.
-  compact = { gap = 1, divider = 16, chip = 16, chipGap = 2 },
+  -- The compact look: lines close together, a thin divider.
+  compact = { gap = 1, divider = 16 },
 }
-
--- Height of a chip and the gap above it in a mode (unscaled).
-function TL.ChipSize(mode)
-  local spec = TL.SPEC
-  if mode == "messenger" then
-    return spec.chip, spec.chipGap
-  end
-  return spec.compact.chip, spec.compact.chipGap
-end
 
 local function isNumber(v)
   return type(v) == "number" and v == v and v > -math.huge and v < math.huge
 end
 
--- Links of a text that may be opened: { kind, link (the payload for SetItemRef), label }. At most MAX_CHIPS,
--- no link twice. Hidden lines have no text and so no links.
-function TL.Links(text)
+-- Links in a shown text (the string a line puts into its FontString) ------------------------------------------
+
+-- The color code in front of a link and the reset behind it belong to the link when they touch it.
+local function rawLink(shown, from, to)
+  local before = from > 10 and shown:sub(from - 10, from - 1) or ""
+  if before:match("^|c%x%x%x%x%x%x%x%x$") then
+    from = from - 10
+  end
+  if shown:sub(to + 1, to + 2) == "|r" then
+    to = to + 2
+  end
+  return shown:sub(from, to)
+end
+
+-- Splits the shown text of a line into what the eye sees and where the links are. plain keeps the escapes that
+-- take room (textures, atlas, a doubled pipe) and drops color codes and link markers, so a prefix of plain
+-- measures like the same prefix on screen. spans = { { payload, kind, from, to, label, raw } } with the byte
+-- range of the link text inside plain, only for kinds of LINK_KINDS (a player link stays text) and payloads up
+-- to MAX_LINK_BYTES. raw is the link as the game wrote it, for SetItemRef and the input line.
+function TL.Spans(shown)
+  local parts, spans = {}, {}
+  if type(shown) ~= "string" or shown == "" then
+    return "", spans
+  end
+  local size, pos, length, open = #shown, 1, 0, nil
+  local function put(text)
+    parts[#parts + 1] = text
+    length = length + #text
+  end
+  while pos <= size do
+    local bar = shown:find("|", pos, true)
+    if not bar then
+      put(shown:sub(pos))
+      break
+    end
+    put(shown:sub(pos, bar - 1))
+    local two = shown:sub(bar, bar + 1)
+    local color = two == "|c" and shown:match("^|c%x%x%x%x%x%x%x%x", bar)
+    local texture = (two == "|T" and shown:match("^|T.-|t", bar)) or (two == "|A" and shown:match("^|A.-|a", bar))
+    if two == "||" then
+      put("||")
+      pos = bar + 2
+    elseif color then
+      pos = bar + #color
+    elseif two == "|r" then
+      pos = bar + 2
+    elseif two == "|H" and not open then
+      local payload, after = shown:match("^|H([^|]*)|h()", bar)
+      if payload then
+        open = { payload = payload, from = length + 1, start = bar }
+        pos = after
+      else
+        pos = bar + 2
+      end
+    elseif two == "|h" then
+      if open and length >= open.from then
+        local kind = open.payload:match("^(%a+):")
+        if kind and TL.LINK_KINDS[kind] and #open.payload <= TL.MAX_LINK_BYTES then
+          local label = table.concat(parts):sub(open.from, length):gsub("^%[", ""):gsub("%]$", "")
+          spans[#spans + 1] = {
+            payload = open.payload,
+            kind = kind,
+            from = open.from,
+            to = length,
+            label = label,
+            raw = rawLink(shown, open.start, bar + 1),
+          }
+        end
+      end
+      open = nil
+      pos = bar + 2
+    elseif texture then
+      put(texture)
+      pos = bar + #texture
+    else
+      pos = bar + 1
+    end
+  end
+  local plain = table.concat(parts)
+  -- Web addresses in the text outside the links: a click opens the copy dialog.
+  local TX = chat.TextLogic
+  for _, found in ipairs(TX and TX.Urls(plain) or {}) do
+    local inside = false
+    for _, span in ipairs(spans) do
+      if found.from <= span.to and found.to >= span.from then
+        inside = true
+        break
+      end
+    end
+    if not inside then
+      spans[#spans + 1] = {
+        payload = found.url,
+        kind = "url",
+        from = found.from,
+        to = found.to,
+        label = found.url,
+        raw = found.url,
+      }
+    end
+  end
+  table.sort(spans, function(a, b)
+    return a.from < b.from
+  end)
+  return plain, spans
+end
+
+local function charEnd(text, pos)
+  local byte = text:byte(pos) or 0
+  local length = byte >= 0xF0 and 4 or byte >= 0xE0 and 3 or byte >= 0xC0 and 2 or 1
+  return math.min(#text, pos + length - 1)
+end
+
+-- Where each link sits inside the wrapped text of a line: a list of { x, y, w, h, span } (the index into
+-- spans), one piece for every line a link touches. The game does the wrapping, so the breaks are measured, not
+-- guessed: ctx.lines(text) answers how many lines a text takes at the width of the line (a prefix wraps like the
+-- whole, the breaks before a word never depend on what follows), ctx.width(text) the width of a text on one line
+-- and ctx.lineHeight the height of one line. x and y count from the top left of the text.
+function TL.LinkRects(plain, spans, ctx)
   local out = {}
-  if type(text) ~= "string" or text == "" then
+  if #spans == 0 or plain == "" then
     return out
   end
-  local seen = {}
-  for payload, label in text:gsub("||", ""):gmatch("|H(.-)|h(.-)|h") do
-    local kind = payload:match("^(%a+):")
-    if kind and TL.LINK_KINDS[kind] and #payload <= TL.MAX_LINK_BYTES and not seen[payload] then
-      label = label:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("^%[", ""):gsub("%]$", "")
-      seen[payload] = true
-      out[#out + 1] = { kind = kind, link = payload, label = chat.ListLogic.CutChars(label, TL.CHIP_LABEL_CHARS) }
-      if #out >= TL.MAX_CHIPS then
-        break
+  local words = {}
+  for first, word in plain:gmatch("()(%S+)") do
+    words[#words + 1] = { first = first, last = first + #word - 1 }
+  end
+  if #words == 0 then
+    return out
+  end
+  -- The line of each word is the line its last character falls on.
+  local starts, previous = {}, 0
+  for _, word in ipairs(words) do
+    word.line = math.max(previous, ctx.lines(plain:sub(1, word.last)))
+    previous = word.line
+    if not starts[word.line] then
+      starts[word.line] = word.first
+    end
+  end
+  local function lineOf(pos, forward)
+    if forward then
+      for _, word in ipairs(words) do
+        if word.last >= pos then
+          return word.line
+        end
+      end
+      return words[#words].line
+    end
+    for k = #words, 1, -1 do
+      if words[k].first <= pos then
+        return words[k].line
+      end
+    end
+    return words[1].line
+  end
+  for index, span in ipairs(spans) do
+    local first, last = lineOf(span.from, true), lineOf(span.to, false)
+    for line = first, last do
+      local lineStart = starts[line]
+      if lineStart then
+        local from = line == first and math.max(span.from, lineStart) or lineStart
+        local to = span.to
+        if line < last then
+          to = (starts[line + 1] or #plain + 1) - 1
+          while to > from and plain:byte(to) == 32 do
+            to = to - 1
+          end
+        end
+        if to >= from then
+          local x = 0
+          if from > lineStart then
+            x = ctx.width(plain:sub(lineStart, charEnd(plain, from))) - ctx.width(plain:sub(from, charEnd(plain, from)))
+          end
+          out[#out + 1] = {
+            x = math.max(0, x),
+            y = (line - 1) * ctx.lineHeight,
+            w = math.max(1, ctx.width(plain:sub(from, to))),
+            h = ctx.lineHeight,
+            span = index,
+          }
+        end
       end
     end
   end
@@ -150,6 +303,44 @@ function TL.Delivery(line)
   return TL.DELIVERY[line.delivery] and line.delivery or nil
 end
 
+-- The locale key of a delivery mark. A message that only waits for Enter in the chat box of the game is not
+-- "Waiting" for a click: it says what it waits for. A secure click that the game has not echoed yet is "Sending",
+-- one that never came back says so ("noecho").
+function TL.DeliveryKey(delivery, reason)
+  if delivery == "waiting" and reason == "enter" then
+    return "chat.delivery.enter"
+  elseif delivery == "failed" and reason == "blocked" then
+    return "chat.delivery.notsent"
+  elseif delivery == "queued" and reason == "echo" then
+    return "chat.delivery.echo"
+  elseif delivery == "sent" and reason == "noecho" then
+    return "chat.delivery.noecho"
+  end
+  return "chat.delivery." .. delivery
+end
+
+-- Failed marks that say why in a few words (locale keys chat.short.<reason>); the tooltip has the long text.
+TL.SHORT_REASONS = { blocked = true, error = true, rejected = true, notfound = true }
+
+-- The locale key of the short reason behind a failed mark, nil when the mark needs none.
+function TL.ReasonShortKey(delivery, reason)
+  if delivery == "failed" and TL.SHORT_REASONS[reason] then
+    return "chat.short." .. reason
+  end
+end
+
+-- The tooltip text of a mark: the sentence of the reason, then the detail the game or the sender gave (the function
+-- of a block, the shortened error, the seconds without an echo). L is the locale table.
+function TL.ReasonText(L, line)
+  local text = L["chat.reason." .. tostring(line.reason)]
+  local detail = line.detail
+  if type(detail) == "table" and type(detail.key) == "string" and L[detail.key] then
+    local extra = detail.arg ~= nil and string.format(L[detail.key], detail.arg) or L[detail.key]
+    text = text and (text .. "\n" .. extra) or extra
+  end
+  return text
+end
+
 local function same(a, b)
   if a.own ~= b.own then
     return false
@@ -159,7 +350,9 @@ end
 
 -- The items of a conversation in order. opts: date(format, time) (the clock text, default `date`),
 -- dividerSeq (first unread line: the divider goes before it), unread (count shown on the divider),
--- deliveryOf(line) (the delivery mark of a line that has none stored, a team keeps its own).
+-- deliveryOf(line) (the delivery mark of a line that has none stored, a team keeps its own), resend(line) (true for
+-- a line that offers "Send again": item.actions; such a line always has its own head, the status line that
+-- carries the buttons).
 function TL.Build(conv, opts)
   opts = opts or {}
   local dateOf = opts.date or rawget(_G, "date") or os.date
@@ -182,6 +375,7 @@ function TL.Build(conv, opts)
       own = line.dir == Logic.DIR_OUT,
       delivery = opts.deliveryOf and opts.deliveryOf(line) or TL.Delivery(line),
       voice = chat.ListLogic.Voice(conv, line),
+      actions = opts.resend ~= nil and opts.resend(line) == true,
     }
     -- A line of the same sender within a few minutes continues the group; a delivery mark needs its head and a
     -- change of the voice (say, yell, emote) starts a new one, the head names the voice.
@@ -190,13 +384,11 @@ function TL.Build(conv, opts)
       and same(previous, item)
       and previous.voice == item.voice
       and not item.delivery
+      and not item.actions
       and isNumber(line.time)
       and isNumber(previous.line.time)
       and line.time - previous.line.time <= TL.GROUP_SECONDS
     )
-    if not line.hidden then
-      item.links = TL.Links(line.text)
-    end
     items[#items + 1] = item
     previous = item
   end
@@ -221,45 +413,26 @@ function TL.TextWidth(width, mode)
   return math.max(20, TL.CardWidth(width, mode) - spec.stripe - 2 * spec.pad)
 end
 
--- Places the chips of a line in one row: { { x, w } } for as many as fit in `width`. widthOf(label) measures
--- a label.
-function TL.ChipRow(links, width, widthOf)
-  local spec, out, x = TL.SPEC, {}, 0
-  for _, link in ipairs(links) do
-    local w = math.ceil(widthOf(link.label)) + spec.chipPad
-    if x + w > width then
-      break
-    end
-    out[#out + 1] = { x = x, w = w }
-    x = x + w + spec.chipGap
-  end
-  return out
-end
-
 -- Heights and tops of the items for a width. m: mode, scale(px) (text size scaling of fixed measures, default
--- identity), measure(text, width, item) -> height of the wrapped text (a yell is set larger), widthOf(label) (chips), text(item) -> the
--- text the line shows. Fills item.top, item.h, item.chips and returns the height of everything.
+-- identity), measure(text, width, item) -> height of the wrapped text (a yell is set larger), text(item) -> the
+-- text the line shows. Fills item.top, item.h, item.bodyH and returns the height of everything.
 function TL.Layout(items, width, m)
   local spec = TL.SPEC
   local scale = m.scale or function(v)
     return v
   end
   local textW = TL.TextWidth(width, m.mode)
-  local chipW = TL.CardWidth(width, m.mode) - spec.stripe - 2 * spec.pad
   local y, previous = 0, nil
-  local chipH, chipGap = TL.ChipSize(m.mode)
   local compact = m.mode ~= "messenger"
   for _, item in ipairs(items) do
     local h
     if item.type == "line" then
       local body = math.max(scale(spec.minLine), m.measure(m.text(item), textW, item))
       item.bodyH = body
-      item.chips = item.links and #item.links > 0 and TL.ChipRow(item.links, chipW, m.widthOf) or {}
-      local chips = #item.chips > 0 and scale(chipH) + chipGap or 0
       if m.mode == "messenger" then
-        h = 2 * spec.padV + (item.first and scale(spec.head) or 0) + body + chips
+        h = 2 * spec.padV + (item.first and scale(spec.head) or 0) + body
       else
-        h = body + chips
+        h = body
       end
     else
       h = scale(compact and spec.compact.divider or spec.day)

@@ -30,10 +30,11 @@ local function lastGap(stack)
   end
 end
 
--- A card is a surface with a nested Stack. opts.span = "full" takes the whole width of the grid.
+-- A card is a surface with a nested Stack. opts.span = "full" takes the whole width of the grid,
+-- opts.id is the stable card id (Modules/SettingsFeatures.lua) that search and links address.
 local function newCard(grid, view, opts)
   local frame = W.Card(grid)
-  local card = { frame = frame, content = frame, grid = grid, span = opts.span }
+  local card = { frame = frame, content = frame, grid = grid, span = opts.span, id = opts.id, accordions = {} }
   -- Stands in for the scroll area of a page view: the stack reads the viewport height from it and
   -- hands the inner height back.
   local area = { content = frame }

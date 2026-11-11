@@ -207,16 +207,18 @@ function S.Add(view)
   toggle(view, "enabled")
   toggle(view, "ore")
   toggle(view, "herbs")
-  toggle(view, "lockedNodes", "sparkles.set.lockedNodesHint")
-  toggle(view, "quest", "sparkles.set.questHint")
-  toggle(view, "questItems", "sparkles.set.questItemsHint")
-  toggle(view, "gameIcons", "sparkles.set.gameIconsHint")
-  local Logic = ns.GatherSparklesLogic
-  slider(view, "offsetY", Logic.OFFSET_MIN, Logic.OFFSET_MAX, Logic.OFFSET_STEP, Logic.CleanOffset, "%d")
-  slider(view, "size", Logic.SIZE_MIN, Logic.SIZE_MAX, Logic.SIZE_STEP, Logic.CleanSize, "%d%%")
   rangeSlider(view)
-  current = { status = measureSection(view), view = view }
-  local style = W.Dropdown(view.content, {
+  -- Everything else is rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "gathering.sparkles" })
+  toggle(more, "lockedNodes", "sparkles.set.lockedNodesHint")
+  toggle(more, "quest", "sparkles.set.questHint")
+  toggle(more, "questItems", "sparkles.set.questItemsHint")
+  toggle(more, "gameIcons", "sparkles.set.gameIconsHint")
+  local Logic = ns.GatherSparklesLogic
+  slider(more, "offsetY", Logic.OFFSET_MIN, Logic.OFFSET_MAX, Logic.OFFSET_STEP, Logic.CleanOffset, "%d")
+  slider(more, "size", Logic.SIZE_MIN, Logic.SIZE_MAX, Logic.SIZE_STEP, Logic.CleanSize, "%d%%")
+  current = { status = measureSection(more), view = view }
+  local style = W.Dropdown(more.content, {
     key = "sparkles.set.style",
     tooltip = "sparkles.set.style",
     tooltipText = "sparkles.set.styleTip",
@@ -234,9 +236,9 @@ function S.Add(view)
     end,
   })
   style.fgId = "sparkles-style"
-  view.stack:Add(style, { height = 46, width = FIELD_WIDTH })
-  ns.AddParagraph(view, "sparkles.set.styleTip", { role = "micro", color = "textMuted" })
-  ns.AddParagraph(view, "sparkles.set.restore", { role = "micro", color = "textMuted" })
+  more.stack:Add(style, { height = 46, width = FIELD_WIDTH })
+  ns.AddParagraph(more, "sparkles.set.styleTip", { role = "micro", color = "textMuted" })
+  ns.AddParagraph(more, "sparkles.set.restore", { role = "micro", color = "textMuted" })
 end
 
 -- A finished measurement or a reset: the texts change even while the page is hidden, so they are right

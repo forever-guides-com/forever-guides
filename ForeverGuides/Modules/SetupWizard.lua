@@ -2,44 +2,67 @@
 -- Opens by itself on a fresh install (5 s after entering the world, never in combat), by
 -- /fg setup and by the buttons in Settings and Help. The window sits in the highest strata and a
 -- guard keeps it there, /fg setup close and /fg setup skip close it without the mouse.
--- Logic: Modules/SetupWizardLogic.lua.
+-- A button that opens a window of the add-on (settings, help, tutorials) leaves the wizard open and visible: UI.Reveal
+-- puts the two windows next to each other. Only a screen too narrow for that folds the wizard to a bar at the top
+-- of the screen (UI.Collapse, called by UI.Reveal alone), its button "Continue setup" (or /fg setup) brings the
+-- step back (UI.Expand).
+-- Size: one height for every step, so the buttons never move. It is the tallest step (with the options of every
+-- row shown, see measureView) at the current font size, language and window zoom. Does that not fit the screen
+-- (UI.SCREEN_SHARE of it), the window shrinks by its scale, down to UI.MIN_SHRINK. Only below that the step scrolls
+-- (last resort, with a visible bar and a fade "more below").
+-- Logic: Modules/SetupWizardLogic.lua, feature rows: Modules/SetupWizardRows.lua.
 local _, ns = ...
 local W, Theme, L, SW = ns.W, ns.Theme, ns.L, ns.SetupWizard
+local R = ns.SetupWizardRows
 
 local UI = {}
 ns.SetupWizardUI = UI
 
-UI.WIDTH, UI.MIN_HEIGHT, UI.MAX_HEIGHT = 540, 380, 640
+UI.WIDTH, UI.MIN_HEIGHT = 540, 380
+-- Share of the screen height the window may take, and how far its scale may shrink for that (1 = not at all).
+UI.SCREEN_SHARE, UI.MIN_SHRINK = 0.85, 0.8
 UI.OPEN_DELAY = 5
 
 local TITLE_H, PROGRESS_H, FOOT_H, PAD = 40, 40, 56, 16
+-- Height of the fade "more below" at the foot of a step that scrolls, and the room a focused control keeps from it.
+local MORE_H = 34
+-- What the summary of the closing step is measured with: a title line and four changes.
+local SUMMARY_RESERVE = "-\n-\n-\n-\n-"
 -- Room the "Step n of m" text keeps at the left of the progress line, the hint uses the rest.
 local PROGRESS_W = 130
 -- Left edge of the label of a toggle, where its hint text lines up.
-local HINT_INDENT = 76
+local HINT_INDENT = R.HINT_INDENT
+-- The folded window: a bar of this height, this far below the top edge of the screen. It stays in the
+-- strata and at the level of the window (SW.GUARD), so it lies over the settings and the guard keeps it there.
+local BAR_H, BAR_TOP = 44, 4
 
 UI.LOGO = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
 local LOGO_SIZE, ROW_BUTTON_W, ROW_MIN_H = 64, 100, 26
 
 local frame, body, session
 local views = {}
+-- Folded to the bar; the point and size of the open window are kept for UI.Expand.
+local collapsed, restore = false, nil
 local keysReady = false
+-- True while UI.Close hides the window; a hide without it is undone (restoreAfterHide).
+local closing = false
 -- Guard state: the corrections made, whether UIParent was hidden at the last check, the level the
 -- window was raised to, the event frame and the ticker that exist while the window is open.
 local guardCounts, uiHidden, baseLevel = {}, false, SW.GUARD.level
 local watcher, ticker
 local startGuard, stopGuard
 local hintToken = 0
+-- The tallest content of the session's steps, kept for the width, font size and steps it was measured for.
+local measured
+-- The step the window showed last (a new step starts at the top).
+local shownId
 
 local function inCombat()
   return type(InCombatLockdown) == "function" and InCombatLockdown() == true
 end
 
 -- Text and buttons grow with the font scale, so the window does too.
-local function factor()
-  local v = ns.db and tonumber(ns.db.settings.fontScale) or 1
-  return math.max(1, v or 1)
-end
+local factor = R.Factor
 
 local function frameWidth()
   local width = math.floor(UI.WIDTH * factor() + 0.5)
@@ -73,6 +96,9 @@ local function valueText(c, stored)
       on = not on
     end
     return L[on and "common.on" or "common.off"]
+  elseif c.type == "feature" then
+    -- stored: "on" or "off", see SW.Raw.
+    return L[stored == "on" and "common.on" or "common.off"]
   elseif c.type == "consent" then
     -- stored: the letters of the flags that are on, see SW.Raw.
     local parts = {}
@@ -103,12 +129,19 @@ local function summaryText()
   local lines, located = { L["setup.changed"] }, false
   for _, change in ipairs(changes) do
     local c = change.control
-    local line = "- " .. L[c.labelKey] .. ": " .. valueText(c, change.new)
-    if c.tab then
-      located = true
-      line = line .. " (" .. L["settings.tab." .. c.tab] .. ")"
+    if c.type == "menu" then
+      -- The menu is one control: its lines name the hidden and the shown entries.
+      for _, line in ipairs(R.MenuLines(change.old, change.new)) do
+        lines[#lines + 1] = "- " .. line
+      end
+    else
+      local line = "- " .. L[c.labelKey] .. ": " .. valueText(c, change.new)
+      if c.tab then
+        located = true
+        line = line .. " (" .. L["settings.feature." .. c.tab] .. ")"
+      end
+      lines[#lines + 1] = line
     end
-    lines[#lines + 1] = line
   end
   if located then
     lines[#lines + 1] = L["setup.changeWhere"]
@@ -166,7 +199,7 @@ local function addControl(view, c)
           view.relayout = true
         end
       end
-      stack:Add(hint, { gap = 10 })
+      stack:Add(hint, { gap = 10, reserve = true })
       view.widgets[#view.widgets + 1] = hint
     end
   else
@@ -390,9 +423,12 @@ local BLOCKS = {
       end, nil, { opens = true })
     end
   end,
+  -- Feature rows, their options and the menu are drawn by their own blocks (features, menu).
   controls = function(view, step)
     for _, c in ipairs(SW.ActiveControls(step)) do
-      addControl(view, c)
+      if c.type ~= "feature" and c.type ~= "menu" and not c.owner then
+        addControl(view, c)
+      end
     end
   end,
   -- The privacy info of the Settings tab "Share" in the copy dialog.
@@ -406,8 +442,9 @@ local BLOCKS = {
   -- The rest of the functions and the other audiences live in the Settings tab "Share".
   allSettings = function(view)
     addRow(view, { key = "setup.sharing.all.text" }, "setup.sharing.all", function()
-      ns.SettingsPage.Select("sharing")
+      ns.SettingsPage.Select("privacy")
       ns.Main.Show("settings")
+      UI.Reveal()
     end, nil, { width = 150, opens = true })
   end,
   summary = function(view)
@@ -416,6 +453,9 @@ local BLOCKS = {
     ns.Bind(view.summary, function(fs)
       fs:SetText(summaryText())
     end)
+    view.reference[#view.reference + 1] = function(on)
+      view.summary:SetText(on and SUMMARY_RESERVE or summaryText())
+    end
   end,
   -- The livestream and the community server: texts, names and addresses come from ns.Channel and ns.Community
   -- (UI/MainFrame.lua, the one place of both), a button opens the copy dialog.
@@ -445,16 +485,88 @@ local BLOCKS = {
     for _, info in ipairs({ { "tutorials", "setup.info.tutorials" }, { "help", "setup.info.help" } }) do
       addRow(view, { key = info[2] }, "setup.open", function()
         ns.Main.Show(info[1])
+        UI.Reveal()
       end, nil, { opens = true })
     end
   end,
+  -- One row per feature of the step (Modules/SetupFeatureData.lua), see Modules/SetupWizardRows.lua.
+  features = R.Features,
+  -- "Restart needed" with the reload button, only while a switched-off sub-add-on is still loaded.
+  restart = R.Restart,
 }
 local DEFAULT_LAYOUT = { "title", "text", "controls" }
+
+-- Lets a module of its own add a block (the menu step: UI.RegisterBlock("menu", function(view, step) .. end)).
+-- A step names its blocks in step.layout; a block that is not known is skipped. Replaces a block of that name.
+function UI.RegisterBlock(name, builder)
+  if type(name) ~= "string" or type(builder) ~= "function" then
+    return false
+  end
+  BLOCKS[name] = builder
+  return true
+end
+
+-- The text and button row of the steps, for blocks of other modules: addRow(view, textOpts, buttonKey, onClick,
+-- tooltipKey, extra) as described above.
+UI.AddRow = addRow
+
+-- The color of the window behind the fade; the fade follows the opacity of the window background.
+local function setFade(texture, r, g, b, a)
+  local ok = false
+  if type(texture.SetGradient) == "function" then
+    texture:SetColorTexture(1, 1, 1, 1)
+    local color = rawget(_G, "CreateColor")
+    if type(color) == "function" then
+      ok = pcall(function()
+        texture:SetGradient("VERTICAL", color(r, g, b, a), color(r, g, b, 0))
+      end)
+    end
+  end
+  if not ok and type(texture.SetGradientAlpha) == "function" then
+    ok = pcall(texture.SetGradientAlpha, texture, "VERTICAL", r, g, b, a, r, g, b, 0)
+  end
+  if not ok then
+    texture:SetColorTexture(r, g, b, a * 0.8)
+  end
+end
+
+local function paintFade(more)
+  local r, g, b = Theme.color("bg")
+  local alpha = frame and frame.fgBack and frame.fgBack:GetAlpha() or 1
+  setFade(more.fade, r, g, b, alpha)
+end
+
+-- "More below": a fade and a short text over the foot of a step that scrolls. It shows only while there is
+-- more content below the visible part and never takes a click.
+local function addMore(area)
+  local more = CreateFrame("Frame", nil, area)
+  more:SetPoint("BOTTOMLEFT")
+  more:SetPoint("BOTTOMRIGHT")
+  more:SetHeight(MORE_H)
+  more:SetFrameLevel(area:GetFrameLevel() + 40)
+  more.fade = more:CreateTexture(nil, "BACKGROUND")
+  more.fade:SetAllPoints()
+  more.label = W.Text(more, { key = "setup.moreBelow", role = "micro", color = "textSecondary" })
+  more.label:SetPoint("BOTTOM", 8, 6)
+  more.glyph = W.Glyph(more, "chevron-down", 12, "textSecondary")
+  more.glyph:SetPoint("RIGHT", more.label, "LEFT", -4, 0)
+  ns.Bind(more, paintFade)
+  more:Hide()
+  local update = area.bar.Update
+  function area.bar.Update(bar, fraction, position)
+    update(bar, fraction, position)
+    local range = math.max(0, area.content:GetHeight() - area:GetHeight())
+    more:SetShown(fraction < 1 and area:GetVerticalScroll() < range - 4)
+  end
+  area.more = more
+end
 
 local function newView(step)
   local area = W.ScrollArea(body)
   area:SetAllPoints(body)
-  local view = { step = step, area = area, stack = W.Stack(area, 4), widgets = {}, rows = {} }
+  addMore(area)
+  -- reference: functions that put the step in its tallest state while it is measured (fn(true)) and back (fn(false)).
+  local view = { step = step, area = area, stack = W.Stack(area, 4), widgets = {}, rows = {}, reference = {} }
   for _, name in ipairs(step.layout or DEFAULT_LAYOUT) do
     if BLOCKS[name] then
       BLOCKS[name](view, step)
@@ -489,22 +601,80 @@ local function currentView()
   return session and views[session:Current().id]
 end
 
--- Grows with the content up to the screen, then the step scrolls.
+-- The content height of a step in its tallest state: every feature row with its options shown, the lines that
+-- come and go (a warning, "restart needed") present, the summary with a few changes. What the player does in the
+-- step then never makes it taller than the window. The view is laid out again by the caller.
+local function measureView(view)
+  for _, entry in ipairs(view.stack.items) do
+    if entry.opts.reserve then
+      entry.opts.keepSpace = true
+    end
+  end
+  for _, fn in ipairs(view.reference) do
+    fn(true)
+  end
+  layoutView(view)
+  local height = view.area.content:GetHeight()
+  for _, fn in ipairs(view.reference) do
+    fn(false)
+  end
+  for _, entry in ipairs(view.stack.items) do
+    if entry.opts.reserve then
+      entry.opts.keepSpace = nil
+    end
+  end
+  return height
+end
+
+-- The tallest content of the steps of this session. All views are built here (once), so the first window
+-- already has the size of the last step.
+local function tallestContent()
+  local ids = {}
+  for _, step in ipairs(session.steps) do
+    ids[#ids + 1] = step.id
+  end
+  local key = frameWidth() .. "|" .. factor() .. "|" .. table.concat(ids, ",")
+  if measured and measured.key == key then
+    return measured.height
+  end
+  local tallest = 0
+  for _, step in ipairs(session.steps) do
+    tallest = math.max(tallest, measureView(views[step.id] or newView(step)))
+  end
+  measured = { key = key, height = tallest }
+  return tallest
+end
+
+-- One size for every step (see the head of the file). Returns the scale the window has now.
 local function fit()
   local view = currentView()
   if not view then
     return
   end
+  if collapsed then
+    frame:SetSize(frameWidth(), BAR_H)
+    return
+  end
   frame:SetWidth(frameWidth())
   frame.hint:SetPoint("TOPLEFT", PAD + math.floor(PROGRESS_W * factor() + 0.5), -(TITLE_H + 8))
-  layoutView(view)
+  local want = TITLE_H + PROGRESS_H + FOOT_H + tallestContent() + 8
+  local base = Theme.windowScale()
+  local scale, limit = base, nil
   local screen = UIParent:GetHeight()
-  local limit = UI.MAX_HEIGHT
   if screen and screen > 0 then
-    limit = math.min(limit, math.floor(screen / (frame:GetScale() or 1) * 0.9))
+    local room = screen * UI.SCREEN_SHARE
+    if want * base > room then
+      scale = base * math.max(UI.MIN_SHRINK, room / (want * base))
+    end
+    limit = math.floor(room / scale)
   end
-  local want = TITLE_H + PROGRESS_H + FOOT_H + view.area.content:GetHeight() + 8
-  frame:SetHeight(math.max(math.min(UI.MIN_HEIGHT, limit), math.min(want, limit)))
+  if frame:GetScale() ~= scale then
+    frame:SetScale(scale)
+  end
+  local height = limit and math.min(math.ceil(want), limit) or math.ceil(want)
+  frame:SetHeight(math.max(math.min(UI.MIN_HEIGHT, limit or UI.MIN_HEIGHT), height))
+  layoutView(view)
+  return scale
 end
 
 -- Window ---------------------------------------------------------------------------------------
@@ -514,7 +684,9 @@ local function paintProgress()
     return
   end
   local n, m = session:Progress()
-  frame.progress:SetText(string.format(L["setup.progress"], n, m))
+  local progress = string.format(L["setup.progress"], n, m)
+  frame.progress:SetText(progress)
+  frame.barText:SetText(L["setup.title"] .. ", " .. progress)
   frame.fill:SetWidth(math.max(1, (frame:GetWidth() - 2 * PAD) * n / m))
 end
 
@@ -523,6 +695,18 @@ local function paintButtons()
   W.SetText(frame.next.label, last and "setup.finish" or "setup.next")
   W.SetText(frame.skip.label, session.firstRun and "setup.skip" or "setup.close")
   frame.back:SetEnabled(not session:IsFirst())
+end
+
+-- The pencil in the menu glows while the window shows a step that talks about the menu.
+local PENCIL_STEPS = { start = true, menu = true, menu2 = true, done = true }
+
+local function paintPencilHint()
+  local SE = ns.SidebarEdit
+  if not (SE and SE.SetHint) then
+    return
+  end
+  local step = frame and frame:IsShown() and session and session:Current()
+  SE.SetHint(step ~= nil and step ~= false and PENCIL_STEPS[step.id] == true)
 end
 
 local function render()
@@ -537,7 +721,13 @@ local function render()
   end
   paintButtons()
   fit()
+  -- A new step starts at the top; the same step again (reset, back from the bar) keeps its place.
+  if shownId ~= step.id then
+    view.area:ScrollTo(0)
+    shownId = step.id
+  end
   paintProgress()
+  paintPencilHint()
 end
 
 function UI.View(id)
@@ -548,10 +738,193 @@ function UI.IsOpen()
   return frame ~= nil and frame:IsShown()
 end
 
+-- Every way out of the window ends here (Done, a confirmed close, Skip, /fg setup close): a hide from anywhere
+-- else is not a decision of the player and is taken back, see the OnHide script.
 function UI.Close()
   if frame then
+    closing = true
     frame:Hide()
+    closing = false
   end
+end
+
+-- Lays the current step out again after something changed outside a click on the step (a switch of a row).
+function UI.Refresh()
+  local view = currentView()
+  if view and refreshView(view) then
+    fit()
+  end
+end
+
+-- The parts only the open window shows; the bar shows frame.barText and frame.resume instead.
+local function openParts()
+  return {
+    body,
+    frame.progress,
+    frame.track,
+    frame.fill,
+    frame.footLine,
+    frame.resetAll,
+    frame.skip,
+    frame.next,
+    frame.back,
+    frame.titleText,
+  }
+end
+
+local function showBar(on)
+  frame.barText:SetShown(on)
+  frame.resume:SetShown(on)
+  for _, part in ipairs(openParts()) do
+    part:SetShown(not on)
+  end
+end
+
+function UI.IsCollapsed()
+  return collapsed
+end
+
+-- Folds the window to the bar at the top of the screen so the settings that were just opened are not covered.
+-- The step, the session and the guard stay as they are. Returns whether it folded.
+function UI.Collapse()
+  if collapsed or not (frame and frame:IsShown() and session) then
+    return false
+  end
+  local point, rel, relPoint, x, y = frame:GetPoint()
+  restore = { point = point, rel = rel, relPoint = relPoint, x = x, y = y, hint = frame.hint:IsShown() }
+  collapsed = true
+  if ns.Focus.current and inside(ns.Focus.current, frame) then
+    ns.Focus.clear()
+  end
+  showBar(true)
+  frame.hint:Hide()
+  frame:ClearAllPoints()
+  frame:SetPoint("TOP", UIParent, "TOP", 0, -BAR_TOP)
+  frame:SetSize(frameWidth(), BAR_H)
+  paintProgress()
+  UI.Front(true)
+  return true
+end
+
+-- Puts the open window back where and as large as it was (no new layout, see UI.Expand).
+local function unfold()
+  collapsed = false
+  showBar(false)
+  frame:ClearAllPoints()
+  local r = restore or {}
+  frame:SetPoint(r.point or "CENTER", r.rel or UIParent, r.relPoint or r.point or "CENTER", r.x or 0, r.y or 0)
+  frame.hint:SetShown(r.hint == true)
+  restore = nil
+end
+
+-- The way back from the bar: the same step, size and position as before.
+function UI.Expand()
+  if not (collapsed and frame) then
+    return false
+  end
+  unfold()
+  if session then
+    render()
+  end
+  UI.Front(true)
+  return true
+end
+
+-- Next to the main window -------------------------------------------------------------------------------
+-- A button of the wizard that opens a window of the add-on (settings, tutorials, help, the menu edit mode) calls
+-- UI.Reveal afterwards. The wizard never closes, folds or hides for it: the two windows are put next to each other,
+-- on a screen that is too narrow the main window lies over the wizard (raised to its strata, the wizard keeps its
+-- place and stays visible). Only a screen too narrow even for that folds the wizard to its bar.
+
+-- The main window before the wizard moved or raised it: { frame, point = { GetPoint }, strata, left, pinned }.
+local placed
+
+local function mainFrame()
+  local main = ns.Main and ns.Main.frame
+  return main and main:IsShown() and main or nil
+end
+
+-- Screen units: the frame's own units times its effective scale. nil while the client has no rectangle yet.
+local function screenRect(f)
+  local scale = f:GetEffectiveScale() or 1
+  local l, r, t, b = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
+  if not (l and r and t and b) then
+    return nil
+  end
+  return { l = l * scale, r = r * scale, t = t * scale, b = b * scale }
+end
+
+local function moveTo(f, left, rect)
+  local scale = f:GetEffectiveScale() or 1
+  f:ClearAllPoints()
+  f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left / scale, rect.t / scale)
+end
+
+local function setStrata(f, strata)
+  if f:GetFrameStrata() ~= strata then
+    f:SetFrameStrata(strata)
+  end
+end
+
+-- The main window back to its own strata (it no longer needs to lie over the wizard).
+local function unpinMain()
+  if placed and placed.pinned then
+    placed.pinned = false
+    pcall(setStrata, placed.frame, placed.strata)
+  end
+end
+
+-- The main window as it was: strata and, when the player did not move it since, its position.
+local function releaseMain()
+  local p = placed
+  if not p then
+    return
+  end
+  unpinMain()
+  placed = nil
+  local now = screenRect(p.frame)
+  if p.point and p.point[1] and now and math.abs(now.l - p.left) < 2 then
+    p.frame:ClearAllPoints()
+    p.frame:SetPoint(unpack(p.point))
+  end
+end
+
+-- Returns whether the window of the add-on is placed next to the wizard (or needs no move).
+function UI.Reveal()
+  local main = mainFrame()
+  if collapsed or not (frame and frame:IsShown() and session and main) then
+    return false
+  end
+  local setup, rect = screenRect(frame), screenRect(main)
+  local screenW = UIParent:GetWidth() * (UIParent:GetEffectiveScale() or 1)
+  if not (setup and rect and screenW and screenW > 0) then
+    return false
+  end
+  local plan = SW.Placement({ w = screenW }, setup, rect)
+  if plan.mode == "apart" then
+    unpinMain()
+    return true
+  elseif plan.mode == "bar" then
+    unpinMain()
+    return UI.Collapse()
+  end
+  if not placed or placed.frame ~= main then
+    local point, rel, relPoint, x, y = main:GetPoint()
+    placed = { frame = main, point = point and { point, rel, relPoint, x, y }, strata = main:GetFrameStrata() }
+  end
+  if plan.setupLeft then
+    moveTo(frame, plan.setupLeft, setup)
+  end
+  moveTo(main, plan.mainLeft, rect)
+  placed.left = plan.mainLeft
+  if plan.mode == "over" then
+    placed.pinned = true
+    setStrata(main, SW.GUARD.strata)
+    main:Raise()
+  else
+    unpinMain()
+  end
+  return true
 end
 
 function UI.Next()
@@ -581,7 +954,7 @@ function UI.AskCancel()
       session:Cancel()
       UI.Close()
     end
-  end)
+  end, nil, { yesKey = "setup.close", noKey = "setup.collapse.resume" })
 end
 
 -- A first run loads the defaults for the wizard's keys. Later runs only close: the user's
@@ -655,6 +1028,26 @@ local function focusList()
   return controls
 end
 
+-- Scrolls the step (when it scrolls at all) so a control that got the keyboard focus lies in the visible part.
+local function scrollIntoView(f)
+  local view = currentView()
+  if not (view and f and inside(f, view.area.content)) then
+    return
+  end
+  local area, content = view.area, view.area.content
+  local contentTop, top, bottom = content:GetTop(), f:GetTop(), f:GetBottom()
+  local visible = area:GetHeight()
+  if not (contentTop and top and bottom and visible) then
+    return
+  end
+  local from, to, scroll = contentTop - top, contentTop - bottom, area:GetVerticalScroll()
+  if from < scroll + 4 then
+    area:ScrollTo(from - 4)
+  elseif to > scroll + visible - MORE_H then
+    area:ScrollTo(to - visible + MORE_H)
+  end
+end
+
 local function moveFocus(step)
   local list = focusList()
   if #list == 0 then
@@ -673,22 +1066,22 @@ local function moveFocus(step)
     index = 1
   end
   ns.Focus.set(list[index])
+  scrollIntoView(list[index])
 end
 
 local function handleKey(key)
+  -- Folded to the bar: every key belongs to the settings below it.
+  if collapsed then
+    return false
+  end
   local current = ns.Focus.current
   -- A dropdown list lives outside the window: it keeps its own keys.
   local inPopup = current ~= nil and not inside(current, frame)
   if key == "ESCAPE" then
-    if ns.Popups.close() then
+    -- An open list, then the newest dialog or window next to the wizard (the settings, a note) closes; only
+    -- when nothing else is open does Esc ask whether to cancel the setup.
+    if ns.EscStack.Close(frame) then
       return true
-    end
-    -- A dialog on top closes itself with Esc.
-    for _, name in ipairs({ "ForeverGuidesConfirmDialog", "ForeverGuidesCopyDialog" }) do
-      local dialog = rawget(_G, name)
-      if dialog and dialog:IsShown() then
-        return false
-      end
     end
     UI.AskCancel()
     return true
@@ -759,6 +1152,9 @@ local function applyLook()
   end
   local alpha = SW.BackgroundAlpha(Theme.mainAlpha() * 100)
   frame.fgBack:SetAlpha(alpha)
+  for _, view in pairs(views) do
+    paintFade(view.area.more)
+  end
   local shell = ns.WindowShell.Of(frame)
   ns.WindowStyle.Apply(frame, {
     bg = ns.WindowStyle.FALLBACK.bg,
@@ -802,6 +1198,10 @@ function UI.Front(raise)
   if (raise or lifted) and not coverOpen() then
     frame:Raise()
     baseLevel = frame:GetFrameLevel()
+    -- A main window that lies over the wizard on a narrow screen stays over it.
+    if placed and placed.pinned and placed.frame:IsShown() then
+      placed.frame:Raise()
+    end
     ns.Focus.Lift()
   end
 end
@@ -862,11 +1262,16 @@ local function build()
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
   W.Fill(frame, "bg", 0.97)
-  local shell =
-    ns.WindowShell.Attach(frame, { title = "setup.title", role = "h2", titleHeight = TITLE_H, shadow = true })
+  -- esc = false: the wizard never closes on a plain Esc. Its own key handler closes a dialog or another window
+  -- first and asks before it ends the setup (handleKey).
+  local shell = ns.WindowShell.Attach(
+    frame,
+    { title = "setup.title", role = "h2", titleHeight = TITLE_H, shadow = true, esc = false }
+  )
   local close =
     W.Action(shell.titleBar, { icon = "close", size = 22, tooltip = "common.close", onClick = UI.AskCancel })
   close:SetPoint("RIGHT", -8, 0)
+  frame.titleText = shell.titleText
   shell.titleText:ClearAllPoints()
   shell.titleText:SetPoint("LEFT", 16, 0)
   shell.titleText:SetPoint("RIGHT", close, "LEFT", -8, 0)
@@ -880,6 +1285,7 @@ local function build()
   frame.hint:SetPoint("TOPRIGHT", -PAD, -(TITLE_H + 8))
   frame.hint:Hide()
   local track = frame:CreateTexture(nil, "ARTWORK")
+  frame.track = track
   track:SetPoint("TOPLEFT", PAD, -(TITLE_H + PROGRESS_H - 14))
   track:SetPoint("TOPRIGHT", -PAD, -(TITLE_H + PROGRESS_H - 14))
   track:SetHeight(4)
@@ -895,6 +1301,15 @@ local function build()
   body:SetPoint("TOPLEFT", PAD, -(TITLE_H + PROGRESS_H))
   body:SetPoint("BOTTOMRIGHT", -PAD, FOOT_H)
 
+  -- A thin line over the footer: the buttons sit under it at the same place in every step.
+  frame.footLine = frame:CreateTexture(nil, "ARTWORK")
+  frame.footLine:SetPoint("BOTTOMLEFT", PAD, FOOT_H)
+  frame.footLine:SetPoint("BOTTOMRIGHT", -PAD, FOOT_H)
+  frame.footLine:SetHeight(1)
+  ns.Bind(frame.footLine, function(line)
+    line:SetColorTexture(Theme.color("surface3"))
+  end)
+
   local k = factor()
   local function button(key, width, onClick, variant)
     return W.Button(frame, { key = key, width = math.floor(width * k + 0.5), onClick = onClick, variant = variant })
@@ -908,18 +1323,60 @@ local function build()
   frame.back = button("setup.back", 90, UI.Back)
   frame.back:SetPoint("RIGHT", frame.next, "LEFT", -8, 0)
 
+  -- The folded window: "Setup, Step n of m" and the way back. Hidden while the window is open.
+  frame.resume = W.Button(shell.titleBar, {
+    key = "setup.collapse.resume",
+    width = math.floor(150 * k + 0.5),
+    onClick = UI.Expand,
+    variant = "primary",
+    tooltip = "setup.collapse.resume",
+    tooltipText = "setup.collapse.tip",
+  })
+  frame.resume:SetPoint("RIGHT", close, "LEFT", -8, 0)
+  frame.barText = W.Text(shell.titleBar, { role = "ui", color = "text" })
+  frame.barText:SetPoint("LEFT", 16, 0)
+  frame.barText:SetPoint("RIGHT", frame.resume, "LEFT", -8, 0)
+  frame.resume:Hide()
+  frame.barText:Hide()
+
   applyLook()
+  -- A click on the visible part of the wizard brings it over a main window that lies over it.
+  frame:HookScript("OnMouseDown", function()
+    if placed and placed.pinned and not coverOpen() then
+      frame:Raise()
+    end
+  end)
   frame:SetScript("OnShow", function()
     frame:SetScale(Theme.windowScale())
     applyLook()
     UI.Front(true)
     startGuard()
   end)
-  -- Closed any other way than Done, Skip or Cancel counts as cancelled.
+  -- The window closes only through UI.Close (Done, a confirmed close, Skip). Anything else that hides it (a
+  -- panel of the game, another add-on, the settings opening) is undone on the next frame with the session and
+  -- the step intact. A hidden UIParent leaves the frame shown, that is no close.
   frame:SetScript("OnHide", function()
+    if frame:IsShown() then
+      return
+    end
+    if not closing and session and not session.closed then
+      guardCounts.hidden = (guardCounts.hidden or 0) + 1
+      C_Timer.After(0, function()
+        if frame and session and not session.closed and not frame:IsShown() then
+          frame:Show()
+        end
+      end)
+      return
+    end
     stopGuard()
+    releaseMain()
+    -- Closed as a bar: the next opening starts as the full window again.
+    if collapsed then
+      unfold()
+    end
     local open = session
     session = nil
+    paintPencilHint()
     if open and not open.closed then
       open:Cancel()
     end
@@ -934,7 +1391,11 @@ function UI.Open(opts)
     return false
   end
   if frame and frame:IsShown() then
+    if collapsed then
+      UI.Expand()
+    end
     frame:Raise()
+    UI.Reveal()
     return true
   end
   local fresh = SW.Begin(opts)
@@ -946,6 +1407,7 @@ function UI.Open(opts)
     build()
   end
   session = fresh
+  shownId = nil
   guardCounts, uiHidden, baseLevel = {}, false, SW.GUARD.level
   for _, view in pairs(views) do
     view.area:Hide()
@@ -955,6 +1417,8 @@ function UI.Open(opts)
   frame:Show()
   setupKeys()
   render()
+  -- Started from the settings or the help: the main window that is open makes room.
+  UI.Reveal()
   if opts and opts.auto then
     local token = hintToken
     C_Timer.After(SW.GUARD.hintSeconds, function()
@@ -969,6 +1433,8 @@ end
 -- Events ---------------------------------------------------------------------------------------
 
 ns.On("FG_UI_REFRESHED", function()
+  -- Font size, language or theme changed: the texts have other sizes, the window is measured again.
+  measured = nil
   if UI.IsOpen() and session then
     applyLook()
     fit()
@@ -981,7 +1447,7 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
     return
   end
   if path == "settings.scale" then
-    frame:SetScale(Theme.windowScale())
+    fit()
   elseif path == "settings.mainAlpha" then
     applyLook()
   end
@@ -989,6 +1455,19 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
   if view and refreshView(view) then
     fit()
   end
+end)
+
+-- The main window opened by any way while the wizard is open (a button, the minimap, /fg): it goes next to the wizard.
+ns.On("FG_MAIN_SHOWN", function()
+  if UI.IsOpen() then
+    -- One frame later: the main window has its size and position by then.
+    C_Timer.After(0, function()
+      ns.Safe("setup-reveal", UI.Reveal)
+    end)
+  end
+end)
+ns.On("FG_MAIN_HIDDEN", function()
+  releaseMain()
 end)
 
 -- A consent changed elsewhere while the window is open: the switches follow.

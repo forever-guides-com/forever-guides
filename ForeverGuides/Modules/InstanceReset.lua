@@ -329,4 +329,4 @@ function R.AddSettings(view)
   )
 end
 
-ns.SettingsPage.Add(R.AddSettings, "social")
+ns.SettingsPage.Add(R.AddSettings, "social", "instances.reset")

@@ -13,12 +13,17 @@ PBL.MAX_LOGOS = 40
 PBL.MAX_ERRORS = 3
 -- Limit of a shift (pixels) in either direction.
 PBL.MAX_OFFSET = 60
-PBL.SIDES = { "left", "right" }
-PBL.DEFAULT_SIDE = "left"
--- Distance of the logo from the middle of the plate and above its top edge. The width of the name is never
--- read, so the side is a fixed gap and not a measured one.
-PBL.GAP = 16
-PBL.RISE = 2
+PBL.SIDES = { "center", "left", "right" }
+PBL.DEFAULT_SIDE = "center"
+-- Distance of the logo row from the middle line of the name (left and right) and above the top edge of the name.
+-- The width of the name is never read, so the side is a fixed gap and not a measured one.
+PBL.GAP = 6
+PBL.RISE = 1
+-- Guild and community symbols next to the logo: at most this many, the gap between two symbols and the widest
+-- row (pixels), so a plate never gets wider than a plate is.
+PBL.MAX_CRESTS = 3
+PBL.ICON_GAP = 2
+PBL.MAX_WIDTH = 96
 
 -- Settings --------------------------------------------------------------------------------------------
 
@@ -31,8 +36,8 @@ function PBL.CleanSize(size)
 end
 
 function PBL.CleanSide(side)
-  if side == "right" then
-    return "right"
+  if side == "right" or side == "left" or side == "center" then
+    return side
   end
   return PBL.DEFAULT_SIDE
 end
@@ -45,15 +50,57 @@ function PBL.CleanOffset(value)
   return math.max(-PBL.MAX_OFFSET, math.min(PBL.MAX_OFFSET, math.floor(value + 0.5)))
 end
 
--- Anchor of the logo at the plate: { point, relPoint, x, y }. The logo hangs left or right of the middle line
--- above the plate; dx and dy shift it (limited to PBL.MAX_OFFSET).
+-- Anchor of the logo row at the name of the plate: { point, relPoint, x, y }. The row sits on the top edge of
+-- the name, centered, or ending left or right of the middle line; dx and dy shift it (limited to PBL.MAX_OFFSET).
 function PBL.Position(side, dx, dy)
-  local x = PBL.GAP + PBL.CleanOffset(dx)
+  local shift = PBL.CleanOffset(dx)
   local y = PBL.RISE + PBL.CleanOffset(dy)
-  if PBL.CleanSide(side) == "right" then
-    return { point = "BOTTOMLEFT", relPoint = "TOP", x = x, y = y }
+  side = PBL.CleanSide(side)
+  if side == "right" then
+    return { point = "BOTTOMLEFT", relPoint = "TOP", x = PBL.GAP + shift, y = y }
+  elseif side == "left" then
+    return { point = "BOTTOMRIGHT", relPoint = "TOP", x = -PBL.GAP + shift, y = y }
   end
-  return { point = "BOTTOMRIGHT", relPoint = "TOP", x = -x, y = y }
+  return { point = "BOTTOM", relPoint = "TOP", x = shift, y = y }
+end
+
+-- Size and width of a row of `count` symbols at the wanted size: the symbols shrink (never below the minimum)
+-- when the row would be wider than PBL.MAX_WIDTH.
+function PBL.Layout(count, size)
+  count = math.max(1, math.floor(tonumber(count) or 1))
+  size = PBL.CleanSize(size)
+  local gap = PBL.ICON_GAP
+  if count * size + (count - 1) * gap > PBL.MAX_WIDTH then
+    size = math.max(PBL.MIN_SIZE, math.floor((PBL.MAX_WIDTH - (count - 1) * gap) / count))
+  end
+  return { size = size, gap = gap, width = count * size + (count - 1) * gap }
+end
+
+-- The guild and community symbols to draw out of the logos of a player (entries as CrestLocal.Shown gives them:
+-- guild first, then communities): the first guild if wanted, communities after it, at most PBL.MAX_CRESTS.
+-- wanted: { guild, community } booleans (nil counts as wanted).
+function PBL.CleanCrests(entries, wanted)
+  local out = {}
+  if type(entries) ~= "table" then
+    return out
+  end
+  wanted = wanted or {}
+  local guildOn, communityOn = wanted.guild ~= false, wanted.community ~= false
+  local hasGuild = false
+  for _, entry in ipairs(entries) do
+    if #out >= PBL.MAX_CRESTS then
+      break
+    end
+    if type(entry) == "table" and (entry.path or entry.icon) then
+      if entry.kind == "guild" and guildOn and not hasGuild then
+        hasGuild = true
+        out[#out + 1] = entry
+      elseif entry.kind == "community" and communityOn then
+        out[#out + 1] = entry
+      end
+    end
+  end
+  return out
 end
 
 -- Decision --------------------------------------------------------------------------------------------
@@ -83,6 +130,26 @@ function PBL.Decide(facts)
     return false, "chatonly"
   end
   return true, "ok"
+end
+
+-- What to draw for a plate: { forever = bool, crests = list } and "ok" or "crests", or nil and the reason. The add-on
+-- logo follows Decide (and the switch for it, facts.logoOn); a player the register does not know still gets the
+-- guild and community symbols the local recognition has for him. facts has the facts of Decide and
+--   entries   logos of the player (guild first, then communities), may be empty or nil
+--   wanted    { guild, community } booleans
+function PBL.Plan(facts)
+  local show, why = PBL.Decide(facts)
+  local crests = PBL.CleanCrests(facts.entries, facts.wanted)
+  if show and why == "self" or (show and why == "ok") then
+    local forever = facts.logoOn ~= false
+    if forever or #crests > 0 then
+      return { forever = forever, crests = crests }, "ok"
+    end
+    return nil, "logo off"
+  elseif not show and why == "unknown" and #crests > 0 then
+    return { forever = false, crests = crests }, "crests"
+  end
+  return nil, why
 end
 
 -- Pool (count only) ---------------------------------------------------------------------------------

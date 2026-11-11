@@ -57,7 +57,7 @@ end
 
 -- One list for our own ns.Safe errors and for what the catcher records. Entry: msg, ctx,
 -- kind ("error", "blocked", "forbidden", "warning"), addon, stack, count, first, last
--- (server time), session (of the last occurrence), ops (blocked map calls only). Old entries lack kind,
+-- (server time), session (of the last occurrence), ops (blocked map calls only), info (context text of a refused call). Old entries lack kind,
 -- addon, session.
 local MAX_STORED = 100
 local MAX_MSG = 500
@@ -153,6 +153,9 @@ function Errors.add(spec)
       if spec.ops then
         e.ops = Errors.clip(spec.ops, MAX_OPS)
       end
+      if spec.info then
+        e.info = Errors.clip(spec.info, MAX_OPS)
+      end
       if ns.Emit then
         ns.Emit("FG_ERRORS_CHANGED")
       end
@@ -167,6 +170,7 @@ function Errors.add(spec)
     addon = addon,
     stack = Errors.clip(spec.stack or "", MAX_STACK),
     ops = spec.ops and Errors.clip(spec.ops, MAX_OPS) or nil,
+    info = spec.info and Errors.clip(spec.info, MAX_OPS) or nil,
     count = 1,
     first = now,
     last = now,

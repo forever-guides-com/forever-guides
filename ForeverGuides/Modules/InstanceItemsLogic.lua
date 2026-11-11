@@ -1,10 +1,11 @@
 -- Items of one instance, grouped for the Items tab (Modules/InstanceItemsView.lua). No game API:
 -- the caller hands in the quest rewards and the captured loot, so every rule here runs in the tests.
 -- Sources, in the order of a group: boss loot from the data (boss.lo), loot the player captured
--- (ns.LootCapture) and quest rewards. Groups follow the boss order of the Bosses tab, then the captured
--- loot that fits no boss, then the quests.
+-- (ns.LootCapture) and quest rewards. Groups follow the boss order of the Bosses tab, then the loot of the
+-- instance that no boss owns in the data (inst.tl), then the captured loot that fits no boss, then the quests.
 --
--- boss.lo = { { id = itemId, n = "name" or { de, en }, q = quality 0-7, r = drop chance in percent } }
+-- boss.lo and inst.tl = { { id = itemId, n = "name" or { de, en }, q = quality 0-7, r = drop chance in percent,
+-- pr = 1 for a preferred drop } }
 -- (`i` is read as `id` too). Format: docs/INSTANZ-EXPORT-FORMAT.md.
 local _, ns = ...
 
@@ -51,9 +52,10 @@ local function anyShared(a, b)
   return false
 end
 
-local function dataItems(boss)
+-- The loot rows of the data (boss.lo or inst.tl) as items, each id once.
+local function dataItems(rows)
   local out, seen = {}, {}
-  for _, e in ipairs(type(boss.lo) == "table" and boss.lo or {}) do
+  for _, e in ipairs(type(rows) == "table" and rows or {}) do
     local id = type(e) == "table" and whole(e.id or e.i, 1)
     if id and not seen[id] then
       seen[id] = true
@@ -64,6 +66,7 @@ local function dataItems(boss)
         name = ns.T(e.n),
         q = q and math.min(q, 7) or nil,
         rate = type(e.r) == "number" and e.r >= 0 and e.r <= 100 and e.r or nil,
+        preferred = e.pr == 1 or nil,
       }
     end
   end
@@ -122,13 +125,13 @@ local function sortedIds(items)
   return ids
 end
 
--- Adds what one captured source dropped to a group. Items the data knows get the capture numbers,
--- new ones are collected in group.fresh and appended last.
-local function takeCaptured(group, source, label)
+-- Adds what one captured source dropped to a group. Items the data knows (in the group, else in `known`) get
+-- the capture numbers, new ones are collected in group.fresh and appended last.
+local function takeCaptured(group, source, label, known)
   local e = source.e
   for _, id in ipairs(sortedIds(e.items or {})) do
     local c = e.items[id]
-    local item = group.byId[id]
+    local item = group.byId[id] or (known and known.byId[id])
     if not item then
       item = { id = id, src = "captured", name = c.name, q = c.q, source = label, group = group }
       group.byId[id] = item
@@ -151,20 +154,27 @@ end
 
 -- opts: rewards (IV.Rewards entries), captured (LootCapture.Bosses() rows), encounterNames(eid) ->
 -- { de, en } or nil, instances (all instances, to tell shared ids apart; default the data).
--- Returns { groups = { { id, kind = "boss"|"extra"|"quests", index?, boss?, items } }, total, first }.
+-- Returns { groups = { { id, kind = "boss"|"instance"|"extra"|"quests", index?, boss?, items } }, total, first }.
 function IL.Build(inst, opts)
   opts = opts or {}
   local instances = opts.instances or (ns.Data and ns.Data.Instances) or {}
   local groups, bosses = {}, {}
   for i, boss in ipairs(inst.bo or {}) do
     local group =
-      { id = "b" .. i, kind = "boss", index = i, boss = boss, items = dataItems(boss), byId = {}, fresh = {} }
+      { id = "b" .. i, kind = "boss", index = i, boss = boss, items = dataItems(boss.lo), byId = {}, fresh = {} }
     for _, item in ipairs(group.items) do
       item.group = group
       group.byId[item.id] = item
     end
     groups[i] = group
     bosses[i] = { index = i, boss = boss, keys = nameKeys(boss.n) }
+  end
+  -- Loot of the instance that the data gives to no boss. A captured source without a boss adds its numbers
+  -- here when the item is listed, else it goes to the extra group.
+  local own = { id = "instance", kind = "instance", items = dataItems(inst.tl), byId = {}, fresh = {} }
+  for _, item in ipairs(own.items) do
+    item.group = own
+    own.byId[item.id] = item
   end
   local extra = { id = "extra", kind = "extra", items = {}, byId = {}, fresh = {} }
   for _, source in ipairs(opts.captured or {}) do
@@ -173,10 +183,11 @@ function IL.Build(inst, opts)
       local b = bossFor(bosses, source.e, opts.encounterNames)
       local group = b and groups[b.index] or (how ~= "shared" and extra) or nil
       if group then
-        takeCaptured(group, source, source.e.name)
+        takeCaptured(group, source, source.e.name, group == extra and own or nil)
       end
     end
   end
+  groups[#groups + 1] = own
   groups[#groups + 1] = extra
   for _, group in ipairs(groups) do
     table.sort(group.fresh, function(a, b)
@@ -216,6 +227,18 @@ function IL.Build(inst, opts)
     total = total + #group.items
   end
   return { groups = out, total = total, first = out[1] and out[1].id or nil }
+end
+
+-- True when an item with this id is in the model (the view repaints only for items it shows).
+function IL.HasItem(model, id)
+  for _, group in ipairs(model and model.groups or {}) do
+    for _, item in ipairs(group.items) do
+      if item.id == id then
+        return true
+      end
+    end
+  end
+  return false
 end
 
 function IL.Find(model, id)

@@ -10,7 +10,7 @@ ns.AddLocale("enUS", {
   ["search.none"] = "Nothing found.",
   ["search.none.hint"] = "Check the spelling or use a shorter word. Spaces and umlauts do not matter.",
   ["search.empty.text"] = "Search the whole guide",
-  ["search.empty.hint"] = "Pages, classes, races, instances, bosses, quests, places, trainers, abilities, items, recipes and profession trainers. Try Silverleaf, Gnomeregan or Copper.",
+  ["search.empty.hint"] = "Pages, settings, classes, races, instances, bosses, quests, places, trainers, abilities, items, recipes and profession trainers. Try Silverleaf, Gnomeregan, Copper or the name of a setting.",
   ["search.group"] = "%s (%d)",
   ["search.group.page"] = "Pages",
   ["search.group.class"] = "Classes",
@@ -51,7 +51,7 @@ ns.AddLocale("enUS", {
   ["search.kind.ability"] = "Ability",
   ["tour.search.title"] = "Search",
   ["tour.search.intro.title"] = "Search",
-  ["tour.search.intro.text"] = "Finds pages, instances, bosses, quests, places, trainers, abilities, items, recipes and profession trainers.",
+  ["tour.search.intro.text"] = "Finds pages, settings, instances, bosses, quests, places, trainers, abilities, items, recipes and profession trainers.",
   ["tour.search.box.title"] = "Search field",
   ["tour.search.box.text"] = "Ctrl+F jumps here, Enter shows the results.",
   ["tour.search.results.title"] = "Results",
@@ -64,7 +64,7 @@ ns.AddLocale("deDE", {
   ["search.none"] = "Nichts gefunden.",
   ["search.none.hint"] = "Prüfe die Schreibweise oder nimm ein kürzeres Wort. Leerzeichen und Umlaute spielen keine Rolle.",
   ["search.empty.text"] = "Alles durchsuchen",
-  ["search.empty.hint"] = "Seiten, Klassen, Völker, Instanzen, Bosse, Quests, Orte, Lehrer, Fähigkeiten, Items, Rezepte und Berufslehrer. Probiere Silberblatt, Gnomeregan oder Kupfer.",
+  ["search.empty.hint"] = "Seiten, Einstellungen, Klassen, Völker, Instanzen, Bosse, Quests, Orte, Lehrer, Fähigkeiten, Items, Rezepte und Berufslehrer. Probiere Silberblatt, Gnomeregan, Kupfer oder den Namen einer Einstellung.",
   ["search.group"] = "%s (%d)",
   ["search.group.page"] = "Seiten",
   ["search.group.class"] = "Klassen",
@@ -105,7 +105,7 @@ ns.AddLocale("deDE", {
   ["search.kind.ability"] = "Fähigkeit",
   ["tour.search.title"] = "Suche",
   ["tour.search.intro.title"] = "Suche",
-  ["tour.search.intro.text"] = "Findet Seiten, Instanzen, Bosse, Quests, Orte, Lehrer, Fähigkeiten, Items, Rezepte und Berufslehrer.",
+  ["tour.search.intro.text"] = "Findet Seiten, Einstellungen, Instanzen, Bosse, Quests, Orte, Lehrer, Fähigkeiten, Items, Rezepte und Berufslehrer.",
   ["tour.search.box.title"] = "Suchfeld",
   ["tour.search.box.text"] = "Strg+F springt hierher, Enter zeigt die Treffer.",
   ["tour.search.results.title"] = "Treffer",
@@ -251,9 +251,20 @@ local function build(container)
     rowHeight = ROW_HEIGHT,
     bind = function(item)
       if item.header then
-        return { title = Theme.hexText("accent2", item.name), inert = true }
+        return { title = Theme.hexText(item.sub and "textSecondary" or "accent2", item.name), inert = true }
       end
       local cursor = item == st.selected
+      if item.settingHit then
+        return {
+          title = item.name,
+          sub = item.subLine,
+          right = item.right,
+          marks = S.Spans(item.name, st.query),
+          tooltipSpec = ns.SettingsSearch.Tooltip(item),
+          selected = cursor,
+          cursor = cursor,
+        }
+      end
       if item.more then
         return {
           title = string.format(L["search.showMore"], item.hidden),
@@ -372,9 +383,24 @@ local function build(container)
       SP.Prepare()
       local result = S.Search(q, { limit = S.GROUP_LIMIT, limits = st.limits })
       total = result.total
-      summary:SetText(total == 0 and L["search.none"] or string.format(L["search.total"], total, q))
       rows = S.ListRows(result, L["search.best"], L["search.all"], groupLabel)
+      -- The settings have a section of their own: after the best matches, before the groups by kind.
+      local settingRows, settingTotal = ns.SettingsSearch.Rows(q)
+      if settingTotal > 0 then
+        local at = #rows + 1
+        for i, row in ipairs(rows) do
+          if row.header and row.kind then
+            at = i
+            break
+          end
+        end
+        for i, row in ipairs(settingRows) do
+          table.insert(rows, at + i - 1, row)
+        end
+        total = total + settingTotal
+      end
       rows[#rows + 1] = SP.PackageRow()
+      summary:SetText(total == 0 and L["search.none"] or string.format(L["search.total"], total, q))
       if total == 0 then
         webQuery = q
         suggestion = result.suggestion
@@ -425,6 +451,9 @@ local function build(container)
       ns.Router:navigate("search/" .. item.name)
     elseif item.package then
       SP.EnableMissing()
+    elseif item.settingHit then
+      remember(st.query)
+      ns.SettingsSearch.Go(item)
     else
       remember(st.query)
       if not SP.Open(item) and item.path then

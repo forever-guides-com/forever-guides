@@ -429,21 +429,24 @@ function AS.Build(parent)
   })
   stack:Add(page.tooltip, { height = 22, gap = 8 })
   stack:Add(text("ui", "text", "auctionset.days"), { gap = 4 })
-  local function commitDays(value)
-    local days = AS.ParseDays(value)
-    if days then
+  page.days = W.EditBox(content, {
+    height = 26,
+    inset = 6,
+    maxLetters = 2,
+    get = function()
+      return tostring(AS.MaxAgeDays())
+    end,
+    set = function(value)
+      local days = AS.ParseDays(value)
+      if not days then
+        return false
+      end
       Store.set("settings.priceDb.maxAgeDays", days)
-    end
-    page.days.edit:SetText(tostring(AS.MaxAgeDays()))
-  end
-  page.days = W.EditBox(content, { height = 26, inset = 6, onEnter = commitDays })
+    end,
+  })
   if page.days.edit.SetNumeric then
     page.days.edit:SetNumeric(true)
   end
-  page.days.edit:SetMaxLetters(2)
-  page.days.edit:HookScript("OnEditFocusLost", function(self)
-    commitDays(self:GetText())
-  end)
   stack:Add(page.days, { height = 26, width = DAYS_W, gap = 8 })
   page.clear = W.Action(content, {
     key = "auctionset.clear",

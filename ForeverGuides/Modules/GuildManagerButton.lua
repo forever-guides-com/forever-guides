@@ -20,8 +20,8 @@ ns.AddLocale("enUS", {
   ["guild.manager.waitGuild"] = "GuildManager loads once you are in a guild.",
   ["guild.manager.wait"] = "GuildManager loads after combat or at the next start.",
   ["guild.manager.disabled"] = "GuildManager is off in the add-on list of the game.",
-  ["guild.manager.failed"] = "GuildManager did not load. See Settings > Addons and the page Errors.",
-  ["guild.manager.outdated"] = "GuildManager is outdated. See Settings > Addons.",
+  ["guild.manager.failed"] = "GuildManager did not load. See Settings > Guild and the page Errors.",
+  ["guild.manager.outdated"] = "GuildManager is outdated. See Settings > Guild.",
 })
 ns.AddLocale("deDE", {
   ["guild.manager.enable"] = "GildenManager einschalten",
@@ -31,8 +31,8 @@ ns.AddLocale("deDE", {
   ["guild.manager.waitGuild"] = "Der GildenManager lädt, sobald du in einer Gilde bist.",
   ["guild.manager.wait"] = "Der GildenManager lädt nach dem Kampf oder beim nächsten Start.",
   ["guild.manager.disabled"] = "Der GildenManager ist in der Addon-Liste des Spiels aus.",
-  ["guild.manager.failed"] = "Der GildenManager konnte nicht laden. Siehe Einstellungen > Addons und die Seite Fehler.",
-  ["guild.manager.outdated"] = "Der GildenManager ist veraltet. Siehe Einstellungen > Addons.",
+  ["guild.manager.failed"] = "Der GildenManager konnte nicht laden. Siehe Einstellungen > Gilde und die Seite Fehler.",
+  ["guild.manager.outdated"] = "Der GildenManager ist veraltet. Siehe Einstellungen > Gilde.",
 })
 
 -- Muted lines per state of ns.SubAddons: line (short text), body (the status text of the Addons tab,

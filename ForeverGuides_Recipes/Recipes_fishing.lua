@@ -1,6 +1,6 @@
 -- Forever Guides: Rezepte "fishing" (generiert, nicht von Hand bearbeiten)
--- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70124)
--- Generated data, do not edit. Data as of 2026-10-11.
+-- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70888)
+-- Generated data, do not edit. Data as of 2026-11-11.
 
 ForeverGuides.RecipeData = ForeverGuides.RecipeData or {}
 ForeverGuides.RecipeData["fishing"] = {
@@ -18,8 +18,8 @@ ForeverGuides.RecipeData["fishing"] = {
     [273295]={en="Seasonal Fish Steaks",ico="inv_misc_food_156_fish_79"},
   },
   list={
-    {g=2715,i=279967,mats={{6291,1},{3371,1}},n={"Fischglas","Fish Bowl"},s=1229745,sk={0,20,23,25},src="t"},
-    {g=2715,i=279965,mats={{4470,2},{8925,1},{8365,2}},n={"Angelständer","Fishing Rack"},pat={273141},s=1262990,sk={140,140,143,145},src="i"},
+    {g=2715,i=279967,mats={{6291,1},{3371,1}},n={"Fischglas","Fish Bowl"},s=1229745,sk={0,20,20,20},src="t"},
+    {bd={{n="Gelihast",npc=6243,zone={de="Blackfathom-Tiefe",en="Blackfathom Deeps"}}},g=2715,i=279965,mats={{4470,2},{8925,1},{8365,2}},n={"Angelständer","Fishing Rack"},pat={273141},s=1262990,sk={140,140,143,145},src="i"},
     {g=2715,i=279966,mats={{4470,5},{14048,2},{273295,1}},n={"Angelhütte","Fishing Hut"},pat={273119},s=1262998,sk={300,300,300,300},src="i"},
   },
   v=1,

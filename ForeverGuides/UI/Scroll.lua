@@ -81,8 +81,10 @@ local function scrollbar(parent, onScroll)
 end
 W.Scrollbar = scrollbar
 
--- ScrollArea: area.content is the child to fill; call area:SetContentHeight(h).
-function W.ScrollArea(parent)
+-- ScrollArea: area.content is the child to fill; call area:SetContentHeight(h). opts.gutter: width the content
+-- leaves free at the right for the scroll bar (default 12).
+function W.ScrollArea(parent, opts)
+  local gutter = opts and opts.gutter or 12
   local area = CreateFrame("ScrollFrame", nil, parent)
   local content = CreateFrame("Frame", nil, area)
   content:SetSize(1, 1)
@@ -101,6 +103,7 @@ function W.ScrollArea(parent)
     area:SetVerticalScroll(range() * frac)
     update()
   end)
+  area.bar = bar
   function area:ScrollTo(y)
     area:SetVerticalScroll(U.clamp(y, 0, range()))
     update()
@@ -114,7 +117,7 @@ function W.ScrollArea(parent)
     area:ScrollTo(area:GetVerticalScroll() - delta * 40)
   end)
   area:SetScript("OnSizeChanged", function(_, w)
-    content:SetWidth(math.max(1, w - 12))
+    content:SetWidth(math.max(1, w - gutter))
     update()
   end)
   return area

@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-07.
+-- Generated data, do not edit. Data as of 2026-11-09.
 -- Spell catalog of PRIEST: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -1320,12 +1320,6 @@ ns.Data.Spells.PRIEST = {
     n={de="Verbesserte Vampirumarmung",en="Improved Vampiric Embrace"},
   },
   {
-    fid=237543,
-    id=436951,
-    k="passive",
-    n={de="Erhöhte Seelenstärke",en="Increased Fortitude"},
-  },
-  {
     fid=135926,
     i="spell_holy_innerfire",
     id=588,
@@ -2598,13 +2592,6 @@ ns.Data.Spells.PRIEST = {
     n={de="Schattenwort: Schmerz",en="Shadow Word: Pain"},
     rk=8,
     sup=10893,
-  },
-  {
-    fid=136199,
-    id=401977,
-    k="spell",
-    l=1,
-    n={de="Schattengeist",en="Shadowfiend"},
   },
   {
     fid=136200,

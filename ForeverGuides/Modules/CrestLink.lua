@@ -85,6 +85,7 @@ local function show(frame, data)
     return
   end
   tip:SetOwner(frame, "ANCHOR_CURSOR")
+  ns.W.Tooltip.Lift(tip, frame)
   tip:AddLine(info.title, 1, 1, 1)
   for _, line in ipairs(info.lines) do
     tip:AddLine(line, 0.8, 0.8, 0.8)

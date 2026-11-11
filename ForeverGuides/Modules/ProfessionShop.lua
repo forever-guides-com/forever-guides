@@ -593,6 +593,12 @@ function S.RowClick(line, button)
     insertChatLink(itemLink(line, name))
     return "link"
   end
+  -- An item only a vendor sells is not at the auction house: the click walks to the nearest vendor.
+  local best = line.source == "vendor" and ns.VendorSource and ns.VendorSource.Best(line.id) or nil
+  if best then
+    ns.VendorSource.SetWaypoint(best.place)
+    return "waypoint"
+  end
   local result = S.SearchAuction(name)
   if result == "closed" then
     ns.Notify(string.format(ns.L["profshop.openAuction"], name), "info")
@@ -605,13 +611,17 @@ end
 -- Tooltip of a list row: the item, what the clicks do, how much of it is there and where it is bought.
 function S.RowTooltip(owner, line)
   local L = ns.L
-  local lines = { L["profshop.rowSearch"], L["profshop.rowMore"] }
+  local best = line.source == "vendor" and ns.VendorSource and ns.VendorSource.Best(line.id) or nil
+  local lines = { best and L["vendor.listTip"] or L["profshop.rowSearch"], L["profshop.rowMore"] }
   if line.need and line.have then
     local key = S.Option("stock") and "profshop.rowHave" or "profshop.rowHaveInfo"
     lines[#lines + 1] = string.format(L[key], line.have, line.need, line.qty)
   end
   if line.source == "vendor" then
     lines[#lines + 1] = L["profshop.rowVendor"]
+    if best then
+      lines[#lines + 1] = string.format(L["vendor.where"], best.text)
+    end
   elseif line.crafted then
     lines[#lines + 1] = L["shoplist.rowCrafted"]
   end

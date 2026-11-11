@@ -14,8 +14,24 @@ local CC = ns.CooldownCore
 local WF = ns.WellFedLogic
 
 -- What the element follows: an aura on a unit, the activation glow of a spell (a proc such as Revenge), or the
--- temporary enchantment of a weapon (poison, sharpening stone, oil, shaman weapon buff; WeaponEnchantLogic).
+-- temporary enchantment of a weapon (poison, sharpening stone, oil, shaman weapon buff; WeaponEnchantLogic). The
+-- weapon enchantment has an element of its own now: "weapon" stays readable here only so an old layout or string
+-- can still be turned into it (CursorWeapon.lua), the panel of the aura element offers UI_SOURCES.
 A.SOURCES = { "aura", "proc", "weapon" }
+A.UI_SOURCES = { "aura", "proc" }
+-- The props of the aura element that say what it follows and how. The weapon element does not store them.
+A.SOURCE_PROPS = {
+  "source",
+  "unit",
+  "mineOnly",
+  "spellBase",
+  "spellExact",
+  "rankMode",
+  "procMode",
+  "procAuraId",
+  "auraType",
+  "anyWellFed",
+}
 A.UNITS = { "player", "target", "focus", "pet" }
 -- aura: shows while the aura is there, missing: only while it is gone, always: dimmed while it is gone.
 A.WHEN = { "active", "missing", "always" }
@@ -52,6 +68,22 @@ A.DEFAULTS = {
   weaponWarn = WE.DEFAULTS.weaponWarn,
   anyWellFed = WF.DEFAULTS.anyWellFed,
 }
+
+-- The default props of the weapon element from the ones of the aura element: everything but what an aura follows
+-- (SOURCE_PROPS) and its computed timer, `trackDefaults` being the defaults of AuraTrackLogic.
+function A.WeaponDefaults(auraDefaults, trackDefaults)
+  local out = {}
+  for key, value in pairs(auraDefaults) do
+    out[key] = value
+  end
+  for _, key in ipairs(A.SOURCE_PROPS) do
+    out[key] = nil
+  end
+  for key in pairs(trackDefaults) do
+    out[key] = nil
+  end
+  return out
+end
 
 local function finite(v)
   return type(v) == "number" and v == v and v > -math.huge and v < math.huge

@@ -30,6 +30,8 @@ local LIMITS = CLL.LIMITS
 local CLUB_TYPE_GUILD = 2
 local CLUB_EVENTS = { "CLUB_ADDED", "CLUB_REMOVED", "CLUB_UPDATED", "CLUB_MEMBER_ADDED", "CLUB_MEMBER_REMOVED" }
 
+-- What the viewer belongs to (CL.Mine), kept for MINE_TTL seconds.
+local mineCache
 local byKey, count, region = {}, 0, nil
 -- The parts of the index and what has to be read again.
 local parts = { guild = nil, guildKey = "", communities = {} }
@@ -288,6 +290,7 @@ end
 -- Empties the index and forgets what was marked.
 function CL.Clear()
   byKey, count, region, report = {}, 0, nil, nil
+  mineCache = nil
   parts = { guild = nil, guildKey = "", communities = {} }
   dirty, lastClubRead = {}, -1e9
 end
@@ -351,11 +354,11 @@ local function seenGuild(name)
   if type(guild) ~= "string" or guild == "" then
     return nil
   end
-  local entry = CLL.GuildEntry(region, guild)
-  if not entry and parts.guild and CRL.NormalizeName(guild) == parts.guildKey then
-    entry = parts.guild.entry
+  -- Only the guild of the viewer: a guild the viewer is not in is no logo here.
+  if parts.guild and CRL.NormalizeName(guild) == parts.guildKey then
+    return parts.guild.entry
   end
-  return entry
+  return nil
 end
 
 local function entriesOf(name, key)
@@ -373,6 +376,38 @@ function CL.Entries(name)
   return key ~= "" and entriesOf(name, key) or {}
 end
 
+-- What the viewer belongs to, for CLL.Shared: the directory ids of the own guild and of the own communities, the
+-- comparison key of the guild name. Read from the game (GetGuildInfo of the player, the subscribed communities), also
+-- while the local recognition is off, and kept for a few seconds. Secret or missing values leave the part empty.
+local MINE_TTL = 10
+
+function CL.Mine()
+  local t = now()
+  if mineCache and t >= mineCache.at and t - mineCache.at < MINE_TTL then
+    return mineCache.value
+  end
+  local at = region or ns.CrestMark.Region()
+  local mine = { guildIds = {}, guildKey = "", communityIds = {} }
+  local guild = safe(try(g("GetGuildInfo"), "player"))
+  if type(guild) == "string" and guild ~= "" then
+    mine.guildKey = CRL.NormalizeName(guild)
+    local entry = CLL.GuildEntry(at, guild)
+    if entry and not entry.logo then
+      mine.guildIds[entry.id] = true
+    end
+  end
+  local club = clubApi()
+  if club then
+    for _, match in ipairs(CLL.Clubs(subscribedClubs(club), at)) do
+      if not match.entry.logo then
+        mine.communityIds[match.entry.id] = true
+      end
+    end
+  end
+  mineCache = { at = t, value = mine }
+  return mine
+end
+
 -- What a chat line and the tooltip show for a player, and where it came from (for the "why" trace of the chat
 -- badge): "off" (switch off, exactly what the logo register says), "sent" (logos the player sends himself, he
 -- decides for himself), "local" (the local result), "no hit" (the index has no logo for him) or "guild unknown"
@@ -384,10 +419,14 @@ function CL.Shown(name)
   if type(name) ~= "string" then
     return {}, "no hit"
   end
-  local sent = ns.CrestMark.Entries(name)
+  local raw = ns.CrestMark.Entries(name)
+  -- Only what the viewer shares with the player: his own logos always, the logos he sends only for the guild and the
+  -- communities the viewer is in as well (the local index below is built from the lists of the viewer's own guild and
+  -- communities, so it is shared by construction).
+  local sent = PN.Equal(name, PN.Self()) and raw or CLL.Shared(raw, CL.Mine())
   if not CL.On() then
     return sent, "off"
-  elseif #sent > 0 then
+  elseif #raw > 0 then
     return sent, "sent"
   end
   local key = PN.Key(name)
@@ -396,6 +435,26 @@ function CL.Shown(name)
     return found, "local"
   end
   return found, parts.guild == nil and "guild unknown" or "no hit"
+end
+
+-- Like CL.Shown, for a player who is on the screen as a unit (a nameplate): when the local recognition is on and the
+-- logos so far name no guild, the guild the game reports for the unit (GetGuildInfo, readable values only) adds the logo
+-- of the own guild when it is that guild. Nothing is read when the switch is off.
+function CL.ShownUnit(name, unit)
+  local entries, tag = CL.Shown(name)
+  if not CL.On() or (entries[1] and entries[1].kind == "guild") or type(unit) ~= "string" or not parts.guild then
+    return entries, tag
+  end
+  -- The guild the game names for the unit counts only when it is the guild of the viewer.
+  local guild = safe(try(g("GetGuildInfo"), unit))
+  if type(guild) ~= "string" or guild == "" or CRL.NormalizeName(guild) ~= parts.guildKey then
+    return entries, tag
+  end
+  local out = { parts.guild.entry }
+  for _, item in ipairs(entries) do
+    out[#out + 1] = item
+  end
+  return out, "unit"
 end
 
 -- Events ---------------------------------------------------------------------------------------------------

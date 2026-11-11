@@ -143,6 +143,16 @@ function FL.ButtonRow(parent, defs, opts)
   function row:GetContentHeight()
     return contentHeight
   end
+  -- Width the shown buttons need side by side, measured with their labels.
+  function row:GetNaturalWidth()
+    local total, count = 0, 0
+    for _, item in ipairs(items) do
+      if item.shown then
+        total, count = total + natural(item, math.huge), count + 1
+      end
+    end
+    return total + math.max(0, count - 1) * gap
+  end
   function row:GetRowCount()
     return lines
   end

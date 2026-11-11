@@ -2,10 +2,15 @@
 -- switch of the mode, and the lines of one conversation in a scrolling view that keeps a small pool of frames
 -- (only the lines in view are frames, never one per line). Two looks, switchable per conversation:
 --   "messenger": a card per line with a stripe in the color of the sender (class color where known), own
---   cards set off to the right in a teal tint, sender and time in a head, links as chips under the text;
+--   cards set off to the right in a teal tint, sender and time in a head, links clickable inside the text;
 --   "compact": one wrapped line per message (time, name, text).
 -- Day dividers and the divider "new messages" run through both. The rules are ChatThreadLogic; reading
 -- moves the read position of the conversation (ChatUnread) as lines come into view.
+--
+-- Links: the text of a line is one wrapped FontString, the link text inside it is colored by the game. A
+-- transparent button sits over each link (one per line the link touches); the position comes from measuring
+-- the wrapped text (TL.LinkRects), so nothing is drawn twice. Hover shows the tooltip of the link, a click opens
+-- it (SetItemRef), Shift+click puts it into the input line, and the buttons are part of the keyboard focus.
 local _, chat = ...
 if not chat.hook then
   return
@@ -13,7 +18,7 @@ end
 
 local FG = chat.FG
 local W, L, Theme, K, U = FG.W, FG.L, FG.Theme, FG.PageKit, FG.U
-local TL, LL, List = chat.ThreadLogic, chat.ListLogic, chat.List
+local TL, LL, List, TX = chat.ThreadLogic, chat.ListLogic, chat.List, chat.TextLogic
 
 local Thread = {}
 chat.Thread = Thread
@@ -33,6 +38,9 @@ local DELIVERY_TOKEN = {
   nobody = "warning",
 }
 local TEAM_STATES = { waiting = true, partial = true, complete = true, nobody = true }
+-- "Send again" and "Use text" sit in the status line of an own message (the head of its card, in the compact look at the
+-- right end of the line while the mouse or the keyboard focus is on it).
+local ACT, ACT_GAP = 16, 4
 
 local function hexOf(r, g, b, text)
   return string.format("|cff%02x%02x%02x%s|r", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5, text)
@@ -88,6 +96,25 @@ local function scaled(base)
   return K.scaledHeight(base)
 end
 
+-- Whether names show in their class color (the option "classColors", on by default).
+local function classColors()
+  local settings = chat.Settings
+  return not (settings and settings.Value) or settings.Value("classColors") ~= false
+end
+
+-- The class token for the name of a line: the class stored with the line (from the GUID of the event), else what is
+-- known about the name (guild list, group, players seen before). A Battle.net partner has the class of the character
+-- that plays. nil when the option is off or the class is unknown.
+function Thread.ClassOf(view, line)
+  if not classColors() then
+    return nil
+  end
+  if view.conv and view.conv.kind == "bnet" then
+    return view.conv.character and view.win.ClassOfName(view.conv.character) or nil
+  end
+  return line.class or view.win.ClassOfName(line.sender)
+end
+
 -- Sender: r, g, b of the stripe and the name, and the name as shown.
 local function look(view, item)
   if item.own then
@@ -102,7 +129,7 @@ local function look(view, item)
     local r, g, b = Theme.rgb("textMuted")
     return r, g, b, "?"
   end
-  local class = not (view.conv and view.conv.kind == "bnet") and view.win.ClassOfName(item.line.sender) or nil
+  local class = Thread.ClassOf(view, item.line)
   if class then
     local r, g, b = U.hex(K.ClassColorHex(class))
     return r, g, b, short
@@ -121,16 +148,40 @@ local function clockOf(line)
 end
 
 -- The text of a line, with the reactions and "seen" of the add-on extras behind it (opt-in, ChatPeer.lua).
+-- The quote head of a reply: the quoted line in short, a link that jumps to it. "" when the line quotes nothing or the
+-- quoted line is gone from the history.
+local function quoteHead(view, line)
+  if not (line.reply and view.conv) then
+    return ""
+  end
+  local original
+  for _, candidate in ipairs(view.conv.lines) do
+    if candidate.seq == line.reply then
+      original = candidate
+      break
+    end
+  end
+  if not original or original.hidden then
+    return ""
+  end
+  local name = original.dir == FG.ChatHistoryLogic.DIR_OUT and FG.PlayerName.Self() or original.sender or "?"
+  local r, g, b = Theme.rgb("textMuted")
+  local text = string.format(L["chat.reply.quote"], name, TX.Excerpt(original.text))
+  return "|Hfgjump:" .. original.seq .. "|h" .. hexOf(r, g, b, text) .. "|h" .. "\n"
+end
+
 local function bodyText(view, item)
   if item.line.hidden then
     return L["chat.thread.hidden"]
   end
+  local r, g, b = Theme.rgb("accent2")
+  local text = TX.ColorUrls(item.line.text, string.format("%02x%02x%02x", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5))
+  text = quoteHead(view, item.line) .. text
   local decor = chat.Peer and view.conv and chat.Peer.Decor(view.conv.key, item.line) or ""
   if decor == "" then
-    return item.line.text
+    return text
   end
-  local r, g, b = Theme.rgb("accent2")
-  return item.line.text .. "  " .. hexOf(r, g, b, "[" .. decor .. "]")
+  return text .. "  " .. hexOf(r, g, b, "[" .. decor .. "]")
 end
 
 -- The logo in front of a name, "" unless the logo setting and Presence say so (ChatPeer.Badge).
@@ -148,14 +199,16 @@ local function deliveryText(view, item)
     local entry = view.teamSet and view.teamSet[tostring(line.time) .. "\n" .. tostring(line.text)]
     return chat.Teams.DeliveryText(type(entry) == "table" and entry or { state = item.delivery })
   end
-  return L["chat.delivery." .. item.delivery]
+  local text = L[TL.DeliveryKey(item.delivery, item.line.reason)]
+  local short = TL.ReasonShortKey(item.delivery, item.line.reason)
+  return short and (text .. ": " .. L[short]) or text
 end
 
 local function compactText(view, item)
   local line = item.line
   local r, g, b, name = look(view, item)
   local mark = ""
-  if item.delivery and item.delivery ~= "sent" then
+  if item.delivery and (item.delivery ~= "sent" or item.line.reason == "noecho") then
     mark = " [" .. deliveryText(view, item) .. "]"
   end
   local mr, mg, mb = Theme.rgb("textMuted")
@@ -181,46 +234,81 @@ local function restricted()
   return ok and locked == true
 end
 
--- Chips: links of a line, opened only while chat is not restricted ------------------------------------------
+-- Links: buttons over the link text, working only while chat is not restricted -------------------------------
 
-local function chipTip(chip)
-  local link = chip.payload
-  if not link then
+local function hitTip(hit)
+  local span = hit.span
+  if not span then
+    return
+  end
+  hit.hl:Show()
+  if span.kind == "url" then
+    FG.ShowTooltip(hit, span.label, L["chat.url.tip"], { anchor = "ANCHOR_RIGHT" })
+    return
+  elseif span.kind == "fgjump" then
+    FG.ShowTooltip(hit, L["chat.reply.jump"], nil, { anchor = "ANCHOR_RIGHT" })
     return
   end
   if restricted() then
-    FG.ShowTooltip(chip, link.label, L["chat.link.locked"], { anchor = "ANCHOR_RIGHT" })
+    FG.ShowTooltip(hit, span.label, L["chat.link.locked"], { anchor = "ANCHOR_RIGHT" })
     return
   end
-  FG.ShowTooltip(chip, link.label, nil, { link = link.link, hint = L["chat.link.open"], anchor = "ANCHOR_RIGHT" })
+  FG.ShowTooltip(hit, span.label, nil, { link = span.payload, hint = L["chat.link.open"], anchor = "ANCHOR_RIGHT" })
 end
 
-local function chipOpen(chip)
-  local link = chip.payload
+local function hitLeave(hit)
+  hit.hl:Hide()
+  FG.HideTooltip()
+end
+
+-- Shift+click (the chat link modifier of the game) puts the link into the input line of the window.
+local function wantsInsert()
+  local modified, shift = rawget(_G, "IsModifiedClick"), rawget(_G, "IsShiftKeyDown")
+  if type(modified) == "function" then
+    local ok, on = pcall(modified, "CHATLINK")
+    if ok then
+      return on == true
+    end
+  end
+  return type(shift) == "function" and shift() == true
+end
+
+local function hitOpen(hit)
+  local span = hit.span
   local open = rawget(_G, "SetItemRef")
-  if not link or restricted() or type(open) ~= "function" then
+  if span and span.kind == "url" then
+    return chat.LineActions.Url(span.payload)
+  elseif span and span.kind == "fgjump" then
+    local view = hit.view
+    return view and view:JumpTo(tonumber(span.payload:match("(%d+)$")))
+  end
+  if not span or restricted() then
     return
   end
-  pcall(open, link.link, "|H" .. link.link .. "|h[" .. link.label .. "]|h", "LeftButton")
+  if wantsInsert() and chat.Input and chat.Input.Insert(span.raw) then
+    return
+  end
+  if type(open) == "function" then
+    pcall(open, span.payload, span.raw, "LeftButton")
+  end
 end
 
-local function newChip(row)
-  local chip = CreateFrame("Button", nil, row)
-  chip.bg = chip:CreateTexture(nil, "BACKGROUND")
-  chip.bg:SetAllPoints()
-  chip.label = W.Text(chip, { role = "small", color = "accent2", justify = "CENTER" })
-  chip.label:SetPoint("CENTER")
-  chip.border = W.Border(chip, "accent2", 0.5)
-  FG.Bind(chip, function()
-    chip.bg:SetColorTexture(Theme.color("surface3", 0.9))
+local function newHit(row)
+  local hit = CreateFrame("Button", nil, row)
+  hit:RegisterForClicks("LeftButtonUp")
+  hit.hl = hit:CreateTexture(nil, "ARTWORK")
+  hit.hl:SetAllPoints()
+  FG.Bind(hit, function()
+    hit.hl:SetColorTexture(Theme.color("accent2", 0.22))
   end)
-  chip:SetScript("OnEnter", chipTip)
-  chip:SetScript("OnLeave", FG.HideTooltip)
-  chip:SetScript("OnClick", FG.Wrap("chat-link", chipOpen))
-  chip.fgOnFocus, chip.fgOnBlur = chipTip, FG.HideTooltip
-  FG.Focus.register(chip, chipOpen)
-  chip:Hide()
-  return chip
+  hit.hl:Hide()
+  hit:SetScript("OnEnter", hitTip)
+  hit:SetScript("OnLeave", hitLeave)
+  hit:SetScript("OnClick", FG.Wrap("chat-link", hitOpen))
+  hit.fgOnFocus, hit.fgOnBlur = hitTip, hitLeave
+  FG.Focus.register(hit, hitOpen)
+  hit:Hide()
+  return hit
 end
 
 -- Battle.net partners ---------------------------------------------------------------------------------------
@@ -270,6 +358,160 @@ function Thread.FindBnet(conv)
   return nil
 end
 
+-- Send again and Use text -----------------------------------------------------------------------------------
+
+-- One secure button serves every "Send again" icon: it lies over the icon under the mouse (resend.overlay), armed with
+-- that message, and leaves when the mouse does. The keyboard and the fallback go through Overlay:Click.
+local resend = { target = nil, overlay = nil }
+
+local function planOf(target)
+  local send = chat.Send
+  if not (target and send and send.Plan) then
+    return nil
+  end
+  local held = send.HeldJobOf(target.line)
+  local plan = send.Plan(target.conv, target.line.text, held)
+  if plan then
+    plan.held = held
+  end
+  return plan
+end
+
+local function resendOverlay()
+  if resend.overlay == nil and chat.Secure then
+    local overlay, why = chat.Secure.New({
+      plan = function()
+        return planOf(resend.target)
+      end,
+      release = true,
+    })
+    if overlay then
+      resend.overlay = overlay
+    elseif why == "nosecure" or why == "forbidden" then
+      resend.overlay = false
+    end
+  end
+  return resend.overlay or nil
+end
+
+-- The mouse is on the icon of a message: the secure button goes over it when it may be offered for that message.
+local function aimResend(view, row, button)
+  local item, overlay = row.item, resendOverlay()
+  if not (overlay and item and item.actions and view.conv) then
+    return
+  end
+  local target = { conv = view.conv, line = item.line }
+  local plan = planOf(target)
+  if plan and plan.secure then
+    resend.target = target
+    overlay:Aim(button)
+  else
+    overlay:Release()
+  end
+end
+
+-- The row shows another message or is hidden: the secure button must not stay over its icon with the old text.
+local function dropAim(row, item)
+  local overlay = resend.overlay
+  if overlay and overlay.anchor and overlay.anchor == row.actResend then
+    if not (item and item.actions and resend.target and resend.target.line == item.line) then
+      overlay:Release()
+    end
+  end
+end
+
+-- "Send again" by the plain icon (keyboard, or a click the secure button did not take). Code never clicks the secure
+-- button, so this is the normal send: the chat function first, the chat box when the game refuses it. A refusal that
+-- has a text is named under the input line.
+function Thread.Resend(view, row)
+  local item, conv = row.item, view.conv
+  if not (item and item.actions and conv and chat.Send) then
+    return nil
+  end
+  local job, why = chat.Send.Resend(conv, item.line)
+  if not job and chat.Input then
+    chat.Input.Refuse(conv.key, why)
+  end
+  return job
+end
+
+-- "Use text": the text of the message goes into the input line.
+function Thread.Take(view, row)
+  local item, conv = row.item, view.conv
+  if not (item and item.actions and conv and chat.Input) then
+    return false
+  end
+  local ok, why = chat.Input.Take(conv.key, item.line.text)
+  if not ok then
+    chat.Input.Refuse(conv.key, why)
+  end
+  return ok
+end
+
+-- The two icons show in the card look always; in the compact look only on the row under the mouse or the focus.
+local function showActions(view, row, on)
+  if not row.actResend then
+    return
+  end
+  local alpha = (view.mode == "messenger" or on) and 1 or 0
+  row.actResend:SetAlpha(alpha)
+  row.actTake:SetAlpha(alpha)
+end
+
+local function leaveActions(view, row)
+  if view.mode == "messenger" or not row.actResend then
+    return
+  end
+  local focus = FG.Focus and FG.Focus.current
+  if not row:IsMouseOver() and focus ~= row.actResend and focus ~= row.actTake then
+    showActions(view, row, false)
+  end
+end
+
+local function ensureActions(view, row)
+  if row.actResend then
+    return
+  end
+  row.actResend = W.Action(row, {
+    icon = "refresh",
+    size = ACT,
+    tooltip = "chat.act.resend",
+    tooltipText = "chat.act.resendTip",
+    wrap = "chat-resend",
+    onClick = function()
+      Thread.Resend(view, row)
+    end,
+  })
+  row.actTake = W.Action(row, {
+    icon = "pencil",
+    size = ACT,
+    tooltip = "chat.act.take",
+    tooltipText = "chat.act.takeTip",
+    wrap = "chat-take",
+    onClick = function()
+      Thread.Take(view, row)
+    end,
+  })
+  row.actResend:HookScript("OnEnter", function(button)
+    showActions(view, row, true)
+    aimResend(view, row, button)
+  end)
+  row.actTake:HookScript("OnEnter", function()
+    showActions(view, row, true)
+  end)
+  for _, button in ipairs({ row.actResend, row.actTake }) do
+    button:HookScript("OnLeave", function()
+      leaveActions(view, row)
+    end)
+    button.fgOnFocus = function()
+      showActions(view, row, true)
+    end
+    button.fgOnBlur = function()
+      leaveActions(view, row)
+    end
+  end
+end
+
 -- Rows ------------------------------------------------------------------------------------------------------
 
 local function newRow(view)
@@ -295,28 +537,45 @@ local function newRow(view)
   row.ruleR = row:CreateTexture(nil, "ARTWORK")
   row.ruleL:SetHeight(1)
   row.ruleR:SetHeight(1)
-  row.chips = {}
-  for i = 1, TL.MAX_CHIPS do
-    row.chips[i] = newChip(row)
-  end
+  row.hits = {}
   row:SetScript("OnEnter", function(self)
     local item = self.item
+    if view.lineBar and item and item.type == "line" then
+      local inset = item.actions and 2 * ACT + ACT_GAP + 16 or 6
+      local top = view.mode == "messenger" and item.first and TL.SPEC.padV - 1 or 0
+      if view.mode == "messenger" and item.first then
+        inset = inset + math.ceil(self.time:GetStringWidth()) + 8 + TL.SPEC.pad
+      end
+      view.lineBar:Aim(self, item, inset, top)
+    end
+    if item and item.actions then
+      showActions(view, self, true)
+    end
     if item and item.type == "line" and item.delivery and item.line.reason then
       FG.ShowTooltip(
         self,
-        L["chat.delivery." .. item.delivery],
-        L["chat.reason." .. item.line.reason] or nil,
+        L[TL.DeliveryKey(item.delivery, item.line.reason)],
+        TL.ReasonText(L, item.line),
         { anchor = "ANCHOR_TOP" }
       )
     end
   end)
-  row:SetScript("OnLeave", FG.HideTooltip)
+  row:SetScript("OnLeave", function(self)
+    FG.HideTooltip()
+    leaveActions(view, self)
+  end)
   row:SetScript("OnMouseUp", function(self, button)
     local item = self.item
     if button == "LeftButton" and item and item.type == "line" and view.OpenReact then
       view:OpenReact(item.line.seq, self)
+    elseif button == "RightButton" and item and item.type == "line" then
+      chat.LineActions.Copy(item)
     end
   end)
+  -- Built with the row, never in combat: a card needs its icons the moment its message appears.
+  ensureActions(view, row)
+  row.actResend:Hide()
+  row.actTake:Hide()
   row:Hide()
   return row
 end
@@ -336,8 +595,14 @@ local function hideParts(row)
   }) do
     part:Hide()
   end
-  for _, chip in ipairs(row.chips) do
-    chip:Hide()
+  for _, hit in ipairs(row.hits) do
+    hit.span = nil
+    hit:Hide()
+  end
+  if row.actResend then
+    dropAim(row, nil)
+    row.actResend:Hide()
+    row.actTake:Hide()
   end
 end
 
@@ -369,20 +634,59 @@ local function dayText(item)
   return L["chat.day." .. kind]
 end
 
-local function paintChips(view, row, item, x, y)
-  for i, chip in ipairs(row.chips) do
-    local place, link = item.chips and item.chips[i], item.links and item.links[i]
-    if place and link then
-      chip.payload = link
-      chip.label:SetText(link.label)
-      chip:ClearAllPoints()
-      chip:SetPoint("TOPLEFT", row, "TOPLEFT", x + place.x, -y)
-      chip:SetSize(place.w, scaled((TL.ChipSize(view.mode))))
-      chip:Show()
-    else
-      chip.payload = nil
-      chip:Hide()
+-- What the game measures for the text of a line: how many lines a text takes at the text width, how wide it is on
+-- one line, and how high one line is. The probes have the font of the body (a yell is set larger).
+local function hitMeasure(view, item, textW)
+  local big = item.voice == "yell" and view.mode == "messenger"
+  local wrap, single = big and view.measBig or view.meas, big and view.measWBig or view.measW
+  wrap:SetWidth(10000)
+  wrap:SetText("Ag")
+  local lineH = math.max(1, wrap:GetStringHeight())
+  wrap:SetWidth(textW)
+  return {
+    lineHeight = lineH,
+    lines = function(text)
+      wrap:SetText(text)
+      return math.max(1, math.floor(wrap:GetStringHeight() / lineH + 0.5))
+    end,
+    width = function(text)
+      single:SetText(text)
+      return single:GetStringWidth()
+    end,
+  }
+end
+
+-- Puts the buttons over the links of the text a line shows. x, y: top left of the text in the row. The result
+-- of the measuring is kept on the item for the same text and width.
+local function paintHits(view, row, item, shown, x, y, textW)
+  local rects, spans = nil, nil
+  if not item.line.hidden then
+    local key = textW .. "\30" .. shown
+    if item.hitKey ~= key then
+      local plain, found = TL.Spans(shown)
+      item.hitKey, item.hitSpans = key, found
+      item.hitRects = #found > 0 and TL.LinkRects(plain, found, hitMeasure(view, item, textW)) or {}
     end
+    rects, spans = item.hitRects, item.hitSpans
+  end
+  local used = 0
+  for _, rect in ipairs(rects or {}) do
+    used = used + 1
+    local hit = row.hits[used]
+    if not hit then
+      hit = newHit(row)
+      row.hits[used] = hit
+    end
+    hit.span = spans[rect.span]
+    hit.view = view
+    hit:ClearAllPoints()
+    hit:SetPoint("TOPLEFT", row, "TOPLEFT", x + rect.x, -(y + rect.y))
+    hit:SetSize(rect.w, rect.h)
+    hit:Show()
+  end
+  for i = used + 1, #row.hits do
+    row.hits[i].span = nil
+    row.hits[i]:Hide()
   end
 end
 
@@ -390,6 +694,7 @@ local function paintLine(view, row, item, width)
   local spec = TL.SPEC
   local r, g, b = look(view, item)
   row.hl:SetShown(false)
+  dropAim(row, item)
   if view.highlight and item.seq == view.highlight then
     local hr, hg, hb = Theme.rgb("accent")
     row.hl:SetColorTexture(hr, hg, hb, 0.25)
@@ -434,14 +739,30 @@ local function paintLine(view, row, item, width)
         stamp = Theme.hexText(token, deliveryText(view, item)) .. "  " .. stamp
       end
       row.time:SetText(stamp)
+      local timeW = math.ceil(row.time:GetStringWidth())
+      local actionsW = 0
+      if item.actions then
+        ensureActions(view, row)
+        actionsW = 2 * ACT + ACT_GAP + 8
+        row.actResend:SetSize(ACT, ACT)
+        row.actTake:SetSize(ACT, ACT)
+        row.actResend:ClearAllPoints()
+        row.actResend:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(spec.pad + timeW + 8), -(spec.padV - 1))
+        row.actTake:ClearAllPoints()
+        row.actTake:SetPoint("RIGHT", row.actResend, "LEFT", -ACT_GAP, 0)
+        -- A card whose head has scrolled out of the view shows no icons (they would hang over the header).
+        row.actResend:SetShown(item.top >= view.offset)
+        row.actTake:SetShown(item.top >= view.offset)
+        showActions(view, row, false)
+      end
       row.head:SetPoint("TOPLEFT", row, "TOPLEFT", left, -spec.padV)
-      row.head:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(spec.pad + math.ceil(row.time:GetStringWidth()) + 8), -spec.padV)
+      row.head:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(spec.pad + timeW + 8 + actionsW), -spec.padV)
       row.head:Show()
       row.time:Show()
     end
     body:SetPoint("TOPLEFT", row, "TOPLEFT", left, -(spec.padV + headH))
     body:SetWidth(TL.TextWidth(width, "messenger"))
-    paintChips(view, row, item, left, spec.padV + headH + item.bodyH + spec.chipGap)
+    paintHits(view, row, item, bodyText(view, item), left, spec.padV + headH, TL.TextWidth(width, "messenger"))
   else
     row:SetSize(width, item.h)
     row:ClearAllPoints()
@@ -451,11 +772,24 @@ local function paintLine(view, row, item, width)
     row.stripe:SetWidth(item.voice == "yell" and 4 or 2)
     row.stripe:SetColorTexture(r, g, b, item.own and 1 or 0.7)
     row.stripe:Show()
-    local chipGap = select(2, TL.ChipSize(view.mode))
     body:SetPoint("TOPLEFT", row, "TOPLEFT", spec.pad - 2, 0)
     body:SetWidth(TL.TextWidth(width, "compact"))
     W.SetColor(body, item.line.hidden and "textMuted" or "text")
-    paintChips(view, row, item, spec.pad - 2, item.bodyH + chipGap)
+    paintHits(view, row, item, compactText(view, item), spec.pad - 2, 0, TL.TextWidth(width, "compact"))
+    if item.actions then
+      ensureActions(view, row)
+      -- A compact row is one line high: the icons fit into it, never into the row above or below.
+      local size = math.max(10, math.min(ACT, math.floor(item.h) - 1))
+      row.actResend:SetSize(size, size)
+      row.actTake:SetSize(size, size)
+      row.actResend:ClearAllPoints()
+      row.actResend:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, 0)
+      row.actTake:ClearAllPoints()
+      row.actTake:SetPoint("RIGHT", row.actResend, "LEFT", -ACT_GAP, 0)
+      row.actResend:SetShown(item.top >= view.offset)
+      row.actTake:SetShown(item.top >= view.offset)
+      showActions(view, row, row:IsMouseOver())
+    end
   end
 end
 
@@ -583,6 +917,9 @@ function Thread.Create(parent, win, shape)
   view.info:SetPoint("BOTTOMRIGHT", 0, 0)
 
   view.host = CreateFrame("Frame", nil, f)
+  view.lineBar = chat.LineActions.NewBar(view.host, function()
+    return view.conv
+  end)
   view.host:SetClipsChildren(true)
   view.host:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, view.headless and 0 or -GAP)
   view.host:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
@@ -608,9 +945,12 @@ function Thread.Create(parent, win, shape)
   view.measBig = W.Text(view.host, { role = "h3", color = "text", wrap = true })
   view.measBig:SetPoint("TOPLEFT", 0, 0)
   view.measBig:SetAlpha(0)
-  view.measW = W.Text(view.host, { role = "small", color = "text" })
+  view.measW = W.Text(view.host, { role = "ui", color = "text" })
   view.measW:SetPoint("TOPLEFT", 0, 0)
   view.measW:SetAlpha(0)
+  view.measWBig = W.Text(view.host, { role = "h3", color = "text" })
+  view.measWBig:SetPoint("TOPLEFT", 0, 0)
+  view.measWBig:SetAlpha(0)
 
   for _ = 1, Thread.PREBUILD do
     view.pool[#view.pool + 1] = newRow(view)
@@ -731,11 +1071,6 @@ function Thread.Create(parent, win, shape)
     return meas:GetStringHeight()
   end
 
-  local function widthOf(label)
-    view.measW:SetText(label)
-    return view.measW:GetStringWidth()
-  end
-
   -- Items and heights for the width now. The line at the top of the view keeps its place.
   function view:Rebuild()
     local conv = view.conv
@@ -758,13 +1093,15 @@ function Thread.Create(parent, win, shape)
       dividerSeq = view.dividerSeq,
       unread = view.dividerCount,
       deliveryOf = deliveryOf,
+      resend = function(line)
+        return chat.WayLogic.Resendable(conv.kind, line)
+      end,
     })
     local mode = view.mode
     view.contentH = TL.Layout(view.items, view.width, {
       mode = mode,
       scale = scaled,
       measure = measure,
-      widthOf = widthOf,
       text = function(item)
         return mode == "messenger" and bodyText(view, item) or compactText(view, item)
       end,
@@ -795,6 +1132,9 @@ function Thread.Create(parent, win, shape)
   end
 
   function view:Render()
+    if view.lineBar then
+      view.lineBar:Release()
+    end
     local conv = view.conv
     local width = view.width
     for _, row in ipairs(view.pool) do
@@ -853,6 +1193,18 @@ function Thread.Create(parent, win, shape)
       view.offset = clamped
       view:Render()
     end
+  end
+
+  -- Scrolls to a line and marks it (the jump of a quote head). Returns whether the line is still there.
+  function view:JumpTo(seq)
+    local index = seq and TL.IndexOfSeq(view.items, seq)
+    if not index then
+      return false
+    end
+    view.highlight = seq
+    view:ScrollTo(view.items[index].top - scaled(TL.SPEC.day))
+    view:Render()
+    return true
   end
 
   function view:ScrollBy(delta)
@@ -964,6 +1316,14 @@ function Thread.Create(parent, win, shape)
       view:ScrollTo(math.huge)
     elseif ctrl and key == "R" then
       return view:ReactLast()
+    elseif ctrl and key == "C" then
+      -- Ctrl+C copies the newest line (the keyboard way to the copy dialog).
+      for i = #view.items, 1, -1 do
+        if view.items[i].type == "line" then
+          return chat.LineActions.Copy(view.items[i])
+        end
+      end
+      return false
     else
       return false
     end

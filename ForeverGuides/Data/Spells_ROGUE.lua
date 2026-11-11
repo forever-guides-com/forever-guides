@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-07.
+-- Generated data, do not edit. Data as of 2026-11-09.
 -- Spell catalog of ROGUE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -88,13 +88,6 @@ ns.Data.Spells.ROGUE = {
     n={de="Hinterhalt",en="Ambush"},
     rk=6,
     sup=11268,
-  },
-  {
-    fid=132100,
-    id=439503,
-    k="other",
-    l=60,
-    n={de="Atrophisches Gift",en="Atrophic Poison"},
   },
   {
     fid=132090,
@@ -1283,27 +1276,12 @@ ns.Data.Spells.ROGUE = {
     sup=1241582,
   },
   {
-    fid=132100,
-    id=439505,
-    k="other",
-    l=60,
-    n={de="Betäubendes Gift",en="Numbing Poison"},
-  },
-  {
     fid=135935,
     id=458822,
     k="other",
     l=54,
     n={de="Okkultes Gift I",en="Occult Poison I"},
     rk=1,
-  },
-  {
-    fid=135935,
-    id=1214168,
-    k="other",
-    l=60,
-    n={de="Okkultes Gift II",en="Occult Poison II"},
-    rk=2,
   },
   {
     c={"HUNTER","PALADIN","ROGUE","SHAMAN","WARRIOR"},
@@ -1409,13 +1387,6 @@ ns.Data.Spells.ROGUE = {
     id=1310728,
     k="talent",
     n={de="Rasante Flucht",en="Quick Getaway"},
-  },
-  {
-    fid=135425,
-    id=438040,
-    k="spell",
-    l=1,
-    n={de="Umleiten",en="Redirect"},
   },
   {
     fid=132340,
@@ -1555,13 +1526,6 @@ ns.Data.Spells.ROGUE = {
     k="talent",
     l=1,
     n={de="Schicksal besiegeln",en="Seal Fate"},
-  },
-  {
-    fid=132108,
-    id=439500,
-    k="other",
-    l=60,
-    n={de="Zähes Gift",en="Sebacious Poison"},
   },
   {
     fid=135315,

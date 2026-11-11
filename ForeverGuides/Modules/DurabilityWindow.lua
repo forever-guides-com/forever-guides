@@ -483,7 +483,7 @@ ns.RegisterPage({
         height = 28,
         opens = true,
         onClick = function()
-          ns.SettingsPage.Select("bags")
+          ns.SettingsPage.Select("durability", "durability.main")
           ns.Main.Show("settings")
         end,
       }),

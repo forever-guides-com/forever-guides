@@ -32,6 +32,7 @@ function ns.AddParagraph(view, key, opts)
     wrap = true,
     family = opts.family,
   })
+  fs.fgParagraph = true
   view.stack:Add(fs, { gap = opts.gap })
   return fs
 end
@@ -42,6 +43,7 @@ function ns.AddHeading(view, key, opts)
     view.content,
     { key = key, text = opts.text, role = opts.role or "h3", family = "heading", color = "accent2", wrap = true }
   )
+  fs.fgHeading = true
   view.stack:Add(fs, { gap = opts.gap or 6 })
   return fs
 end
@@ -94,6 +96,7 @@ ns.ICONS = {
   professions = STOCK .. "Trade_BlackSmithing",
   professionroute = OWN_ICONS .. "professionroute.png",
   proftrainers = STOCK .. "Trade_Engineering",
+  vendors = STOCK .. "INV_Misc_Coin_01",
   gathering = STOCK .. "Trade_Mining",
   items = STOCK .. "INV_Chest_Plate06",
   macros = STOCK .. "INV_Misc_Note_01",

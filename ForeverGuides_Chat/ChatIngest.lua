@@ -211,6 +211,16 @@ end
 -- which turns a whisper that went to nobody into a failed one. It makes no conversation and no line.
 local SYSTEM = "CHAT_MSG_SYSTEM"
 
+-- Whether a line is the player's own: a whisper that went out, or a line whose sender is the own name (a group,
+-- guild or channel echo). A secret sender is no match.
+local function isOwnLine(input)
+  if input.dir == FG.ChatHistoryLogic.DIR_OUT then
+    return true
+  end
+  local sender = FG.AutoGuard.Safe(input.sender)
+  return type(sender) == "string" and ctx.own ~= "" and PN.Equal(sender, ctx.own)
+end
+
 -- One chat event. Returns true when a line was taken, else false and the reason (see IngestLogic.Build, and
 -- the reasons of Conversations.AddLine: "time", "text", "duplicate", "full").
 local function handle(event, ...)
@@ -226,10 +236,20 @@ local function handle(event, ...)
   ctx.restrictedName = FG.L["chat.restricted.name"]
   ctx.bnetUnknownName = FG.L["chat.bnet.unknown"]
   ctx.blocked = skipsIgnored() and isIgnored or nil
+  ctx.classOf = chat.Class and chat.Class.Of or nil
   local target, input, extra = IL.Build(ctx, event, { ... })
   if not target then
     stats.skipped = stats.skipped + 1
     return false, input
+  end
+  -- The own line that the game echoes after Enter in its chat box confirms the message that waited there. The line
+  -- of that message exists already, so no second one is made.
+  if not input.hidden and chat.Send and isOwnLine(input) then
+    local ownKey = Conv.Key(target.kind, target.name, target.homeRealm)
+    if ownKey and chat.Send.OnOwnLine(ownKey, input.text) then
+      markDirty(ownKey)
+      return true
+    end
   end
   local line, conv = Conv.AddLine(chat.convs, target, input)
   if not line then

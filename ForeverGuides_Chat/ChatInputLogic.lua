@@ -12,8 +12,8 @@ local SL = chat.SendLogic
 local IL = {}
 chat.InputLogic = IL
 
--- The counter shows from this many bytes on (a part holds SendLogic.MAX_BYTES).
-IL.COUNTER_FROM = 200
+-- The counter shows from this many bytes on (a part holds the limit of its chat type, SendLogic.Limit).
+IL.COUNTER_FROM = 1
 IL.HISTORY_SIZE = 20
 -- No input is longer than what the sender takes at all.
 IL.MAX_BYTES = SL.MAX_PARTS * SL.MAX_BYTES
@@ -22,34 +22,41 @@ function IL.IsBlank(text)
   return type(text) ~= "string" or not text:find("%S")
 end
 
--- Counter of a text: nil below COUNTER_FROM, else { key, bytes, parts, over } where key names the locale text
--- (one part: bytes and the limit, several parts: bytes and parts, too long: bytes only).
-function IL.Counter(text)
+-- Counter of a text for a conversation kind: nil below COUNTER_FROM, else { key, bytes, limit, parts, over,
+-- measured } where key names the locale text (one part: bytes and the limit, several parts: bytes, the limit and the
+-- number of messages, too long: bytes and the most messages). Bytes are UTF-8 bytes, a link counts with its full
+-- escape text. measured is false for a chat type whose limit nobody measured here (Battle.net).
+function IL.Counter(text, kind)
   local bytes = type(text) == "string" and #text or 0
   if bytes < IL.COUNTER_FROM then
     return nil
   end
-  local parts, why = SL.Split(text)
+  local limit, measured = SL.Limit(kind)
+  local parts, why = SL.Split(text, limit)
+  local counter = { bytes = bytes, limit = limit, measured = measured }
   if parts then
-    local n = #parts
-    return { key = n > 1 and "chat.input.count.parts" or "chat.input.count.one", bytes = bytes, parts = n }
+    counter.parts = #parts
+    counter.key = counter.parts > 1 and "chat.input.count.parts" or "chat.input.count.one"
+    return counter
   end
   if why == "toolong" then
-    return { key = "chat.input.count.over", bytes = bytes, parts = SL.MAX_PARTS, over = true }
+    counter.key, counter.parts, counter.over = "chat.input.count.over", SL.MAX_PARTS, true
+    return counter
   end
   -- A broken link or bad character: the sender will say why, the counter still counts bytes.
-  local n = math.max(1, math.ceil(bytes / SL.MAX_BYTES))
-  return { key = n > 1 and "chat.input.count.parts" or "chat.input.count.one", bytes = bytes, parts = n }
+  counter.parts = math.max(1, math.ceil(bytes / limit))
+  counter.key = counter.parts > 1 and "chat.input.count.parts" or "chat.input.count.one"
+  return counter
 end
 
 -- Arguments of the counter text in the order of its format.
 function IL.CounterArgs(counter)
   if counter.key == "chat.input.count.one" then
-    return counter.bytes, SL.MAX_BYTES
+    return counter.bytes, counter.limit
   elseif counter.key == "chat.input.count.parts" then
-    return counter.bytes, counter.parts
+    return counter.bytes, counter.limit, counter.parts
   end
-  return counter.bytes
+  return counter.bytes, counter.parts
 end
 
 -- History of sent inputs (memory only) ---------------------------------------------------------------------
@@ -125,15 +132,35 @@ function IL.Held(jobs, key)
   return out
 end
 
+-- The jobs of a list that wait for the given reason.
+function IL.WithReason(jobs, reason)
+  local out = {}
+  for _, job in ipairs(jobs) do
+    if job.reason == reason then
+      out[#out + 1] = job
+    end
+  end
+  return out
+end
+
 -- What the strip shows for the held jobs of a conversation, nil when there are none:
 -- { key (locale key of the text), count (argument when the text has one), release (locale key of the send
--- button), failedOnly }. One held message names its reason, several only count.
-function IL.HeldView(held)
+-- button), failedOnly }. sendNow: the secure "Send now" button is offered for the one held message. One held message names its reason, several only count.
+function IL.HeldView(held, sendNow)
   local w, f = #held.waiting, #held.failed
   if w + f == 0 then
     return nil
   end
-  local view = { failedOnly = w == 0, release = w > 0 and "chat.queue.release" or "chat.queue.retry" }
+  local release = w > 0 and "chat.queue.release" or "chat.queue.retry"
+  -- Every waiting message sits in the chat box of the game: the button puts it there again, it does not send.
+  if w > 0 and #held.waiting == #IL.WithReason(held.waiting, "enter") then
+    release = "chat.queue.reopen"
+  end
+  -- The secure button may be offered for the one held message: "Send now", a real mouse click sends it.
+  if sendNow and w + f == 1 then
+    release = "chat.queue.sendnow"
+  end
+  local view = { failedOnly = w == 0, release = release }
   if w + f == 1 then
     local job = held.waiting[1] or held.failed[1]
     view.key = "chat.reason." .. (job.reason or (w == 1 and "click" or "error"))

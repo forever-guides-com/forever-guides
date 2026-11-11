@@ -1,6 +1,6 @@
 -- Zone transition arrows on Blizzard's world map (WorldMapFrame), from Modules/ZoneBorderLogic.lua. A zone
 -- map shows an arrow at every crossing to a neighbouring zone, pointing into it (a dashed one is an estimate);
--- hover names the zone and says how sure the place is, a click opens the zone on the add-on map. The borders come from the outlines of Data.Travel and the zone rectangles on the
+-- hover names the zone and says how sure the place is, a click shows the zone in this window. The borders come from the outlines of Data.Travel and the zone rectangles on the
 -- continent (C_Map.GetMapRectOnMap), the same zone view the map page uses. Other map types and zones without
 -- data get none. Like WorldMapFlightPins it only hooks Blizzard's map and keeps its pins as children of the
 -- canvas; the world map has no focus ring, the zone list of the map page is the keyboard route.
@@ -78,20 +78,31 @@ local function arrowsFor(id, canvas)
   return ZBL.ForView(zv, lookup().bySlug, w > 0 and h / w or 1)
 end
 
--- The click opens the zone on the add-on map. Blizzard's map is never switched from here: SetMapID from
--- addon code runs the map's pin and quest providers tainted.
+-- The click shows the neighbour in Blizzard's own window. SetMapID runs from addon code, so it only runs
+-- out of combat and while the client lets this add-on touch the map (ZBL.WorldClickPlan); otherwise nothing
+-- of Blizzard's is called and the player gets a note. The add-on map is not involved.
 local function open(pin, button)
   if button ~= "LeftButton" or ZE.Active() then
     return
   end
   ns.HideTooltip()
-  if not ns.MapRequest then
+  local target = pin.arrow.map
+  local plan = ZBL.WorldClickPlan(target, WML.MapID(), ns.InCombat(), ns.ProtectedAllowed(map))
+  ns.MapOps.Record("arrow click", target)
+  if plan == "switch" then
+    ns.MapOps.Record("WorldMapFrame:SetMapID", target)
+    -- A Lua closure, not the game's method handed to pcall (see ns.PropagateKeys).
+    local ok = pcall(function()
+      map:SetMapID(target)
+    end)
+    if not ok then
+      ns.Notify(L["zb.failed"], "warning")
+    end
+  elseif plan == "combat" or plan == "blocked" then
+    ns.Notify(L["zb.combat"], "warning")
+  elseif plan == "invalid" then
     ns.Notify(L["zb.failed"], "warning")
-    return
   end
-  ns.MapOps.Record("arrow click", pin.arrow.map)
-  ns.MapRequest.Open({ map = pin.arrow.map })
-  ns.BlizzardLinks.RaiseMain(map)
 end
 
 local function newPin(canvas)
@@ -102,7 +113,7 @@ local function newPin(canvas)
   pin.badge.box:SetPoint("CENTER")
   pin:SetScript("OnEnter", function(self)
     self.badge:Highlight(1)
-    local title, lines = ZBL.TooltipLines(self.arrow, L, nil, ZE.HintKey("zb.hint.addon"))
+    local title, lines = ZBL.TooltipLines(self.arrow, L, nil, ZE.HintKey("zb.hint"))
     ns.ShowTooltip(self, title, table.concat(lines, "\n"))
   end)
   pin:SetScript("OnLeave", function(self)

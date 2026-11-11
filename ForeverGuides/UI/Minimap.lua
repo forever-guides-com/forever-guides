@@ -120,29 +120,6 @@ function Minimap_.Init()
       end,
     })
   end
-
-  if ns.can.settingsCanvas and ns.can.settingsAddCategory then
-    pcall(function()
-      local panel = CreateFrame("Frame")
-      local open = ns.W.Action(panel, {
-        label = "act.open",
-        icon = "open",
-        tooltip = "settings.openAddon",
-        variant = "primary",
-        width = 220,
-        opens = true,
-        onClick = function()
-          if SettingsPanel and SettingsPanel.Close then
-            SettingsPanel:Close(true)
-          end
-          ns.Main.Show("settings")
-        end,
-      })
-      open:SetPoint("TOPLEFT", 16, -16)
-      local category = Settings.RegisterCanvasLayoutCategory(panel, "Forever Guides")
-      Settings.RegisterAddOnCategory(category)
-    end)
-  end
 end
 
 function Minimap_.Apply()

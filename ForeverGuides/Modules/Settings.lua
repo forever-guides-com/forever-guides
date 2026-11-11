@@ -1,5 +1,5 @@
--- Settings page in tabs: general, appearance, map, items, loot and inventory, selling, automation,
--- guild and contacts, share, add-ons, advanced. Every tab is a grid of cards (Modules/SettingsGrid.lua), one card per
+-- Settings page: 8 groups with 43 features as tabs (Modules/SettingsFeatures.lua, drawn by
+-- Modules/SettingsNav.lua). Every feature is a grid of cards (Modules/SettingsGrid.lua), one card per
 -- section. The sections of other modules are added through ns.SettingsPage.
 local _, ns = ...
 local W, Store, WS, Theme = ns.W, ns.Store, ns.WindowStyle, ns.Theme
@@ -41,6 +41,8 @@ ns.AddLocale("enUS", {
   ["settings.winStyle.drawing"] = "Drawing windows",
   ["settings.reopenNoteWindows"] = "Reopen last opened note windows at start",
   ["settings.reopenNoteWindowsHint"] = "Open note windows return at the next login. On by default.",
+  ["settings.hudwindowsHint"] = "The HUD windows have their own page in the main menu. Size, position and content are set there.",
+  ["settings.hudwindowsOpen"] = "Open HUD windows",
   ["settings.feedback"] = "Feedback",
   ["settings.feedbackHelp"] = 'Off (default): no confirmations, errors and warnings still show as a toast.\nToast: small message at the top right, disappears on its own.\nExample: "Drawing House saved".\nChat: message as a line in the chat window.\nHovering pauses the timer.\nClick closes it, right-click closes all.\nErrors and warnings can also go to chat.\nThe last 50 messages, whatever the setting: "Recent messages".\nNot affected: chat links of shared notes and drawings.',
   ["settings.feedbackModeLabel"] = "Where should feedback appear?",
@@ -64,15 +66,6 @@ ns.AddLocale("enUS", {
   ["settings.pkg.loaded"] = "On",
   ["settings.pkg.disabled"] = "Off",
   ["settings.pkg.missing"] = "Missing",
-  ["settings.tab.general"] = "General",
-  ["settings.tab.window"] = "Appearance",
-  ["settings.tab.map"] = "Map and travel",
-  ["settings.tab.items"] = "Items",
-  ["settings.tab.bags"] = "Loot and inventory",
-  ["settings.tab.sell"] = "Selling",
-  ["settings.tab.automation"] = "Automation",
-  ["settings.tab.social"] = "Guild and contacts",
-  ["settings.tab.advanced"] = "Advanced",
 })
 ns.AddLocale("deDE", {
   ["settings.buttonLabels"] = "Beschriftung an Symbolknöpfen anzeigen",
@@ -98,6 +91,8 @@ ns.AddLocale("deDE", {
   ["settings.winStyle.drawing"] = "Zeichnungsfenster",
   ["settings.reopenNoteWindows"] = "Beim Start zuletzt geöffnete Notizfenster wieder öffnen",
   ["settings.reopenNoteWindowsHint"] = "Offene Notizfenster kommen beim nächsten Login zurück. Standardmäßig an.",
+  ["settings.hudwindowsHint"] = "Die HUD-Fenster haben eine eigene Seite im Hauptmenü. Größe, Position und Inhalt stellst du dort ein.",
+  ["settings.hudwindowsOpen"] = "HUD-Fenster öffnen",
   ["settings.feedback"] = "Rückmeldungen",
   ["settings.feedbackHelp"] = "Aus (Standard): keine Bestätigungen, Fehler und Warnungen erscheinen weiter als Toast.\nToast: kleine Meldung oben rechts, verschwindet von selbst.\nBeispiel: „Zeichnung Haus gespeichert“.\nChat: Meldung als Zeile im Chatfenster.\nMaus darüber pausiert den Timer.\nKlick schließt ihn, Rechtsklick schließt alle.\nFehler und Warnungen können zusätzlich im Chat erscheinen.\nDie letzten 50 Meldungen, egal bei welcher Einstellung: „Letzte Meldungen“.\nNicht betroffen: Chat-Links geteilter Notizen und Zeichnungen.",
   ["settings.feedbackModeLabel"] = "Wo sollen Rückmeldungen erscheinen?",
@@ -121,15 +116,6 @@ ns.AddLocale("deDE", {
   ["settings.pkg.loaded"] = "An",
   ["settings.pkg.disabled"] = "Aus",
   ["settings.pkg.missing"] = "Fehlt",
-  ["settings.tab.general"] = "Allgemein",
-  ["settings.tab.window"] = "Darstellung",
-  ["settings.tab.map"] = "Karte und Reise",
-  ["settings.tab.items"] = "Items",
-  ["settings.tab.bags"] = "Beute und Bestand",
-  ["settings.tab.sell"] = "Verkauf",
-  ["settings.tab.automation"] = "Automatik",
-  ["settings.tab.social"] = "Gilde und Kontakte",
-  ["settings.tab.advanced"] = "Erweitert",
 })
 
 local function keysText()
@@ -256,8 +242,8 @@ local function feedbackSection(view)
   errors.fgId = "feedback-errors"
   s:Add(errors, { height = 24, gap = 6 })
   ns.AddParagraph(view, "settings.feedbackErrorsHint", { role = "micro", color = "textMuted" })
-  local function button(key, label, icon, onClick, opens)
-    local b = W.Action(view.content, {
+  local function button(target, key, label, icon, onClick, opens)
+    local b = W.Action(target.content, {
       label = label,
       icon = icon,
       tooltip = key,
@@ -266,13 +252,16 @@ local function feedbackSection(view)
       opens = opens,
       onClick = onClick,
     })
-    s:Add(b, { height = 28, width = 220 })
+    b.fgId = "button-" .. key:gsub("%.", "-")
+    target.stack:Add(b, { height = 28, width = 220 })
     return b
   end
-  button("settings.feedbackTest", "act.test", "play", Toast.SendTest)
-  button("settings.feedbackHistory", "act.history", "history", Toast.OpenHistory, true)
+  button(view, "settings.feedbackTest", "act.test", "play", Toast.SendTest)
+  -- History and the place of the toast are set once: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "messages.feedback" })
+  button(more, "settings.feedbackHistory", "act.history", "history", Toast.OpenHistory, true)
   local position
-  position = button("settings.toastPosition", "act.move", "marker", function()
+  position = button(more, "settings.toastPosition", "act.move", "marker", function()
     Toast.SetEditing(not Toast.IsEditing())
   end)
   local function syncPosition()
@@ -281,88 +270,94 @@ local function feedbackSection(view)
   -- A right-click on the sample toast also ends the mode.
   ns.On("FG_TOAST_EDITING", syncPosition)
   position.Refresh = syncPosition
-  button("settings.toastReset", "act.reset", "reset", Toast.ResetPosition)
-  ns.AddParagraph(view, "settings.toastPositionHint", { role = "micro", color = "textMuted" })
+  button(more, "settings.toastReset", "act.reset", "reset", Toast.ResetPosition)
+  ns.AddParagraph(more, "settings.toastPositionHint", { role = "micro", color = "textMuted" })
 end
 
--- The tabs of the page. A section is added to a tab with a function build(view); the built-in
--- sections below call the Add functions of their modules, other modules append theirs with
--- ns.SettingsPage.Add(build, tab).
+-- The settings are features, each with cards (Modules/SettingsFeatures.lua). A card is added with a
+-- function build(view); the built-in cards below call the Add functions of their modules, other modules
+-- register theirs with ns.SettingsPage.Add(build, target, cardId).
 local PAD = 16
-local TAB_LIST = {
-  "general",
-  "window",
-  "map",
-  "items",
-  "bags",
-  "sell",
-  "automation",
-  "social",
-  "sharing",
-  "addons",
-  "advanced",
-}
-local TABS = {}
-for _, id in ipairs(TAB_LIST) do
-  TABS[id] = true
-end
+local L = ns.SettingsFeatureLogic
 
-local SP = { TABS = TAB_LIST }
+local SP = {}
 ns.SettingsPage = SP
 
-local extra = {}
+-- Card builders by card id, and the cards a module adds without an id the registry knows (a sub-add-on of
+-- an older version) per feature.
+local builders = {}
+local late = {}
 
--- Appends a section to a tab (default "general"; an unknown tab id falls back to it). build(view)
--- runs when the page is built, after the built-in sections of that tab, and fills a card of its own.
-function SP.Add(build, tab)
-  tab = TABS[tab] and tab or "general"
-  extra[tab] = extra[tab] or {}
-  table.insert(extra[tab], build)
+-- Registers the builder of a card. target is a feature or an old tab id and only matters while the id
+-- is unknown to the registry: the card then goes to the end of that feature (an unknown target means
+-- the first feature). build(view) fills a card of its own when the feature is built.
+function SP.Add(build, target, cardId)
+  local feature = cardId and L.CardFeature(cardId)
+  if feature then
+    builders[cardId] = { build = build, safe = true }
+  else
+    feature = L.FeatureOrFirst(target)
+    late[feature] = late[feature] or {}
+    table.insert(late[feature], { build = build, id = cardId })
+  end
+  -- A sub-add-on that loads while the page stands shows its cards without a /reload.
+  if SP.page and SP.page.features[feature] then
+    ns.Debounce("settings-rebuild-" .. feature, 0, function()
+      SP.page:Rebuild(feature)
+    end)
+  end
+end
+
+-- True when a module registered the builder of the card (a sub-add-on's card exists only while it is loaded).
+function SP.HasCard(cardId)
+  return builders[cardId] ~= nil
+end
+
+local function register(cardId, build, when)
+  builders[cardId] = { build = build, when = when }
 end
 
 -- invert: the toggle shows the opposite of the stored value (on = feature shown, stored as hidden = false).
 local function toggle(view, key, labelKey, after, tooltipText, invert)
   local get, set = setting(key)
-  view.stack:Add(
-    W.Toggle(view.content, {
-      key = labelKey,
-      get = function()
-        local v = get() and true or false
-        if invert then
-          v = not v
-        end
-        return v
-      end,
-      set = function(v)
-        v = v and true or false
-        if invert then
-          v = not v
-        end
-        set(v)
-        if after then
-          after(v)
-        end
-      end,
-      tooltip = labelKey,
-      tooltipText = tooltipText,
-    }),
-    { height = 24, gap = 6 }
-  )
+  local control = W.Toggle(view.content, {
+    key = labelKey,
+    get = function()
+      local v = get() and true or false
+      if invert then
+        v = not v
+      end
+      return v
+    end,
+    set = function(v)
+      v = v and true or false
+      if invert then
+        v = not v
+      end
+      set(v)
+      if after then
+        after(v)
+      end
+    end,
+    tooltip = labelKey,
+    tooltipText = tooltipText,
+  })
+  control.fgId = "setting-" .. key
+  view.stack:Add(control, { height = 24, gap = 6 })
 end
 
 local function button(view, key, label, icon, onClick, opens)
-  view.stack:Add(
-    W.Action(view.content, {
-      label = label,
-      icon = icon,
-      tooltip = key,
-      width = 220,
-      height = 28,
-      opens = opens,
-      onClick = onClick,
-    }),
-    { height = 28, width = 220 }
-  )
+  local action = W.Action(view.content, {
+    label = label,
+    icon = icon,
+    tooltip = key,
+    width = 220,
+    height = 28,
+    opens = opens,
+    onClick = onClick,
+  })
+  action.fgId = "button-" .. key:gsub("%.", "-")
+  view.stack:Add(action, { height = 28, width = 220 })
 end
 
 -- Sections: each function fills one card (a view-like object with content, stack and Layout).
@@ -484,6 +479,7 @@ local function windowSection(view)
       return string.format("%d %%", math.floor(v * 100 + 0.5))
     end,
   })
+  scale.fgId = "setting-scale"
   view.stack:Add(scale, { height = 42, width = 320 })
   -- The footer zoom buttons change the same value.
   ns.On("FG_SETTING_CHANGED", function(_, path)
@@ -495,34 +491,35 @@ local function windowSection(view)
   button(view, "settings.resetWindow", "act.reset", "reset", function()
     ns.Main.ResetGeometry()
   end)
-  button(view, "settings.dock", "act.compact", "open", function()
+  local minimap = W.Toggle(view.content, {
+    key = "settings.minimap",
+    get = function()
+      return not ns.db.settings.minimap.hide
+    end,
+    set = function(v)
+      ns.db.settings.minimap.hide = not v
+      ns.MinimapButton.Apply()
+    end,
+  })
+  minimap.fgId = "setting-minimap"
+  view.stack:Add(minimap, { height = 24, gap = 6 })
+  -- Behaviour and looks of the window that one sets once: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "window.size" })
+  button(more, "settings.dock", "act.compact", "open", function()
     ns.Dock.Toggle()
   end)
-  toggle(view, "combatHide", "settings.combatHide")
-  view.stack:Add(
-    W.Toggle(view.content, {
-      key = "settings.minimap",
-      get = function()
-        return not ns.db.settings.minimap.hide
-      end,
-      set = function(v)
-        ns.db.settings.minimap.hide = not v
-        ns.MinimapButton.Apply()
-      end,
-    }),
-    { height = 24, gap = 6 }
-  )
-  toggle(view, "sidebarCollapsed", "settings.sidebarCollapsed", function()
+  toggle(more, "combatHide", "settings.combatHide")
+  toggle(more, "sidebarCollapsed", "settings.sidebarCollapsed", function()
     ns.Main.Relayout()
   end, "settings.sidebarCollapsedHint")
-  toggle(view, "buttonLabels", "settings.buttonLabels", restyle, "settings.buttonLabelsHint")
-  toggle(view, "characterButton", "blizz.set.character", function()
+  toggle(more, "buttonLabels", "settings.buttonLabels", restyle, "settings.buttonLabelsHint")
+  toggle(more, "characterButton", "blizz.set.character", function()
     ns.BlizzardLinks.Apply()
   end)
-  toggle(view, "hideTalkingHead", "settings.hideTalkingHead", function()
+  toggle(more, "hideTalkingHead", "settings.hideTalkingHead", function()
     ns.TalkingHead.Apply()
   end, "settings.hideTalkingHeadHint", true)
-  local hostSkin = W.Dropdown(view.content, {
+  local hostSkin = W.Dropdown(more.content, {
     key = "settings.hostSkin",
     width = 280,
     options = {
@@ -539,27 +536,8 @@ local function windowSection(view)
     end,
   })
   hostSkin.fgId = "host-skin"
-  view.stack:Add(hostSkin, { height = 46, width = 280 })
-  ns.AddParagraph(view, "settings.hostSkinHint", { role = "micro", color = "textMuted" })
-  local slotOverlays = W.Dropdown(view.content, {
-    key = "settings.slotOverlays",
-    width = 280,
-    options = {
-      { value = "auto", key = "settings.slotOverlays.auto" },
-      { value = "ours", key = "settings.slotOverlays.ours" },
-      { value = "none", key = "settings.slotOverlays.none" },
-    },
-    get = function()
-      return ns.db.settings.slotOverlays
-    end,
-    set = function(v)
-      Store.set("settings.slotOverlays", v)
-      ns.RefreshUI()
-    end,
-  })
-  slotOverlays.fgId = "slot-overlays"
-  view.stack:Add(slotOverlays, { height = 46, width = 280 })
-  ns.AddParagraph(view, "settings.slotOverlaysHint", { role = "micro", color = "textMuted" })
+  more.stack:Add(hostSkin, { height = 46, width = 280 })
+  ns.AddParagraph(more, "settings.hostSkinHint", { role = "micro", color = "textMuted" })
 end
 
 local function styleSection(view)
@@ -592,6 +570,9 @@ local function worldMapSection(view)
   toggle(view, "dungeonWorldMap", "dwm.set", function()
     ns.DungeonWorldMap.Apply()
   end)
+  -- The pins of single map layers and the flight list are set once: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "map.world" })
+  view = more
   for _, item in ipairs({
     { "mapMarkersWorld", "mm.set.world" },
     { "mapMarkersAddonMap", "mm.set.addon" },
@@ -622,23 +603,22 @@ local function worldMapSection(view)
     ns.ZoneCrossingRecorder.Apply()
   end, "zcr.set.recordHint")
   toggle(view, "zoneCrossNotify", "zcr.set.notify")
-  view.stack:Add(
-    W.Slider(view.content, {
-      key = "fp.set.listCount",
-      min = ns.FlightPointsLogic.COUNT_MIN,
-      max = ns.FlightPointsLogic.COUNT_MAX,
-      step = 1,
-      get = ns.FlightPointList.Count,
-      set = function(v)
-        Store.set("settings.flightListCount", ns.FlightPointsLogic.ClampCount(v))
-        ns.WorldMapLinks.Apply()
-      end,
-      format = function(v)
-        return string.format("%d", math.floor(v + 0.5))
-      end,
-    }),
-    { height = 42, width = 320 }
-  )
+  local count = W.Slider(view.content, {
+    key = "fp.set.listCount",
+    min = ns.FlightPointsLogic.COUNT_MIN,
+    max = ns.FlightPointsLogic.COUNT_MAX,
+    step = 1,
+    get = ns.FlightPointList.Count,
+    set = function(v)
+      Store.set("settings.flightListCount", ns.FlightPointsLogic.ClampCount(v))
+      ns.WorldMapLinks.Apply()
+    end,
+    format = function(v)
+      return string.format("%d", math.floor(v + 0.5))
+    end,
+  })
+  count.fgId = "setting-flightListCount"
+  view.stack:Add(count, { height = 42, width = 320 })
   toggle(view, "flightListOnlyKnown", "fp.set.onlyKnown", function()
     ns.WorldMapLinks.Apply()
   end)
@@ -680,189 +660,238 @@ local function extensionSection(view)
   ns.DevTools.AddButtons(view, "settings")
 end
 
--- The sections of each tab in page order, one card each.
-local SECTIONS = {
-  general = {
-    setupSection,
-    languageSection,
-    feedbackSection,
-    rosterSection,
-    keysSection,
-    function(view)
-      ns.KeysSettings.Add(view)
-    end,
-  },
-  window = {
-    windowSection,
-    function(view)
-      ns.Appearance.AddSettings(view)
-    end,
-    styleSection,
-    accessSection,
-    function(view)
-      ns.TypographySettings.Add(view)
-    end,
-  },
-  map = {
-    worldMapSection,
-    flightSection,
-    function(view)
-      ns.GatherSparklesSettings.Add(view)
-    end,
-    function(view)
-      ns.GatheringSettings.Add(view)
-    end,
-    function(view)
-      ns.FarmHudSettings.Add(view)
-    end,
-  },
-  items = {
-    function(view)
-      ns.ItemLevelSettings.Add(view)
-    end,
-    function(view)
-      ns.InspectPage.AddSettings(view)
-    end,
-  },
-  bags = {
-    function(view)
-      ns.LootPage.AddSettings(view)
-    end,
-    function(view)
-      ns.InventorySettings.Add(view)
-    end,
-    function(view)
-      ns.ProfessionTracker.AddSettings(view)
-    end,
-  },
-  sell = {
-    function(view)
-      ns.SellSettings.Add(view)
-    end,
-  },
-  automation = {
-    function(view)
-      ns.AutomationSettings.Add(view)
-    end,
-  },
-  social = {
-    function(view)
-      ns.InviteSettings.Add(view)
-    end,
-    function(view)
-      ns.AutomationSettings.AddInvites(view)
-    end,
-    function(view)
-      ns.GuildPage.AddSettings(view)
-    end,
-    function(view)
-      ns.ContactsPage.AddSettings(view)
-    end,
-  },
-  sharing = {
-    function(view)
-      ns.ConsentSettings.Add(view)
-    end,
-  },
-  addons = {
-    function(view)
-      ns.AddonSettings.AddSettings(view)
-    end,
-  },
-  advanced = {
-    advancedSection,
-    function(view)
-      ns.ErrorCatcher.AddSettings(view)
-    end,
-    extensionSection,
-  },
-}
-
--- The tab that opens next, kept per character. Anything unknown means the first one.
-local function savedTab()
-  local id = ns.charDB and ns.charDB.settingsTab
-  return TABS[id] and id or TAB_LIST[1]
+-- Built-in cards: the card id and the function that fills it. Module functions are looked up when the
+-- feature is built, the modules load after this file.
+local function call(module, fn, ...)
+  local args = { ... }
+  return function(view)
+    ns[module][fn](view, unpack(args))
+  end
 end
 
--- Selects a tab, also before the page exists: /fg automatik opens the settings on its tab.
-function SP.Select(id)
-  if not TABS[id] then
+-- The HUD windows are pages of the main menu, this card only points there.
+local function hudWindowsSection(view)
+  ns.AddHeading(view, "settings.feature.hudwindows")
+  ns.AddParagraph(view, "settings.hudwindowsHint", { role = "micro", color = "textMuted" })
+  button(view, "settings.hudwindowsOpen", "act.show", "open", function()
+    ns.Router:navigate("areas")
+  end, true)
+end
+
+-- The logos of guilds and communities are a sharing function: the card only points to its consent.
+local function logosCrestsSection(view)
+  ns.AddHeading(view, "settings.card.logos.crests")
+  ns.AddParagraph(view, "settings.logosCrestsHint", { role = "micro", color = "textMuted" })
+  button(view, "settings.logosCrestsOpen", "act.show", "open", function()
+    ns.SettingsPage.Select("consents", "consents.crestMark")
+  end, true)
+end
+
+register("setup.wizard", setupSection)
+register("logos.crests", logosCrestsSection)
+register("hudwindows.main", hudWindowsSection)
+register("setup.tour", advancedSection)
+register("setup.addons", call("AddonSettings", "AddOverview"))
+register("language.main", languageSection)
+register("messages.feedback", feedbackSection)
+register("messages.errors", call("AutomationSettings", "AddErrors"))
+register("automation.control", call("AutomationSettings", "AddControl"))
+register("automation.overview", call("AutomationSettings", "AddOverview"))
+register("diagnostics.errors", call("ErrorCatcher", "AddSettings"))
+register("diagnostics.dev", extensionSection, function()
+  return #ns.DevTools.Slot("settings") > 0
+end)
+register("window.size", windowSection)
+register("window.look", call("Appearance", "AddSettings"))
+register("notes.main", styleSection)
+register("fonts.main", call("TypographySettings", "Add"))
+register("access.main", accessSection)
+register("keys.main", keysSection)
+register("mouse.main", call("KeysSettings", "Add"))
+register("farmhud.main", call("FarmHudSettings", "Add"))
+register("map.world", worldMapSection)
+register("flight.main", flightSection)
+register("gathering.pins", call("GatheringSettings", "Add"))
+register("gathering.sparkles", call("GatherSparklesSettings", "Add"))
+register("fishing.enable", call("AddonSettings", "AddEnable", "fishing"))
+register("quests.main", call("AutomationSettings", "AddQuests"))
+register("quests.exceptions", call("AutomationSettings", "AddQuestExceptions"))
+register("professions.shopping", call("ProfessionTracker", "AddSettings"))
+register("selling.repair", call("AutomationSettings", "AddRepair"))
+for _, id in ipairs({ "selling.main", "sellrules.quality", "sellrules.binding", "sellrules.keep", "protect.main" }) do
+  register(id, function(view)
+    ns.SellSettings.BUILDERS[id](view)
+  end)
+end
+register("items.itemlevel", call("ItemLevelSettings", "Add"))
+register("items.inspect", call("InspectPage", "AddSettings"))
+register("inventory.stock", call("InventorySettings", "Add"))
+register("loot.main", call("LootPage", "AddSettings"))
+register("foreverchat.enable", call("AddonSettings", "AddEnable", "chat"))
+register("foreverchat.lines", call("ConsentSettings", "AddChatLines"))
+register("party.summon", call("AutomationSettings", "AddSummon"))
+register("party.duels", call("AutomationSettings", "AddDuels"))
+register("guild.enable", call("AddonSettings", "AddEnable", "guildmanager"))
+register("guild.inspect", call("GuildPage", "AddSettings"))
+register("contacts.main", call("ContactsPage", "AddSettings"))
+register("contacts.plates", call("ContactsPage", "AddPlates"))
+register("invites.whisper", call("InviteSettings", "Add"))
+register("invites.accept", call("AutomationSettings", "AddInvites"))
+register("privacy.overview", call("ConsentSettings", "AddOverview"))
+register("roster.main", rosterSection)
+
+-- Features whose cards are not fixed: they add their cards to the grid after the listed ones.
+local DYNAMIC = {
+  consents = function(grid)
+    ns.ConsentSettings.AddFunctionCards(grid)
+  end,
+  setup = function(grid)
+    for _, entry in ipairs(ns.SubAddons.List()) do
+      local id = ns.AddonSettings.CardId(entry.id)
+      if not L.Card(id) then
+        ns.AddonSettings.AddEnable(grid:Card({ id = id }), entry.id)
+      end
+    end
+  end,
+}
+
+-- The feature that opens next, kept per character. A value of the old tab store (settingsTab) is
+-- translated through the aliases and moved to settingsFeature. Anything unknown means the first feature.
+local function savedFeature()
+  local char = ns.charDB
+  if not char then
+    return L.FeatureOrFirst(nil)
+  end
+  local feature = L.FeatureOrFirst(char.settingsFeature or char.settingsTab)
+  if char.settingsTab ~= nil or char.settingsFeature ~= feature then
+    char.settingsFeature, char.settingsTab = feature, nil
+  end
+  return feature
+end
+
+-- The feature that was open last in each group, kept per character.
+local function groupLast()
+  local char = ns.charDB
+  if not char then
+    return {}
+  end
+  if type(char.settingsGroupLast) ~= "table" then
+    char.settingsGroupLast = {}
+  end
+  return char.settingsGroupLast
+end
+
+local pending
+
+-- Selects a feature and optionally one of its cards and one control of it, also before the page exists:
+-- /fg automatik opens the settings there. target is a feature id or an old tab id, a card id also works on
+-- its own. controlId is the id (fgId) of a control or the locale key of its name; a control behind a closed
+-- "More settings" section opens it for now. A page that is not on screen keeps the jump until it shows.
+function SP.Select(target, cardId, controlId)
+  local feature, card = L.Target(target, cardId)
+  if not feature then
     return false
   end
   if ns.charDB then
-    ns.charDB.settingsTab = id
+    ns.charDB.settingsFeature, ns.charDB.settingsTab = feature, nil
   end
+  pending = { card = card, control = controlId }
   if SP.page then
-    SP.page:Select(id)
+    SP.page:Select(feature, card, controlId)
+    if SP.page.container:IsVisible() then
+      pending = nil
+    end
   end
   return true
 end
 
+-- Jump from the label key of a command control (the "control" of Core/Commands.lua): opens its card, and
+-- the "More settings" section that holds the control when it sits behind one.
+function SP.SelectControl(controlKey)
+  local card = ns.SettingsFeatures.CONTROLS[controlKey]
+  if not card then
+    return false
+  end
+  return SP.Select(card, card, ns.SettingsFeatures.CONTROL_IDS[controlKey])
+end
+
 function SP.Current()
-  return SP.page and SP.page.current or savedTab()
+  return SP.page and SP.page.current or savedFeature()
 end
 
 local function build(container)
-  local FL = ns.FlowLayout
-  local page = { tabs = {}, current = savedTab() }
+  local page = { features = {}, current = savedFeature(), container = container }
   SP.page = page
 
-  -- The tab row wraps instead of cutting off, the selected tab has a bar (and its own color).
-  local defs = {}
-  for _, id in ipairs(TAB_LIST) do
-    defs[#defs + 1] = {
-      id = id,
-      key = "settings.tab." .. id,
-      variant = "ghost",
-      fgId = "settings-tab-" .. id,
-      onClick = function()
-        page:Select(id)
-      end,
-    }
-  end
-  local row = FL.ButtonRow(container, defs)
-  row:SetPoint("TOPLEFT", container, "TOPLEFT", PAD, -PAD)
-  row:SetPoint("TOPRIGHT", container, "TOPRIGHT", -PAD, -PAD)
-  page.row = row
+  local nav = ns.SettingsNav.New(container, {
+    current = page.current,
+    groupLast = groupLast(),
+    onSelect = function(id)
+      page:Select(id)
+    end,
+    onHeight = function()
+      local view = page.features[page.current]
+      if view then
+        view:Layout()
+      end
+    end,
+  })
+  nav.frame:SetPoint("TOPLEFT", container, "TOPLEFT", PAD, -PAD)
+  nav.frame:SetPoint("TOPRIGHT", container, "TOPRIGHT", -PAD, -PAD)
+  page.nav, page.row = nav, nav.frame
 
-  local function paintTabs()
-    for _, id in ipairs(TAB_LIST) do
-      local b = row:GetButton(id)
-      local on = id == page.current
-      b.bar:SetShown(on)
-      W.SetColor(b.label, on and "accent" or "textSecondary")
-    end
-  end
-  for _, id in ipairs(TAB_LIST) do
-    local b = row:GetButton(id)
-    b.bar = b:CreateTexture(nil, "ARTWORK")
-    b.bar:SetPoint("BOTTOMLEFT", 4, 0)
-    b.bar:SetPoint("BOTTOMRIGHT", -4, 0)
-    b.bar:SetHeight(2)
-    ns.Bind(b.bar, function(t)
-      t:SetColorTexture(ns.Theme.color("accent2"))
-    end)
-    b:HookScript("OnEnter", paintTabs)
-    b:HookScript("OnLeave", paintTabs)
-  end
-
-  -- One scrolling view per tab, built once; only the selected one is shown.
   local body = CreateFrame("Frame", nil, container)
-  body:SetPoint("TOPLEFT", row, "BOTTOMLEFT", -PAD, -8)
+  body:SetPoint("TOPLEFT", nav.frame, "BOTTOMLEFT", -PAD, -8)
   body:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
-  for _, id in ipairs(TAB_LIST) do
+
+  -- The view of a feature, built when it is first needed. Its cards come in the order of the registry,
+  -- then the dynamic ones, then those of a module that did not name a card the registry knows.
+  local function buildView(id)
     local view = ns.NewPageView(body)
     view.area:Hide()
     local grid = ns.SettingsGrid.New(view)
-    for _, section in ipairs(SECTIONS[id]) do
-      if section ~= extensionSection or #ns.DevTools.Slot("settings") > 0 then
-        section(grid:Card())
+    for _, cardId in ipairs(L.Cards(id, nil, false)) do
+      local entry = builders[cardId]
+      if entry and (not entry.when or entry.when()) then
+        local card = grid:Card({ id = cardId })
+        if entry.safe then
+          ns.Safe("settings-section", entry.build, card)
+        else
+          entry.build(card)
+        end
       end
     end
-    for _, add in ipairs(extra[id] or {}) do
-      ns.Safe("settings-section", add, grid:Card())
+    if DYNAMIC[id] then
+      DYNAMIC[id](grid)
     end
-    page.tabs[id] = view
+    for _, add in ipairs(late[id] or {}) do
+      ns.Safe("settings-section", add.build, grid:Card({ id = add.id }))
+    end
+    page.features[id] = view
+    return view
+  end
+
+  -- The view of a feature or of the feature an old tab id stands for; nil for anything else.
+  function page:View(target)
+    local id = L.ResolveFeature(target)
+    if not id then
+      return nil
+    end
+    return self.features[id] or buildView(id)
+  end
+
+  -- Drops the built view of a feature and builds it again, the page keeps showing the feature it shows.
+  function page:Rebuild(target)
+    local id = L.ResolveFeature(target)
+    local old = id and self.features[id]
+    if not old then
+      return
+    end
+    old.area:Hide()
+    self.features[id] = nil
+    if self.current == id then
+      self:Select(id)
+    end
   end
 
   local function refresh(view)
@@ -873,41 +902,83 @@ local function build(container)
     end
   end
 
-  function page:Select(id)
-    if not (TABS[id] and page.tabs[id]) then
+  local function scrollToCard(view, cardId)
+    for _, card in ipairs(view.grid.cards) do
+      if card.id == cardId and card.top then
+        view.area:ScrollTo(card.top)
+        return
+      end
+    end
+  end
+
+  -- A control is named by its id (fgId) or by the locale key of its name. Without a card the first card that
+  -- holds it answers. A control inside a closed "More settings" section opens the section (for now, the saved
+  -- state stays).
+  local function goToControl(view, cardId, ref)
+    for _, card in ipairs(view.grid.cards) do
+      if not cardId or card.id == cardId then
+        if ns.SettingsJump.Go(view, card, ref, function()
+          view:Layout()
+        end) then
+          return true
+        end
+      end
+    end
+    return false
+  end
+
+  function page:Select(target, cardId, controlId)
+    local id, card = L.Target(target, cardId)
+    local view = id and self:View(id)
+    if not view then
       return
     end
-    page.current = id
+    self.current = id
     if ns.charDB then
-      ns.charDB.settingsTab = id
+      ns.charDB.settingsFeature, ns.charDB.settingsTab = id, nil
     end
-    for tabId, view in pairs(page.tabs) do
-      view.area:SetShown(tabId == id)
+    for featureId, v in pairs(self.features) do
+      v.area:SetShown(featureId == id)
     end
-    paintTabs()
-    refresh(page.tabs[id])
-    page.tabs[id]:Layout()
+    nav:SetCurrent(id)
+    refresh(view)
+    ns.SettingsJump.ClearMark(view)
+    self:Layout()
+    if card then
+      scrollToCard(view, card)
+    end
+    if controlId then
+      goToControl(view, card, controlId)
+    end
   end
 
   function page:Layout()
     local width = container:GetWidth()
     if width and width > 2 * PAD then
-      row:SetWidthAvailable(width - 2 * PAD)
+      nav:Layout(width - 2 * PAD)
     end
-    local view = page.tabs[page.current]
+    local view = self.features[self.current]
     if view then
       view:Layout()
     end
   end
 
   -- Values can change elsewhere (Ctrl+wheel, /fg scale, reset, the key bindings dialog).
-  function page:Show()
-    for id, view in pairs(page.tabs) do
-      if id ~= page.current then
+  -- params[1] is a feature or card id of a route "settings/<id>" (a link of the changelog, kept by the history).
+  function page:Show(params)
+    for id, view in pairs(self.features) do
+      if id ~= self.current then
         refresh(view)
       end
     end
-    page:Select(savedTab())
+    local jump = pending or {}
+    pending = nil
+    local feature = savedFeature()
+    local routed, routedCard = L.Target(params and params[1])
+    if routed then
+      feature, jump = routed, { card = routedCard }
+    end
+    self:Select(feature, jump.card, jump.control)
   end
   return page
 end
@@ -919,5 +990,9 @@ ns.RegisterPage({
   title = "page.settings",
   icon = ns.ICONS.settings,
   aliases = { "einstellungen", "optionen", "settings", "options" },
+  crumbLabel = function(param)
+    local feature = L.Target(param)
+    return feature and ns.L["settings.feature." .. feature] or param
+  end,
   build = build,
 })

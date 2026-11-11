@@ -1,6 +1,6 @@
 -- Forever Guides: Rezepte "mining" (generiert, nicht von Hand bearbeiten)
--- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70124)
--- Generated data, do not edit. Data as of 2026-10-11.
+-- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70888)
+-- Generated data, do not edit. Data as of 2026-11-11.
 
 ForeverGuides.RecipeData = ForeverGuides.RecipeData or {}
 ForeverGuides.RecipeData["mining"] = {
@@ -45,7 +45,7 @@ ForeverGuides.RecipeData["mining"] = {
     {ch=true,g=2575,i=2841,mats={{2840,1},{3576,1}},n={"Bronze verhütten","Smelt Bronze"},s=2659,sk={0,65,90,115},src="t"},
     {g=2575,i=2842,mats={{2775,1}},n={"Silber verhütten","Smelt Silver"},s=2658,sk={0,100,113,125},src="t"},
     {g=2575,i=3575,mats={{2772,1}},n={"Eisen verhütten","Smelt Iron"},s=3307,sk={0,130,135,140},src="t"},
-    {g=2717,i=279948,mats={{2838,2},{2772,1},{2842,1}},n={"Felsgarten","Rock Garden"},pat={273097},s=1262975,sk={140,140,143,145},src="i"},
+    {bd={{n="Relic Guardian",zone={de="Ausgrabungsstätte: Sumpfland",en="Excavation Site: Wetlands"}}},g=2717,i=279948,mats={{2838,2},{2772,1},{2842,1}},n={"Felsgarten","Rock Garden"},pat={273097},s=1262975,sk={140,140,143,145},src="i"},
     {g=2575,i=3859,mats={{3575,1},{3857,1}},n={"Stahl verhütten","Smelt Steel"},s=3569,sk={0,165,165,165},src="t"},
     {g=2575,i=3577,mats={{2776,1}},n={"Gold verhütten","Smelt Gold"},s=3308,sk={0,170,178,185},src="t"},
     {g=2575,i=3860,mats={{3858,1}},n={"Mithril verhütten","Smelt Mithril"},s=10097,sk={0,175,175,175},src="t"},

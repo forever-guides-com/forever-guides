@@ -406,7 +406,7 @@ local function handleKey(key)
   if key == "TAB" then
     ns.Focus.move(IsShiftKeyDown() and -1 or 1)
     return true
-  elseif (key == "ENTER" or key == "SPACE") and ns.Focus.current then
+  elseif (key == "ENTER" or key == "SPACE") and ns.Focus.current and ns.Focus.recent() then
     return ns.Focus.activate()
   elseif (key == "UP" or key == "DOWN") and IsShiftKeyDown() and ns.Focus.current and ns.Focus.current.fgReorder then
     ns.Focus.current:fgReorder(key == "UP" and -1 or 1)
@@ -421,7 +421,12 @@ local function handleKey(key)
       ns.Router:goForward()
     end
     return true
+  elseif (key == "HOME" or key == "END") and ns.Focus.current and ns.Focus.current.fgEdge then
+    ns.Focus.touch()
+    ns.Focus.current:fgEdge(key == "HOME" and -1 or 1)
+    return true
   elseif (key == "LEFT" or key == "RIGHT") and ns.Focus.current and ns.Focus.current.fgArrow then
+    ns.Focus.touch()
     ns.Focus.current:fgArrow(key == "LEFT" and -1 or 1)
     return true
   elseif key == "BACKSPACE" then
@@ -429,6 +434,14 @@ local function handleKey(key)
   elseif key == "F" and IsControlKeyDown() then
     search.edit:SetFocus()
     return true
+  elseif
+    key:match("^%a$")
+    and not IsControlKeyDown()
+    and not IsAltKeyDown()
+    and ns.Focus.current
+    and ns.Focus.current.fgTypeahead
+  then
+    return ns.Focus.current:fgTypeahead(key:lower()) == true
   end
   return false
 end

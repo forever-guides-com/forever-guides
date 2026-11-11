@@ -465,6 +465,119 @@ function NL.Show(layout, base, kind, id)
   return NL.SetHidden(layout, base, kind, id, false)
 end
 
+-- Canonical text of a sanitized layout, to tell whether an edit changed anything.
+local function fingerprint(value)
+  if type(value) ~= "table" then
+    return tostring(value)
+  end
+  local parts = {}
+  local keys = {}
+  for k in pairs(value) do
+    keys[#keys + 1] = k
+  end
+  table.sort(keys, function(a, b)
+    return tostring(a) < tostring(b)
+  end)
+  for _, k in ipairs(keys) do
+    parts[#parts + 1] = tostring(k) .. "=" .. fingerprint(value[k])
+  end
+  return "{" .. table.concat(parts, ",") .. "}"
+end
+
+-- Many hide or show edits in one pass: list = { { kind = "page" | "group", id, hidden = bool }, .. },
+-- applied in order, so a later entry sees the result of an earlier one. Returns the new layout (nil =
+-- default), whether it differs from the old one, and the list entries the rules refused (a protected
+-- page, a group that holds one, an unknown kind or id).
+function NL.SetHiddenBatch(layout, base, list)
+  local before = fingerprint(NL.Sanitize(layout))
+  local current, refused = NL.Sanitize(layout), {}
+  for _, op in ipairs(type(list) == "table" and list or {}) do
+    local nextLayout, ok = NL.SetHidden(current, base, op.kind, op.id, op.hidden == true)
+    if ok then
+      current = nextLayout
+    else
+      refused[#refused + 1] = op
+    end
+  end
+  return current, fingerprint(current) ~= before, refused
+end
+
+-- True when the layout hides the page (a protected page is never hidden). Needs no base.
+function NL.PageHidden(layout, id)
+  if NL.PROTECTED[id] or not validId(id) then
+    return false
+  end
+  return normalized(layout).pages.hidden[id] == true
+end
+
+-- What a menu row shows for one group: { total, visible, hidden, locked, flagged } or nil for a group
+-- the base does not list. total counts the pages of the group in the base (the caller leaves out pages it
+-- does not offer), a protected page counts as visible. hidden is true when the group is off in the menu:
+-- flagged itself or without a single visible page (Resolve drops such a group). locked: it holds a
+-- protected page and can not be hidden.
+function NL.GroupState(layout, base, groupId)
+  local view = NL.Resolve(base.groups, base.pages, layout, true)
+  local at = findGroup(view, groupId)
+  if not at then
+    return nil
+  end
+  local group = view.groups[at]
+  local visible = 0
+  for _, e in ipairs(group.pages) do
+    if not e.hidden then
+      visible = visible + 1
+    end
+  end
+  local total = #group.pages
+  return {
+    total = total,
+    visible = visible,
+    hidden = group.hidden or (total > 0 and visible == 0),
+    locked = group.locked,
+    flagged = group.hidden,
+  }
+end
+
+-- The edits that switch a whole group: off hides the group and keeps the marks of its pages (so on
+-- brings back the old picture); on shows the group and, when every page was off, all its pages as well.
+-- Returns the list for SetHiddenBatch, or nil for an unknown or locked group.
+function NL.GroupSwitchOps(layout, base, groupId, visible)
+  local state = NL.GroupState(layout, base, groupId)
+  if not state or state.locked then
+    return nil
+  end
+  if not visible then
+    return { { kind = "group", id = groupId, hidden = true } }
+  end
+  local ops = { { kind = "group", id = groupId, hidden = false } }
+  if state.visible == 0 then
+    local view = NL.Resolve(base.groups, base.pages, layout, true)
+    for _, e in ipairs(view.groups[findGroup(view, groupId)].pages) do
+      ops[#ops + 1] = { kind = "page", id = e.id, hidden = false }
+    end
+  end
+  return ops
+end
+
+-- The ids the layout hides in the menu, as sorted lists: { groups = { id, .. }, pages = { id, .. } }.
+-- Only ids of the base count (an entry of a switched-off sub-addon is not in the menu either way).
+function NL.HiddenIds(layout, base)
+  local out = { groups = {}, pages = {} }
+  for _, g in ipairs(NL.Resolve(base.groups, base.pages, layout, true).groups) do
+    if g.hidden then
+      out.groups[#out.groups + 1] = g.id
+    end
+    for _, e in ipairs(g.pages) do
+      if e.hidden then
+        out.pages[#out.pages + 1] = e.id
+      end
+    end
+  end
+  table.sort(out.groups)
+  table.sort(out.pages)
+  return out
+end
+
 -- An empty text (after cleaning) restores the default name. base is not used, the argument list is
 -- the same as with the other edits.
 function NL.Rename(layout, _, kind, id, text)
@@ -539,6 +652,23 @@ function NL.Apply(scope, op, ...)
     NL.Save(scope, layout)
   end
   return ok
+end
+
+-- The layer a bulk edit of the setup wizard writes to: the layer this character sees, so the menu is
+-- right at once (a character with its own layout keeps it, otherwise the account layout of all characters).
+function NL.EffectiveScope()
+  return NL.HasCharLayout() and "char" or "account"
+end
+
+-- Many hide or show edits (see NL.SetHiddenBatch) on one layer with one save and one FG_NAV_CHANGED, so the
+-- menu rebuilds once. Nothing is saved or announced when no edit changed anything. Returns whether the
+-- layout changed, and the refused entries.
+function NL.SetHiddenMany(scope, list)
+  local layout, changed, refused = NL.SetHiddenBatch(NL.EditLayout(scope), NL.Base(), list)
+  if changed then
+    NL.Save(scope, layout)
+  end
+  return changed, refused
 end
 
 function NL.ResetLayer(scope)

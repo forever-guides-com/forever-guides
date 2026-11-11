@@ -1,29 +1,21 @@
--- Dungeons & raids: list on the left, header and tabs on the right (side by side from a page width of
--- 760, stacked and without tabs below it). Data: ns.Data.Instances. The header and the row lists are
--- in Modules/InstanceView.lua, the items in Modules/InstanceItemsView.lua.
+-- Dungeons & raids in two levels: without a slug the card grid with its filter bar (Modules/InstanceCards.lua),
+-- with a slug the instance: back button, header band with the loading screen and the tabs (every section in a
+-- column below a page width of 760). Data: ns.Data.Instances. The header and the row lists are in
+-- Modules/InstanceView.lua, the items in Modules/InstanceItemsView.lua.
 local _, ns = ...
 local W, L, Theme, R, K, IV = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.PageKit, ns.InstanceView
 local DA = ns.InstanceDataAccess
 
 ns.AddLocale("enUS", {
   ["instances.intro"] = "Dungeons and raids: levels, entrance, bosses, quests",
-  ["instances.tab.dungeon"] = "Dungeons",
-  ["instances.tab.raid"] = "Raids",
   ["instances.search"] = "Filter by instance or boss name",
-  ["instances.sub"] = "%s · group %s",
   ["instances.unknown"] = "?",
   ["instances.sort.label"] = "Sort by",
   ["instances.sort.name"] = "Name",
   ["instances.sort.level"] = "Level",
-  ["instances.group.by"] = "Group by faction",
-  ["instances.group.title"] = "%s (%d)",
-  ["instances.group.open"] = "expanded",
-  ["instances.group.closed"] = "collapsed",
-  ["instances.group.tip"] = "Click to expand or collapse this group.",
+  ["instances.back"] = "All instances",
+  ["instances.back.tip"] = "Back to the overview of all instances (Backspace).",
   ["instances.status.announced"] = "announced",
-  ["instances.release"] = "release %s",
-  ["instances.empty"] = "No instance matches.",
-  ["instances.pick"] = "Select an instance from the list.",
   ["instances.dtab.info"] = "Info",
   ["instances.dtab.bosses"] = "Bosses",
   ["instances.dtab.quests"] = "Quests",
@@ -61,32 +53,23 @@ ns.AddLocale("enUS", {
   ["tour.instances.intro.title"] = "Dungeons and raids",
   ["tour.instances.intro.text"] = "Instances with bosses and quests (Enter: next, Esc: end)",
   ["tour.instances.filters.title"] = "Filters",
-  ["tour.instances.filters.text"] = "Switch dungeons and raids, filter by name and faction.",
-  ["tour.instances.list.title"] = "Instance list",
-  ["tour.instances.list.text"] = "Tab to an entry and press Enter to open its details.",
+  ["tour.instances.filters.text"] = "Filter by type, faction, level and name.",
+  ["tour.instances.list.title"] = "Instance cards",
+  ["tour.instances.list.text"] = "Arrow keys move between cards, Enter opens the details.",
   ["tour.instances.detail.title"] = "Details",
-  ["tour.instances.detail.text"] = "Picture, numbers and map button, below them bosses, quests, items, access and map.",
+  ["tour.instances.detail.text"] = "Loading screen, numbers and map button, below them bosses, quests, items, access and map.",
 })
 
 ns.AddLocale("deDE", {
   ["instances.intro"] = "Dungeons und Raids: Stufen, Eingang, Bosse, Quests",
-  ["instances.tab.dungeon"] = "Dungeons",
-  ["instances.tab.raid"] = "Raids",
   ["instances.search"] = "Nach Instanz- oder Bossname filtern",
-  ["instances.sub"] = "%s · Gruppe %s",
   ["instances.unknown"] = "?",
   ["instances.sort.label"] = "Sortieren nach",
   ["instances.sort.name"] = "Name",
   ["instances.sort.level"] = "Stufe",
-  ["instances.group.by"] = "Nach Fraktion gruppieren",
-  ["instances.group.title"] = "%s (%d)",
-  ["instances.group.open"] = "aufgeklappt",
-  ["instances.group.closed"] = "eingeklappt",
-  ["instances.group.tip"] = "Klicken zum Auf- oder Zuklappen dieser Gruppe.",
+  ["instances.back"] = "Alle Instanzen",
+  ["instances.back.tip"] = "Zurück zur Übersicht aller Instanzen (Rücktaste).",
   ["instances.status.announced"] = "angekündigt",
-  ["instances.release"] = "Release %s",
-  ["instances.empty"] = "Keine Instanz passt.",
-  ["instances.pick"] = "Wähle eine Instanz aus der Liste.",
   ["instances.dtab.info"] = "Info",
   ["instances.dtab.bosses"] = "Bosse",
   ["instances.dtab.quests"] = "Quests",
@@ -124,11 +107,11 @@ ns.AddLocale("deDE", {
   ["tour.instances.intro.title"] = "Dungeons und Raids",
   ["tour.instances.intro.text"] = "Instanzen mit Bossen und Quests (Enter: weiter, Esc: Ende)",
   ["tour.instances.filters.title"] = "Filter",
-  ["tour.instances.filters.text"] = "Wechsle zwischen Dungeons und Raids, filtere nach Namen und Fraktion.",
-  ["tour.instances.list.title"] = "Instanzliste",
-  ["tour.instances.list.text"] = "Mit Tab zu einem Eintrag, Enter öffnet die Details.",
+  ["tour.instances.filters.text"] = "Filtere nach Typ, Fraktion, Stufe und Namen.",
+  ["tour.instances.list.title"] = "Instanzkarten",
+  ["tour.instances.list.text"] = "Pfeiltasten wechseln die Karte, Enter öffnet die Details.",
   ["tour.instances.detail.title"] = "Details",
-  ["tour.instances.detail.text"] = "Bild, Eckdaten und Karten-Knopf, darunter Bosse, Quests, Items, Zugang und Karte.",
+  ["tour.instances.detail.text"] = "Ladebild, Eckdaten und Karten-Knopf, darunter Bosse, Quests, Items, Zugang und Karte.",
 })
 
 local plural, dual = IV.Plural, IV.Dual
@@ -165,16 +148,15 @@ function ns.InstanceInfoText(inst)
   if inst.loc then
     lines[#lines + 1] = string.format(L["instances.info.location"], dual(inst.loc))
   end
-  if inst.st or inst.rd then
-    local bits = {}
-    if inst.st then
-      local key = "instances.status." .. inst.st
-      bits[#bits + 1] = L[key] ~= key and L[key] or inst.st
-    end
-    if inst.rd then
-      bits[#bits + 1] = string.format(L["instances.release"], inst.rd)
+  if inst.st then
+    local key = "instances.status." .. inst.st
+    local bits = { L[key] ~= key and L[key] or inst.st }
+    if info.releaseText then
+      bits[#bits + 1] = info.releaseText
     end
     lines[#lines + 1] = string.format(L["instances.info.status"], table.concat(bits, ", "))
+  elseif info.releaseText then
+    lines[#lines + 1] = Theme.hexText("textMuted", info.releaseText)
   end
   if inst.ent and #inst.ent > 0 then
     for _, e in ipairs(inst.ent) do
@@ -253,269 +235,93 @@ function ns.InstanceQuestText(inst, faction)
   return table.concat(blocks, "\n\n")
 end
 
--- Two sub lines (level, group, location / second-language names) need more than the 42 px default.
-local ROW_HEIGHT = 56
-local LIST_ROWS_SIDE, LIST_ROWS_STACKED = 3, 5 -- the least rows the list shows
-local SCROLLBAR = 12 -- gutter of a ScrollArea
+local STACK_BELOW = 760 -- below this width every section follows the other and the tabs are gone
 local TABS = { "bosses", "quests", "items", "access", "map", "info" }
 local VALID_TAB = {}
 for _, id in ipairs(TABS) do
   VALID_TAB[id] = true
 end
-
-local SORTS = { name = true, level = true }
-
--- The instance chosen last, kept while the game runs so the page opens where it was left.
-local lastSlug
+-- Other names of a tab in a route.
+local TAB_ALIAS = { loot = "items" }
+-- One faction choice for the cards, the header, the loot quests and the quest tab (see QuestChainView).
+local FACTION_PATH = "settings.instancesQuestFilter"
 
 local function build(container)
   local FL = ns.FlowLayout
+  local IL = ns.InstanceListLogic
   local view = ns.NewPageView(container)
   local s = view.stack
-  local state = {
-    kind = "dungeon",
-    faction = K.PlayerFaction() or "all",
-    query = "",
-    slug = nil,
-    dtab = "bosses",
-    sort = SORTS[ns.db.settings.instancesSort] and ns.db.settings.instancesSort or "name",
-    group = ns.db.settings.instancesGroup == true,
-  }
-  local refresh, layoutPanes, relayout, scrollToDetail
-  -- The rows of the list as shown, and whether the list still has to scroll to the chosen row (after layout).
-  local shown, revealPending
+  local state = { slug = nil, dtab = "bosses" }
+  local refresh, relayout
 
-  local intro = ns.AddParagraph(view, "instances.intro", { role = "micro", gap = 6 })
-
-  -- Two panes: list and filters on the left, the chosen instance on the right. Below a page width
-  -- of 760 the panes stack: the list on top at a fixed height, the instance below it with every
-  -- section one after the other and the page itself scrolling.
-  local split = FL.TwoPane(view.content, {
-    ratio = 0.32,
-    leftMin = 260,
-    leftMax = 380,
-    rightMin = 300,
-    stackedShare = 0,
-    stackedRightMin = 1,
-    minHeight = 420,
-    getPageWidth = function()
-      return view.area:GetWidth()
-    end,
-    getHeight = function()
-      return view.area:GetHeight() - 2 * s.pad - intro:GetHeight() - 6
-    end,
-    onLayout = function(info)
-      return layoutPanes(info)
-    end,
-  })
-  s:Add(split, { gap = 0 })
-  local leftPane, rightPane = split.left, split.right
-
-  local function currentItems()
-    local faction = state.faction ~= "all" and state.faction or nil
-    return R.Instances(state.kind, faction, state.query, ns.SearchLogic.match, state.sort)
+  local function faction()
+    return IL.Faction(ns.db.settings.instancesQuestFilter, K.PlayerFaction())
+  end
+  -- The faction as the detail views take it: "A", "H", or nil for both.
+  local function detailFaction()
+    local choice = faction()
+    return choice ~= "all" and choice or nil
   end
 
-  local function firstSlug()
-    local first = K.HasData("Instances") and currentItems()[1]
-    return first and R.InstanceSlug(first) or nil
-  end
+  ns.AddParagraph(view, "instances.intro", { role = "micro", gap = 6 })
 
-  -- Left pane: kind tabs, faction, search and sort, then the list --------------------------------
-  local filters = CreateFrame("Frame", nil, leftPane)
-  K.Anchor("FG.Instances.Filters", filters)
-  local kindTabs = W.Tabs(filters, {
-    tabs = { { id = "dungeon", key = "instances.tab.dungeon" }, { id = "raid", key = "instances.tab.raid" } },
-    onSelect = function(id)
-      if state.kind ~= id then
-        state.kind = id
-        state.slug = firstSlug()
-      end
-      refresh()
-    end,
-  })
-  kindTabs:SetPoint("TOPLEFT")
-  local facDd = K.FactionButtons(filters, {
-    withAll = true,
-    get = function()
-      return state.faction
-    end,
-    set = function(v)
-      state.faction = v
-      refresh()
-    end,
-  })
-  local search = W.EditBox(filters, {
-    placeholder = "instances.search",
-    clear = true,
-    onChange = function(text)
-      state.query = text
-      refresh()
-    end,
-  })
-  local sortLabel = W.Text(filters, { key = "instances.sort.label", role = "ui", color = "textSecondary" })
-  local sortToggle = K.ViewToggle(filters, {
-    views = { "name", "level" },
-    keyPrefix = "instances.sort.",
-    get = function()
-      return state.sort
-    end,
-    set = function(v)
-      state.sort = v
-      ns.Store.set("settings.instancesSort", v)
-      refresh()
-    end,
-  })
-  local groupBox = W.Checkbox(filters, {
-    key = "instances.group.by",
-    get = function()
-      return state.group
-    end,
-    set = function(on)
-      state.group = on
-      ns.Store.set("settings.instancesGroup", on)
-      refresh()
-    end,
-  })
-  local resetBtn = ns.InstanceReset.Button(filters)
-  function filters:fgGridLayout(width)
-    local y = 38
-    facDd:ClearAllPoints()
-    facDd:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
-    facDd:SetWidth(width)
-    y = y + facDd:fgGridLayout(width) + 12
-    search:ClearAllPoints()
-    search:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
-    search:SetWidth(math.min(width, 360))
-    y = y + 26 + 8
-    sortLabel:ClearAllPoints()
-    sortToggle:ClearAllPoints()
-    if math.ceil(sortLabel:GetStringWidth()) + 8 + sortToggle:GetWidth() <= width then
-      sortLabel:SetPoint("LEFT", filters, "TOPLEFT", 0, -(y + 11))
-      sortToggle:SetPoint("LEFT", sortLabel, "RIGHT", 8, 0)
-      y = y + 22
-    else
-      sortLabel:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
-      y = y + math.ceil(sortLabel:GetStringHeight()) + 4
-      sortToggle:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
-      y = y + 22
-    end
-    y = y + 8
-    groupBox:ClearAllPoints()
-    groupBox:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
-    groupBox:SetWidth(width)
-    y = y + groupBox:GetHeight() + 8
-    resetBtn:ClearAllPoints()
-    resetBtn:SetPoint("TOPLEFT", filters, "TOPLEFT", 0, -y)
+  -- The reset of the instances (chat command of the game) is for both levels.
+  local resetRow = CreateFrame("Frame", nil, view.content)
+  local resetBtn = ns.InstanceReset.Button(resetRow)
+  resetBtn:SetPoint("TOPLEFT")
+  function resetRow:fgGridLayout(width)
     resetBtn:SetWidth(resetBtn:Fit(width))
-    y = y + resetBtn:GetHeight()
-    filters:SetHeight(y)
-    return y
+    self:SetHeight(resetBtn:GetHeight())
+    return resetBtn:GetHeight()
   end
+  s:Add(resetRow, { gap = 8 })
 
-  local list = K.NewList(leftPane, {
-    rowHeight = ROW_HEIGHT,
-    bind = function(inst)
-      if inst.heading then
-        return {
-          title = string.format(
-            L["instances.group.title"],
-            L[inst.heading == "B" and "kit.faction.all" or "kit.faction." .. inst.heading],
-            inst.count
-          ),
-          right = L[inst.closed and "instances.group.closed" or "instances.group.open"],
-          tooltip = L["instances.group.tip"],
-        }
-      end
-      local when = inst.rd and Theme.hexText("textMuted", string.format(L["instances.release"], inst.rd)) or ""
-      local name, otherName = R.Names(inst.n)
-      local loc, otherLoc = R.Names(inst.loc)
-      local label, levelTip = levelLabel(inst)
-      local announced = ns.InstanceLevelLogic.Announced(inst)
-      if announced then
-        levelTip = L["instances.announced.tip"] .. (levelTip and ("\n" .. levelTip) or "")
-      end
-      local sub = string.format(L["instances.sub"], label, plural(inst.gs)) .. (loc and (" · " .. loc) or "")
-      local others = {}
-      for _, text in ipairs({ otherName or "", otherLoc or "" }) do
-        if text ~= "" then
-          others[#others + 1] = text
-        end
-      end
-      if #others > 0 then
-        sub = sub .. "\n" .. Theme.hexText("textMuted", table.concat(others, " · "))
-      end
-      return {
-        title = name or "?",
-        sub = sub,
-        wrapSub = true,
-        right = not announced and when or nil,
-        badge = announced and { text = L["instances.announced"], color = "warning" } or nil,
-        tooltip = levelTip,
-        selected = R.InstanceSlug(inst) == state.slug,
-      }
-    end,
-    onClick = function(inst)
-      if inst.heading then
-        local copy = {}
-        for faction, on in pairs(ns.Store.get("settings.instancesClosed") or {}) do
-          copy[faction] = on
-        end
-        copy[inst.heading] = not inst.closed or nil
-        ns.Store.set("settings.instancesClosed", copy)
-        refresh()
-        return
-      end
-      scrollToDetail = true
+  -- Decides what the page shows before anything below it is placed: the cards, or the chosen instance
+  -- (every section in a column when narrow, else the chosen tab).
+  local probe = CreateFrame("Frame", nil, view.content)
+  local showSections
+  function probe:fgGridLayout()
+    showSections(view.area:GetWidth() < STACK_BELOW)
+    return 0
+  end
+  s:Add(probe, { height = 0, gap = 0 })
+
+  -- Level one: the card grid ----------------------------------------------------------------------------
+  local cards = ns.InstanceCards.Create(view.content, {
+    faction = K.PlayerFaction(),
+    filter = { faction = faction() },
+    onOpen = function(inst)
       ns.Router:navigate("instances/" .. R.InstanceSlug(inst))
-      scrollToDetail = false
+    end,
+    onFaction = function(choice)
+      ns.Store.set(FACTION_PATH, choice)
     end,
   })
-  K.Anchor("FG.Instances.List", list)
-  local listNote = W.Text(leftPane, { role = "ui", color = "textSecondary", wrap = true })
-
-  -- Places the left pane and returns the height it needs at least (the list at its least rows).
-  local function layoutLeft(info)
-    local width = info.leftWidth
-    filters:ClearAllPoints()
-    filters:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 0, 0)
-    filters:SetWidth(width)
-    local y = filters:fgGridLayout(width) + 8
-    if listNote:IsShown() then
-      listNote:ClearAllPoints()
-      listNote:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 0, -y)
-      listNote:SetWidth(width)
-      y = y + math.ceil(listNote:GetStringHeight()) + 6
-    end
-    local least = K.scaledHeight(ROW_HEIGHT) * (info.mode == "stacked" and LIST_ROWS_STACKED or LIST_ROWS_SIDE)
-    list:ClearAllPoints()
-    list:SetPoint("TOPLEFT", leftPane, "TOPLEFT", 0, -y)
-    list:SetSize(width, math.max(least, info.leftHeight - y))
-    if revealPending then
-      revealPending = false
-      for i, inst in ipairs(shown or {}) do
-        if not inst.heading and R.InstanceSlug(inst) == state.slug then
-          list:Reveal(i)
-        end
-      end
-    end
-    return y + least
+  function cards:fgGridLayout(width)
+    return self:Layout(width)
   end
+  K.Anchor("FG.Instances.Filters", cards.bar)
+  K.Anchor("FG.Instances.List", cards.grid)
+  s:Add(cards, { gap = 0 })
 
-  -- Right pane: the chosen instance in a column ------------------------------------------------
-  local rightArea = W.ScrollArea(rightPane)
-  rightArea:SetFrameLevel(rightPane:GetFrameLevel() + 1)
-  rightArea:SetAllPoints()
-  local rc = rightArea.content
-  local side = { area = rightArea, content = rc, stack = W.Stack(rightArea, 0) }
+  -- Level two: the chosen instance ----------------------------------------------------------------------
+  local back = W.Action(view.content, {
+    key = "instances.back",
+    icon = "chevron-left",
+    variant = "ghost",
+    height = 26,
+    opens = false,
+    tooltip = "instances.back",
+    tooltipText = "instances.back.tip",
+    onClick = function()
+      ns.Router:navigate("instances")
+    end,
+  })
+  s:Add(back, { width = 220, height = 26, gap = 8 })
 
-  local header = IV.Header(rc)
+  local header = IV.Header(view.content)
   K.Anchor("FG.Instances.Detail", header)
-  side.stack:Add(header, { gap = 12 })
-
-  -- Shown without a chosen instance (no data, or an empty list).
-  local pickTitle = ns.AddHeading(side, "instances.pick", { gap = 6 })
-  local pickText = ns.AddParagraph(side, "instances.pick.text", { role = "ui" })
+  s:Add(header, { gap = 12 })
 
   -- The tab row wraps instead of cutting off, a selected tab has a bar (and its own color).
   local tabDefs = {}
@@ -530,8 +336,8 @@ local function build(container)
       end,
     }
   end
-  local tabRow = FL.ButtonRow(rc, tabDefs)
-  side.stack:Add(tabRow, { gap = 10 })
+  local tabRow = FL.ButtonRow(view.content, tabDefs)
+  s:Add(tabRow, { gap = 10 })
   local function paintTabs()
     for _, id in ipairs(TABS) do
       local b = tabRow:GetButton(id)
@@ -557,50 +363,50 @@ local function build(container)
   local order = {}
   local function newSection(id)
     local sec = { id = id, parts = {} }
-    sec.heading = ns.AddHeading(side, "instances.dtab." .. id, { gap = 6 })
+    sec.heading = ns.AddHeading(view, "instances.dtab." .. id, { gap = 6 })
     order[#order + 1] = sec
     return sec
   end
   local function part(sec, item, opts)
-    side.stack:Add(item, opts or { gap = 10 })
+    s:Add(item, opts or { gap = 10 })
     sec.parts[#sec.parts + 1] = item
     return item
   end
   local function note(sec)
-    return part(sec, W.Text(rc, { role = "ui", color = "textSecondary", wrap = true }))
+    return part(sec, W.Text(view.content, { role = "ui", color = "textSecondary", wrap = true }))
   end
 
   local bosses = newSection("bosses")
   local bossNote = note(bosses)
-  local bossList = part(bosses, IV.BossList(rc), { gap = 14 })
+  local bossList = part(bosses, IV.BossList(view.content), { gap = 14 })
 
   local quests = newSection("quests")
   local questNote = note(quests)
-  local questList = part(quests, ns.QuestChainView.Create(rc), { gap = 14 })
+  local questList = part(quests, ns.QuestChainView.Create(view.content), { gap = 14 })
   questList.onChange = function()
     relayout()
   end
 
   local items = newSection("items")
-  local itemsView = part(items, ns.InstanceItemsView.Create(rc), { gap = 14 })
+  local itemsView = part(items, ns.InstanceItemsView.Create(view.content), { gap = 14 })
   itemsView.onChange = function()
     relayout()
   end
 
   local accessSec = newSection("access")
-  local access = part(accessSec, ns.AccessView.Create(rc), { gap = 14 })
+  local access = part(accessSec, ns.AccessView.Create(view.content), { gap = 14 })
   access.onChange = function()
     relayout()
   end
 
   local mapSec = newSection("map")
-  local mapView = part(mapSec, ns.DungeonMapView.Create(rc), { gap = 14 })
+  local mapView = part(mapSec, ns.DungeonMapView.Create(view.content), { gap = 14 })
   mapView.onChange = function()
     relayout()
   end
 
   local infoSec = newSection("info")
-  local infoText = part(infoSec, W.Text(rc, { role = "ui", color = "text", wrap = true }), { gap = 10 })
+  local infoText = part(infoSec, W.Text(view.content, { role = "ui", color = "text", wrap = true }), { gap = 10 })
   -- Buttons an extension registers for the open instance (slot "instances"), none without an extension.
   local infoButtons = {}
   for _, tool in ipairs(ns.DevTools.Slot("instances")) do
@@ -618,13 +424,14 @@ local function build(container)
     }
   end
   if #infoButtons > 0 then
-    part(infoSec, FL.ButtonRow(rc, infoButtons), { gap = 14 })
+    part(infoSec, FL.ButtonRow(view.content, infoButtons), { gap = 14 })
   end
 
-  -- Shows what the layout mode asks for: every section when stacked, the chosen tab beside the list.
-  local function showSections(mode)
-    local stacked = mode == "stacked"
+  function showSections(stacked)
     local inst = state.inst
+    cards:SetShown(inst == nil)
+    back:SetShown(inst ~= nil)
+    header:SetShown(inst ~= nil)
     for _, sec in ipairs(order) do
       local on = inst ~= nil and (stacked or state.dtab == sec.id)
       sec.heading:SetShown(on and stacked)
@@ -632,10 +439,7 @@ local function build(container)
         item:SetShown(on and item.fgOn ~= false)
       end
     end
-    header:SetShown(inst ~= nil)
     tabRow:SetShown(inst ~= nil and not stacked)
-    pickTitle:SetShown(inst == nil)
-    pickText:SetShown(inst == nil)
     -- The map holds tile textures, so it only has an instance while it is on screen.
     local mapOn = inst ~= nil and (stacked or state.dtab == "map")
     if mapOn then
@@ -648,100 +452,59 @@ local function build(container)
     end
   end
 
-  function layoutPanes(info)
-    showSections(info.mode)
-    local need = layoutLeft(info)
-    rc:SetWidth(math.max(1, info.rightWidth - SCROLLBAR))
-    side.stack:Layout()
-    if info.mode == "stacked" then
-      -- The page scrolls, so the pane takes the height of its content and the wheel goes to the page.
-      info.rightHeight = math.max(1, math.ceil(rc:GetHeight()))
-      info.height = info.leftHeight + info.gap + info.rightHeight
-      rightPane:SetHeight(info.rightHeight)
-      split:SetHeight(info.height)
-    end
-    rightArea:EnableMouseWheel(info.mode ~= "stacked")
-    return need
-  end
-
   function relayout()
     view:Layout()
-  end
-
-  local function revealDetail()
-    if split:GetMode() ~= "stacked" then
-      return
-    end
-    local top, at = view.content:GetTop(), rightPane:GetTop()
-    if top and at then
-      view.area:ScrollTo(top - at)
-    end
   end
 
   function refresh()
     -- The quests are in a data add-on that loads here, before anything reads inst.q.
     local dataStatus = DA.Ensure()
-    if not K.HasData("Instances") then
-      state.inst = nil
-      listNote:SetText(L["kit.noData"])
-      listNote:SetShown(true)
-      pickText:SetText(L["kit.noData"])
-      header:SetInstance(nil)
-      relayout()
-      return
-    end
-    local faction = state.faction ~= "all" and state.faction or nil
-    local found = currentItems()
-    shown = found
-    if state.group then
-      shown = {}
-      local closed = ns.Store.get("settings.instancesClosed") or {}
-      for _, group in ipairs(ns.InstanceLevelLogic.Groups(found)) do
-        shown[#shown + 1] = { heading = group.faction, count = #group.items, closed = closed[group.faction] == true }
-        if not closed[group.faction] then
-          for _, inst in ipairs(group.items) do
-            shown[#shown + 1] = inst
-          end
-        end
-      end
-    end
-    list:SetData(shown)
-    listNote:SetText(#found == 0 and L["instances.empty"] or "")
-    listNote:SetShown(#found == 0)
-    local inst = state.slug and R.FindInstance(state.slug) or nil
+    local inst = K.HasData("Instances") and state.slug and R.FindInstance(state.slug) or nil
     state.inst = inst
-    pickText:SetText(L["instances.pick.text"])
-    header:SetInstance(inst, faction)
+    local choice = detailFaction()
+    header:SetInstance(inst, choice)
     if inst then
-      lastSlug = state.slug
       bossList:SetInstance(inst)
-      questList:SetInstance(inst, faction)
-      itemsView:SetInstance(inst, faction)
-      bossNote:SetText(L["instances.bosses.none"])
-      bossNote.fgOn = bossList.count == 0
+      questList:SetInstance(inst, choice)
+      itemsView:SetInstance(inst, choice)
+      -- No bosses: the empty note. Else one line says for how many bosses the data has abilities.
+      if bossList.count == 0 then
+        bossNote:SetText(L["instances.bosses.none"])
+      else
+        local known, total = ns.InstanceGaps.AbilityCount(inst)
+        bossNote:SetText(string.format(L["instances.abilities.summary"], known, total))
+      end
+      bossNote.fgOn = true
       if dataStatus ~= DA.STATUS.ok then
         questNote:SetText(DA.Hint(dataStatus))
       else
         questNote:SetText(L[#(inst.q or {}) == 0 and "instances.quests.none" or "instances.quests.noneFaction"])
       end
       questNote.fgOn = questList.count == 0
-      access:SetInstance(inst, faction)
+      access:SetInstance(inst, choice)
       infoText:SetText(ns.InstanceInfoText(inst))
     end
     paintTabs()
-    facDd.Refresh()
-    sortToggle.Refresh()
-    groupBox.Refresh()
     relayout()
-    if scrollToDetail then
-      scrollToDetail = false
-      revealDetail()
-    end
   end
+
+  -- The switch of the quest tab or of the cards changed the shared choice: the other controls follow.
+  ns.On("FG_SETTING_CHANGED", function(_, path, value)
+    if path ~= FACTION_PATH then
+      return
+    end
+    local choice = IL.Faction(value, K.PlayerFaction())
+    if cards.filter.faction ~= choice then
+      cards:SetFilter({ faction = choice })
+    end
+    if state.inst and view.area:IsVisible() then
+      refresh()
+    end
+  end)
 
   -- The quest data came in after a fight: the open page shows the quests.
   ns.On("FG_INSTANCE_DATA", function()
-    if view.area:IsVisible() then
+    if state.inst and view.area:IsVisible() then
       refresh()
     end
   end)
@@ -750,79 +513,75 @@ local function build(container)
   ns.On("FG_BOSS_PROGRESS", function()
     local inst = state.inst
     if inst and view.area:IsVisible() then
-      header:SetInstance(inst, state.faction ~= "all" and state.faction or nil)
+      header:SetInstance(inst, detailFaction())
       bossList:SetInstance(inst)
       relayout()
     end
   end)
 
-  -- Opened from a link or the search: that instance and tab. Opened inside an instance: that one,
-  -- on its map. Opened bare: the one chosen last, else the first of the list.
-  -- Chooses the instance the player stands in (the resolver of the dungeon map: instance ID, else the name in
-  -- either language) with the boss tab. A filter that would hide it gives way: faction on both, search cleared.
+  -- The instance the player stands in (the resolver of the dungeon map: instance ID, else the name in either
+  -- language), on its boss tab.
   local function selectCurrent()
     local here = ns.DungeonMapView.Current()
     if not here then
       return false
     end
-    state.kind, state.slug, state.dtab, revealPending = here.t, R.InstanceSlug(here), "bosses", true
-    local function listed()
-      for _, inst in ipairs(currentItems()) do
-        if R.InstanceSlug(inst) == state.slug then
-          return true
-        end
-      end
-      return false
-    end
-    if not listed() then
-      state.faction = "all"
-    end
-    if not listed() then
-      state.query = ""
-      search.edit:SetText("")
-    end
+    state.slug, state.dtab = R.InstanceSlug(here), "bosses"
     return true
   end
 
-  -- The instance the player stood in when the page last looked: a change while the page is open chooses the new one,
-  -- a floor change or the same instance leaves a manual choice alone.
   local hereSlug
   local function currentSlug()
     local here = ns.DungeonMapView.Current()
     return here and R.InstanceSlug(here) or nil
   end
 
+  local function showState()
+    -- The shared choice may have changed on another page since the cards were built.
+    if cards.filter.faction ~= faction() then
+      cards:SetFilter({ faction = faction() })
+    end
+    refresh()
+    view.area:ScrollTo(0)
+  end
+
+  -- Entering another instance while the page is open chooses it, a floor change or the same instance does not.
   ns.On("PLAYER_ENTERING_WORLD", function()
     local slug = currentSlug()
     local changed = slug ~= nil and slug ~= hereSlug
     hereSlug = slug
     if changed and view.area:IsVisible() and selectCurrent() then
-      kindTabs:Select(state.kind)
+      showState()
     end
   end)
 
+  -- Leaving the page forgets the choice, so the next opening starts at the current instance again.
+  view.area:HookScript("OnHide", function()
+    state.slug = nil
+  end)
+
+  -- A slug (and a tab) of the route: that instance, an unknown slug shows the cards. No slug: the instance the
+  -- player stands in, else the cards. Coming from an open instance (back button, back key, breadcrumb) always
+  -- shows the cards, so the way back is never undone.
   function view:Show(params)
-    local slug = params and params[1]
-    local tab = params and params[2]
     hereSlug = currentSlug()
-    if not slug and selectCurrent() then
-      if VALID_TAB[tab] then
-        state.dtab = tab
-      end
-      kindTabs:Select(state.kind)
-      return
-    end
-    local inst = slug and R.FindInstance(slug) or (not slug and lastSlug and R.FindInstance(lastSlug)) or nil
+    local inst = params and params[1] and R.FindInstance(params[1]) or nil
+    local tab = params and params[2]
+    tab = TAB_ALIAS[tab] or tab
     if inst then
-      state.kind = inst.t
       state.slug = R.InstanceSlug(inst)
     else
-      state.slug = firstSlug()
+      local leaving = state.slug ~= nil and ns.Router.current == "instances"
+      -- The boss tab of the instance the player stands in, unless the route names another tab.
+      local picked = not (params and params[1]) and not leaving and selectCurrent()
+      if not picked then
+        state.slug = nil
+      end
     end
     if VALID_TAB[tab] then
       state.dtab = tab
     end
-    kindTabs:Select(state.kind)
+    showState()
   end
   return view
 end
@@ -839,7 +598,7 @@ ns.RegisterPage({
       local inst = R.FindInstance(param)
       return inst and ns.T(inst.n) or param
     end
-    local key = "instances.dtab." .. param
+    local key = "instances.dtab." .. (TAB_ALIAS[param] or param)
     return L[key] ~= key and L[key] or param
   end,
   build = build,

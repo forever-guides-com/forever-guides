@@ -1,9 +1,10 @@
--- Items tab of the instances page: the loot of an instance by boss (one accordion group open at a
--- time, the first one at the start) or as one list with the boss beside each item. Rules and data
--- merging are in Modules/InstanceItemsLogic.lua. Headers and rows come from pools, the height follows
--- the open group, and a page Stack holds the view through fgGridLayout(width).
+-- Items tab of the instances page: the loot of an instance by boss (list and detail, Modules/InstanceBossView.lua,
+-- the first boss chosen at the start) or as one list with the boss beside each item. Rules and data
+-- merging are in Modules/InstanceItemsLogic.lua. The rows of the list come from a pool and a page Stack holds
+-- the view through fgGridLayout(width).
 local _, ns = ...
 local W, L, Theme, R, IV, IL = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.InstanceView, ns.InstanceItemsLogic
+local LR, BV = ns.InstanceLootRow, ns.InstanceBossView
 
 ns.AddLocale("enUS", {
   ["instances.items.view.boss"] = "By boss",
@@ -14,8 +15,9 @@ ns.AddLocale("enUS", {
   ["instances.items.sort.boss"] = "Sort by boss",
   ["instances.items.count.one"] = "1 item",
   ["instances.items.count.other"] = "%d items",
-  ["instances.items.bossNone"] = "No loot known",
+  ["instances.items.bossNone"] = "Loot not recorded yet",
   ["instances.items.bossHint"] = "Loot is added when you record or export it.",
+  ["instances.items.group.instance"] = "More loot of the instance",
   ["instances.items.group.extra"] = "More recorded loot",
   ["instances.items.group.quests"] = "Quests",
   ["instances.items.sourceQuest"] = "Quest",
@@ -23,7 +25,8 @@ ns.AddLocale("enUS", {
   ["instances.items.bossLine"] = "Boss: %s",
   ["instances.items.captured"] = "Recorded",
   ["instances.items.capturedTip"] = "Recorded by you: %d drops in %d kills",
-  ["instances.items.rate"] = "Drop chance %s%%",
+  ["instances.items.rateOwn"] = "Drop chance %s%% (from your own kills, %d kills)",
+  ["instances.items.rateEstimate"] = "Drop chance about %s%% (estimated, may differ from the Forever state)",
 })
 
 ns.AddLocale("deDE", {
@@ -35,8 +38,9 @@ ns.AddLocale("deDE", {
   ["instances.items.sort.boss"] = "Nach Boss sortieren",
   ["instances.items.count.one"] = "1 Item",
   ["instances.items.count.other"] = "%d Items",
-  ["instances.items.bossNone"] = "Keine Beute bekannt",
+  ["instances.items.bossNone"] = "Beute noch nicht erfasst",
   ["instances.items.bossHint"] = "Beute kommt beim eigenen Erfassen oder Export dazu.",
+  ["instances.items.group.instance"] = "Weitere Beute der Instanz",
   ["instances.items.group.extra"] = "Weitere erfasste Beute",
   ["instances.items.group.quests"] = "Quests",
   ["instances.items.sourceQuest"] = "Quest",
@@ -44,7 +48,8 @@ ns.AddLocale("deDE", {
   ["instances.items.bossLine"] = "Boss: %s",
   ["instances.items.captured"] = "Erfasst",
   ["instances.items.capturedTip"] = "Von dir erfasst: %d Drops bei %d Kills",
-  ["instances.items.rate"] = "Droprate %s %%",
+  ["instances.items.rateOwn"] = "Droprate %s %% (aus eigenen Kills, %d Kills)",
+  ["instances.items.rateEstimate"] = "Droprate etwa %s %% (geschätzt, kann vom Forever-Stand abweichen)",
 })
 
 local IIV = {}
@@ -52,18 +57,15 @@ ns.InstanceItemsView = IIV
 
 local PAD = 8
 local ICON = IV.ICON
-local HEAD_PORTRAIT = 40
-local INDENT = 14
+local BOSS_ICON = 24 -- the boss mark beside the boss name of an item row
+local BOSS_GAP = 6
+local NAME_DELAY = 0.2 -- seconds: item names that arrive together paint the list once
 local COLUMN_MIN = 440 -- the boss column starts from this width on
 local COLUMN_SHARE = 0.6
 local COLUMN_H = 26
 
 local function ceil(fs)
   return math.ceil(fs:GetStringHeight())
-end
-
-local function percent(value)
-  return value >= 10 and tostring(math.floor(value + 0.5)) or tostring(math.floor(value * 10 + 0.5) / 10)
 end
 
 -- Scrolls every scroll area around the frame so that the frame is in view (keyboard focus).
@@ -122,6 +124,11 @@ local function makeItemRow(view)
   row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   row.name = W.Text(row, { role = "ui", color = "text", wrap = true })
   row.boss = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
+  -- Boss mark: the symbol of the boss, else its small 3D portrait, else the placeholder symbol (IV.PaintBossImage).
+  row.bossHost = CreateFrame("Frame", nil, row)
+  row.bossHost:SetSize(BOSS_ICON, BOSS_ICON)
+  row.bossPic = row.bossHost:CreateTexture(nil, "ARTWORK")
+  row.bossPic:SetAllPoints()
   row.meta = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
   local hover = row:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
@@ -148,17 +155,23 @@ local function makeItemRow(view)
     self.name:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -PAD)
     self.name:SetWidth(nameW)
     local y, side = PAD + ceil(self.name), 0
+    local marked = self.boss:IsShown() and self.bossMarked
+    self.bossHost:SetShown(marked == true)
     if self.boss:IsShown() then
       self.boss:SetText(self.colX and self.source or string.format(L["instances.items.bossLine"], self.source))
       self.boss:ClearAllPoints()
+      local shift = marked and BOSS_ICON + BOSS_GAP or 0
+      self.bossHost:ClearAllPoints()
       if self.colX then
-        self.boss:SetPoint("TOPLEFT", self, "TOPLEFT", self.colX, -PAD)
-        self.boss:SetWidth(math.max(40, width - self.colX))
-        side = PAD + ceil(self.boss)
+        self.bossHost:SetPoint("TOPLEFT", self, "TOPLEFT", self.colX, -PAD)
+        self.boss:SetPoint("TOPLEFT", self, "TOPLEFT", self.colX + shift, -PAD)
+        self.boss:SetWidth(math.max(40, width - self.colX - shift))
+        side = PAD + math.max(marked and BOSS_ICON or 0, ceil(self.boss))
       else
-        self.boss:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(y + 2))
-        self.boss:SetWidth(nameW)
-        y = y + 2 + ceil(self.boss)
+        self.bossHost:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(y + 2))
+        self.boss:SetPoint("TOPLEFT", self, "TOPLEFT", textX + shift, -(y + 2))
+        self.boss:SetWidth(math.max(40, nameW - shift))
+        y = y + 2 + math.max(marked and BOSS_ICON or 0, ceil(self.boss))
       end
     end
     if self.meta:IsShown() then
@@ -178,11 +191,14 @@ local function sourceLabel(item)
     return (R.Names(group.boss.n)) or "?"
   elseif group.kind == "quests" then
     return L["instances.items.sourceQuest"]
+  elseif group.kind == "instance" then
+    return L["instances.items.group.instance"]
   end
   return item.source or L["instances.items.unknownSource"]
 end
 
-local function paintItemRow(row, item, flat)
+-- inst is the instance of the view, it finds the boss mark of an item that belongs to a boss.
+local function paintItemRow(row, item, flat, inst)
   row.entry = item
   row.colX = nil
   local name = IV.ItemName(item)
@@ -204,117 +220,26 @@ local function paintItemRow(row, item, flat)
   if item.src == "quest" then
     meta = string.format(L["instances.items.from"], table.concat(item.quests or {}, ", "))
   else
-    local rate = item.rate or (own and ns.LootCapture.Rate(own.kills, own.drops))
-    meta = rate and string.format(L["instances.items.rate"], percent(rate)) or nil
+    -- A rate the player recorded is a measurement. A rate of the data is an estimate from an older state of the game.
+    local measured = own and ns.LootCapture.Rate(own.kills, own.drops)
+    if measured then
+      meta = string.format(L["instances.items.rateOwn"], LR.Percent(measured), own.kills)
+    elseif item.rate then
+      meta = string.format(L["instances.items.rateEstimate"], LR.Percent(item.rate))
+    end
   end
   row.meta:SetText(meta or "")
   row.meta:SetShown(meta ~= nil)
   row.tip = own and string.format(L["instances.items.capturedTip"], own.drops, own.kills) or nil
   row.source = sourceLabel(item)
   row.boss:SetShown(flat)
-end
-
--- Group headers: chevron, boss portrait (boss groups), name with tags and the item count.
-local function makeHeader(view)
-  local h = CreateFrame("Button", nil, view)
-  h.bg = h:CreateTexture(nil, "BACKGROUND")
-  h.bg:SetAllPoints()
-  ns.Bind(h, function()
-    h.bg:SetColorTexture(Theme.color("surface"))
-  end)
-  local hover = h:CreateTexture(nil, "HIGHLIGHT")
-  hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.06)
-  h.chevron = ns.IconDraw.new(h, 12)
-  h.portrait = CreateFrame("Frame", nil, h)
-  h.portrait:SetSize(HEAD_PORTRAIT, HEAD_PORTRAIT)
-  h.pic = h.portrait:CreateTexture(nil, "ARTWORK")
-  h.pic:SetAllPoints()
-  h.name = W.Text(h, { role = "text", color = "text", wrap = true })
-  h.count = W.Text(h, { role = "micro", color = "textMuted", wrap = true })
-  h:SetScript(
-    "OnClick",
-    ns.Wrap("instance-items", function(self)
-      view:Toggle(self.group)
-    end)
-  )
-  register(view, h, function(self)
-    self:Click()
-  end)
-  newLine(h)
-
-  function h:fgLayout(width)
-    local withPortrait = self.portrait:IsShown()
-    local x = PAD + 12 + 10
-    self.chevron:ClearAllPoints()
-    self.chevron:SetPoint("LEFT", self, "LEFT", PAD, 0)
-    self.portrait:ClearAllPoints()
-    self.portrait:SetPoint("LEFT", self, "LEFT", x, 0)
-    local textX = x + (withPortrait and HEAD_PORTRAIT + 10 or 0)
-    local textW = math.max(40, width - textX - PAD)
-    self.name:ClearAllPoints()
-    self.name:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -PAD)
-    self.name:SetWidth(textW)
-    local y = PAD + ceil(self.name) + 2
-    self.count:ClearAllPoints()
-    self.count:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
-    self.count:SetWidth(textW)
-    y = y + ceil(self.count)
-    return math.max(y + PAD, withPortrait and HEAD_PORTRAIT + PAD * 2 or 0)
-  end
-  return h
-end
-
-local function paintPortrait(h, inst, boss)
-  local fid = IV.Portrait(inst, boss)
-  h.pic:SetTexture(fid)
-end
-
-local function paintHeader(h, view, group)
-  h.group = group
-  local open = view.open == group.id
-  h.fgExpanded = open
-  h.chevron:Draw(open and "chevron-down" or "chevron-right")
-  local boss = group.boss
-  local text
+  local boss = flat and item.group.kind == "boss" and item.group.boss or nil
+  row.bossMarked = boss ~= nil
   if boss then
-    text = string.format("%d. %s", group.index, IV.Dual(boss.n) or "?")
-    if boss.opt then
-      text = text .. "  " .. Theme.hexText("textMuted", L["instances.bosses.optional"])
-    end
-    if boss.hc then
-      text = text .. "  " .. Theme.hexText("warning", L["instances.bosses.heroic"])
-    end
-    paintPortrait(h, view.inst, boss)
+    IV.PaintBossImage(row.bossHost, row.bossPic, inst, boss)
   else
-    text = L["instances.items.group." .. group.kind]
+    ns.BossPortrait.Unbind(row.bossHost)
   end
-  h.portrait:SetShown(boss ~= nil)
-  h.name:SetText(text)
-  local n = #group.items
-  h.count:SetText(
-    n == 0 and L["instances.items.bossNone"]
-      or string.format(L["instances.items.count." .. (n == 1 and "one" or "other")], n)
-  )
-end
-
--- Note under an open boss without loot.
-local function makeHint(view)
-  local f = CreateFrame("Frame", nil, view)
-  f.title = W.Text(f, { key = "instances.items.bossNone", role = "ui", color = "textSecondary", wrap = true })
-  f.text = W.Text(f, { key = "instances.items.bossHint", role = "micro", color = "textMuted", wrap = true })
-  function f:fgLayout(width)
-    local w = math.max(40, width - 2 * PAD)
-    self.title:ClearAllPoints()
-    self.title:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -PAD)
-    self.title:SetWidth(w)
-    local y = PAD + ceil(self.title) + 2
-    self.text:ClearAllPoints()
-    self.text:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -y)
-    self.text:SetWidth(w)
-    return y + ceil(self.text) + PAD
-  end
-  return f
 end
 
 -- Column heads of the all-items list: two sort buttons, the active one with a chevron and a bar.
@@ -389,7 +314,6 @@ function IIV.Create(parent)
   f.pooled = {}
   f.entries = {}
   local pools = {
-    header = { make = makeHeader, list = {}, used = 0 },
     item = { make = makeItemRow, list = {}, used = 0 },
   }
 
@@ -440,7 +364,17 @@ function IIV.Create(parent)
     opens = true,
     onClick = openLoot,
   })
-  f.hint = makeHint(f)
+  f.bossView = BV.Create(f, function(frame, activate)
+    register(f, frame, activate)
+  end)
+  f.bossView.onChange = function()
+    if f.onChange then
+      f.onChange()
+    end
+  end
+  f.bossView.onOrder = function()
+    f:SyncFocusOrder(f.bossView:Frames())
+  end
 
   local function take(kind)
     local p = pools[kind]
@@ -458,46 +392,31 @@ function IIV.Create(parent)
     return IV.ItemName(item)
   end
 
-  -- Pools are taken in display order, so a header keeps its frame (and its keyboard focus) when
-  -- another group opens. The keyboard order of the pooled frames follows the display order.
+  -- Pools are taken in display order. The keyboard order of the pooled frames follows the display order.
   local function sync()
     for _, p in pairs(pools) do
       p.used = 0
     end
-    f.hint:Hide()
     local entries, ordered = {}, {}
     local model = f.model
     local empty = model == nil or model.total == 0
     f.empty:SetShown(empty and f.inst ~= nil)
+    f.bossView:SetShown(not empty and f.view == "boss")
+    if not empty and f.view == "boss" then
+      f.bossView:SetModel(f.inst, model)
+    end
     f.toolbar:SetShown(not empty)
     f.columns:SetShown(not empty and f.view == "all")
     if not empty then
       if f.view == "all" then
         for _, row in ipairs(IL.Flat(model, f.sort, nameOf)) do
           local frame = take("item")
-          entries[#entries + 1] = { frame = frame, flat = true }
-          paintItemRow(frame, row.item, true)
+          entries[#entries + 1] = { frame = frame }
+          paintItemRow(frame, row.item, true, f.inst)
           ordered[#ordered + 1] = frame
         end
       else
-        for _, group in ipairs(model.groups) do
-          local frame = take("header")
-          paintHeader(frame, f, group)
-          entries[#entries + 1] = { frame = frame }
-          ordered[#ordered + 1] = frame
-          if f.open == group.id then
-            for _, item in ipairs(group.items) do
-              local row = take("item")
-              paintItemRow(row, item, false)
-              entries[#entries + 1] = { frame = row, indent = INDENT }
-              ordered[#ordered + 1] = row
-            end
-            if #group.items == 0 then
-              f.hint:Show()
-              entries[#entries + 1] = { frame = f.hint, indent = INDENT }
-            end
-          end
-        end
+        ordered = f.bossView:Frames()
       end
       for _, id in ipairs(IL.VIEWS) do
         rings[id].show(id == f.view)
@@ -505,7 +424,10 @@ function IIV.Create(parent)
     end
     for _, p in pairs(pools) do
       for i = p.used + 1, #p.list do
-        p.list[i]:Hide()
+        local frame = p.list[i]
+        frame:Hide()
+        -- A hidden row gives its 3D portrait back to the pool.
+        ns.BossPortrait.Unbind(frame.bossHost or frame.portrait)
       end
     end
     f.entries = entries
@@ -545,14 +467,6 @@ function IIV.Create(parent)
     end
   end
 
-  function f:Toggle(group)
-    self.open = self.open ~= group.id and group.id or nil
-    sync()
-    if self.onChange then
-      self.onChange()
-    end
-  end
-
   function f:SetView(view)
     self.view = IL.View(view)
     ns.Store.set("settings.instancesItemsView", self.view)
@@ -573,7 +487,6 @@ function IIV.Create(parent)
   -- inst, faction ("A", "H" or nil) like the other lists of the page.
   function f:SetInstance(inst, faction)
     local LC = ns.LootCapture
-    local changed = self.inst ~= inst
     self.inst = inst
     self.model = inst
       and IL.Build(inst, {
@@ -582,11 +495,26 @@ function IIV.Create(parent)
         encounterNames = LC.EncounterNames,
       })
     self.count = self.model and self.model.total or 0
-    if self.model and (changed or (self.open and not IL.Find(self.model, self.open))) then
-      self.open = self.model.first
-    end
     sync()
   end
+
+  -- Item names arrive late from the client. The list paints again (names, sort order, heights) once per burst,
+  -- and only when the instance shown holds the item.
+  local function onItemData(_, id)
+    if not f:IsVisible() or (id ~= nil and not IL.HasItem(f.model, id)) then
+      return
+    end
+    ns.Debounce("instance-items-names", NAME_DELAY, function()
+      if f:IsVisible() then
+        sync()
+        if f.onChange then
+          f.onChange()
+        end
+      end
+    end)
+  end
+  ns.On("GET_ITEM_INFO_RECEIVED", onItemData)
+  ns.On("ITEM_DATA_LOAD_RESULT", onItemData)
 
   function f:fgGridLayout(width)
     local y = 0
@@ -620,13 +548,19 @@ function IIV.Create(parent)
         self.columns:SetSize(width, COLUMN_H)
         y = y + self.columns:fgLayout(width) + 2
       end
+      if self.bossView:IsShown() then
+        self.bossView:ClearAllPoints()
+        self.bossView:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+        self.bossView:SetWidth(width)
+        y = y + self.bossView:fgGridLayout(width)
+      end
       for _, e in ipairs(self.entries) do
-        local frame, indent = e.frame, e.indent or 0
-        frame.colX = e.flat and colX or nil
+        local frame = e.frame
+        frame.colX = colX
         frame:ClearAllPoints()
-        frame:SetPoint("TOPLEFT", self, "TOPLEFT", indent, -y)
-        frame:SetWidth(width - indent)
-        local h = frame:fgLayout(width - indent)
+        frame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+        frame:SetWidth(width)
+        local h = frame:fgLayout(width)
         frame:SetHeight(h)
         y = y + h
       end

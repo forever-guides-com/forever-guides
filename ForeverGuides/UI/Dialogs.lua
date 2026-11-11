@@ -222,7 +222,8 @@ end
 
 local confirm
 -- titleKey, textKey: locale keys. opts (optional): yesKey (label of the confirming button instead of "OK"),
--- text and title (literal strings that replace the keys, for texts built from several parts). A long
+-- noKey (label of the other button instead of "Cancel"), text and title (literal strings that replace the
+-- keys, for texts built from several parts). A long
 -- text makes the dialog taller.
 function Dialogs.Confirm(titleKey, textKey, onYes, onNo, opts)
   opts = opts or {}
@@ -255,6 +256,14 @@ function Dialogs.Confirm(titleKey, textKey, onYes, onNo, opts)
   confirm.active = yes
   confirm.no:ClearAllPoints()
   confirm.no:SetPoint("RIGHT", yes, "LEFT", -8, 0)
+  -- opts.noKey: the text of the other button (default "Cancel"), the button grows with a longer text.
+  if confirm.no.label then
+    W.SetText(confirm.no.label, opts.noKey or "act.cancel")
+  end
+  if opts.noKey or confirm.noWide then
+    confirm.no:SetWidth(opts.noKey and 170 or 110)
+    confirm.noWide = opts.noKey ~= nil
+  end
   confirm.no:SetScript(
     "OnClick",
     ns.Wrap("confirm-no", function()

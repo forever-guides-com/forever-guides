@@ -11,6 +11,13 @@
 --     action = true (custom: a button, not a setting: no change entry, no reset),
 --     tab = "automation" (Settings tab that holds it, named in the summary) } } })
 --
+-- Two more types have no Store key either and follow the pattern of the consent control (the key only names
+-- the control in the session): { type = "feature", id = "fishing" } is one feature row of
+-- Modules/SetupFeatureData.lua (read and written through ns.SetupFeatureLogic: on or off, with its menu
+-- pages), { type = "menu" } is the hidden part of the left menu (ns.NavLayout, as one comparable text; a
+-- write takes a list of { kind = "group" | "page", id, hidden } edits and applies it in one batch).
+-- Option toggles of a feature row carry owner = <row id>: the first-run skip leaves them alone.
+--
 -- A control exists only while its key has a default in Store.defaults, so a step can be
 -- registered before the module that owns the key. A step without controls is an info step.
 -- A consent control (fn, aud) is no Store key: it reads and writes the send and receive flag of one
@@ -23,7 +30,8 @@ local SW = { steps = {}, VERSION = 1 }
 ns.SetupWizard = SW
 
 local seq = 0
-local TYPES = { toggle = true, dropdown = true, slider = true, custom = true, consent = true }
+local TYPES =
+  { toggle = true, dropdown = true, slider = true, custom = true, consent = true, feature = true, menu = true }
 local DIRECTIONS = { send = true, receive = true }
 
 local function validControl(c)
@@ -38,8 +46,22 @@ local function validControl(c)
     return type(c.build) == "function"
   elseif c.type == "consent" then
     return type(c.fn) == "string" and c.fn ~= "" and type(c.aud) == "string" and c.aud ~= ""
+  elseif c.type == "feature" then
+    return type(c.id) == "string" and c.id ~= ""
   end
   return true
+end
+
+-- A feature or menu control may leave its key out: it is named after the row or the menu.
+local function withKey(c)
+  if type(c) == "table" and c.key == nil then
+    if c.type == "feature" and type(c.id) == "string" then
+      c.key = "feature." .. c.id
+    elseif c.type == "menu" then
+      c.key = "menu.layout"
+    end
+  end
+  return c
 end
 
 function SW.RegisterStep(step)
@@ -48,7 +70,7 @@ function SW.RegisterStep(step)
   end
   local controls = {}
   for _, c in ipairs(step.controls or {}) do
-    if validControl(c) then
+    if validControl(withKey(c)) then
       controls[#controls + 1] = c
     end
   end
@@ -97,7 +119,11 @@ function SW.DefaultOf(path)
 end
 
 function SW.ControlActive(c)
-  if c.type == "consent" then
+  if c.type == "feature" then
+    return ns.SetupFeatureLogic ~= nil and ns.SetupFeatureLogic.Available(c.id) and check(c.when)
+  elseif c.type == "menu" then
+    return ns.SetupFeatureLogic ~= nil and ns.SetupFeatureLogic.MenuAvailable() and check(c.when)
+  elseif c.type == "consent" then
     return ns.Consent ~= nil and ns.Consent.IsAvailable(c.fn) and check(c.when)
   end
   return SW.DefaultOf(c.key) ~= nil and check(c.when)
@@ -224,9 +250,14 @@ end
 -- Values --------------------------------------------------------------------------------------
 
 -- The value a session compares: the stored value, for a consent control the letters of the flags that
--- are on ("", "S", "R" or "SR").
+-- are on ("", "S", "R" or "SR"), for a feature row "on" or "off", for the menu the text of its hidden
+-- entries (SetupFeatureLogic.MenuRaw).
 function SW.Raw(c)
-  if c.type == "consent" then
+  if c.type == "feature" then
+    return ns.SetupFeatureLogic.Raw(c.id)
+  elseif c.type == "menu" then
+    return ns.SetupFeatureLogic.MenuRaw()
+  elseif c.type == "consent" then
     local Consent = ns.Consent
     return (Consent.Allows(c.fn, "send", c.aud) and "S" or "") .. (Consent.Allows(c.fn, "receive", c.aud) and "R" or "")
   end
@@ -234,9 +265,14 @@ function SW.Raw(c)
 end
 
 -- Shown value of a control: its stored value, else the default; toggles can be inverted. A consent
--- control answers for one direction ("send" or "receive"), off when unknown.
+-- control answers for one direction ("send" or "receive"), off when unknown. A feature control answers
+-- true or false, the menu control { groups = { id, .. }, pages = { id, .. } } of the hidden entries.
 function SW.Get(c, dir)
-  if c.type == "consent" then
+  if c.type == "feature" then
+    return ns.SetupFeatureLogic.IsOn(c.id)
+  elseif c.type == "menu" then
+    return ns.SetupFeatureLogic.ParseMenuRaw(ns.SetupFeatureLogic.MenuRaw())
+  elseif c.type == "consent" then
     return DIRECTIONS[dir] == true and ns.Consent.Allows(c.fn, dir, c.aud) or false
   end
   local v = Store.get(c.key)
@@ -259,9 +295,18 @@ local function runApply(c, value)
 end
 
 -- Stores a shown value (the wizard is the trust boundary: unknown options and non-numbers
--- are refused) and returns whether it was accepted. A consent control also needs the direction.
+-- are refused) and returns whether it was accepted. A consent control also needs the direction, a feature
+-- control takes a boolean, the menu control a list of edits (see the header).
 function SW.Put(c, value, dir)
-  if c.type == "consent" then
+  if c.type == "feature" then
+    return type(value) == "boolean" and ns.SetupFeatureLogic.Set(c.id, value)
+  elseif c.type == "menu" then
+    if type(value) ~= "table" or not ns.SetupFeatureLogic.MenuAvailable() then
+      return false
+    end
+    local _, refused = ns.SetupFeatureLogic.SetMenu(value)
+    return #refused == 0
+  elseif c.type == "consent" then
     local Consent = ns.Consent
     if type(value) ~= "boolean" or not DIRECTIONS[dir] or not Consent then
       return false
@@ -302,20 +347,42 @@ function SW.Put(c, value, dir)
   return true
 end
 
+local function resetKey(c, default)
+  default = U.copy(default)
+  Store.set(c.key, default)
+  runApply(c, default)
+end
+
+local function resetFeature(c)
+  if not SW.ControlActive(c) then
+    return 0
+  end
+  if c.type == "menu" then
+    ns.SetupFeatureLogic.ResetMenu()
+  else
+    ns.SetupFeatureLogic.Reset(c.id)
+  end
+  return 1
+end
+
 -- Every key any step touches goes back to its Store default, the other settings stay. Sharing goes
--- fully off: every function is withdrawn (by "wizard", written to the consent log).
-function SW.ResetToDefaults()
+-- fully off: every function is withdrawn (by "wizard", written to the consent log). A feature row goes to
+-- its shipped state with its menu pages shown, the menu shows every hidden entry again. opts.keepFeatures
+-- leaves the feature rows, their option toggles (owner) and the menu as they are: the first-run skip changes
+-- none of the player's feature choices, the defaults already apply on a fresh install.
+function SW.ResetToDefaults(opts)
   local count, consent = 0, false
+  local keepFeatures = opts and opts.keepFeatures == true
   for _, step in ipairs(SW.Steps()) do
     for _, c in ipairs(step.controls) do
       local default = SW.DefaultOf(c.key)
-      if c.type == "consent" then
+      if c.type == "feature" or c.type == "menu" then
+        count = count + (keepFeatures and 0 or resetFeature(c))
+      elseif c.type == "consent" then
         consent = true
         count = count + 1
-      elseif default ~= nil and not c.action then
-        default = U.copy(default)
-        Store.set(c.key, default)
-        runApply(c, default)
+      elseif default ~= nil and not c.action and not (keepFeatures and c.owner) then
+        resetKey(c, default)
         count = count + 1
       end
     end
@@ -443,6 +510,46 @@ function SW.CoversScreen(w, h, sw, sh, share)
   return (w * h) / (sw * sh) > (share or 0.8)
 end
 
+-- Window placement -------------------------------------------------------------------------------
+-- A button of the wizard opens a window of the add-on (settings, help, tutorials). The wizard stays open and
+-- visible, so the two windows are placed next to each other. Pure decision in screen units, the UI applies it.
+
+SW.PLACE = { gap = 8, minStrip = 200 }
+
+local function overlaps(a, b)
+  return a.l < b.r and b.l < a.r and a.b < b.t and b.b < a.t
+end
+
+-- screen: { w }, setup and main: { l, r, t, b } (x to the right, y up).
+-- Returns { mode, setupLeft?, mainLeft? }:
+--   "apart"   the windows do not touch, nothing moves
+--   "beside"  next to each other without overlap: the main window moves (mainLeft), or when neither side has room
+--             for it both move (setupLeft, mainLeft)
+--   "over"    the screen is too narrow for both: the wizard sits at the left edge, the main window at the right
+--             edge and lies over it (the caller raises it above the wizard), the wizard stays standing and visible
+--   "bar"     the main window leaves less than minStrip of the wizard: the wizard folds to its bar as the last resort
+function SW.Placement(screen, setup, main)
+  local gap, strip = SW.PLACE.gap, SW.PLACE.minStrip
+  if not overlaps(setup, main) then
+    return { mode = "apart" }
+  end
+  local sw, mw = setup.r - setup.l, main.r - main.l
+  if setup.r + gap + mw <= screen.w then
+    return { mode = "beside", mainLeft = setup.r + gap }
+  end
+  if setup.l - gap - mw >= 0 then
+    return { mode = "beside", mainLeft = setup.l - gap - mw }
+  end
+  if sw + gap + mw <= screen.w then
+    local start = math.floor((screen.w - (sw + gap + mw)) / 2)
+    return { mode = "beside", setupLeft = start, mainLeft = start + sw + gap }
+  end
+  if mw <= screen.w and screen.w - mw >= math.min(strip, sw) then
+    return { mode = "over", setupLeft = 0, mainLeft = screen.w - mw }
+  end
+  return { mode = "bar" }
+end
+
 -- Session ----------------------------------------------------------------------------------------
 
 local Session = {}
@@ -550,7 +657,7 @@ function Session:Skip()
   for _, step in ipairs(self.steps) do
     self.visited[step.id] = true
   end
-  SW.ResetToDefaults()
+  SW.ResetToDefaults({ keepFeatures = true })
   return conclude(self, "skip")
 end
 

@@ -157,16 +157,6 @@ function R.AddSettings(card)
   toggle.fgId = "lfg-all"
   card.stack:Add(toggle, { height = 24, gap = 10 })
 
-  local reset = W.Button(card.content, {
-    key = "lfg.set.reset",
-    width = 220,
-    onClick = function()
-      R.Write(LL.DEFAULT)
-    end,
-  })
-  reset.fgId = "lfg-reset"
-  card.stack:Add(reset, { height = 28, width = 220, gap = 10 })
-
   local notice = W.Text(card.content, { key = "lfg.reload.notice", role = "ui", color = "warning", wrap = true })
   notice.fgId = "lfg-reload-notice"
   notice:Hide()
@@ -194,7 +184,19 @@ function R.AddSettings(card)
   card.stack:Add(panel, { height = 24, gap = 6 })
   ns.AddParagraph(card, "lfg.set.panelHint", { role = "micro", color = "textMuted", gap = 8 })
 
-  local auto = W.Toggle(card.content, {
+  -- The rarely used rest sits behind "More settings".
+  local more = W.Accordion(card, { id = card.id or "invites.lfg" })
+  local reset = W.Button(more.content, {
+    key = "lfg.set.reset",
+    width = 220,
+    onClick = function()
+      R.Write(LL.DEFAULT)
+    end,
+  })
+  reset.fgId = "lfg-reset"
+  more.stack:Add(reset, { height = 28, width = 220, gap = 10 })
+
+  local auto = W.Toggle(more.content, {
     key = "lfg.set.panelAuto",
     get = function()
       return ns.db.settings.lfgPanelAuto ~= false
@@ -204,10 +206,10 @@ function R.AddSettings(card)
     end,
   })
   auto.fgId = "lfg-panel-auto"
-  card.stack:Add(auto, { height = 24, gap = 6 })
-  ns.AddParagraph(card, "lfg.set.panelAutoHint", { role = "micro", color = "textMuted", gap = 8 })
+  more.stack:Add(auto, { height = 24, gap = 6 })
+  ns.AddParagraph(more, "lfg.set.panelAutoHint", { role = "micro", color = "textMuted", gap = 8 })
 
-  local dock = W.Toggle(card.content, {
+  local dock = W.Toggle(more.content, {
     key = "lfg.set.panelDock",
     get = function()
       return ns.db.settings.lfgPanelDock ~= false
@@ -217,8 +219,8 @@ function R.AddSettings(card)
     end,
   })
   dock.fgId = "lfg-panel-dock"
-  card.stack:Add(dock, { height = 24, gap = 6 })
-  ns.AddParagraph(card, "lfg.set.panelDockHint", { role = "micro", color = "textMuted", gap = 8 })
+  more.stack:Add(dock, { height = 24, gap = 6 })
+  ns.AddParagraph(more, "lfg.set.panelDockHint", { role = "micro", color = "textMuted", gap = 8 })
   built.toggle, built.status, built.notice, built.reload = toggle, status, notice, reload
   R.Refresh()
 end
@@ -232,4 +234,4 @@ ns.On("CVAR_UPDATE", function(_, name)
   end
 end)
 
-ns.SettingsPage.Add(R.AddSettings, "social")
+ns.SettingsPage.Add(R.AddSettings, "social", "invites.lfg")

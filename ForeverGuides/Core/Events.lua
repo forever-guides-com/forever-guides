@@ -30,6 +30,9 @@ local function isInternal(event)
   return event:sub(1, 3) == "FG_"
 end
 
+-- Events some clients do not have. Their features have another trigger, so a missing one is logged as info.
+local OPTIONAL = { TRADE_SKILL_UPDATE = true, LEARNED_SPELL_IN_TAB = true, INSPECT_TALENT_READY = true }
+
 function ns.On(event, fn)
   local list = listeners[event]
   if not list then
@@ -38,7 +41,7 @@ function ns.On(event, fn)
     if not isInternal(event) then
       local ok = pcall(frame.RegisterEvent, frame, event)
       if not ok then
-        ns.Log.warn("event %s not available", event)
+        ns.Log[OPTIONAL[event] and "info" or "warn"]("event %s not available", event)
       end
     end
   end

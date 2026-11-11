@@ -1770,25 +1770,15 @@ local function handleKey(key)
   if not (doc and frame:IsShown()) then
     return false
   end
-  -- An open menu or gallery takes Esc first.
-  if key == "ESCAPE" and Desktop.Layer.current and Desktop.Layer.escape() then
-    return true
+  if key == "ESCAPE" then
+    -- An open menu or gallery takes Esc first, then the stack: it works wherever the pointer is and closes
+    -- the window like every other one (a dirty drawing asks first).
+    return (Desktop.Layer.current and Desktop.Layer.escape()) or ns.EscStack.Close(frame)
   end
   if not frame:IsMouseOver() and not (S.stroke or S.drag or S.resize) then
     return false
   end
   local ctrl = IsControlKeyDown() or (IsMetaKeyDown and IsMetaKeyDown())
-  if key == "ESCAPE" then
-    if S.stroke or S.drag or S.resize then
-      cancelStroke()
-    elseif S.sel then
-      setSelection(nil)
-      refreshUI()
-    else
-      DE.Close()
-    end
-    return true
-  end
   if S.stroke or S.drag or S.resize then
     return false
   end
@@ -3405,6 +3395,19 @@ local function create()
     end)
   )
   ui.ready = true
+  -- Esc first ends a stroke, a drag or a resize, then clears the selection, then closes (DE.Close asks before
+  -- it drops unsaved work, a plain Hide would not).
+  ns.WindowShell.RegisterEsc(f, function()
+    if S.stroke or S.drag or S.resize then
+      cancelStroke()
+    elseif S.sel then
+      setSelection(nil)
+      refreshUI()
+    else
+      DE.Close()
+    end
+    return true
+  end)
   setupKeyboard()
   f:Hide()
   return f

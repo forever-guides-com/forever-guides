@@ -128,6 +128,7 @@ local function addAccentButton(view)
   ns.Bind(chip, function()
     chip.tex:SetColorTexture(Theme.color("accent2"))
   end)
+  button.fgId = "look-accent"
   s:Add(button, { height = 26, width = 220 })
   local default = W.Action(view.content, {
     label = "act.reset",
@@ -140,6 +141,7 @@ local function addAccentButton(view)
   })
   default.label:ClearAllPoints()
   default.label:SetPoint("LEFT", 8, 0)
+  default.fgId = "look-accentDefault"
   s:Add(default, { height = 26, width = 220 })
   -- Always one line, so the page does not jump when the state changes.
   local status = W.Text(view.content, { role = "micro", color = "success" })
@@ -187,6 +189,7 @@ function A.AddSettings(view)
       return string.format("%d %%", v)
     end,
   })
+  alpha.fgId = "look-alpha"
   s:Add(alpha, { height = 42, width = 320 })
   local hint = ns.AddParagraph(view, "settings.alphaHint", { role = "micro", color = "textMuted" })
   local function paintHint()
@@ -195,44 +198,43 @@ function A.AddSettings(view)
     W.SetColor(hint, low and "warning" or "textMuted")
   end
   hint.Refresh = paintHint
-  s:Add(
-    W.Dropdown(view.content, {
-      key = "settings.skin",
-      width = 240,
-      options = A.SkinOptions(),
-      get = Skins.currentId,
-      set = A.SetSkin,
-    }),
-    { height = 46, width = 240 }
-  )
+  local skin = W.Dropdown(view.content, {
+    key = "settings.skin",
+    width = 240,
+    options = A.SkinOptions(),
+    get = Skins.currentId,
+    set = A.SetSkin,
+  })
+  skin.fgId = "look-skin"
+  s:Add(skin, { height = 46, width = 240 })
   ns.AddParagraph(view, "settings.skinHint", { role = "micro", color = "textMuted" })
   local options = {}
   for _, id in ipairs(Theme.PRESET_ORDER) do
     options[#options + 1] = { value = id, key = "settings.theme." .. id }
   end
-  s:Add(
-    W.Dropdown(view.content, {
-      key = "settings.theme",
-      width = 240,
-      options = options,
-      get = function()
-        return Theme.presets[ns.db.settings.theme] and ns.db.settings.theme or "default"
-      end,
-      set = A.SetTheme,
-    }),
-    { height = 46, width = 240 }
-  )
-  addAccentButton(view)
-  s:Add(
-    W.Action(view.content, {
-      label = "act.reset",
-      icon = "reset",
-      tooltip = "settings.lookReset",
-      width = 220,
-      onClick = A.Reset,
-    }),
-    { height = 26, width = 220 }
-  )
+  local theme = W.Dropdown(view.content, {
+    key = "settings.theme",
+    width = 240,
+    options = options,
+    get = function()
+      return Theme.presets[ns.db.settings.theme] and ns.db.settings.theme or "default"
+    end,
+    set = A.SetTheme,
+  })
+  theme.fgId = "look-theme"
+  s:Add(theme, { height = 46, width = 240 })
+  -- The accent color and the reset are touched rarely: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "window.look" })
+  addAccentButton(more)
+  local reset = W.Action(more.content, {
+    label = "act.reset",
+    icon = "reset",
+    tooltip = "settings.lookReset",
+    width = 220,
+    onClick = A.Reset,
+  })
+  reset.fgId = "look-reset"
+  more.stack:Add(reset, { height = 26, width = 220 })
   -- The footer controls change the opacity as well.
   ns.On("FG_SETTING_CHANGED", function(_, path)
     if path == "settings.mainAlpha" then

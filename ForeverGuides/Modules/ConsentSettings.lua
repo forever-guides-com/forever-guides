@@ -506,14 +506,22 @@ local function chatCard(view)
   ns.AddParagraph(view, "consent.chat.who", { role = "micro", color = "textMuted", gap = 2 })
 end
 
--- The tab: the overview in the card it is given, a card per function and the chat lines after it.
-function S.Add(view)
+-- The cards of the settings page: the overview, one card per function, the chat lines. Each builder
+-- reads its state once built, the events below keep it current.
+function S.AddOverview(view)
   overviewCard(view)
-  local grid = view.grid
+  refreshAll()
+end
+
+function S.AddFunctionCards(grid)
   for _, def in ipairs(Consent.List()) do
-    functionCard(grid:Card(), def)
+    functionCard(grid:Card({ id = "consents." .. def.id }), def)
   end
-  chatCard(grid:Card())
+  refreshAll()
+end
+
+function S.AddChatLines(view)
+  chatCard(view)
   refreshAll()
 end
 

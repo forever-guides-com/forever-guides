@@ -21,8 +21,20 @@ chat.SettingsLogic = SL
 SL.MAX_OPTIONS = chat.Store.MAX_EXTRA_OPTIONS
 SL.TYPES = { toggle = true, slider = true, dropdown = true }
 -- Groups in page order; a group not listed here comes after these, in the order of its first option.
-SL.GROUPS =
-  { "intake", "history", "open", "launch", "view", "time", "mentions", "sound", "window", "integration", "extras" }
+SL.GROUPS = {
+  "intake",
+  "history",
+  "open",
+  "launch",
+  "input",
+  "view",
+  "time",
+  "mentions",
+  "sound",
+  "window",
+  "integration",
+  "extras",
+}
 -- Game sounds the choice offers (names in SOUNDKIT). A name the client lacks plays nothing.
 SL.SOUNDS =
   { "TELL_MESSAGE", "UI_BNET_TOAST", "IG_QUEST_LIST_OPEN", "IG_MAINMENU_OPTION_CHECKBOX_ON", "ALARM_CLOCK_WARNING_2" }
@@ -303,6 +315,9 @@ end
 
 local builtin = {
   { id = "intake", group = "intake", type = "toggle", default = true, apply = syncIntake },
+  { id = "gameInput", group = "input", type = "toggle", default = false },
+  { id = "classColors", group = "view", type = "toggle", default = true },
+  { id = "replyHead", group = "input", type = "toggle", default = true },
   { id = "localChat", group = "intake", type = "toggle", default = true, apply = syncIntake },
   { id = "archive", group = "history", type = "toggle", default = true, apply = syncArchive },
   {
@@ -346,7 +361,15 @@ local builtin = {
   },
 }
 -- Options that carry a tooltip text besides the hint.
-local TIP = { intake = true, localChat = true, archive = true, archivePublic = true, sound = true, opacity = true }
+local TIP = {
+  intake = true,
+  localChat = true,
+  archive = true,
+  archivePublic = true,
+  sound = true,
+  opacity = true,
+  gameInput = false,
+}
 for _, def in ipairs(builtin) do
   def.label = "chat.set." .. def.id
   def.hint = "chat.set." .. def.id .. ".hint"

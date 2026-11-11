@@ -424,6 +424,14 @@ local function commitPoint(x, y)
   DWM.ApplyArea()
 end
 
+-- The reason the picture may not zoom right now (a locale key), else nil: the client protects the map
+-- in combat, and our frames hang on it. The wheel then does nothing, the buttons are dimmed.
+local function zoomBlocked()
+  if InCombatLockdown() or (map and not ns.ProtectedAllowed(map)) then
+    return "map.mag.blocked"
+  end
+end
+
 local function onMapClick(button, x, y)
   if button == "LeftButton" and S.placing then
     S.placing = false
@@ -433,6 +441,13 @@ local function onMapClick(button, x, y)
   if button == "RightButton" and not S.view.state.edit then
     DWM.SetMode("world")
     return true
+  end
+end
+
+-- The zoom buttons follow the combat state.
+local function refreshZoom()
+  if S.view then
+    S.view:RefreshZoom()
   end
 end
 
@@ -469,6 +484,7 @@ end
 
 local function build()
   local p = CreateFrame("Frame", nil, map)
+  ns.Layer.Own(p) -- stays out of the measure that lifts the map bar (the panel lies above it)
   S.panel = p
   p:SetPoint("TOPLEFT", container, "TOPLEFT", 0, 0)
   p:SetPoint("BOTTOMRIGHT", container, "BOTTOMRIGHT", 0, 0)
@@ -515,6 +531,7 @@ local function build()
   S.view.onFloorPick = onFloorPick
   S.view.onMapClick = onMapClick
   S.view.onChange = DWM.Layout
+  S.view.zoomBlocked = zoomBlocked
   S.foot = FL.ButtonRow(p, {
     {
       id = "here",
@@ -751,4 +768,8 @@ ns.On("PLAYER_REGEN_ENABLED", function()
     S.waiting = false
     DWM.Refresh()
   end
+  DWM.Run("dwm-zoom", refreshZoom)
+end)
+ns.On("PLAYER_REGEN_DISABLED", function()
+  DWM.Run("dwm-zoom", refreshZoom)
 end)

@@ -20,6 +20,8 @@
 -- buff), which is no aura. WeaponEnchantLogic reads both hands (C_PaperDollInfo.GetTemporaryEnchantmentInfo, else
 -- GetWeaponEnchantInfo), the events of the inventory and the slow check keep it current, and the ring runs on the
 -- element's own duration object. A reading the game keeps secret keeps the last readable run going until its end.
+-- The weapon element (CursorWeapon.lua, type "weapon") has the props, the panel and the preset of its own and draws
+-- through this file: propsOf turns its props into the ones of an aura element with the source "weapon".
 --
 -- In combat the element can show a buff or debuff of the player through the native aura container (AuraNative):
 -- the engine fills icon, ring, number and stacks and Lua reads nothing. The element keeps the read and computed
@@ -56,29 +58,9 @@ ns.AddLocale("enUS", {
   ["cursor.type.aura.desc"] = "Shows a buff or debuff, or the glow of a proc such as Revenge, as a ring, square or status bar. Can show only while the aura is missing, or only when little time is left.",
   ["cursor.preset.aura"] = "Aura (buff missing)",
   ["cursor.aura.source"] = "Source",
-  ["cursor.aura.source.tip"] = "An aura (buff or debuff) on a unit, the glow a spell gets when it procs, or the temporary enchantment of a weapon such as a poison, sharpening stone, oil or shaman weapon buff.",
+  ["cursor.aura.source.tip"] = "An aura (buff or debuff) on a unit, or the glow a spell gets when it procs.",
   ["cursor.aura.source.aura"] = "Aura (buff or debuff)",
   ["cursor.aura.source.proc"] = "Proc (spell glow)",
-  ["cursor.aura.source.weapon"] = "Weapon enchantment",
-  ["cursor.aura.weaponHand"] = "Weapon",
-  ["cursor.aura.weaponHand.tip"] = "Which weapon is looked at. Any shows the enchantment with the least time left and counts as missing only when no weapon has one.",
-  ["cursor.aura.weaponHand.any"] = "Any hand",
-  ["cursor.aura.weaponHand.main"] = "Main hand",
-  ["cursor.aura.weaponHand.off"] = "Off hand",
-  ["cursor.aura.weaponWarn"] = "Low below (s)",
-  ["cursor.aura.weaponWarn.tip"] = "Under this many seconds the ring and the time take the low color (red by default, set with the color curve). 0 turns it off.",
-  ["cursor.aura.weapon.name"] = "Weapon enchantment",
-  ["cursor.aura.weapon.current"] = "Right now",
-  ["cursor.aura.weapon.line"] = "%s: %s",
-  ["cursor.aura.weapon.hand.main"] = "Main hand",
-  ["cursor.aura.weapon.hand.off"] = "Off hand",
-  ["cursor.aura.weapon.kind.bare"] = "no enchantment",
-  ["cursor.aura.weapon.kind.none"] = "no weapon",
-  ["cursor.aura.weapon.kind.secret"] = "hidden by the game",
-  ["cursor.aura.weapon.kind.unreadable"] = "this client does not tell",
-  ["cursor.aura.weaponNote"] = "Poisons, sharpening stones, weightstones, oils and shaman weapon buffs are enchantments of the weapon, not auras. The conditions above work on the enchantment. A symbol is known for the common ones, any other shows your weapon.",
-  ["cursor.aura.status.weapon"] = "Read from the weapon, on the events of the inventory and by a slow check.",
-  ["cursor.preset.weapon"] = "Weapon enchantment (missing)",
   ["cursor.preset.wellfed"] = "Well Fed (missing)",
   ["cursor.aura.unit"] = "Unit",
   ["cursor.aura.unit.tip"] = "Whose auras are looked at.",
@@ -195,29 +177,9 @@ ns.AddLocale("deDE", {
   ["cursor.type.aura.desc"] = "Zeigt einen Buff oder Debuff oder das Leuchten eines Procs wie Rache als Ring, Quadrat oder Statusbalken. Kann nur erscheinen, wenn die Aura fehlt, oder nur bei wenig Restzeit.",
   ["cursor.preset.aura"] = "Aura (Buff fehlt)",
   ["cursor.aura.source"] = "Quelle",
-  ["cursor.aura.source.tip"] = "Eine Aura (Buff oder Debuff) auf einer Einheit, das Leuchten, das ein Zauber bei einem Proc bekommt, oder die zeitlich begrenzte Verzauberung einer Waffe wie Gift, Wetzstein, Öl oder ein Waffenbuff des Schamanen.",
+  ["cursor.aura.source.tip"] = "Eine Aura (Buff oder Debuff) auf einer Einheit oder das Leuchten, das ein Zauber bei einem Proc bekommt.",
   ["cursor.aura.source.aura"] = "Aura (Buff oder Debuff)",
   ["cursor.aura.source.proc"] = "Proc (Zauberleuchten)",
-  ["cursor.aura.source.weapon"] = "Waffenverzauberung",
-  ["cursor.aura.weaponHand"] = "Waffe",
-  ["cursor.aura.weaponHand.tip"] = "Welche Waffe angesehen wird. Beliebig zeigt die Verzauberung mit der kürzesten Restzeit und zählt nur als fehlend, wenn keine Waffe eine hat.",
-  ["cursor.aura.weaponHand.any"] = "Beliebige Hand",
-  ["cursor.aura.weaponHand.main"] = "Haupthand",
-  ["cursor.aura.weaponHand.off"] = "Nebenhand",
-  ["cursor.aura.weaponWarn"] = "Niedrig unter (Sek)",
-  ["cursor.aura.weaponWarn.tip"] = "Unter dieser Zahl Sekunden nehmen Ring und Zeit die niedrige Farbe an (standardmäßig rot, einstellbar bei der Farbkurve). 0 schaltet es aus.",
-  ["cursor.aura.weapon.name"] = "Waffenverzauberung",
-  ["cursor.aura.weapon.current"] = "Gerade jetzt",
-  ["cursor.aura.weapon.line"] = "%s: %s",
-  ["cursor.aura.weapon.hand.main"] = "Haupthand",
-  ["cursor.aura.weapon.hand.off"] = "Nebenhand",
-  ["cursor.aura.weapon.kind.bare"] = "keine Verzauberung",
-  ["cursor.aura.weapon.kind.none"] = "keine Waffe",
-  ["cursor.aura.weapon.kind.secret"] = "vom Spiel verborgen",
-  ["cursor.aura.weapon.kind.unreadable"] = "dieser Client sagt es nicht",
-  ["cursor.aura.weaponNote"] = "Gifte, Wetzsteine, Gewichtssteine, Öle und Waffenbuffs des Schamanen sind Verzauberungen der Waffe und keine Auren. Die Bedingungen oben gelten für die Verzauberung. Für die gängigen ist ein Symbol bekannt, bei jeder anderen erscheint deine Waffe.",
-  ["cursor.aura.status.weapon"] = "Wird an der Waffe gelesen, bei den Ereignissen des Inventars und durch eine langsame Prüfung.",
-  ["cursor.preset.weapon"] = "Waffenverzauberung (fehlt)",
   ["cursor.preset.wellfed"] = "Satt (fehlt)",
   ["cursor.aura.unit"] = "Einheit",
   ["cursor.aura.unit.tip"] = "Wessen Auren angesehen werden.",
@@ -345,19 +307,24 @@ end
 DEFAULTS.color = "4aa8ff"
 DEFAULTS.readyColor = "6b6b6b"
 
+-- The props of an aura element with every field valid; `d` holds the defaults (the weapon element passes its own).
+local function cleanProps(raw, d)
+  local p = CC.CleanLook(raw, d)
+  for key, value in pairs(AL.Clean(raw, d)) do
+    p[key] = value
+  end
+  for key, value in pairs(TR.Clean(raw, d)) do
+    p[key] = value
+  end
+  return p
+end
+
+AU.DEFAULTS, AU.CleanProps = DEFAULTS, cleanProps
+
 CU.Register("aura", {
   defaults = DEFAULTS,
   size = { 48, 48 },
-  clean = function(raw, d)
-    local p = CC.CleanLook(raw, d)
-    for key, value in pairs(AL.Clean(raw, d)) do
-      p[key] = value
-    end
-    for key, value in pairs(TR.Clean(raw, d)) do
-      p[key] = value
-    end
-    return p
-  end,
+  clean = cleanProps,
 })
 
 -- Game access -----------------------------------------------------------------------------------------
@@ -850,7 +817,7 @@ local function readWeapon(st)
   }
   if state.hand then
     local described =
-      WE.Describe(state.enchantID, data, slotTexture(WE.SLOT[state.hand]), L["cursor.aura.weapon.name"], ns.T)
+      WE.Describe(state.enchantID, data, slotTexture(WE.SLOT[state.hand]), L["cursor.weapon.name"], ns.T)
     s.icon, s.name = described.icon, described.name
   end
   if state.present == true and state.startAt and state.duration and state.remaining and state.remaining > 0 then
@@ -1370,8 +1337,18 @@ local function identity(p)
   }, "|")
 end
 
+-- The props the drawing runs on: an aura element's own, and for a weapon element the same with the source "weapon".
+local function propsOf(element)
+  if element.type ~= "weapon" then
+    return CU.Props("aura", element.props)
+  end
+  local p = CU.Props("weapon", element.props)
+  p.source = "weapon"
+  return CU.Props("aura", p)
+end
+
 local function render(frame, element, ctx)
-  local p = CU.Props("aura", element.props)
+  local p = propsOf(element)
   local st = Kit.widgetOf(frame)
   st.refreshFn, st.applyFn = refresh, applyView
   local key = identity(p)
@@ -1646,43 +1623,26 @@ function AU.WeaponLines()
   for _, hand in ipairs(WE.Hands(reading, equip)) do
     local what
     if reading.how == nil then
-      what = L["cursor.aura.weapon.kind.unreadable"]
+      what = L["cursor.weapon.kind.unreadable"]
     elseif hand.kind == "enchanted" then
-      local described = WE.Describe(hand.entry.enchantID, data, nil, L["cursor.aura.weapon.name"], ns.T)
+      local described = WE.Describe(hand.entry.enchantID, data, nil, L["cursor.weapon.name"], ns.T)
       what = described.name
       if hand.entry.remainingSec then
         what = what .. ", " .. K.FormatStyled(hand.entry.remainingSec, { timeStyle = "clock" }, "own")
       end
     else
-      what = L["cursor.aura.weapon.kind." .. hand.kind]
+      what = L["cursor.weapon.kind." .. hand.kind]
     end
-    lines[#lines + 1] = string.format(L["cursor.aura.weapon.line"], L["cursor.aura.weapon.hand." .. hand.hand], what)
+    lines[#lines + 1] = string.format(L["cursor.weapon.line"], L["cursor.weapon.hand." .. hand.hand], what)
   end
   return lines
-end
-
--- A wrapped text row with the lines of AU.WeaponLines, read again with every refresh.
-local function weaponCurrentRow(state, add, shown)
-  local row = CreateFrame("Frame", nil, state.panel)
-  local text = W.Text(row, { role = "ui", color = "textMuted", wrap = true })
-  text:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
-  text:SetWidth(controls().PANEL_WIDTH or 284)
-  function row:Refresh()
-    W.SetText(text, nil, L["cursor.aura.weapon.current"] .. "\n" .. table.concat(AU.WeaponLines(), "\n"))
-  end
-  row:Refresh()
-  return add(row, function()
-    local height = controls().FitText(state, text)
-    row:SetHeight(height)
-    return height
-  end, shown)
 end
 
 -- The status of the combat display for the props `p`, for the panel line and the test window: { key, color, text }.
 -- `st` is the drawn element (nil in the editor), which knows whether the game refused its container.
 function AU.Status(p, st)
   if p.source == "weapon" then
-    return { key = "weapon", color = "success", text = L["cursor.aura.status.weapon"] }
+    return { key = "weapon", color = "success", text = L["cursor.weapon.status"] }
   end
   local state = st ~= nil and st.notes.native and st.notes.native.state or nil
   local status = NL.Status(p, nativeCaps(), {
@@ -1736,9 +1696,7 @@ function AU.Panel(parent, element, onChange)
       local R = CC.Rows
       local c = CC.LookConds(state)
       local proc = c.on("source", "proc")
-      local weapon = c.on("source", "weapon")
       local aura = c.on("source", "aura")
-      local spellBased = c.negate(weapon)
       local whenAlways = c.on("when", "always")
       -- The spell shown in the fields: the exact id while only the chosen id counts, else the base.
       local function shownSpell()
@@ -1752,51 +1710,22 @@ function AU.Panel(parent, element, onChange)
         return state.get("procMode") ~= "overlay"
       end)
       state.section("basics", "canvas.sec.basics")
-      -- A weapon enchantment is a warning most of the time, so choosing it also takes the warning color for the
-      -- missing ring, as long as the color was never changed.
       add(
         C.Choice(state.panel, {
           label = "cursor.aura.source",
           tooltip = "cursor.aura.source",
           tooltipText = "cursor.aura.source.tip",
-          options = C.Choices(AL.SOURCES, "cursor.aura.source."),
+          options = C.Choices(AL.UI_SOURCES, "cursor.aura.source."),
           get = function()
             return state.get("source")
           end,
           set = function(source)
             state.write("source", source)
-            if source == "weapon" and state.get("readyColor") == DEFAULTS.readyColor then
-              state.write("readyColor", AU.WEAPON_MISSING_COLOR)
-            elseif source ~= "weapon" and state.get("readyColor") == AU.WEAPON_MISSING_COLOR then
-              state.write("readyColor", DEFAULTS.readyColor)
-            end
             state.panel:Refresh()
           end,
         }),
         C.HEIGHT.choice
       )
-      R.choice(state, add, "cursor.aura.weaponHand", "weaponHand", WE.HANDS, weapon)
-      add(
-        C.Number(state.panel, {
-          label = "cursor.aura.weaponWarn",
-          tooltip = "cursor.aura.weaponWarn",
-          tooltipText = "cursor.aura.weaponWarn.tip",
-          labelWidth = 110,
-          min = 0,
-          max = WE.WARN_MAX,
-          step = 30,
-          get = function()
-            return state.get("weaponWarn")
-          end,
-          set = function(seconds)
-            state.write("weaponWarn", seconds)
-          end,
-        }),
-        C.HEIGHT.number,
-        weapon
-      )
-      weaponCurrentRow(state, add, weapon)
-      C.TextRow(state, add, "cursor.aura.weaponNote", nil, weapon)
       -- Own auras only is the usual wish for a target or focus, so choosing the unit sets it too.
       add(
         C.Choice(state.panel, {
@@ -1832,8 +1761,7 @@ function AU.Panel(parent, element, onChange)
             state.writeMany({ spellBase = id and K.BaseOf(id) or 0, spellExact = id or 0 })
           end,
         }),
-        C.HEIGHT.spell,
-        spellBased
+        C.HEIGHT.spell
       )
       add(
         C.Number(state.panel, {
@@ -1850,10 +1778,9 @@ function AU.Panel(parent, element, onChange)
             state.writeMany({ spellBase = K.BaseOf(id), spellExact = id })
           end,
         }),
-        C.HEIGHT.number,
-        spellBased
+        C.HEIGHT.number
       )
-      R.choice(state, add, "cursor.aura.rank", "rankMode", AL.RANK_MODES, spellBased, true)
+      R.choice(state, add, "cursor.aura.rank", "rankMode", AL.RANK_MODES, nil, true)
       R.toggle(
         state,
         add,
@@ -2001,15 +1928,6 @@ CU.RegisterPreset("wellfed", function(el, build)
   })
 end)
 
--- A ring that shows while no weapon carries a temporary enchantment (a poison, a stone, an oil), in the
--- warning color.
-CU.RegisterPreset("weapon", function(el, build)
-  return build("weapon", {
-    el("ring", "ring", 64, 64, { thickness = 1, alpha = 0.85 }),
-    el("aura", "aura", 56, 56, { source = "weapon", when = "missing", readyColor = AU.WEAPON_MISSING_COLOR }),
-  })
-end)
-
 -- A ring that counts the buff in combat from the cast and the learned duration, for a buff the player casts
 -- on themselves (the class buff of the sample, else the aura is chosen in the panel).
 CU.RegisterPreset("auracalc", function(el, build)
@@ -2024,5 +1942,7 @@ CU.RegisterPreset("auracalc", function(el, build)
 end)
 
 -- Registry ---------------------------------------------------------------------------------------------
+
+AU.Render, AU.Drive, AU.Release = render, drive, release
 
 E.Register("aura", { render = render, drive = drive, release = release, panel = AU.Panel })

@@ -207,12 +207,6 @@ function S.Add(view)
       return math.floor(value + 0.5) / 100
     end
   )
-  dropdown(view, "strata", FH.STRATA, "farmhud.set.strata.", function()
-    return stored("strata")
-  end)
-  dropdown(view, "terrain", FH.TERRAINS, "farmhud.set.terrain.", function()
-    return stored("terrain")
-  end)
   slider(
     view,
     "alpha",
@@ -227,7 +221,16 @@ function S.Add(view)
       return math.floor(value + 0.5) / 100
     end
   )
-  slider(view, "zoom", FH.ZOOM_KEEP, FH.ZOOM_MAX, 1, function()
+  stateToggle(view, "hideInCombat")
+  -- Everything else is rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "farmhud.main" })
+  dropdown(more, "strata", FH.STRATA, "farmhud.set.strata.", function()
+    return stored("strata")
+  end)
+  dropdown(more, "terrain", FH.TERRAINS, "farmhud.set.terrain.", function()
+    return stored("terrain")
+  end)
+  slider(more, "zoom", FH.ZOOM_KEEP, FH.ZOOM_MAX, 1, function()
     return stored("zoom")
   end, function(value)
     value = math.floor(value + 0.5)
@@ -235,21 +238,20 @@ function S.Add(view)
   end, function(value)
     return math.floor(value + 0.5)
   end)
-  stateToggle(view, "hideInCombat")
-  stateToggle(view, "hideInInstance")
-  stateToggle(view, "compass")
-  slider(view, "compassSize", FH.COMPASS_SIZE_MIN, FH.COMPASS_SIZE_MAX, 1, function()
+  stateToggle(more, "hideInInstance")
+  stateToggle(more, "compass")
+  slider(more, "compassSize", FH.COMPASS_SIZE_MIN, FH.COMPASS_SIZE_MAX, 1, function()
     return stored("compassSize")
   end, function(value)
     return string.format("%d px", math.floor(value + 0.5))
   end, function(value)
     return math.floor(value + 0.5)
   end)
-  dropdown(view, "compassColor", FH.COMPASS_ORDER, "farmhud.set.color.", function()
+  dropdown(more, "compassColor", FH.COMPASS_ORDER, "farmhud.set.color.", function()
     return stored("compassColor")
   end)
-  stateToggle(view, "ring")
-  slider(view, "ringYards", FH.RING_YARDS_MIN, FH.RING_YARDS_MAX, FH.RING_YARDS_STEP, function()
+  stateToggle(more, "ring")
+  slider(more, "ringYards", FH.RING_YARDS_MIN, FH.RING_YARDS_MAX, FH.RING_YARDS_STEP, function()
     return stored("ringYards")
   end, function(value)
     return string.format(ns.L["farmhud.set.yards"], math.floor(value + 0.5))
@@ -257,7 +259,7 @@ function S.Add(view)
     return math.floor(value + 0.5)
   end)
   slider(
-    view,
+    more,
     "pinScale",
     FH.PIN_SCALE_MIN * 100,
     FH.PIN_SCALE_MAX * 100,

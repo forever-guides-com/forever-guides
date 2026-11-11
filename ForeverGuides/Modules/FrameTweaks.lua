@@ -202,6 +202,16 @@ local function canTouch(name, frame)
   return FL.CanTouch(true, FL.Protected(name) or isProtected(frame), combatSafe())
 end
 
+-- The player's own drag. A window that is not protected may be moved in combat whatever "no changes in
+-- combat" says: the setting keeps our automatic changes (restore, zoom) out of a fight, a drag is the
+-- player's hand and only moves the window.
+local function canMove(name, frame)
+  if not inCombat() then
+    return canTouch(name, frame)
+  end
+  return not (FL.Protected(name) or isProtected(frame))
+end
+
 -- Points of a window as the client has them now.
 local function snapshot(frame)
   local list = {}
@@ -487,7 +497,7 @@ local function bothModifiers()
 end
 
 local function onDragStart(name, frame)
-  if dragging[frame] or not featureOn(name, "move") or bothModifiers() or not canTouch(name, frame) then
+  if dragging[frame] or not featureOn(name, "move") or bothModifiers() or not canMove(name, frame) then
     return
   end
   local key = keyOf(name, frame)

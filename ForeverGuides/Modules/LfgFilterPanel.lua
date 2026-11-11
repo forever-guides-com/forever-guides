@@ -102,7 +102,7 @@ ns.AddLocale("enUS", {
   ["lfgp.age.300"] = "Under 5 min",
   ["lfgp.reset"] = "Reset filters",
   ["lfgp.where"] = "The filter shows in the group finder.",
-  ["lfgp.off"] = "Filter panel is off, see Settings > Guild and contacts.",
+  ["lfgp.off"] = "Filter panel is off, see Settings > Invites and group finder.",
 })
 ns.AddLocale("deDE", {
   ["lfgp.title"] = "Filter",
@@ -177,7 +177,7 @@ ns.AddLocale("deDE", {
   ["lfgp.age.300"] = "Unter 5 Min.",
   ["lfgp.reset"] = "Filter zurücksetzen",
   ["lfgp.where"] = "Der Filter erscheint in der Gruppensuche.",
-  ["lfgp.off"] = "Filter-Panel ist aus (Einstellungen, Gilde und Kontakte).",
+  ["lfgp.off"] = "Filter-Panel aus: Einstellungen, Einladen und Gruppensuche.",
 })
 
 local P = {}

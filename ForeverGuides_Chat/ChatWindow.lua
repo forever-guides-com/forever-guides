@@ -82,7 +82,7 @@ end
 
 -- Class and guild data of a name or a chat for the other windows of the add-on (the mini windows).
 function Window.ClassOfName(name)
-  return classOf(memberOfName(name))
+  return classOf(memberOfName(name)) or (chat.Class and chat.Class.Cached(name)) or nil
 end
 
 function Window.ClassOfKey(key)
@@ -644,7 +644,7 @@ local function create()
   f.inputHost:SetHeight(0)
   f.thread = Thread.Create(f.pane, {
     ClassOfName = function(name)
-      return classOf(memberOfName(name))
+      return Window.ClassOfName(name)
     end,
     ClassOf = function(key)
       return classOf(memberOfKey(key))
@@ -901,7 +901,7 @@ FG.On("FG_CHAT_SETTING", function(_, id)
   end
   if id == "opacity" then
     applyLook()
-  elseif id == "timeFormat" or id == "timeSeconds" or id == "defaultMode" or id == "views" then
+  elseif id == "timeFormat" or id == "timeSeconds" or id == "defaultMode" or id == "views" or id == "classColors" then
     if frame:IsShown() then
       frame.thread:Refresh()
       frame.list:Refresh()
@@ -961,10 +961,16 @@ chat.hook.Register({
   Unread = chat.Unread,
   Search = chat.Search,
   Ingest = chat.Ingest,
+  Class = chat.Class,
+  TextLogic = chat.TextLogic,
+  LineActions = chat.LineActions,
+  ClassLogic = chat.ClassLogic,
   Archive = chat.Archive,
   ArchiveLogic = chat.ArchiveLogic,
   Send = chat.Send,
   SendLogic = chat.SendLogic,
+  WayLogic = chat.WayLogic,
+  Secure = chat.Secure,
   Queue = chat.Queue,
   Input = chat.Input,
   InputLogic = chat.InputLogic,

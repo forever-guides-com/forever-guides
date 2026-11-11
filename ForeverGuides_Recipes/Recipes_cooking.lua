@@ -1,12 +1,11 @@
 -- Forever Guides: Rezepte "cooking" (generiert, nicht von Hand bearbeiten)
--- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70124)
--- Generated data, do not edit. Data as of 2026-10-11.
+-- Quelle: Forever-Guides-Datenbank (Client-Build 1.60.1.70888)
+-- Generated data, do not edit. Data as of 2026-11-11.
 
 ForeverGuides.RecipeData = ForeverGuides.RecipeData or {}
 ForeverGuides.RecipeData["cooking"] = {
   groups={
     [2426]={de="Kochkunst",en="Cooking",o=0},
-    [2594]={de="SAISON DER ENTDECKUNGEN",en="SEASON OF DISCOVERY",o=9999},
     [2632]={de="Alltägliche Mahlzeiten",en="Everyday Meals",o=10,p=2426},
     [2633]={de="Stärkungsnahrung",en="Strength Food",o=20,p=2426},
     [2634]={de="Beweglichkeitsnahrung",en="Agility Food",o=30,p=2426},
@@ -180,7 +179,7 @@ ForeverGuides.RecipeData["cooking"] = {
     {g=2632,i=5526,mats={{5503,1},{1179,1},{2678,1}},n={"Muschelsuppe","Clam Chowder"},pat={5528},s=6501,sk={90,130,150,170},src="i"},
     {ch=true,g=2634,i=2684,mats={{2673,1}},n={"Kojotensteak","Coyote Steak"},s=2541,sk={0,90,110,130},src="t"},
     {ch=true,g=2632,i=5478,mats={{5051,1}},n={"Grubenratteneintopf","Dig Rat Stew"},pat={5487},s=6417,sk={90,130,150,170},src="i"},
-    {g=2714,i=279961,mats={{11291,1}},n={"Lagerfeuer des Gesellen","Journeyman Campfire"},pat={273087},s=1283400,sk={90,95,100,105},src="i"},
+    {bd={{n="Lord Serpentis",npc=3673,zone={de="Die Höhlen des Wehklagens",en="Wailing Caverns"}}},g=2714,i=279961,mats={{11291,1}},n={"Lagerfeuer des Gesellen","Journeyman Campfire"},pat={273087},s=1283400,sk={90,95,100,105},src="i"},
     {g=2640,i=3663,mats={{1468,2},{2692,1}},n={"Murlocflossensuppe","Murloc Fin Soup"},pat={3680},s=3372,sk={90,130,150,170},src="i"},
     {g=2644,i=4593,mats={{6308,1}},n={"Stoppelfühlerwels","Bristle Whisker Catfish"},pat={6330},s=7755,sk={100,140,160,180},src="i"},
     {ch=true,g=2640,i=5479,mats={{5470,1},{2692,1}},n={"Knuspriger Donnerechsenschwanz","Crispy Lizard Tail"},pat={5488},s=6418,sk={100,140,160,180},src="i"},
@@ -189,7 +188,7 @@ ForeverGuides.RecipeData["cooking"] = {
     {ch=true,g=2634,i=1017,mats={{1015,2},{2678,1}},n={"Gewürzter Wolfskebab","Seasoned Wolf Kabob"},pat={2701},s=2549,sk={100,140,160,180},src="i"},
     {g=2645,i=249872,mats={{1179,1},{2678,2},{3174,1}},n={"Schleimiger Smoothie","Slimy Smoothie"},pat={249886},s=1249964,sk={100,105,113,120},src="i"},
     {g=2633,i=3726,mats={{3730,1},{2692,1}},n={"Großes Bärensteak","Big Bear Steak"},pat={3734},s=3397,sk={110,150,170,190},src="i"},
-    {g=2632,i=3666,mats={{2251,2},{2692,1}},n={"Klebriger Spinnenkuchen","Gooey Spider Cake"},pat={3683},s=3377,sk={110,150,170,190},src="i"},
+    {g=2640,i=3666,mats={{2251,2},{2692,1}},n={"Klebriger Spinnenkuchen","Gooey Spider Cake"},pat={3683},s=3377,sk={110,150,170,190},src="i"},
     {ch=true,g=2633,i=5480,mats={{5471,1},{2678,4}},n={"Mageres Wildbret","Lean Venison"},pat={5489},s=6419,sk={110,150,170,190},src="i"},
     {ch=true,g=2633,i=2685,mats={{2677,2},{2692,1}},n={"Saftige Schweinerippchen","Succulent Pork Ribs"},pat={2700},s=2548,sk={110,130,150,170},src="i"},
     {ch=true,g=2635,i=2683,mats={{2674,1},{2678,1}},n={"Krebsküchlein","Crab Cake"},s=2544,sk={0,115,135,155},src="t"},
@@ -200,7 +199,7 @@ ForeverGuides.RecipeData["cooking"] = {
     {g=2645,i=249873,mats={{1205,1},{2692,2},{1468,1}},n={"Mrrggl Smrrthle","Mrrggl Smrrthle"},pat={249887},s=1249965,sk={125,135,140,145},src="i"},
     {g=2646,i=249867,mats={{1205,1},{3357,2}},n={"Wurzeltee","Root Tea"},pat={249881},s=1249959,sk={125,155,170,185},src="i"},
     {g=2640,i=3665,mats={{3685,1},{2692,1}},n={"Seltsam schmeckendes Omelett","Curiously Tasty Omelet"},pat={3682},s=3376,sk={130,170,190,210},src="i"},
-    {g=2714,i=279957,mats={{12037,2},{12204,1},{3713,1}},n={"Krümels Festmahl","Cookie's Feast"},pat={273102},s=1262978,sk={140,145,148,150},src="i"},
+    {bd={{n="Cookie",npc=645,zone={de="Die Todesminen",en="The Deadmines"}}},g=2714,i=279957,mats={{12037,2},{12204,1},{3713,1}},n={"Krümels Festmahl","Cookie's Feast"},pat={273102},s=1262978,sk={140,145,148,150},src="i"},
     {g=2634,i=20074,mats={{3667,2},{3713,1}},n={"Schwerer Krokiliskeneintopf","Heavy Crocolisk Stew"},pat={20075},s=24418,sk={150,160,180,200},src="i"},
     {g=2634,i=3728,mats={{3731,2},{3713,1}},n={"Schmackhaftes Löwensteak","Tasty Lion Steak"},pat={3736},s=3399,sk={150,190,210,230},src="i"},
     {g=2632,i=5527,mats={{5504,1},{2692,1}},n={"Scharfe Muscheln nach Goblin-Art","Goblin Deviled Clams"},s=6500,sk={0,165,185,205},src="t"},
@@ -241,12 +240,9 @@ ForeverGuides.RecipeData["cooking"] = {
     {g=2642,i=13928,mats={{13755,1},{3713,1}},n={"Gegrillter Kalmar","Grilled Squid"},pat={13942},s=18240,sk={240,280,300,320},src="i"},
     {g=2642,i=13929,mats={{13756,1},{2692,2}},n={"Scharfer geräucherter Barsch","Hot Smoked Bass"},pat={13943},s=18242,sk={240,280,300,320},src="i"},
     {g=2632,i=17222,mats={{12205,2}},n={"Spinnenwurst","Spider Sausage"},s=21175,sk={0,240,260,280},src="t"},
-    {ch=true,g=2594,i=238638,mats={{12203,2},{239016,1}},n={"Filet aus der Flanke","Filet o' Flank"},pat={238646,0},s=1225759,sk={250,260,270,280},src="i"},
     {g=2641,i=13931,mats={{13759,1},{159,1}},n={"Nachtflossensuppe","Nightfin Soup"},pat={13945},s=18243,sk={250,290,310,330},src="i"},
     {g=2643,i=13932,mats={{13760,1}},n={"Gedünsteter Sonnenschuppenlachs","Poached Sunscale Salmon"},pat={13946},s=18244,sk={250,290,310,330},src="i"},
-    {ch=true,g=2594,i=238637,mats={{12202,2},{239016,1}},n={"Pirschersteak","Prowler Steak"},pat={238645,0},s=1225758,sk={250,260,270,280},src="i"},
     {g=2646,i=249870,mats={{8766,1},{13465,2}},n={"Tee des Weisen","Sage's Tea"},pat={249884},s=1249962,sk={250,260,275,290},src="i"},
-    {ch=true,g=2594,i=238639,mats={{12207,2},{239016,1}},n={"Morgengrauenomelett","Sunrise Omelette"},pat={238647,0},s=1225760,sk={250,260,270,280},src="i"},
     {g=2645,i=249876,mats={{8766,1},{3713,4},{8146,1}},n={"Heftiger Smoothie","Wicked Smoothie"},pat={249890},s=1249968,sk={250,255,263,270},src="i"},
     {g=2641,i=13935,mats={{13889,1},{3713,1}},n={"Gebackener Lachs","Baked Salmon"},pat={13949},s=18247,sk={275,315,335,355},src="i"},
     {g=2635,i=250067,mats={{12223,3},{3713,2}},n={"Fledermausragout","Bat Hachee"},pat={250175},s=1250144,sk={275,280,295,310},src="i"},
@@ -263,13 +259,9 @@ ForeverGuides.RecipeData["cooking"] = {
     {g=2633,i=250071,mats={{5471,3},{3713,4}},n={"Dampfendes Hirschsteak","Steaming Stag Steak"},pat={250179},s=1250148,sk={275,280,295,310},src="i"},
     {g=2636,i=267341,mats={{249796,3},{3713,1}},n={"Süßtatzenmarmelade","Sweetpaw Jam"},pat={274415},s=1294014,sk={275,280,283,285},src="i"},
     {g=2634,i=250072,mats={{12202,3},{3713,2}},n={"Flinkschlagsteak","Swiftstrike Steak"},pat={250180},s=1250149,sk={275,280,295,310},src="i"},
-    {g=2594,i=238642,mats={{13888,12},{3712,4},{3404,3},{239017,1}},n={"Großes Hummerbankett","Grand Lobster Banquet"},pat={238650,0},s=1225763,sk={280,290,300,310},src="i"},
-    {g=2594,i=238641,mats={{4603,12},{12184,4},{6362,3},{239017,1}},n={"Fleckfinnenfestmahl","Specklefin Feast"},pat={238649,239021,0},s=1225762,sk={280,290,300,310},src="i"},
     {i=23683,mats={{23567,1},{8150,1}},n={"Crystal Throat Lozenge","Crystal Throat Lozenge"},rm=true,s=30047,sk={300,325,345,365},src="t"},
-    {g=2594,i=232436,mats={{13888,1},{227813,1}},n={"Dunkelklauensuppe","Darkclaw Bisque"},pat={232437},s=470359,sk={300,325,345,365},src="i"},
     {ch=true,g=2636,i=21023,mats={{2692,1},{9061,1},{8150,1},{21024,1}},n={"Dirges abgefahrene Chimearokkoteletts","Dirge's Kickin' Chimaerok Chops"},pat={21025},s=25659,sk={300,325,345,365},src="i"},
     {g=2714,i=279982,mats={{10284,10},{159,5},{3713,4}},n={"Eisenofen","Iron Oven"},pat={273115},s=1263067,sk={300,300,300,300},src="i"},
-    {g=2594,i=232438,mats={{13758,1}},n={"Geräucherte Rotkieme","Smoked Redgill"},pat={232443},s=470370,sk={300,325,345,365},src="i"},
     {g=2633,i=20452,mats={{20424,1},{3713,1}},n={"Geräucherte Wüstenknödel","Smoked Desert Dumplings"},s=24801,sk={0,325,345,365},src="t"},
     {g=2632,ico="inv_misc_frostystew",mats={{5471,1},{12207,1}},n={"Reinigender Eintopf","Cleansing Stew"},pat={0},s=1255241,sk={0,0,0,0},src="i"},
   },

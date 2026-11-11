@@ -102,7 +102,7 @@ local function hasDungeonMap(nameEn)
   return view ~= nil and view.KeyFor(nameEn) ~= nil
 end
 
--- One marker per entrance: { slug, name, kind, lv, ml, rl, players, faction, map, x, y, note, source,
+-- One marker per entrance: { slug, name, kind, lv, ml, rl, rd, players, faction, map, x, y, note, source,
 -- hasDungeonMap, entranceIndex }. overrides is ns.db.mapMarkers (or nil); opts.hasMap(nameEn)
 -- tells whether the instance has a dungeon map (default: ns.DungeonMapView.KeyFor). Second result:
 -- count of own entries that were invalid and left out.
@@ -130,6 +130,7 @@ function M.Build(instances, overrides, opts)
           lv = inst.lv,
           ml = inst.ml,
           rl = inst.rl,
+          rd = inst.rd,
           players = inst.gs,
           faction = inst.f or "B",
           map = e.map,
@@ -186,6 +187,9 @@ function M.TooltipLines(marker, L, T)
   lines[#lines + 1] = level.text
   if level.entryText then
     lines[#lines + 1] = level.entryText
+  end
+  if level.releaseText then
+    lines[#lines + 1] = level.releaseText
   end
   if level.gapText then
     lines[#lines + 1] = level.gapText

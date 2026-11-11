@@ -686,6 +686,9 @@ function B.CreateSideTab(parent, opts)
     button = makeIconButton(parent, link, parent, opts.onClick)
     decorateTab(button)
   end
+  -- Over the window's own art (border frame, title strip), measured.
+  ns.Layer.Own(button)
+  ns.Layer.Panel(button, parent, parent:GetFrameLevel() + LEVEL_BOOST)
   button:SetPoint(opts.point or "TOPLEFT", opts.rel or parent, opts.relPoint or "TOPRIGHT", opts.x or 0, opts.y or 0)
   return button
 end

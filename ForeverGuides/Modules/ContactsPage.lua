@@ -197,33 +197,35 @@ local function build(container)
   return view
 end
 
--- The settings card of the contacts: include targets, detect players nearby, clear the list. The switch
--- for storing the data of seen players is on the guild card (GuildPage.AddSettings).
-function P.AddSettings(view)
-  local s = view.stack
-  ns.AddHeading(view, "contacts.set.heading")
-  for _, item in ipairs({
-    { "seenTargets", "guild.set.targets", ns.SeenPlayers.Targets, "guild-targets" },
-    { "nearbyDetect", "guild.set.nearby", ns.NearbyContacts.Switch, "guild-nearby", "guild.set.nearbyHint" },
-  }) do
-    local toggle = W.Toggle(view.content, {
-      key = item[2],
-      get = item[3],
-      set = function(v)
-        Store.set("settings." .. item[1], v)
-      end,
-    })
-    toggle.fgId = item[4]
-    s:Add(toggle, { height = 24, gap = item[5] and 2 or 6 })
-    if item[5] then
-      ns.AddParagraph(view, item[5], { role = "micro", color = "textMuted", gap = 6 })
-    end
-    if item[1] == "nearbyDetect" then
-      CV.AddPlates(view)
-    end
+local function addToggle(view, setting, key, get, id, hint)
+  local toggle = W.Toggle(view.content, {
+    key = key,
+    get = get,
+    set = function(v)
+      Store.set("settings." .. setting, v)
+    end,
+  })
+  toggle.fgId = id
+  view.stack:Add(toggle, { height = 24, gap = hint and 2 or 6 })
+  if hint then
+    ns.AddParagraph(view, hint, { role = "micro", color = "textMuted", gap = 6 })
   end
+end
+
+-- The settings card of the contacts: include targets, clear the list. The switch for storing the data of
+-- seen players is on the guild card (GuildPage.AddSettings).
+function P.AddSettings(view)
+  ns.AddHeading(view, "contacts.set.heading")
+  addToggle(view, "seenTargets", "guild.set.targets", ns.SeenPlayers.Targets, "guild-targets")
   CV.AddClear(view)
   CV.AddLocalNote(view)
+end
+
+-- The card of the friendly name plates: detect players nearby and the game's plate setting.
+function P.AddPlates(view)
+  ns.AddHeading(view, "settings.card.contacts.plates")
+  addToggle(view, "nearbyDetect", "guild.set.nearby", ns.NearbyContacts.Switch, "guild-nearby", "guild.set.nearbyHint")
+  CV.AddPlates(view)
 end
 
 ns.RegisterPage({

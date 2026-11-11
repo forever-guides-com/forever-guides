@@ -170,6 +170,7 @@ local function showTip(rec, owner)
     return
   end
   tooltip:SetOwner(owner, "ANCHOR_RIGHT")
+  ns.W.Tooltip.Lift(tooltip, owner)
   tooltip:SetText(tip, rec.tipColor[1], rec.tipColor[2], rec.tipColor[3], 1, true)
   tooltip:Show()
 end

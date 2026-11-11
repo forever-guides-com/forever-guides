@@ -219,16 +219,28 @@ local function specItem(spec)
   end
 end
 
+-- Puts the shared tooltip over its owner: another add-on may have moved it out of the top strata, and a
+-- popup in the TOOLTIP strata would otherwise sit above the tooltip of its own entries. Every code path
+-- that fills GameTooltip itself calls this after SetOwner (tests/test_strata.lua).
+function Tooltip.Lift(tip, owner)
+  if not tip then
+    return
+  end
+  if tip.SetFrameStrata and tip.GetFrameStrata and tip:GetFrameStrata() ~= "TOOLTIP" then
+    tip:SetFrameStrata("TOOLTIP")
+  end
+  if owner and owner.GetFrameStrata and owner:GetFrameStrata() == "TOOLTIP" and tip.SetFrameLevel then
+    tip:SetFrameLevel(owner:GetFrameLevel() + 10)
+  end
+end
+
 function Tooltip.Show(owner, spec)
   local tip = rawget(_G, "GameTooltip")
   if not (tip and owner) then
     return false
   end
   tip:SetOwner(owner, spec.anchor or "ANCHOR_RIGHT")
-  -- Another add-on may have moved the shared tooltip; ours always lies in the top strata.
-  if tip.SetFrameStrata and tip.GetFrameStrata and tip:GetFrameStrata() ~= "TOOLTIP" then
-    tip:SetFrameStrata("TOOLTIP")
-  end
+  Tooltip.Lift(tip, owner)
   clearSeparators(tip)
   -- The inventory block comes last (before the hint), so the client's hooks wait until it is added.
   local item, inventory = specItem(spec), ns.InventoryTooltip
@@ -265,10 +277,6 @@ function Tooltip.Show(owner, spec)
   if spec.hint and spec.hint ~= "" then
     local r, g, b = Theme.color("textMuted")
     tip:AddLine(spec.hint, r, g, b, true)
-  end
-  -- A popup in the TOOLTIP strata would sit above the tooltip of its own entries.
-  if owner.GetFrameStrata and owner:GetFrameStrata() == "TOOLTIP" then
-    tip:SetFrameLevel(owner:GetFrameLevel() + 10)
   end
   tip:Show()
   -- The tooltip follows its owner into hiding (a panel closed under the mouse).
@@ -375,8 +383,141 @@ function TopLayer.Over(frame, layer)
   return true
 end
 
+-- Layers of our frames next to Blizzard windows ----------------------------------------------------------
+-- A frame of ours that is a child of a Blizzard window sits at the window's strata, and frame levels count
+-- across the whole strata: the window's own art (border frame, title, side panel) can lie above a level that
+-- was only guessed as "window level plus N". Layer.Panel measures the levels of the window's own parts and
+-- puts the panel above them. Rules (docs/notes/strata-audit.md): panels over Blizzard frame parts but never
+-- above FULLSCREEN_DIALOG; dropdown lists, popup menus and tooltips in TOOLTIP above every panel.
+local Layer = {}
+ns.Layer = Layer
+
+Layer.STRATA = { "BACKGROUND", "LOW", "MEDIUM", "HIGH", "DIALOG", "FULLSCREEN", "FULLSCREEN_DIALOG", "TOOLTIP" }
+Layer.CAP = 9990
+Layer.GAP = 5 -- levels between the highest part of the window and our panel
+Layer.MAX_PANEL = "FULLSCREEN_DIALOG"
+local SCAN_DEPTH, SCAN_LIMIT, RESCAN = 3, 600, 1
+
+function Layer.Rank(strata)
+  for i, name in ipairs(Layer.STRATA) do
+    if name == strata then
+      return i
+    end
+  end
+end
+
+local function readNumber(frame, method)
+  local ok, value = pcall(function()
+    return frame[method](frame)
+  end)
+  return ok and type(value) == "number" and value == value and value or nil
+end
+
+-- Our own frames never count as a part of the window (the panel would chase itself upwards).
+function Layer.Own(frame)
+  frame.fgLayerOwn = true
+  return frame
+end
+
+local function ownFrame(frame)
+  local ok, name = pcall(function()
+    return frame.fgLayerOwn or frame:GetName()
+  end)
+  return ok and (name == true or (type(name) == "string" and name:find("^ForeverGuides") ~= nil))
+end
+
+-- Highest level and strata rank over the parts of `host`: its children and theirs, down to SCAN_DEPTH.
+-- `skip` is a set of frames (keys) left out with everything below them, like the map canvas whose pins have
+-- their own levels.
+local function scan(frame, depth, skip, acc)
+  if depth < 1 or acc.count >= SCAN_LIMIT or type(frame.GetChildren) ~= "function" then
+    return
+  end
+  local ok, children = pcall(function()
+    return { frame:GetChildren() }
+  end)
+  if not ok then
+    return
+  end
+  for _, child in ipairs(children) do
+    if acc.count >= SCAN_LIMIT then
+      return
+    end
+    if not (skip and skip[child]) and not ownFrame(child) then
+      acc.count = acc.count + 1
+      acc.level = math.max(acc.level, readNumber(child, "GetFrameLevel") or 0)
+      local ok2, strata = pcall(child.GetFrameStrata, child)
+      acc.rank = math.max(acc.rank, ok2 and Layer.Rank(strata) or 0)
+      scan(child, depth - 1, skip, acc)
+    end
+  end
+end
+
+-- Returns the highest frame level of the parts of `host` (nil when none can be read) and the highest
+-- strata rank among them (0 when none). `skip`: a set of children left out with everything below them.
+function Layer.PartsTop(host, skip)
+  local acc = { level = 0, rank = 0, count = 0 }
+  scan(host, SCAN_DEPTH, skip, acc)
+  if acc.count == 0 then
+    return nil, 0
+  end
+  return acc.level, acc.rank
+end
+
+-- Sets the level of `frame` and moves its descendants by the same distance (the client may or may not do
+-- that on its own, so it is set explicitly, like TopLayer.Over).
+function Layer.SetTreeLevel(frame, level)
+  local rootLevel = frame:GetFrameLevel()
+  if rootLevel == level then
+    return false
+  end
+  local children = collectOffsets(frame, rootLevel, {})
+  frame:SetFrameLevel(level)
+  for _, entry in ipairs(children) do
+    entry[1]:SetFrameLevel(math.min(math.max(level + entry[2], 0), LEVEL_CAP))
+  end
+  return true
+end
+
+local lastScan = setmetatable({}, { __mode = "k" })
+
+-- Puts `panel` (a child of `host`) above the parts of the host window: level at least `minLevel` and
+-- GAP above the highest part, strata at least the host's own and the highest of its parts (never above
+-- MAX_PANEL). `skip` leaves the canvas out. Cheap to call often: the host is measured once per second.
+-- Returns the level now set.
+function Layer.Panel(panel, host, minLevel, skip)
+  local now = type(GetTime) == "function" and GetTime() or 0
+  local cached = lastScan[panel]
+  local top, rank
+  if cached and cached.host == host and now > 0 and now - cached.at < RESCAN then
+    top, rank = cached.top, cached.rank
+  else
+    top, rank = Layer.PartsTop(host, { [panel] = true, [skip or panel] = true })
+    lastScan[panel] = { host = host, at = now, top = top, rank = rank }
+  end
+  local level = math.min(math.max(minLevel or 0, top and top + Layer.GAP or 0), Layer.CAP)
+  local want = math.max(Layer.Rank(host:GetFrameStrata()) or 0, rank or 0, Layer.Rank(panel:GetFrameStrata()) or 0)
+  want = math.min(want, Layer.Rank(Layer.MAX_PANEL))
+  if want > 0 and Layer.Rank(panel:GetFrameStrata()) ~= want then
+    panel:SetFrameStrata(Layer.STRATA[want])
+  end
+  Layer.SetTreeLevel(panel, level)
+  return level
+end
+
+-- Enter and Space only act on a focus that keyboard navigation touched a moment ago (Focus.recent). An old focus
+-- ring left on a window never takes the jump or the chat key away from the game.
 local Focus = { items = {}, current = nil }
+Focus.RECENT = 8
 ns.Focus = Focus
+
+function Focus.touch()
+  Focus.keyAt = GetTime()
+end
+
+function Focus.recent()
+  return Focus.keyAt ~= nil and GetTime() - Focus.keyAt <= Focus.RECENT
+end
 
 local ring
 local function getRing()
@@ -429,6 +570,7 @@ function Focus.Lift()
 end
 
 function Focus.set(frame)
+  Focus.touch()
   local previous = Focus.current
   if previous and previous ~= frame and previous.fgOnBlur then
     previous:fgOnBlur()
@@ -453,6 +595,7 @@ end
 function Focus.clear()
   local previous = Focus.current
   Focus.current = nil
+  Focus.keyAt = nil
   if ring then
     ring:Hide()
   end
@@ -907,6 +1050,15 @@ local function fitAction(b, maxWidth)
   return fullWidth(b)
 end
 
+-- Marks a control with what the settings search needs to know about it: its kind, the locale key of its
+-- name, the key of an extra explanation (the tooltip text) and, for a button, the key of its short label (the
+-- search takes it as the name when the tooltip is a whole sentence). Plain data on the frame, nothing is built.
+local function describe(frame, kind, key, tipKey, labelKey)
+  if key then
+    frame.fgSetting = { kind = kind, key = key, tip = tipKey, label = labelKey ~= key and labelKey or nil }
+  end
+end
+
 -- opts: key|text (fixed text), labelRole (font role of the text, default ui), label (short locale key, hidden by the setting "buttonLabels" and
 -- when there is no room), icon (name of ns.UI_ICONS), variant (primary, secondary, ghost, icon,
 -- danger, gold; default secondary, icon without text), size (height 24, 28 or 32; icon-only buttons
@@ -1004,6 +1156,7 @@ function W.Action(parent, opts)
     paintAction(self)
   end
   b.fgNameKey = opts.tooltip or opts.label or opts.key
+  describe(b, "action", opts.tooltip or opts.key or opts.label, opts.tooltipText, opts.key or opts.label)
   -- The accessible name as text (tests and audits read it).
   function b.fgName()
     return b.fgNameKey and L[b.fgNameKey] or nil
@@ -1415,6 +1568,7 @@ end
 function W.Toggle(parent, opts)
   local f = CreateFrame("Button", nil, parent)
   f:SetHeight(24)
+  describe(f, "toggle", opts.key, opts.tooltipText)
   local track = CreateFrame("Frame", nil, f)
   track:SetSize(36, 18)
   track:SetPoint("LEFT")
@@ -1427,8 +1581,10 @@ function W.Toggle(parent, opts)
   state:SetPoint("LEFT", track, "RIGHT", 6, 0)
   state:SetWidth(30)
   local label = W.Text(f, { key = opts.key, role = "ui" })
-  label:SetPoint("LEFT", state, "RIGHT", 4, 0)
+  -- labelInset: room between the state text and the name (a decorative icon of the caller sits there).
+  label:SetPoint("LEFT", state, "RIGHT", 4 + (opts.labelInset or 0), 0)
   label:SetPoint("RIGHT")
+  f.state = state
   if opts.quality then
     -- A quality name in its item color; the name stays in the text.
     ns.Bind(label, function(fs)
@@ -1464,6 +1620,7 @@ end
 function W.Checkbox(parent, opts)
   local f = CreateFrame("Button", nil, parent)
   f:SetHeight(22)
+  describe(f, "toggle", opts.key, opts.tooltipText)
   local box = CreateFrame("Frame", nil, f)
   box:SetSize(16, 16)
   box:SetPoint("LEFT")
@@ -1624,9 +1781,11 @@ end
 
 -- opts: key, min, max, step, get(), set(v, anchor), format(v) -> string
 -- applyOn = "release": set runs once when the thumb is let go (anchor: the thumb), see W.ReleaseGate.
+-- tooltip + tooltipText (locale keys) show on the label row and on the track.
 function W.Slider(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(42)
+  describe(f, "slider", opts.key, opts.tooltipText)
   local label = W.Text(f, { key = opts.key, role = "ui" })
   label:SetPoint("TOPLEFT")
   local value = W.Text(f, { role = "ui", color = "accent2", justify = "RIGHT" })
@@ -1727,6 +1886,12 @@ function W.Slider(parent, opts)
   end
   f.slider, f.valueText = s, value
   f.Refresh = sync
+  -- The label row and the track both explain the slider.
+  if opts.tooltip then
+    f:EnableMouse(true)
+    attachTooltip(f, opts.tooltip, opts.tooltipText)
+    attachTooltip(s, opts.tooltip, opts.tooltipText)
+  end
   sync()
   return f
 end
@@ -1932,11 +2097,18 @@ end
 
 -- Edit box ----------------------------------------------------------------
 
--- opts: placeholder (locale key), onEnter(text), onChange(text), clear (bool), inset (text margin, 8)
+-- opts: placeholder (locale key), onEnter(text), onChange(text), clear (bool), inset (text margin, 8),
+-- maxLetters (set before the first text goes in), tooltip + tooltipText (locale keys, shown over the field).
+-- Stored value (the one place every settings text field goes through): get() returns the saved text, set(text)
+-- stores what was typed. The box shows get() when it is created, whenever it is shown again and on every
+-- f:Refresh(); Enter or leaving the box stores once and shows get() again (so a refused text puts the saved
+-- one back), Escape drops the typed text. live: set runs on every change instead (a step that shows the effect
+-- while typing); Enter and leaving then only show the cleaned stored value. With get the box owns the text: no caller writes it with SetText.
 function W.EditBox(parent, opts)
   opts = opts or {}
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(opts.height or 26)
+  describe(f, "text", opts.placeholder)
   W.Fill(f, "bg", 0.9)
   local border = W.Border(f, "white", 0.25)
   local eb = CreateFrame("EditBox", nil, f)
@@ -1944,6 +2116,9 @@ function W.EditBox(parent, opts)
   eb:SetPoint("TOPLEFT", inset, 0)
   eb:SetPoint("BOTTOMRIGHT", opts.clear and -24 or -inset, 0)
   eb:SetAutoFocus(false)
+  if opts.maxLetters then
+    eb:SetMaxLetters(opts.maxLetters)
+  end
   ns.Bind(eb, function()
     Theme.applyFont(eb, "ui", "body")
     eb:SetTextColor(Theme.color("text"))
@@ -1966,10 +2141,49 @@ function W.EditBox(parent, opts)
       clearBtn:SetShown(not empty)
     end
   end
+  local bound = type(opts.get) == "function"
+  -- shown: the text the box was given last; a different text at the end of an edit is what gets stored.
+  local shown, sent, discard, storing = "", "", false, false
+  -- The saved text goes into the box and the view starts at its beginning: a text set while the box has no
+  -- width yet (before the first layout) would otherwise stay scrolled to its end and look empty. A box that
+  -- is being typed in keeps its text unless force is set.
+  local function show(force)
+    if not bound or (eb:HasFocus() and not force) then
+      return
+    end
+    local ok, value = ns.Safe("editbox-get", opts.get)
+    shown = ok and value ~= nil and tostring(value) or ""
+    sent = shown
+    eb:SetText(shown)
+    if eb.SetCursorPosition then
+      eb:SetCursorPosition(0)
+    end
+  end
+  -- A live box sends each text once: what Enter or leaving finds already sent is not written again.
+  local function send()
+    local text = eb:GetText()
+    if opts.live and text == sent then
+      return
+    end
+    sent = text
+    ns.Safe("editbox-set", opts.set, text)
+  end
+  local function store()
+    if not bound or storing then
+      return
+    end
+    storing = true
+    send()
+    show(true)
+    storing = false
+  end
   eb:SetScript(
     "OnTextChanged",
     ns.Wrap("editbox", function(_, user)
       update()
+      if user and bound and opts.live then
+        send()
+      end
       if user and opts.onChange then
         opts.onChange(eb:GetText())
       end
@@ -1981,25 +2195,63 @@ function W.EditBox(parent, opts)
   end)
   eb:SetScript("OnEditFocusLost", function()
     border.set("white", 0.25)
+    if discard then
+      discard = false
+      show(true)
+    elseif bound and eb:GetText() ~= shown then
+      store()
+    end
     update()
   end)
   eb:SetScript("OnEscapePressed", function()
+    discard = true
     eb:ClearFocus()
+    if discard then
+      discard = false
+      show(true)
+    end
   end)
   eb:SetScript(
     "OnEnterPressed",
     ns.Wrap("editbox-enter", function()
+      store()
       if opts.onEnter then
         opts.onEnter(eb:GetText())
       end
       eb:ClearFocus()
     end)
   )
+  if bound then
+    eb:SetScript("OnShow", function()
+      show()
+    end)
+    eb:SetScript("OnHide", function()
+      if eb:GetText() ~= shown then
+        store()
+      end
+    end)
+    eb:SetScript("OnSizeChanged", function()
+      if not eb:HasFocus() and eb.SetCursorPosition then
+        eb:SetCursorPosition(0)
+      end
+    end)
+  end
   Focus.register(f, function()
     eb:SetFocus()
   end)
+  attachTooltip(eb, opts.tooltip, opts.tooltipText)
   f.edit = eb
   f.clearButton = clearBtn
+  if bound then
+    f.Refresh = function()
+      show()
+    end
+    -- Puts the saved text back whatever the box holds (the owner changed it from outside).
+    f.Revert = function()
+      show(true)
+    end
+  end
+  show()
   update()
   return f
 end
@@ -2056,9 +2308,45 @@ W.DROPDOWN_FIELD_Y = 20
 -- places the dropdown itself, otherwise its width is undefined and the client may draw nothing.
 -- f.button is the clickable button, f.arrow its chevron frame (a frame level change of the wrapper does not
 -- move them), f:Open([anchor]) opens the list.
+-- Typeahead for a list: the index of the entry whose text starts with the typed letters, searching from
+-- the entry after `from` and wrapping around. The same letter typed again steps to the next entry with
+-- that letter. Nil when nothing matches.
+function W.TypeaheadFind(texts, typed, from)
+  typed = typed:lower()
+  local count = #texts
+  if count == 0 or typed == "" then
+    return nil
+  end
+  local repeated = typed == typed:sub(1, 1):rep(#typed)
+  local needle = repeated and typed:sub(1, 1) or typed
+  -- A growing word ("sel") keeps the current entry, a repeated letter moves on.
+  local first = (from or 1) + (repeated and 1 or 0)
+  for step = 0, count - 1 do
+    local index = (first - 1 + step) % count + 1
+    local text = (texts[index] or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower()
+    if text:sub(1, #needle) == needle then
+      return index
+    end
+  end
+  return nil
+end
+
+local typeaheadText, typeaheadAt = "", 0
+
+-- Accumulates the letters of one typing burst (a second without a key starts a new word).
+function W.TypeaheadAdd(char, now)
+  if now - typeaheadAt > 1 then
+    typeaheadText = ""
+  end
+  typeaheadAt = now
+  typeaheadText = typeaheadText .. char
+  return typeaheadText
+end
+
 function W.Dropdown(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(opts.compact and 24 or 46)
+  describe(f, "choice", opts.key, opts.tooltipText)
   local label = W.Text(f, { key = opts.key, role = "ui", color = "textMuted" })
   label:SetPoint("TOPLEFT")
   label:SetShown(not opts.compact)
@@ -2127,6 +2415,22 @@ function W.Dropdown(parent, opts)
         Focus.register(r, function(self)
           self:Click()
         end)
+        -- Letters typed in the open list jump to the matching option.
+        r.fgTypeahead = function(_, char)
+          local texts, at = {}, 1
+          for index, option in ipairs(opts.options) do
+            texts[index] = optionText(option)
+            if p.rows[index] == r then
+              at = index
+            end
+          end
+          local typed = W.TypeaheadAdd(char, GetTime())
+          local hit = W.TypeaheadFind(texts, typed, at)
+          if hit and p.rows[hit] then
+            Focus.set(p.rows[hit])
+          end
+          return true
+        end
         p.rows[i] = r
       end
       r:ClearAllPoints()

@@ -46,7 +46,8 @@ local function fit(b, width)
   return h
 end
 
--- opts: buttonKey (locale key of the label), buttonWidth (default BUTTON_W), onClick, opens (true: the
+-- opts: buttonKey (locale key of the label), tooltip + tooltipText (locale keys of the button's tooltip),
+-- buttonWidth (default BUTTON_W), onClick, opens (true: the
 -- button opens a window, false: it does so in some states, b.button:SetOpens(on) switches it), color (text color,
 -- default warning). Fields: text, button; methods Fit(width) -> height and Refit() -> true when the
 -- height changed (after the texts changed; a banner that was never fitted stays as it is).
@@ -60,6 +61,8 @@ function AB.New(parent, opts)
     width = b.buttonWidth,
     height = AB.BUTTON_H,
     opens = opts.opens,
+    tooltip = opts.tooltip,
+    tooltipText = opts.tooltipText,
     onClick = opts.onClick,
   })
   if opts.opens then

@@ -32,6 +32,7 @@ ns.AddLocale("enUS", {
   ["errcatch.session.ago.other"] = "%d starts ago",
   ["errcatch.script"] = "Script",
   ["errcatch.ops"] = "Last map operations of the addon:",
+  ["errcatch.info"] = "Context of the refused call:",
 })
 ns.AddLocale("deDE", {
   ["errcatch.heading"] = "Fehlerfänger",
@@ -60,6 +61,7 @@ ns.AddLocale("deDE", {
   ["errcatch.session.ago.other"] = "vor %d Starts",
   ["errcatch.script"] = "Skript",
   ["errcatch.ops"] = "Letzte Karten-Operationen des Addons:",
+  ["errcatch.info"] = "Kontext des abgelehnten Aufrufs:",
 })
 
 local EC = {}
@@ -99,6 +101,27 @@ end
 
 -- source tells the handler chain from the error callback of another addon so one error seen by both is
 -- counted once. Returns the entry or nil when the error is not recorded.
+-- An add-on of ours can explain a refused call of its own: provider(addon) returns a short text (or nil) that the
+-- error page shows under the stack. A provider that raises an error is ignored.
+local providers = {}
+
+function EC.AddContext(provider)
+  if type(provider) == "function" then
+    providers[#providers + 1] = provider
+  end
+end
+
+function EC.ContextOf(addon)
+  local parts = {}
+  for _, provider in ipairs(providers) do
+    local ok, text = pcall(provider, addon)
+    if ok and type(text) == "string" and text ~= "" then
+      parts[#parts + 1] = text
+    end
+  end
+  return #parts > 0 and table.concat(parts, "\n") or nil
+end
+
 function EC.Capture(kind, msg, stack, addon, source)
   if not EC.Enabled() then
     return nil
@@ -112,12 +135,13 @@ function EC.Capture(kind, msg, stack, addon, source)
   if ns.MapOps and Logic.IsMapBlock(kind, msg, stack) then
     ops = Logic.OpsText(ns.MapOps.Last())
   end
+  local info = (kind == "blocked" or kind == "forbidden") and EC.ContextOf(addon) or nil
   stack = Logic.CleanStack(stack)
   addon = addon or Logic.AddonOf(msg, stack)
   if not Logic.IsOwn(addon) and not flag("errorForeign") then
     return nil
   end
-  return (ns.Errors.add({ msg = msg, kind = kind, addon = addon, stack = stack, ctx = addon, ops = ops }))
+  return (ns.Errors.add({ msg = msg, kind = kind, addon = addon, stack = stack, ctx = addon, ops = ops, info = info }))
 end
 
 local function currentStack()
@@ -251,7 +275,8 @@ end
 
 -- A module that provokes a refusal on purpose (a call the game is known to block) announces it: for the
 -- given seconds a blocked call of our own addon whose function name contains one of the words is not recorded.
-local expected = {}
+-- ExpectRefusal does the same for blocked and forbidden calls. The module that announced it handles the refusal itself.
+local expected, expectedForbidden = {}, {}
 
 function EC.ExpectBlock(seconds, ...)
   for _, word in ipairs({ ... }) do
@@ -259,13 +284,20 @@ function EC.ExpectBlock(seconds, ...)
   end
 end
 
-local function isExpected(addon, func)
+function EC.ExpectRefusal(seconds, ...)
+  EC.ExpectBlock(seconds, ...)
+  for _, word in ipairs({ ... }) do
+    expectedForbidden[word] = clock() + seconds
+  end
+end
+
+local function isExpected(addon, func, kind)
   if not Logic.IsOwn(addon) then
     return false
   end
   local now = clock()
   func = tostring(func)
-  for word, untilTime in pairs(expected) do
+  for word, untilTime in pairs(kind == "forbidden" and expectedForbidden or expected) do
     if now <= untilTime and func:find(word, 1, true) then
       return true
     end
@@ -278,7 +310,7 @@ local function onAction(kind, text)
     if addon == nil or addon == "" then
       addon = "?"
     end
-    if kind == "blocked" and isExpected(addon, func) then
+    if isExpected(addon, func, kind) then
       return
     end
     local okStack, stack = pcall(EC.ActionStack)
@@ -449,17 +481,10 @@ end
 
 function EC.AddSettings(view)
   local W, Store = ns.W, ns.Store
-  local s = view.stack
   ns.AddHeading(view, "errcatch.heading")
-  for _, def in ipairs({
-    { "errorCatcher", "errcatch.enable", "errors-enable" },
-    { "errorChat", "errcatch.chat", "errors-chat" },
-    { "errorSound", "errcatch.sound", "errors-sound" },
-    { "errorForeign", "errcatch.foreign", "errors-foreign" },
-    { "errorHideBlizzard", "errcatch.hideBlizzard", "errors-hide" },
-  }) do
+  local function addToggle(target, def)
     local key = def[1]
-    local toggle = W.Toggle(view.content, {
+    local toggle = W.Toggle(target.content, {
       key = def[2],
       get = function()
         return flag(key)
@@ -475,11 +500,11 @@ function EC.AddSettings(view)
       end,
     })
     toggle.fgId = def[3]
-    s:Add(toggle, { height = 24, gap = 6 })
+    target.stack:Add(toggle, { height = 24, gap = 6 })
   end
-  ns.AddParagraph(view, "errcatch.hint", { role = "micro", color = "textMuted" })
-  ns.AddParagraph(view, "errcatch.hideHint", { role = "micro", color = "textMuted" })
-  s:Add(
+  addToggle(view, { "errorCatcher", "errcatch.enable", "errors-enable" })
+  addToggle(view, { "errorChat", "errcatch.chat", "errors-chat" })
+  view.stack:Add(
     W.Action(view.content, {
       label = "act.open",
       icon = "open",
@@ -490,6 +515,13 @@ function EC.AddSettings(view)
         ns.Main.Show("errors")
       end,
     }),
-    { height = 26, width = 220 }
+    { height = 26, width = 220, gap = 10 }
   )
+  -- The sound, the other add-ons and the game's own error window are set once: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "diagnostics.errors" })
+  addToggle(more, { "errorSound", "errcatch.sound", "errors-sound" })
+  addToggle(more, { "errorForeign", "errcatch.foreign", "errors-foreign" })
+  addToggle(more, { "errorHideBlizzard", "errcatch.hideBlizzard", "errors-hide" })
+  ns.AddParagraph(more, "errcatch.hint", { role = "micro", color = "textMuted" })
+  ns.AddParagraph(more, "errcatch.hideHint", { role = "micro", color = "textMuted" })
 end

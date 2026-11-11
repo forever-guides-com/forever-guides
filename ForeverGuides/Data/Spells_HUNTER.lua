@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-07.
+-- Generated data, do not edit. Data as of 2026-11-09.
 -- Spell catalog of HUNTER: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -244,13 +244,6 @@ ns.Data.Spells.HUNTER = {
     n={de="Aspekt des Geparden",en="Aspect of the Cheetah"},
   },
   {
-    fid=132188,
-    id=469145,
-    k="spell",
-    l=60,
-    n={de="Aspekt des Gerfalken",en="Aspect of the Falcon"},
-  },
-  {
     fid=136076,
     i="spell_nature_ravenform",
     id=13165,
@@ -339,13 +332,6 @@ ns.Data.Spells.HUNTER = {
     k="spell",
     l=40,
     n={de="Aspekt des Rudels",en="Aspect of the Pack"},
-  },
-  {
-    fid=132160,
-    id=415423,
-    k="spell",
-    l=1,
-    n={de="Aspekt der Viper",en="Aspect of the Viper"},
   },
   {
     fid=136074,
@@ -1179,13 +1165,6 @@ ns.Data.Spells.HUNTER = {
     n={de="Effizienz",en="Efficiency"},
   },
   {
-    fid=236205,
-    id=1221404,
-    k="spell",
-    l=32,
-    n={de="Zauberflamme",en="Enchanted Flare"},
-  },
-  {
     fid=136080,
     i="spell_nature_reincarnation",
     id=19583,
@@ -1709,14 +1688,6 @@ ns.Data.Spells.HUNTER = {
     id=19498,
     k="talent",
     n={de="Falkenauge",en="Hawk Eye"},
-  },
-  {
-    fid=132185,
-    i="ability_hunter_pet_cat",
-    id=409580,
-    k="spell",
-    l=1,
-    n={de="Löwenherz",en="Heart of the Lion"},
   },
   {
     fid=135942,

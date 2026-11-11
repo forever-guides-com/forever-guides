@@ -611,6 +611,7 @@ function NW.ShowIconPicker(anchor, onPick)
       iconPicker.owner = nil
       iconPicker.onPick = nil
     end)
+    ns.WindowShell.RegisterEsc(iconPicker)
     iconPicker:Hide()
   end
   iconPicker.owner = anchor
@@ -839,7 +840,8 @@ local function newFrame()
   f.renderers = {}
   f.bg = f:CreateTexture(nil, "BACKGROUND")
   f.bg:SetAllPoints()
-  f.shell = ns.WindowShell.Attach(f, { titleHeight = HEAD_H, shadow = true })
+  -- esc = false: a pinned note stays open on Esc, ApplyPin toggles its place in the Esc stack (Shell.SetEsc).
+  f.shell = ns.WindowShell.Attach(f, { titleHeight = HEAD_H, shadow = true, esc = false })
   f.border, f.bar, f.barBg, f.title = f.shell.border, f.shell.titleBar, f.shell.barFill, f.shell.titleText
 
   f.bar:EnableMouse(true)

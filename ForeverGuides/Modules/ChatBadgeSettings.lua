@@ -23,7 +23,7 @@ ns.AddLocale("enUS", {
   ["chatbadge.style.both"] = "Both",
   ["chatbadge.size"] = "Size",
   ["chatbadge.size.auto"] = "Auto (font size)",
-  ["chatbadge.crest.hint"] = "Guild and community logos follow the add-on logo. The tooltip of the add-on logo lists all of them.",
+  ["chatbadge.crest.hint"] = "Guild and community logos follow the add-on logo. Forever Guides shows them only for players you share a guild or community with. The tooltip of the add-on logo lists them.",
   ["chatbadge.crest.count"] = "More logos per line",
   ["chatbadge.crest.off"] = "None",
   ["chatbadge.crest.notice"] = "Logos of guilds and communities need sharing.",
@@ -51,7 +51,7 @@ ns.AddLocale("enUS", {
   ["chatbadge.locked"] = "Locked chat in encounters: no logo there.",
   ["chatbadge.off"] = "Chat logo switched off after %d errors.",
   ["chatbadge.status"] = "Status",
-  ["chatbadge.limits"] = "Who gets a logo: only players of your group or guild who share their logo and whose message you have already heard. Never: strangers in Say, Yell and public channels, system and loot lines, your own lines (unless enabled) and whispers (unless enabled). Local recognition (\"Recognize logos without the add-on\") reads names from your guild roster, your communities and the guild of players you have seen, and sends nothing.",
+  ["chatbadge.limits"] = 'Who gets a logo: only players of your group or guild who share their logo and whose message you have already heard. Never: strangers in Say, Yell and public channels, system and loot lines, your own lines (unless enabled) and whispers (unless enabled). Local recognition ("Recognize logos without the add-on") reads names from your guild roster, your communities and the guild of players you have seen, and sends nothing.',
   ["chatbadge.status.off"] = "The chat logo was switched off after errors. Switch it on again to try once more.",
   ["chatbadge.status.switchOff"] = 'You receive logos, yet "See logos of others" is switched off, so no add-on logo appears. Switch it on to see them.',
   ["chatbadge.status.idle"] = 'Nothing is switched on, so no logo appears. Turn on "See logos of others" or the guild and community logos.',
@@ -81,7 +81,7 @@ ns.AddLocale("deDE", {
   ["chatbadge.style.both"] = "Beides",
   ["chatbadge.size"] = "Größe",
   ["chatbadge.size.auto"] = "Auto (Schriftgröße)",
-  ["chatbadge.crest.hint"] = "Gilden- und Community-Logos folgen dem Addon-Logo. Der Tooltip des Addon-Logos listet alle auf.",
+  ["chatbadge.crest.hint"] = "Gilden- und Community-Logos folgen dem Addon-Logo. Forever Guides zeigt sie nur bei Spielern, mit denen du Gilde oder Community teilst. Der Tooltip des Addon-Logos listet sie auf.",
   ["chatbadge.crest.count"] = "Weitere Logos je Zeile",
   ["chatbadge.crest.off"] = "Keine",
   ["chatbadge.crest.notice"] = "Logos von Gilden und Communitys brauchen Teilen.",
@@ -109,7 +109,7 @@ ns.AddLocale("deDE", {
   ["chatbadge.locked"] = "Gesperrter Chat in Begegnungen: dort kein Logo.",
   ["chatbadge.off"] = "Chat-Logo nach %d Fehlern ausgeschaltet.",
   ["chatbadge.status"] = "Status",
-  ["chatbadge.limits"] = "Wer ein Logo bekommt: nur Spieler deiner Gruppe oder Gilde, die ihr Logo teilen und deren Nachricht du schon gehört hast. Nie: Fremde in Sagen, Rufen und öffentlichen Kanälen, System- und Beutezeilen, deine eigenen Zeilen (außer eingeschaltet) und Flüstern (außer eingeschaltet). Die lokale Erkennung (\"Logos auch ohne Addon erkennen\") liest Namen aus deiner Gildenliste, deinen Communitys und die Gilde gesehener Spieler und sendet nichts.",
+  ["chatbadge.limits"] = 'Wer ein Logo bekommt: nur Spieler deiner Gruppe oder Gilde, die ihr Logo teilen und deren Nachricht du schon gehört hast. Nie: Fremde in Sagen, Rufen und öffentlichen Kanälen, System- und Beutezeilen, deine eigenen Zeilen (außer eingeschaltet) und Flüstern (außer eingeschaltet). Die lokale Erkennung ("Logos auch ohne Addon erkennen") liest Namen aus deiner Gildenliste, deinen Communitys und die Gilde gesehener Spieler und sendet nichts.',
   ["chatbadge.status.off"] = "Das Chat-Logo wurde nach Fehlern ausgeschaltet. Schalte es wieder ein, um es erneut zu versuchen.",
   ["chatbadge.status.switchOff"] = 'Du empfängst Logos, doch "Logos anderer sehen" ist ausgeschaltet, deshalb erscheint kein Addon-Logo. Schalte es ein, um sie zu sehen.',
   ["chatbadge.status.idle"] = 'Nichts ist eingeschaltet, deshalb erscheint kein Logo. Schalte "Logos anderer sehen" oder die Gilden- und Community-Logos ein.',
@@ -318,26 +318,28 @@ function S.Add(view)
     notice:Update(not CB.Listening())
   end)
   styleDropdown(view)
-  sizeSlider(view)
-  crestRows(view)
-  channelToggles(view)
-  settingToggle(view, "chatBadgeSelf", "chatbadge.self", "chatbadge.self.tip")
-  ns.AddParagraph(view, "chatbadge.preview", { role = "micro", color = "textMuted", gap = 2 })
-  local preview = ns.AddParagraph(view, nil, { role = "ui", color = "text", gap = 2 })
+  -- Size, the guild and community logos, the channels and the rest are rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "logos.chat" })
+  sizeSlider(more)
+  crestRows(more)
+  channelToggles(more)
+  settingToggle(more, "chatBadgeSelf", "chatbadge.self", "chatbadge.self.tip")
+  ns.AddParagraph(more, "chatbadge.preview", { role = "micro", color = "textMuted", gap = 2 })
+  local preview = ns.AddParagraph(more, nil, { role = "ui", color = "text", gap = 2 })
   preview.fgId = "chatbadge-preview"
   track(preview, function()
     preview:SetText(S.PreviewLine())
   end)
-  ns.AddParagraph(view, "chatbadge.meaning", { role = "micro", color = "textMuted", gap = 6 })
-  ns.AddParagraph(view, "chatbadge.status", { role = "micro", color = "textMuted", gap = 2 })
-  local status = ns.AddParagraph(view, nil, { role = "micro", color = "text", gap = 6 })
+  ns.AddParagraph(more, "chatbadge.meaning", { role = "micro", color = "textMuted", gap = 6 })
+  ns.AddParagraph(more, "chatbadge.status", { role = "micro", color = "textMuted", gap = 2 })
+  local status = ns.AddParagraph(more, nil, { role = "micro", color = "text", gap = 6 })
   status.fgId = "chatbadge-status"
   track(status, function()
     status:SetText(S.StatusText())
   end)
-  local other = ns.AddParagraph(view, nil, { role = "micro", color = "warning", gap = 4 })
+  local other = ns.AddParagraph(more, nil, { role = "micro", color = "warning", gap = 4 })
   other.fgId = "chatbadge-other"
-  local otherOn = settingToggle(view, "chatBadgeOtherAddons", "chatbadge.otherOn", "chatbadge.otherOn.tip")
+  local otherOn = settingToggle(more, "chatBadgeOtherAddons", "chatbadge.otherOn", "chatbadge.otherOn.tip")
   track(other, function()
     local names = CB.OtherAddons()
     other:SetShown(#names > 0)
@@ -346,8 +348,8 @@ function S.Add(view)
       other:SetText(string.format(L["chatbadge.other"], table.concat(names, ", ")))
     end
   end)
-  ns.AddParagraph(view, "chatbadge.locked", { role = "micro", color = "textMuted", gap = 2 })
-  ns.AddParagraph(view, "chatbadge.limits", { role = "micro", color = "textMuted", gap = 2 })
+  ns.AddParagraph(more, "chatbadge.locked", { role = "micro", color = "textMuted", gap = 2 })
+  ns.AddParagraph(more, "chatbadge.limits", { role = "micro", color = "textMuted", gap = 2 })
   refreshAll()
 end
 
@@ -380,4 +382,4 @@ ns.ConsentSettings.AddExtra(CB.FN, function(card)
 end)
 
 -- Later than the built-in sections of the tab (Modules/Settings.lua appends in this order).
-ns.SettingsPage.Add(S.Add, "sharing")
+ns.SettingsPage.Add(S.Add, "sharing", "logos.chat")

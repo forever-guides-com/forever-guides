@@ -27,6 +27,12 @@ ns.AddLocale("enUS", {
   ["map.gather.chooseTip"] = "Opens the page Ores and herbs.",
   ["map.gather.known"] = "Known spot",
   ["map.gather.own"] = "Own find",
+  ["map.gatherObjects"] = "Show chests and fishing schools",
+  ["map.gatherObjects.tip"] = "Shows the spots of chests, clams and other finds and of fishing schools on the zone map. The settings choose the kinds.\nHover a symbol for its name.",
+  ["map.gatherObjects.spots"] = "Chests and schools: %d spots (kinds: %d)",
+  ["map.gatherObjects.noZone"] = "Open a zone to see chests and fishing schools.",
+  ["map.gatherObjects.none"] = "All kinds of this zone are switched off. Choose them in the settings.",
+  ["map.gatherObjects.empty"] = "The data has no chests or fishing schools for this zone.",
 })
 
 ns.AddLocale("deDE", {
@@ -42,6 +48,12 @@ ns.AddLocale("deDE", {
   ["map.gather.chooseTip"] = "Öffnet die Seite Erze und Kräuter.",
   ["map.gather.known"] = "Bekannter Fundort",
   ["map.gather.own"] = "Eigener Fund",
+  ["map.gatherObjects"] = "Truhen und Fischschwärme zeigen",
+  ["map.gatherObjects.tip"] = "Zeigt die Fundorte von Truhen, Muscheln und weiteren Fundstücken sowie von Fischschwärmen auf der Gebietskarte. Die Einstellungen wählen die Arten.\nSymbol anfahren zeigt den Namen.",
+  ["map.gatherObjects.spots"] = "Truhen und Schwärme: %d Fundorte (Arten: %d)",
+  ["map.gatherObjects.noZone"] = "Öffne ein Gebiet, um Truhen und Fischschwärme zu sehen.",
+  ["map.gatherObjects.none"] = "Alle Arten dieses Gebiets sind ausgeschaltet. Wähle sie in den Einstellungen.",
+  ["map.gatherObjects.empty"] = "Für dieses Gebiet kennen die Daten keine Truhen oder Fischschwärme.",
 })
 
 -- The lines of a symbol's tooltip: title (item name) and text (profession and skill, then where the spot
@@ -58,6 +70,33 @@ function GMap.TipText(data, pin)
   return title, table.concat(lines, "\n")
 end
 
+-- The feed of the ore and herb spots, the default of Attach: the items of the zone that pass the filter.
+GMap.ItemFeed = {
+  set = function(mapId)
+    local data = ns.GatherDataAccess.Get()
+    return data and ns.GatherFilter.ZoneItems(data, mapId) or nil
+  end,
+  points = function(data, mapId, set)
+    return GM.Points(data, mapId, set)
+  end,
+  summary = function(data, mapId, set)
+    return GM.Summary(data, mapId, set)
+  end,
+  zoneHas = function(data, mapId)
+    local zone = data.zones and data.zones[mapId]
+    return zone ~= nil and next(zone.items or {}) ~= nil
+  end,
+  icon = function(data, pin)
+    return ns.GatheringLogic.IconPath(pin.itemId, data.items[pin.itemId])
+  end,
+  iconKey = function(pin)
+    return pin.itemId
+  end,
+  tip = function(data, pin)
+    return GMap.TipText(data, pin)
+  end,
+}
+
 -- ctx = {
 --   canvas                the map canvas the symbols sit on
 --   mapId()               UiMapID of the open zone, nil on the world view
@@ -69,18 +108,19 @@ end
 --   unit()                canvas units per screen px (default 1): the edge ring, the hover ring and the
 --                         hit padding stay the same on screen
 --   pinSize(width)        symbol edge in canvas units for the visible width (default: GM.PinSize)
---   items(mapId)          the set { [itemId] = true } to draw (default: GatherFilter.ZoneItems)
+--   items(mapId)          the set { [itemId] = true } to draw (default: the set of the feed)
 --   onMap(target)         true when the frame under the cursor belongs to the map (default: the
 --                         canvas and the symbol layer)
 -- }
+--   feed                  where the spots come from (default: the ores and herbs, GMap.ItemFeed). A feed has
+--                         set(mapId), points(data, mapId, set), summary(data, mapId, set), zoneHas(data, mapId),
+--                         icon(data, pin), iconKey(pin) and tip(data, pin); GatherObjects.Feed is the other one.
 -- Returns the controller: Paint(force), Clear, Info, Poll, layer, plan, hover.
 function GMap.Attach(ctx)
   local canvas = ctx.canvas
   local ctl = { stamp = 0 }
-  local function itemsOf(mapId)
-    local data = ns.GatherDataAccess.Get()
-    return data and ns.GatherFilter.ZoneItems(data, mapId) or nil
-  end
+  local feed = ctx.feed or GMap.ItemFeed
+  local itemsOf = feed.set
   local function unit()
     return ctx.unit and ctx.unit() or 1
   end
@@ -162,7 +202,7 @@ function GMap.Attach(ctx)
     glow:Show()
     local data = ns.GatherDataAccess.Get()
     if data then
-      local title, text = GMap.TipText(data, pin)
+      local title, text = feed.tip(data, pin)
       ns.ShowTooltip(layer, title, text, { anchor = "ANCHOR_CURSOR" })
     end
   end
@@ -291,16 +331,17 @@ function GMap.Attach(ctx)
     then
       return
     end
-    local plan = GM.Plan(GM.Points(data, mapId, set), { cw = cw, ch = ch, l = wl, t = wt, w = ww, h = wh })
+    local plan = GM.Plan(feed.points(data, mapId, set), { cw = cw, ch = ch, l = wl, t = wt, w = ww, h = wh })
     plan.mapId, plan.cw, plan.ch, plan.size, plan.unit = mapId, cw, ch, size, u
     plan.radius = GM.HitRadius(size, u)
     plan.index = GM.Index(plan.pins, plan.radius)
     local icons = {}
     for i, pin in ipairs(plan.pins) do
-      local path = icons[pin.itemId]
+      local key = feed.iconKey(pin)
+      local path = icons[key]
       if not path then
-        path = ns.GatheringLogic.IconPath(pin.itemId, data.items[pin.itemId])
-        icons[pin.itemId] = path
+        path = feed.icon(data, pin)
+        icons[key] = path
       end
       place(i, pin, size, path, GMap.RING * u)
     end
@@ -331,10 +372,9 @@ function GMap.Attach(ctx)
     end
     local set = (ctx.items or itemsOf)(mapId) or {}
     if not next(set) then
-      local zone = data.zones and data.zones[mapId]
-      return { state = zone and next(zone.items or {}) and "none" or "empty", mapId = mapId }
+      return { state = feed.zoneHas(data, mapId) and "none" or "empty", mapId = mapId }
     end
-    local points, items = GM.Summary(data, mapId, set)
+    local points, items = feed.summary(data, mapId, set)
     return { state = "shown", mapId = mapId, points = points, items = items }
   end
 

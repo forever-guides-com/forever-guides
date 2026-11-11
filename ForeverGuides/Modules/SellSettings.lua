@@ -217,31 +217,25 @@ local function levelField(view, key, label, quality, warning, allKey)
     end
   end
   ns.Bind(status, paintStatus)
-  local function commit(text)
-    local level = Logic.CleanLevel(text)
-    Store.set("settings." .. key, level)
-    paintStatus()
-    return level
-  end
   box = W.EditBox(row, {
-    onChange = commit,
-    onEnter = function(text)
-      box.edit:SetText(tostring(commit(text)))
+    maxLetters = 4,
+    live = true,
+    get = function()
+      return tostring(Logic.CleanLevel(stored(key)))
+    end,
+    set = function(text)
+      Store.set("settings." .. key, Logic.CleanLevel(text))
+      paintStatus()
     end,
   })
   box:SetPoint("TOPLEFT", row, "TOPLEFT")
   box:SetSize(120, 26)
   status:SetPoint("LEFT", box, "RIGHT", 10, 0)
   status:SetPoint("RIGHT", row, "RIGHT")
-  box.edit:SetMaxLetters(4)
-  box.edit:HookScript("OnEditFocusLost", function()
-    box.edit:SetText(tostring(Logic.CleanLevel(stored(key))))
-  end)
   box.fgId = "sell-" .. key
+  local showStored = box.Refresh
   function box:Refresh()
-    if not self.edit:HasFocus() then
-      self.edit:SetText(tostring(Logic.CleanLevel(stored(key))))
-    end
+    showStored()
     paintStatus()
     paintLock()
   end
@@ -284,7 +278,7 @@ end
 local function generalSection(view)
   section(view, "sell.sec.general")
   ns.AddParagraph(view, "sell.set.buttonHint", { role = "micro", color = "textMuted" })
-  toggle(view, "sellBlizzButton", "sell.set.blizz", { hint = "sell.set.blizzHint" })
+  toggle(view, "sellAuto", "sell.set.auto", { warning = "sell.set.autoHint" })
   local click = W.Dropdown(view.content, {
     key = "sell.set.click",
     width = 270,
@@ -302,24 +296,32 @@ local function generalSection(view)
   click.fgId = "sell-click"
   view.stack:Add(click, { height = 46, width = 270 })
   toggle(view, "sellConfirmRare", "sell.set.confirmRare", { hint = "sell.set.confirmRareHint" })
-  toggle(view, "sellAuto", "sell.set.auto", { warning = "sell.set.autoHint" })
-  toggle(view, "sellNative", "sell.set.native", { hint = "sell.set.nativeHint" })
+  local more = W.Accordion(view, { id = view.id or "selling.main" })
+  toggle(more, "sellBlizzButton", "sell.set.blizz", { hint = "sell.set.blizzHint" })
+  toggle(more, "sellNative", "sell.set.native", { hint = "sell.set.nativeHint" })
 end
 
 local function qualitySection(view)
   section(view, "sell.sec.quality")
   ns.AddParagraph(view, "sell.set.levelHint", { role = "micro", color = "textMuted" })
   toggle(view, "sellGray", "sell.set.gray", { quality = GRAY })
-  for _, def in ipairs(QUALITY_ROWS) do
+  -- White items are the ones sold most often, the higher qualities sit behind "More settings".
+  local more
+  for i, def in ipairs(QUALITY_ROWS) do
+    local target = view
+    if i > 1 then
+      more = more or W.Accordion(view, { id = view.id or "sellrules.quality" })
+      target = more
+    end
     local field
-    toggle(view, def.all, def.allLabel, {
+    toggle(target, def.all, def.allLabel, {
       quality = def.quality,
       warning = def.allHint,
       onSet = function()
         field:Refresh()
       end,
     })
-    field = levelField(view, def.level, def.label, def.quality, def.hint, def.all)
+    field = levelField(target, def.level, def.label, def.quality, def.hint, def.all)
   end
 end
 
@@ -372,18 +374,19 @@ local function protectSection(view)
   view.stack:Add(manage, { height = 26, width = 220, gap = 6 })
 end
 
--- The sections in page order. A later section "Always sell (list)" belongs after the quality rules:
--- it selects items like a rule, the protections still win over it.
-local SECTIONS = { generalSection, qualitySection, bindSection, keepSection, protectSection }
-
-function S.Add(view)
-  ns.AddHeading(view, "sell.set.heading")
-  ns.AddParagraph(view, "sell.set.hint", { role = "micro", color = "textMuted" })
-  -- On the settings page every further section is a card of its own.
-  for i, build in ipairs(SECTIONS) do
-    build(i > 1 and view.grid and view.grid:Card() or view)
-  end
-end
+-- One builder per card, keyed by the card id of the settings registry. A later section "Always sell
+-- (list)" belongs after the quality rules: it selects items like a rule, the protections still win.
+S.BUILDERS = {
+  ["selling.main"] = function(view)
+    ns.AddHeading(view, "sell.set.heading")
+    ns.AddParagraph(view, "sell.set.hint", { role = "micro", color = "textMuted" })
+    generalSection(view)
+  end,
+  ["sellrules.quality"] = qualitySection,
+  ["sellrules.binding"] = bindSection,
+  ["sellrules.keep"] = keepSection,
+  ["protect.main"] = protectSection,
+}
 
 -- Both names: older clients know ChatEdit_InsertLink, newer ones ChatFrameUtil.InsertLink. Adding the
 -- same id twice changes nothing.

@@ -24,6 +24,7 @@ ns.AddLocale("enUS", {
   ["proftracker.setting"] = "Shopping list in tracker",
   ["proftracker.hint"] = "Panel below the quest tracker, drag the title.",
   ["proftracker.collapse"] = "Collapse or expand",
+  ["proftracker.close"] = "Hide the list (switch it on again in the settings)",
   ["proftracker.send"] = "To shopping list",
   ["proftracker.window"] = "Window",
   ["proftracker.more"] = "+%d more",
@@ -33,6 +34,7 @@ ns.AddLocale("deDE", {
   ["proftracker.setting"] = "Einkaufsliste im Tracker",
   ["proftracker.hint"] = "Feld unter dem Quest-Tracker, am Titel ziehen.",
   ["proftracker.collapse"] = "Ein- oder ausklappen",
+  ["proftracker.close"] = "Liste ausblenden (in den Einstellungen wieder einschaltbar)",
   ["proftracker.send"] = "An Einkaufsliste",
   ["proftracker.window"] = "Fenster",
   ["proftracker.more"] = "+%d weitere",
@@ -328,13 +330,16 @@ local function create()
   f:SetSize(WIDTH, HEAD_H)
   f.bg = f:CreateTexture(nil, "BACKGROUND")
   f.bg:SetAllPoints()
-  f.shell = ns.WindowShell.Attach(f, { title = "profshop.title", titleHeight = HEAD_H, shadow = true })
+  -- esc = false: the tracker sits next to the profession window of the game and closes with it, it is no window of its own.
+  f.shell = ns.WindowShell.Attach(f, { title = "profshop.title", titleHeight = HEAD_H, shadow = true, esc = false })
   f.border, f.bar, f.barBg, f.title = f.shell.border, f.shell.titleBar, f.shell.barFill, f.shell.titleText
 
   f.bar:EnableMouse(true)
   f.bar:RegisterForDrag("LeftButton")
   f.bar:SetScript("OnDragStart", function()
-    if inCombat() then
+    -- The window is ours and not protected, so it moves in combat too. Only re-anchoring it to the game's
+    -- frame waits for the end of the fight.
+    if f:IsProtected() and inCombat() then
       return
     end
     f.dragging = true
@@ -367,8 +372,16 @@ local function create()
     end)
   )
 
+  f.close = W.Action(f.bar, { icon = "close", size = 18, tooltip = "proftracker.close" })
+  f.close:SetPoint("RIGHT", -2, 0)
+  f.close:SetScript(
+    "OnClick",
+    ns.Wrap("proftracker-close", function()
+      T.SetEnabled(false)
+    end)
+  )
   f.look = W.Action(f.bar, { icon = "palette", size = 18, tooltip = "wstyle.title", opens = true })
-  f.look:SetPoint("RIGHT", -2, 0)
+  f.look:SetPoint("RIGHT", f.close, "LEFT", -2, 0)
   f.look:SetScript(
     "OnClick",
     ns.Wrap("proftracker-look", function()

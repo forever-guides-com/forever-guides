@@ -54,6 +54,20 @@ local function hasAccess(inst)
   return #ns.AccessLogic.Conditions(list) > 0
 end
 
+-- True when the data records abilities for the boss. An empty list counts as recorded (the boss may have none),
+-- only a missing list is a gap.
+function G.HasAbilities(boss)
+  return type(boss.ab) == "table"
+end
+
+-- How many bosses of the instance have abilities in the data: known, total.
+function G.AbilityCount(inst)
+  local missing, total = countBosses(inst, function(b)
+    return not G.HasAbilities(b)
+  end)
+  return total - missing, total
+end
+
 -- A quest without a quest ID is weakly confirmed: rewards, experience and chain links cannot be matched.
 function G.QuestWeak(q)
   return q.id == nil
@@ -103,7 +117,7 @@ function G.Of(inst)
       add("loot", noLoot, total)
     end
     local noAbility = countBosses(inst, function(b)
-      return b.ab == nil
+      return not G.HasAbilities(b)
     end)
     if noAbility > 0 then
       add("abilities", noAbility, total)

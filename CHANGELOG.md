@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.7.0
+
+### Added
+
+- Forever Chat: lines can be copied, forwarded and replied to, and links are clickable.
+- Chat name: optionally put your own name in front of your messages, with brackets, profile and class color.
+- Fishing helper: one key casts and reels in, optionally with auto loot and louder sound.
+- Catch journal: "My catches" shows every fish with catches, locations and recipes.
+- Fishing places: a window lists areas, minimum skill and catch chance per cast.
+- Instances: the grid shows loading screens, starts sorted by level and shares one faction choice.
+- Instances: the Items tab lists loot by boss with drop rate, and quests show text and where they start.
+- Dungeon maps: zoom, entrance and a legend, and two more instances now have a map.
+- Gathering spots: chests, clams, fish schools and wreckage have a switch of their own.
+- Vendors: a new page finds vendors with search, filters and waypoint.
+- Search: the field in the window header jumps to menu pages, tabs and single settings.
+- Setup: in the step "Menu areas" you show and hide areas and pages, each with its icon.
+- Sleeping bag: a bar shows the Well Rested stacks only while you lie, and an X hides it. Off by default.
+- Profession tracker: the shopping list has a close button.
+
+### Changed
+
+- Settings: the eleven tabs become 43 in eight groups, and long cards fold away the rest.
+- Setup: the wizard asks about features instead of single switches.
+- Windows: Esc closes every add-on window, the newest first.
+- Window style: fresh installs start with "WoW Forever", and existing installs keep their choice.
+- World map: a click on a zone transition shows the area in the map window.
+- Raids: Barrow Deeps, Hyjal Summit and Onyxia's Lair are level 60 raids, dated December 9, 2026.
+- Data: game build 1.60.1.70888, and Season of Discovery recipes and spells are removed.
+- Ores and herbs: about 1,900 more spots, for the first time also in Shen'dralas.
+
+### Fixed
+
+- Sleeping bag: the bar shows only while you lie, no longer while you stand.
+- Fishing helper: fish show with their name instead of a number.
+- Instances: items show their name instead of the number.
+- Keyboard: Enter and Space only act after you used the keyboard in a window.
+- Settings: Escape discards the input in a text field.
+- Catch journal: every bar shows its true share and stays visible.
+- World map: the "Forever Guides" panel sits above the map frame.
+- Forever Chat: blocked messages stay as a draft in the chat box.
+
 ## 0.6.0
 
 ### Added

@@ -1,9 +1,9 @@
--- Generated data, do not edit. Data as of 2026-11-07.
+-- Generated data, do not edit. Data as of 2026-11-10.
 local _, ns = ...
 ns.Data = ns.Data or {}
 ns.Data.WellFed = {
   v = 1,
-  build = "1.60.1.70862",
+  build = "1.60.1.70888",
   names = { "Satt", "Well Fed" },
   ids = {
     19705, 19706, 19708, 19709, 19710, 19711, 24799, 24870,

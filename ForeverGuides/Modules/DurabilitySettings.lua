@@ -48,21 +48,25 @@ local function get(key)
   return ns.db.settings[key]
 end
 
+-- The id of a control for the search and the jumps: the last part of its label key.
+local function controlId(labelKey)
+  return "durability-" .. labelKey:match("[^.]+$")
+end
+
 local function toggle(view, key, labelKey, tipKey, getter, setter)
-  view.stack:Add(
-    W.Toggle(view.content, {
-      key = labelKey,
-      get = getter or function()
-        return get(key) == true
-      end,
-      set = setter or function(v)
-        Store.set("settings." .. key, v == true)
-      end,
-      tooltip = labelKey,
-      tooltipText = tipKey,
-    }),
-    { height = 24, gap = 6 }
-  )
+  local t = W.Toggle(view.content, {
+    key = labelKey,
+    get = getter or function()
+      return get(key) == true
+    end,
+    set = setter or function(v)
+      Store.set("settings." .. key, v == true)
+    end,
+    tooltip = labelKey,
+    tooltipText = tipKey,
+  })
+  t.fgId = controlId(labelKey)
+  view.stack:Add(t, { height = 24, gap = 6 })
 end
 
 local function slider(view, labelKey, getter, setter)
@@ -75,6 +79,7 @@ local function slider(view, labelKey, getter, setter)
     set = setter,
     format = percent,
   })
+  s.fgId = controlId(labelKey)
   view.stack:Add(s, { height = 42, width = 320 })
   return s
 end
@@ -96,9 +101,18 @@ function S.Add(view)
   ns.AddParagraph(view, "dur.set.hint", { role = "micro", color = "textMuted" })
   toggle(view, nil, "dur.set.show", "dur.set.showTip", ns.DurabilityWindow.IsWanted, ns.DurabilityWindow.SetWanted)
 
+  toggle(view, "durabilityWarn", "dur.set.warn", "dur.set.warnTip")
+  slider(view, "dur.set.warnPct", function()
+    return DL.CleanLimit(get("durabilityWarnPct"), DL.DEFAULTS.warn)
+  end, function(v)
+    Store.set("settings.durabilityWarnPct", DL.CleanLimit(v, DL.DEFAULTS.warn))
+  end)
+
+  -- The color limits and "only while a part is low" are rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "durability.main" })
   local sliders = {}
   for i, limit in ipairs(LIMITS) do
-    sliders[i] = slider(view, limit.label, function()
+    sliders[i] = slider(more, limit.label, function()
       return (select(i, limitValues()))
     end, function(v)
       Store.set("settings." .. limit.key, v)
@@ -114,20 +128,13 @@ function S.Add(view)
     end)
   end
 
-  toggle(view, "durabilityOnlyBelow", "dur.set.onlyBelow", "dur.set.onlyBelowTip")
-  slider(view, "dur.set.onlyBelowPct", function()
+  toggle(more, "durabilityOnlyBelow", "dur.set.onlyBelow", "dur.set.onlyBelowTip")
+  slider(more, "dur.set.onlyBelowPct", function()
     return DL.CleanLimit(get("durabilityOnlyBelowPct"), DL.DEFAULTS.onlyBelow)
   end, function(v)
     Store.set("settings.durabilityOnlyBelowPct", DL.CleanLimit(v, DL.DEFAULTS.onlyBelow))
   end)
-
-  toggle(view, "durabilityWarn", "dur.set.warn", "dur.set.warnTip")
-  slider(view, "dur.set.warnPct", function()
-    return DL.CleanLimit(get("durabilityWarnPct"), DL.DEFAULTS.warn)
-  end, function(v)
-    Store.set("settings.durabilityWarnPct", DL.CleanLimit(v, DL.DEFAULTS.warn))
-  end)
 end
 
 -- Later than the built-in sections of the tab (Modules/Settings.lua appends in this order).
-ns.SettingsPage.Add(S.Add, "bags")
+ns.SettingsPage.Add(S.Add, "bags", "durability.main")

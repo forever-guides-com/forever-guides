@@ -101,17 +101,21 @@ local function keep(control)
   return control
 end
 
+-- The stable id of a control: the locale key with dashes, the search and the jumps know it by this.
+local function idOf(key)
+  return (key:gsub("%.", "-"))
+end
+
 local function toggle(view, labelKey, tipKey, get, set)
-  view.stack:Add(
-    keep(W.Toggle(view.content, {
-      key = labelKey,
-      get = get,
-      set = set,
-      tooltip = labelKey,
-      tooltipText = tipKey,
-    })),
-    { height = 24, gap = 6 }
-  )
+  local control = keep(W.Toggle(view.content, {
+    key = labelKey,
+    get = get,
+    set = set,
+    tooltip = labelKey,
+    tooltipText = tipKey,
+  }))
+  control.fgId = idOf(labelKey)
+  view.stack:Add(control, { height = 24, gap = 6 })
 end
 
 local function choice(view, key, options, get, set, tip)
@@ -121,6 +125,7 @@ local function choice(view, key, options, get, set, tip)
       { key = key, width = 240, options = options, get = get, set = set, tooltip = tip and key, tooltipText = tip }
     )
   )
+  dropdown.fgId = idOf(key)
   view.stack:Add(dropdown, { height = 46, width = 240 })
 end
 
@@ -231,6 +236,7 @@ local function addCharacter(view)
   end
   keep(note)
   note.Refresh()
+  note.fgId = "cursor-char-note"
   view.stack:Add(note, { gap = 10 })
 end
 
@@ -245,39 +251,6 @@ function S.Add(view, opts)
   toggle(view, "cursor.set.enabled", "cursor.set.enabledTip", function()
     return C.Config().accountEnabled
   end, C.SetAccountEnabled)
-  choice(view, "cursor.set.strata", listOf(CU.STRATA, "cursor.strata."), function()
-    return C.Config().strata
-  end, function(v)
-    Store.set("settings.cursorRing.strata", v)
-  end)
-  choice(view, "cursor.set.mouselook", listOf(CU.MOUSELOOK, "cursor.mouselook."), function()
-    return C.Config().mouselook
-  end, function(v)
-    Store.set("settings.cursorRing.mouselook", v)
-  end)
-  ns.AddHeading(view, "cursor.set.load", { role = "ui", gap = 4 })
-  view.stack:Add(
-    keep(Controls.LoadPanel(view.content, {
-      get = function()
-        return C.Config().load
-      end,
-      set = function(load)
-        Store.set("settings.cursorRing.load", load)
-      end,
-      onResize = function()
-        if type(view.Layout) == "function" then
-          view:Layout()
-        end
-      end,
-    })),
-    { gap = 10 }
-  )
-  -- The game's own swing bars double the swing timer element: say so where the ring is set up.
-  local timers = ns.CursorTimers
-  if type(timers) == "table" and type(timers.SwingHint) == "function" and timers.SwingHint() ~= nil then
-    ns.AddParagraph(view, "cursor.timers.swingNative", { role = "micro", color = "textMuted" })
-  end
-
   -- The list is refilled in place on every read: layouts come and go while the card is open.
   local options = {}
   choice(view, "cursor.set.layout", options, function()
@@ -289,19 +262,50 @@ function S.Add(view, opts)
     end
     return C.Config().accountLayoutId
   end, C.SetAccountLayout)
-  view.stack:Add(
-    ns.LayoutSet.BuildButtons(view.content, C.LayoutSet),
-    { height = ns.LayoutSet.BUTTONS_H, width = ns.LayoutSet.BUTTONS_W, gap = 8 }
-  )
-  view.stack:Add(
-    W.Button(view.content, { key = "cursor.set.edit", width = 190, opens = true, onClick = C.Edit }),
-    { height = 26, width = 190, gap = 8 }
-  )
-  view.stack:Add(
-    W.Button(view.content, { key = "cursor.set.reset", width = 240, onClick = C.ResetOptions }),
-    { height = 26, width = 240, gap = 16 }
-  )
-  addCharacter(view)
+  local edit = W.Button(view.content, { key = "cursor.set.edit", width = 190, opens = true, onClick = C.Edit })
+  edit.fgId = "cursor-set-edit"
+  view.stack:Add(edit, { height = 26, width = 190, gap = 8 })
+
+  -- The page of the ring has room for everything, the card keeps the rest behind "More settings".
+  local more = opts and opts.page and view or W.Accordion(view, { id = view.id or "cursor.main" })
+  choice(more, "cursor.set.strata", listOf(CU.STRATA, "cursor.strata."), function()
+    return C.Config().strata
+  end, function(v)
+    Store.set("settings.cursorRing.strata", v)
+  end)
+  choice(more, "cursor.set.mouselook", listOf(CU.MOUSELOOK, "cursor.mouselook."), function()
+    return C.Config().mouselook
+  end, function(v)
+    Store.set("settings.cursorRing.mouselook", v)
+  end)
+  ns.AddHeading(more, "cursor.set.load", { role = "ui", gap = 4 })
+  local load = keep(Controls.LoadPanel(more.content, {
+    get = function()
+      return C.Config().load
+    end,
+    set = function(value)
+      Store.set("settings.cursorRing.load", value)
+    end,
+    onResize = function()
+      if type(view.Layout) == "function" then
+        view:Layout()
+      end
+    end,
+  }))
+  load.fgId = "cursor-set-load"
+  more.stack:Add(load, { gap = 10 })
+  -- The game's own swing bars double the swing timer element: say so where the ring is set up.
+  local timers = ns.CursorTimers
+  if type(timers) == "table" and type(timers.SwingHint) == "function" and timers.SwingHint() ~= nil then
+    ns.AddParagraph(more, "cursor.timers.swingNative", { role = "micro", color = "textMuted" })
+  end
+  local buttons = ns.LayoutSet.BuildButtons(more.content, C.LayoutSet)
+  buttons.fgId = "cursor-set-layoutButtons"
+  more.stack:Add(buttons, { height = ns.LayoutSet.BUTTONS_H, width = ns.LayoutSet.BUTTONS_W, gap = 8 })
+  local reset = W.Button(more.content, { key = "cursor.set.reset", width = 240, onClick = C.ResetOptions })
+  reset.fgId = "cursor-set-reset"
+  more.stack:Add(reset, { height = 26, width = 240, gap = 16 })
+  addCharacter(more)
 end
 
 ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
@@ -316,4 +320,4 @@ ns.On("FG_SETTING_CHANGED", function(_, path, _, scope)
   end
 end)
 
-ns.SettingsPage.Add(S.Add, "general")
+ns.SettingsPage.Add(S.Add, "general", "cursor.main")

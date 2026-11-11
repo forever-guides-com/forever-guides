@@ -1,233 +1,27 @@
--- Steps and texts of the setup wizard. Controls name their Store key; a control whose key has
--- no default yet (a module not built yet) is left out by the logic, so steps can be added early.
+-- Steps of the setup wizard. A step names its controls (Store keys or feature rows); the feature steps are built
+-- from the registry in Modules/SetupFeatureData.lua (one block "features" per step, see SetupWizardRows.lua).
+-- The texts of all steps are in Modules/SetupWizardLocale.lua, the step "menu" registers itself in
+-- Modules/SetupWizardMenu.lua. A control whose key has no default (a module that is not there) is left out by the
+-- logic, a step without a usable control is skipped.
+--
+--   start  look  access  display  world  helpers  chat  party  social  sharing  menu  menu2  done
+-- Every step has to fit the one window height with all its options shown (see Modules/SetupWizard.lua):
+-- a topic that grows past that gets a step of its own.
 local _, ns = ...
-local SW, Theme = ns.SetupWizard, ns.Theme
+local SW, Theme, FL = ns.SetupWizard, ns.Theme, ns.SetupFeatureLogic
 
-ns.AddLocale("enUS", {
-  ["setup.title"] = "Setup",
-  ["setup.start"] = "Start setup",
-  ["setup.notice"] = "New: setup with /fg setup",
-  ["setup.noticeNew"] = "New setup steps: /fg setup new",
-  ["setup.nothingNew"] = "No new steps.",
-  ["setup.escapeHint"] = "Controls blocked? Type /fg setup close in chat",
-  ["setup.progress"] = "Step %d of %d",
-  ["setup.back"] = "Back",
-  ["setup.next"] = "Next",
-  ["setup.finish"] = "Done",
-  ["setup.skip"] = "Skip",
-  ["setup.close"] = "Close",
-  ["setup.resetAll"] = "Reset all",
-  ["setup.skipTitle"] = "Skip setup",
-  ["setup.skipText"] = "Apply defaults and close?",
-  ["setup.cancelTitle"] = "Cancel setup",
-  ["setup.cancelText"] = "Cancel setup? Your changes stay.",
-  ["setup.resetTitle"] = "Reset all",
-  ["setup.resetText"] = "Set all options to default? Sharing is switched off.",
-  ["setup.copy"] = "Copy",
-  ["setup.open"] = "Open",
-  ["setup.info.tutorials"] = "Tutorials: page in the left navigation (group Addon)",
-  ["setup.info.help"] = "Help & feedback: page in the left navigation, report errors there too",
-  ["setup.changed"] = "You changed:",
-  ["setup.noChanges"] = "No changes, defaults active.",
-  ["setup.changeWhere"] = "Change later: Settings, tab in brackets.",
-  ["setup.step.look"] = "Language and look",
-  ["setup.step.look.text"] = "A few quick settings. Changes apply right away.\nSkip any time.",
-  ["setup.alphaLow"] = "Very transparent, text can be hard to read.",
-  ["setup.step.addons"] = "Optional add-ons",
-  ["setup.step.addons.text"] = "For all characters. Per character: Settings > Addons.",
-  ["setup.step.windows"] = "Windows",
-  ["setup.step.windows.text"] = "Game windows, addon and messages.",
-  ["setup.step.invitations"] = "Invites",
-  ["setup.step.invitations.text"] = "Who you invite and who may invite you.",
-  ["setup.step.sharing"] = "Share with others",
-  ["setup.step.sharing.text"] = "Everything here is off until you switch it on.",
-  ["setup.sharing.privacy"] = "Where the data goes, how to withdraw.",
-  ["setup.sharing.more"] = "More info",
-  ["setup.sharing.all.text"] = "More audiences and all functions.",
-  ["setup.sharing.all"] = "All settings",
-  ["setup.ctl.inviteGroup"] = "Group invite by whisper",
-  ["setup.ctl.inviteWords"] = "Keywords for the group invite",
-  ["setup.ctl.inviteWordsHint"] = "Default: only friends may ask (Settings).",
-  ["setup.ctl.inviteWordsExample"] = "inv, invite",
-  ["setup.ctl.inviteWordsUsed"] = "Used: %s",
-  ["setup.ctl.inviteWordsNone"] = "No keyword: the whisper invite stays off.",
-  ["setup.ctl.inviteWordsOff"] = "none",
-  ["setup.ctl.inviteGuild"] = "Guild invite by whisper",
-  ["setup.ctl.inviteGuildWords"] = "Keywords for the guild invite",
-  ["setup.ctl.acceptFriends"] = "Friends may invite me",
-  ["setup.ctl.acceptGuild"] = "Guild members may invite me",
-  ["setup.ctl.acceptGuildHint"] = "Friends and guild are accepted at once, never while queued.",
-  ["setup.step.map"] = "Map and waypoints",
-  ["setup.step.map.text"] = "World map, gathering spots and waypoint arrow.",
-  ["setup.step.loot"] = "Loot and selling",
-  ["setup.step.loot.text"] = "Boss loot recording, selling and repair.",
-  ["setup.step.comfort"] = "Convenience",
-  ["setup.step.comfort.text"] = "Helpers stay off until you switch them on.",
-  ["setup.step.controls"] = "Controls",
-  ["setup.step.controls.text"] = "Buttons, text size and key combinations.",
-  ["setup.ctl.sparklesHint"] = "Sets game graphics, off puts them back (restart ends it).",
-  ["setup.ctl.sellNote"] = "Selling every white, green, blue or epic item: Settings.",
-  ["setup.ctl.contrastHint"] = "Black background, white text.",
-  ["setup.ctl.motionHint"] = "Fewer fades and moving effects.",
-  ["setup.ctl.keysOpen"] = "Key combinations for mouse actions",
-  ["setup.ctl.keysOpenHint"] = "Opens: Settings, General, Key combinations.",
-  ["setup.ctl.mapReveal"] = "Show all map areas in color",
-  ["setup.ctl.mapRevealHint"] = "Off: only explored areas, the rest dark.",
-  ["setup.ctl.dungeonMap"] = "Dungeon map on M inside instances",
-  ["setup.ctl.dungeonMapHint"] = "A panel in the world map, a button switches back.",
-  ["setup.ctl.autoRepair"] = "Repair at the merchant",
-  ["setup.ctl.autoRepairHint"] = "Repairs when it opens, with enough gold.",
-  ["setup.ctl.autoSummon"] = "Accept summons",
-  ["setup.ctl.autoSummonHint"] = "Known players only, never in combat.",
-  ["setup.ctl.autoResurrect"] = "Accept resurrections",
-  ["setup.ctl.autoResurrectHint"] = "Group, guild and friends only.",
-  ["setup.ctl.stopKeyHint"] = "Hold it: no helper acts.",
-  ["setup.ctl.autoQuest"] = "Accept and turn in quests",
-  ["setup.ctl.autoQuestHint"] = "Without reward choice. The stop key pauses it.",
-  ["setup.ctl.autoRelease"] = "Release in battlegrounds",
-  ["setup.ctl.autoReleaseHint"] = "Battlegrounds only, not with a soulstone.",
-  ["setup.ctl.hideErrors"] = "Hide red error messages",
-  ["setup.ctl.hideErrorsHint"] = "Chat stays. Warnings like bag full stay.",
-  ["setup.ctl.lootEnabled"] = "Record boss loot",
-  ["setup.ctl.lootEnabledHint"] = "Improves the data. Stays on your PC, no names.",
-  ["setup.ctl.sellGray"] = "Sell gray items",
-  ["setup.ctl.sellGrayHint"] = "A Junk button at the merchant sells them.",
-  ["setup.ctl.buttonLabels"] = "Show text on icon buttons",
-  ["setup.ctl.buttonLabelsHint"] = "Icon buttons get a short label.",
-  ["setup.step.done"] = "All set",
-  ["setup.step.done.text"] = "Later: /fg setup or Settings > Setup",
-  ["setup.ctl.frameTweaks"] = "Move game windows",
-  ["setup.ctl.frameTweaksHint"] = "Drag by the title bar, reset on the page Windows.",
-  ["setup.ctl.frameMore"] = "More options",
-  ["setup.ctl.hideTalkingHead"] = "Show Talking Head",
-  ["setup.ctl.hideTalkingHeadHint"] = "Off hides the NPC speech window.",
-  ["setup.ctl.arrow"] = "Show arrow",
-  ["setup.ctl.arrowTitle"] = "Arrow: show destination",
-  ["setup.ctl.arrowBackground"] = "Arrow: background",
-})
-ns.AddLocale("deDE", {
-  ["setup.title"] = "Einrichtung",
-  ["setup.start"] = "Einrichtung starten",
-  ["setup.notice"] = "Neu: Einrichtung mit /fg setup",
-  ["setup.noticeNew"] = "Neue Einrichtungsschritte: /fg setup neu",
-  ["setup.nothingNew"] = "Keine neuen Schritte.",
-  ["setup.escapeHint"] = "Bedienung blockiert? Tippe /fg setup close im Chat",
-  ["setup.progress"] = "Schritt %d von %d",
-  ["setup.back"] = "Zurück",
-  ["setup.next"] = "Weiter",
-  ["setup.finish"] = "Fertig",
-  ["setup.skip"] = "Überspringen",
-  ["setup.close"] = "Schließen",
-  ["setup.resetAll"] = "Alles auf Standard",
-  ["setup.skipTitle"] = "Einrichtung überspringen",
-  ["setup.skipText"] = "Standardwerte übernehmen und schließen?",
-  ["setup.cancelTitle"] = "Einrichtung abbrechen",
-  ["setup.cancelText"] = "Einrichtung abbrechen? Änderungen bleiben.",
-  ["setup.resetTitle"] = "Alles auf Standard",
-  ["setup.resetText"] = "Alle Optionen auf Standard? Teilen wird ausgeschaltet.",
-  ["setup.copy"] = "Kopieren",
-  ["setup.open"] = "Öffnen",
-  ["setup.info.tutorials"] = "Tutorials: Seite in der Navigation links (Gruppe Addon)",
-  ["setup.info.help"] = "Hilfe & Feedback: Seite in der Navigation links, dort auch Fehler melden",
-  ["setup.changed"] = "Du hast geändert:",
-  ["setup.noChanges"] = "Keine Änderungen, Standardwerte aktiv.",
-  ["setup.changeWhere"] = "Später ändern: Einstellungen, Reiter in Klammern.",
-  ["setup.step.look"] = "Sprache und Aussehen",
-  ["setup.step.look.text"] = "Ein paar schnelle Einstellungen. Änderungen wirken sofort.\nJederzeit überspringbar.",
-  ["setup.alphaLow"] = "Sehr durchsichtig, Text kann schwer lesbar sein.",
-  ["setup.step.addons"] = "Optionale Addons",
-  ["setup.step.addons.text"] = "Für alle Charaktere. Pro Charakter: Einstellungen > Addons.",
-  ["setup.step.windows"] = "Fenster",
-  ["setup.step.windows.text"] = "Spielfenster, Addon und Meldungen.",
-  ["setup.step.invitations"] = "Einladungen",
-  ["setup.step.invitations.text"] = "Wen du einlädst und wer dich einladen darf.",
-  ["setup.step.sharing"] = "Mit anderen teilen",
-  ["setup.step.sharing.text"] = "Alles hier ist aus, bis du es einschaltest.",
-  ["setup.sharing.privacy"] = "Wohin die Daten gehen, wie du widerrufst.",
-  ["setup.sharing.more"] = "Mehr dazu",
-  ["setup.sharing.all.text"] = "Weitere Zielgruppen und alle Funktionen.",
-  ["setup.sharing.all"] = "Alle Einstellungen",
-  ["setup.ctl.inviteGroup"] = "Gruppe per Flüstern einladen",
-  ["setup.ctl.inviteWords"] = "Stichwörter für die Gruppeneinladung",
-  ["setup.ctl.inviteWordsHint"] = "Standard: nur Freunde dürfen fragen (Einstellungen).",
-  ["setup.ctl.inviteWordsExample"] = "inv, invite",
-  ["setup.ctl.inviteWordsUsed"] = "Gilt: %s",
-  ["setup.ctl.inviteWordsNone"] = "Kein Stichwort: Einladung per Flüstern bleibt aus.",
-  ["setup.ctl.inviteWordsOff"] = "keine",
-  ["setup.ctl.inviteGuild"] = "Gilde per Flüstern einladen",
-  ["setup.ctl.inviteGuildWords"] = "Stichwörter für die Gildeneinladung",
-  ["setup.ctl.acceptFriends"] = "Freunde dürfen mich einladen",
-  ["setup.ctl.acceptGuild"] = "Gildenmitglieder dürfen mich einladen",
-  ["setup.ctl.acceptGuildHint"] = "Freunde und Gilde sofort angenommen, nie in Warteschlangen.",
-  ["setup.step.map"] = "Karte und Wegpunkte",
-  ["setup.step.map.text"] = "Weltkarte, Sammelpunkte und Wegpunkt-Pfeil.",
-  ["setup.step.loot"] = "Beute und Verkaufen",
-  ["setup.step.loot.text"] = "Beute der Bosse, Verkaufen und Reparieren.",
-  ["setup.step.comfort"] = "Komfort",
-  ["setup.step.comfort.text"] = "Helfer bleiben aus, bis du sie einschaltest.",
-  ["setup.step.controls"] = "Bedienung",
-  ["setup.step.controls.text"] = "Knöpfe, Schriftgröße und Tastenkombinationen.",
-  ["setup.ctl.sparklesHint"] = "Setzt Spiel-Grafik, Aus stellt sie zurück (mit Neustart).",
-  ["setup.ctl.sellNote"] = "Alles Weiß, Grün, Blau, Episch verkaufen: Einstellungen.",
-  ["setup.ctl.contrastHint"] = "Schwarzer Grund, weiße Schrift.",
-  ["setup.ctl.motionHint"] = "Weniger Überblendungen und Bewegung.",
-  ["setup.ctl.keysOpen"] = "Tastenkombinationen für Mausaktionen",
-  ["setup.ctl.keysOpenHint"] = "Öffnet: Einstellungen, Allgemein, Tastenkombinationen.",
-  ["setup.ctl.mapReveal"] = "Alle Kartengebiete in Farbe zeigen",
-  ["setup.ctl.mapRevealHint"] = "Aus: nur erkundete Gebiete, der Rest dunkel.",
-  ["setup.ctl.dungeonMap"] = "In Instanzen bei M die Dungeonkarte zeigen",
-  ["setup.ctl.dungeonMapHint"] = "Ein Feld in der Weltkarte, ein Knopf schaltet zurück.",
-  ["setup.ctl.autoRepair"] = "Beim Händler reparieren",
-  ["setup.ctl.autoRepairHint"] = "Repariert beim Öffnen, nur mit genug Gold.",
-  ["setup.ctl.autoSummon"] = "Beschwörungen annehmen",
-  ["setup.ctl.autoSummonHint"] = "Nur bekannte Spieler, nie im Kampf.",
-  ["setup.ctl.autoResurrect"] = "Wiederbelebung annehmen",
-  ["setup.ctl.autoResurrectHint"] = "Nur Gruppe, Gilde und Freunde.",
-  ["setup.ctl.stopKeyHint"] = "Gedrückt halten: kein Helfer handelt.",
-  ["setup.ctl.autoQuest"] = "Quests annehmen und abgeben",
-  ["setup.ctl.autoQuestHint"] = "Ohne Belohnungswahl. Die Stopp-Taste hält an.",
-  ["setup.ctl.autoRelease"] = "Im Schlachtfeld freilassen",
-  ["setup.ctl.autoReleaseHint"] = "Nur Schlachtfelder, nicht mit Seelenstein.",
-  ["setup.ctl.hideErrors"] = "Rote Fehlermeldungen ausblenden",
-  ["setup.ctl.hideErrorsHint"] = "Chat bleibt. Warnungen wie Tasche voll bleiben.",
-  ["setup.ctl.lootEnabled"] = "Beute der Bosse erfassen",
-  ["setup.ctl.lootEnabledHint"] = "Verbessert die Daten. Nur lokal, keine Namen.",
-  ["setup.ctl.sellGray"] = "Graue Items verkaufen",
-  ["setup.ctl.sellGrayHint"] = "Ein Plunder-Knopf beim Händler verkauft sie.",
-  ["setup.ctl.buttonLabels"] = "Beschriftung an Symbolknöpfen anzeigen",
-  ["setup.ctl.buttonLabelsHint"] = "Symbolknöpfe bekommen einen kurzen Text.",
-  ["setup.step.done"] = "Fertig",
-  ["setup.step.done.text"] = "Später: /fg setup oder Einstellungen > Einrichtung",
-  ["setup.ctl.frameTweaks"] = "Spielfenster verschiebbar",
-  ["setup.ctl.frameTweaksHint"] = "Am Titel ziehen, zurücksetzen auf der Seite Fenster.",
-  ["setup.ctl.frameMore"] = "Mehr Optionen",
-  ["setup.ctl.hideTalkingHead"] = "Talking Head anzeigen",
-  ["setup.ctl.hideTalkingHeadHint"] = "Aus blendet das NPC-Sprechfenster aus.",
-  ["setup.ctl.arrow"] = "Pfeil anzeigen",
-  ["setup.ctl.arrowTitle"] = "Pfeil: Ziel anzeigen",
-  ["setup.ctl.arrowBackground"] = "Pfeil: Hintergrund",
-})
+-- The version that brings the steps of this layout. look, sharing and done keep their own: a player who saw
+-- them before does not see them again (SW.Baseline).
+local RELEASE = "0.7.0"
+-- Order of the steps. The steps "menu" and "menu2" sit between sharing and done (Modules/SetupWizardMenu.lua).
+local ORDER = { start = 5, look = 10, access = 15, display = 20, world = 30, helpers = 40, chat = 50, party = 60 }
+ORDER.social, ORDER.sharing, ORDER.done = 65, 75, 80
 
-local function toggle(key, labelKey, extra)
-  local c = { type = "toggle", key = key, labelKey = labelKey }
-  for k, v in pairs(extra or {}) do
-    c[k] = v
-  end
-  return c
-end
+-- Every action row of a step has no setting. Its control only needs a key that exists in the defaults.
+local ACTION_KEY = "setup.done"
 
 local function percent(v)
   return string.format("%d %%", math.floor(v * 100 + 0.5))
-end
-
--- Optional module hook: the Store change already reaches listeners of FG_SETTING_CHANGED.
-local function applyModule(name)
-  return function()
-    local module = ns[name]
-    if type(module) == "table" and type(module.Apply) == "function" then
-      module.Apply()
-    end
-  end
 end
 
 -- The same repaint as the accessibility settings.
@@ -249,17 +43,23 @@ for _, id in ipairs(Theme.PRESET_ORDER) do
   themes[#themes + 1] = { value = id, key = "settings.theme." .. id }
 end
 
-local SINCE = "0.1.0"
+local function toggle(key, labelKey, extra)
+  local c = { type = "toggle", key = key, labelKey = labelKey }
+  for k, v in pairs(extra or {}) do
+    c[k] = v
+  end
+  return c
+end
 
--- extra.tab: the Settings tab of the step's controls, named in the summary; a control with its own
--- tab (or tab = false for none) overrides it.
-local function step(id, order, controls, extra)
+-- extra.tab: the settings feature of the step's controls, named in the summary; a control with its own tab
+-- (or tab = false for none) overrides it.
+local function step(id, controls, extra)
   local def = {
     id = id,
-    order = order,
+    order = ORDER[id],
     titleKey = "setup.step." .. id,
     textKey = "setup.step." .. id .. ".text",
-    since = SINCE,
+    since = RELEASE,
     controls = controls,
   }
   for k, v in pairs(extra or {}) do
@@ -273,127 +73,146 @@ local function step(id, order, controls, extra)
   SW.RegisterStep(def)
 end
 
--- A line of text without a setting. The key only has to exist in the defaults, nothing is stored.
-local function note(key, textKey)
-  return {
-    type = "custom",
-    key = key,
-    labelKey = textKey,
-    action = true,
-    build = function(view)
-      local text = ns.W.Text(view.content, { key = textKey, role = "micro", color = "textMuted", wrap = true })
-      view.stack:Add(text, { gap = 8 })
-      return text
-    end,
-  }
+-- An action row of the step: build(view) adds its widgets to view.stack. Nothing is stored.
+local function action(build)
+  return { type = "custom", key = ACTION_KEY, action = true, build = build }
 end
 
--- Text, a hint and a button that opens a tab of the Settings. Nothing is stored.
-local function settingsLink(key, labelKey, hintKey, tab)
-  return {
-    type = "custom",
-    key = key,
-    labelKey = labelKey,
-    action = true,
-    build = function(view)
-      local W = ns.W
-      local width = math.floor(180 * math.max(1, tonumber(ns.db.settings.fontScale) or 1) + 0.5)
-      view.stack:Add(
-        W.Text(view.content, { key = labelKey, role = "ui", color = "textSecondary", wrap = true }),
-        { gap = 2 }
-      )
-      view.stack:Add(
-        W.Text(view.content, { key = hintKey, role = "micro", color = "textMuted", wrap = true }),
-        { gap = 4 }
-      )
-      local button = W.Action(view.content, {
-        label = "act.open",
-        icon = "open",
-        tooltip = labelKey,
-        width = width,
+-- Opens a card of the settings next to the wizard, which stays open.
+local function openSettings(feature, card)
+  if ns.SettingsPage.Select(feature, card) then
+    ns.Main.Show("settings")
+    ns.SetupWizardUI.Reveal()
+  end
+end
+
+-- One line of buttons, each named after an area of the settings and opening its card (with the new-window mark).
+-- areas: { { nameKey, feature, card }, .. }
+local BUTTON_W, BUTTON_GAP, BUTTON_H = 170, 8, 26
+
+local function areaButtons(id, areas)
+  return action(function(view)
+    local holder = CreateFrame("Frame", nil, view.content)
+    holder.fgId = "wizard-areas-" .. id
+    holder.buttons = {}
+    local factor = ns.SetupWizardRows.Factor()
+    for i, area in ipairs(areas) do
+      local button = ns.W.Button(holder, {
+        key = area[1],
+        width = math.floor(BUTTON_W * factor + 0.5),
+        tooltip = area[1],
+        tooltipText = "setup.row.optionsTip",
         opens = true,
         onClick = function()
-          ns.SettingsPage.Select(tab)
-          ns.Main.Show("settings")
+          openSettings(area[2], area[3])
         end,
       })
-      view.stack:Add(button, { height = 26, width = width, gap = 8 })
-      return button
-    end,
-  }
-end
-
--- The keyword field of a whisper invite: what is typed is stored cleaned by IL.ParseWords (at most
--- 8 words, 20 letters each), the field shows it that way once it loses the focus.
-local function cleanWords(text)
-  local IL = ns.InviteLogic
-  return IL.JoinWords(IL.ParseWords(text))
-end
-
-local function inviteWords(key, labelKey, withHint)
-  local path = "settings." .. key
-  return {
-    type = "custom",
-    key = path,
-    labelKey = labelKey,
-    format = function(v)
-      return v == "" and ns.L["setup.ctl.inviteWordsOff"] or v
-    end,
-    build = function(view)
-      local W, IL = ns.W, ns.InviteLogic
-      view.stack:Add(W.Text(view.content, { key = labelKey, role = "ui", color = "textSecondary" }), { gap = 4 })
-      local box
-      box = W.EditBox(view.content, {
-        placeholder = "setup.ctl.inviteWordsExample",
-        onChange = function(text)
-          ns.Store.set(path, cleanWords(text))
-        end,
-        onEnter = function(text)
-          ns.Store.set(path, cleanWords(text))
-          box.edit:SetText(cleanWords(text))
-        end,
-      })
-      box.edit:SetMaxLetters(IL.MAX_WORDS * (IL.MAX_WORD + 2))
-      box.fgId = "setup-" .. key
-      view.stack:Add(box, { height = 26, width = 320, gap = 4 })
-      local status = W.Text(view.content, { role = "micro", wrap = true })
-      local function paint()
-        local words = ns.Store.get(path)
-        local used = type(words) == "string" and words or ""
-        W.SetColor(status, used == "" and "warning" or "textMuted")
-        status:SetText(
-          used == "" and ns.L["setup.ctl.inviteWordsNone"] or string.format(ns.L["setup.ctl.inviteWordsUsed"], used)
-        )
-      end
-      ns.Bind(status, paint)
-      view.stack:Add(status, { gap = 2 })
-      if withHint then
-        view.stack:Add(
-          W.Text(view.content, { key = "setup.ctl.inviteWordsHint", role = "micro", color = "textMuted", wrap = true }),
-          { gap = 8 }
-        )
-      end
-      function box:Refresh()
-        if not self.edit:HasFocus() then
-          self.edit:SetText(ns.Store.get(path) or "")
+      button.fgId = "wizard-areas-" .. id .. "-button" .. i
+      holder.buttons[i] = button
+    end
+    function holder:fgGridLayout(width)
+      local x, y, h = 0, 0, 0
+      for _, button in ipairs(self.buttons) do
+        local w = math.ceil(button:GetWidth())
+        if x > 0 and x + w > width then
+          x, y = 0, y + h + BUTTON_GAP
         end
-        paint()
+        button:ClearAllPoints()
+        button:SetPoint("TOPLEFT", x, -y)
+        h = math.max(h, BUTTON_H)
+        x = x + w + BUTTON_GAP
       end
-      box.edit:HookScript("OnEditFocusLost", function()
-        box.edit:SetText(ns.Store.get(path) or "")
-      end)
-      box:Refresh()
-      return box
-    end,
-  }
+      self:SetHeight(y + h)
+      return y + h
+    end
+    view.stack:Add(holder, { gap = 10 })
+    return holder
+  end)
 end
 
--- Language first: the welcome text, the logo and the website link open the wizard.
-step("look", 10, {
+-- The three lines of the first step: what the switch, the button "Options" and the pencil of the menu do.
+local HOW_TO =
+  { { "setup.start.how1", "check" }, { "setup.start.how2", "gear" }, { "setup.start.how3", "pencil", "text" } }
+local HOW_ICON = 16
+
+local function howTo()
+  return action(function(view)
+    local W = ns.W
+    local holder = CreateFrame("Frame", nil, view.content)
+    local lines = {}
+    for i, entry in ipairs(HOW_TO) do
+      local line = {}
+      line.icon = holder:CreateTexture(nil, "ARTWORK")
+      line.icon:SetSize(HOW_ICON, HOW_ICON)
+      line.icon:SetTexture(ns.UI_ICONS[entry[2]])
+      line.text = W.Text(holder, { key = entry[1], role = "ui", color = entry[3] or "textSecondary", wrap = true })
+      lines[i] = line
+    end
+    function holder:fgGridLayout(width)
+      local y = 0
+      local indent = math.floor(HOW_ICON * 1.5)
+      for _, line in ipairs(lines) do
+        line.icon:ClearAllPoints()
+        line.icon:SetPoint("TOPLEFT", 0, -(y + 2))
+        line.text:ClearAllPoints()
+        line.text:SetPoint("TOPLEFT", indent, -y)
+        line.text:SetWidth(math.max(40, width - indent))
+        y = y + math.max(HOW_ICON + 4, line.text:GetStringHeight()) + 4
+      end
+      self:SetHeight(y)
+      return y
+    end
+    view.stack:Add(holder, { gap = 8 })
+    return holder
+  end)
+end
+
+-- The controls of the feature rows of a step: the switch of each row and its options, for the summary and
+-- "Reset all". The window draws the rows through the block "features", not through the block "controls".
+local function featureControls(stepId)
+  local controls = {}
+  for _, def in ipairs(FL.Rows(stepId)) do
+    local c = FL.Control(def.id)
+    if c then
+      if c.tab == nil then
+        c.tab = false
+      end
+      controls[#controls + 1] = c
+    end
+    for _, option in ipairs(FL.Options(def.id)) do
+      if option.control then
+        controls[#controls + 1] = option.control
+      else
+        -- A list of key words: shown as its text in the summary, drawn by the row.
+        controls[#controls + 1] = {
+          type = "custom",
+          key = option.key,
+          labelKey = option.labelKey,
+          owner = def.id,
+          tab = def.target.feature,
+          format = function(v)
+            return v == "" and ns.L["setup.ctl.inviteWordsOff"] or v
+          end,
+          build = function() end,
+        }
+      end
+    end
+  end
+  return controls
+end
+
+local function featureStep(id)
+  step(id, featureControls(id), { layout = { "title", "text", "features" } })
+end
+
+-- 1: start ---------------------------------------------------------------------------------------------
+
+step("start", {
   {
     type = "dropdown",
     key = "settings.locale",
     labelKey = "settings.languageLabel",
+    tab = "language",
     options = {
       { value = "auto", key = "settings.lang.auto" },
       { value = "deDE", text = "Deutsch" },
@@ -401,11 +220,16 @@ step("look", 10, {
     },
     apply = applyLocale,
   },
+  howTo(),
+}, { layout = { "logo", "title", "text", "controls", "links" } })
+
+-- 2: look and windows ------------------------------------------------------------------------------------
+
+local lookControls = {
   {
     type = "dropdown",
     key = "settings.skin",
     labelKey = "settings.skin",
-    hintKey = "settings.skinHint",
     options = ns.Appearance.SkinOptions(),
     apply = function(value)
       ns.Appearance.SetSkin(value)
@@ -448,34 +272,18 @@ step("look", 10, {
       ns.Main.SetScale(value)
     end,
   },
-}, { layout = { "logo", "title", "text", "links", "controls" } })
+  areaButtons("look", { { "settings.feature.window", "window", "window.look" } }),
+}
+step("look", lookControls, { since = "0.1.0", tab = "window", layout = { "title", "text", "controls" } })
 
--- One switch per optional add-on of the manifest: the wizard sets the default for all characters, the
--- override of a single character lives in the Settings tab.
-local addonSwitches = {}
-for _, entry in ipairs(ns.SubAddons.List()) do
-  addonSwitches[#addonSwitches + 1] = toggle("settings.subaddons." .. entry.id, entry.titleKey, {
-    hintKey = entry.descKey,
-    apply = function(value)
-      ns.SubAddons.SetEnabled(entry.id, value, "account")
-    end,
-  })
-end
-step("addons", 15, addonSwitches, { tab = "addons", since = "0.1.4" })
+-- 3: readability and the two window rows --------------------------------------------------------------
 
--- Appears once the key has a default (the icon button labels are built separately).
-step("controls", 20, {
-  toggle("settings.buttonLabels", "setup.ctl.buttonLabels", {
-    hintKey = "setup.ctl.buttonLabelsHint",
-    tab = false,
-    apply = function()
-      ns.RefreshUI()
-    end,
-  }),
+local accessControls = {
   {
     type = "slider",
     key = "settings.fontScale",
     labelKey = "settings.fontScale",
+    tab = "fonts",
     min = Theme.FONT_SCALE_MIN,
     max = Theme.FONT_SCALE_MAX,
     step = 0.05,
@@ -483,110 +291,25 @@ step("controls", 20, {
     applyOn = "release",
     apply = restyle,
   },
-  toggle("settings.contrast", "settings.contrast", { hintKey = "setup.ctl.contrastHint", apply = restyle }),
-  toggle("settings.colorblind", "settings.colorblind", { hintKey = "settings.colorblindHint", apply = restyle }),
-  toggle("settings.reduceMotion", "settings.reduceMotion", { hintKey = "setup.ctl.motionHint" }),
-  settingsLink("settings.modKeys", "setup.ctl.keysOpen", "setup.ctl.keysOpenHint", "general"),
-}, { tab = "window" })
+  toggle("settings.contrast", "settings.contrast", { tab = "access", apply = restyle }),
+  toggle("settings.colorblind", "settings.colorblind", { tab = "access", apply = restyle }),
+  areaButtons("access", { { "settings.feature.access", "access" } }),
+}
+for _, c in ipairs(featureControls("access")) do
+  accessControls[#accessControls + 1] = c
+end
+step("access", accessControls, { tab = "access", layout = { "title", "text", "controls", "features" } })
 
-step("windows", 30, {
-  toggle("settings.frameTweaks", "setup.ctl.frameTweaks", {
-    hintKey = "setup.ctl.frameTweaksHint",
-    apply = applyModule("FrameTweaks"),
-  }),
-  {
-    -- A link to the page "Windows". The key only has to exist in the defaults, nothing is stored.
-    type = "custom",
-    key = "settings.frameBarHover",
-    labelKey = "setup.ctl.frameMore",
-    build = function(view)
-      local button = ns.W.Action(view.content, {
-        label = "act.options",
-        icon = "gear",
-        tooltip = "setup.ctl.frameMore",
-        width = 180,
-        opens = true,
-        onClick = function()
-          ns.Main.Show("windows")
-        end,
-      })
-      view.stack:Add(button, { height = 26, width = 180, gap = 8 })
-      return button
-    end,
-  },
-  toggle("settings.combatHide", "settings.combatHide"),
-  toggle("settings.hideTalkingHead", "setup.ctl.hideTalkingHead", {
-    hintKey = "setup.ctl.hideTalkingHeadHint",
-    invert = true,
-    apply = applyModule("TalkingHead"),
-  }),
-  toggle("settings.minimap.hide", "settings.minimap", {
-    invert = true,
-    apply = function()
-      ns.MinimapButton.Apply()
-    end,
-  }),
-  toggle("settings.hideErrors", "setup.ctl.hideErrors", { hintKey = "setup.ctl.hideErrorsHint", tab = "automation" }),
-})
+-- The feature steps ------------------------------------------------------------------------------
 
-step("map", 40, {
-  toggle("settings.sparkles.enabled", "sparkles.set.enabled", { hintKey = "setup.ctl.sparklesHint" }),
-  -- The map image mode lives on the Map page, not in the Settings tabs.
-  toggle("settings.mapReveal", "setup.ctl.mapReveal", { hintKey = "setup.ctl.mapRevealHint", tab = false }),
-  toggle("settings.dungeonWorldMap", "setup.ctl.dungeonMap", {
-    hintKey = "setup.ctl.dungeonMapHint",
-    apply = applyModule("DungeonWorldMap"),
-  }),
-  -- The arrow and its title and background are set on the arrow itself, not in the Settings tabs.
-  toggle("waypoints.settings.arrow", "setup.ctl.arrow", {
-    tab = false,
-    apply = function(value)
-      ns.Waypoints.SetSetting("arrow", value)
-    end,
-  }),
-  toggle("settings.waypointWindowTitle", "setup.ctl.arrowTitle", { tab = false }),
-  toggle("settings.waypointWindowBackground", "setup.ctl.arrowBackground", { tab = false }),
-}, { tab = "map" })
+for _, id in ipairs({ "display", "world", "helpers", "chat", "party", "social" }) do
+  featureStep(id)
+end
 
-step("loot", 50, {
-  toggle("settings.lootEnabled", "setup.ctl.lootEnabled", { hintKey = "setup.ctl.lootEnabledHint" }),
-  toggle("settings.sellGray", "setup.ctl.sellGray", { hintKey = "setup.ctl.sellGrayHint", tab = "sell" }),
-  toggle("settings.autoRepair", "setup.ctl.autoRepair", { hintKey = "setup.ctl.autoRepairHint", tab = "automation" }),
-  toggle("settings.durabilityWarn", "dur.set.warn", { hintKey = "dur.set.warnTip" }),
-  note("settings.sellWhiteAll", "setup.ctl.sellNote"),
-}, { tab = "bags" })
+-- 8: sharing ---------------------------------------------------------------------------------------------
 
--- Everything below is off by default and only acts on the player's own switch.
-step("comfort", 60, {
-  toggle("settings.autoQuest", "setup.ctl.autoQuest", { hintKey = "setup.ctl.autoQuestHint" }),
-  toggle("settings.autoRelease", "setup.ctl.autoRelease", { hintKey = "setup.ctl.autoReleaseHint" }),
-  toggle("settings.autoSummon", "setup.ctl.autoSummon", { hintKey = "setup.ctl.autoSummonHint" }),
-  toggle("settings.autoResurrect", "setup.ctl.autoResurrect", { hintKey = "setup.ctl.autoResurrectHint" }),
-  {
-    type = "dropdown",
-    key = "settings.autoKey",
-    labelKey = "auto.set.key",
-    hintKey = "setup.ctl.stopKeyHint",
-    -- The same ids as AutoGuard.KEYS, which loads after this file.
-    options = {
-      { value = "shift", key = "auto.key.shift" },
-      { value = "alt", key = "auto.key.alt" },
-      { value = "ctrl", key = "auto.key.ctrl" },
-    },
-  },
-}, { tab = "automation" })
-
-step("invitations", 70, {
-  toggle("settings.inviteGroup", "setup.ctl.inviteGroup"),
-  inviteWords("inviteGroupWords", "setup.ctl.inviteWords", true),
-  toggle("settings.inviteGuild", "setup.ctl.inviteGuild"),
-  inviteWords("inviteGuildWords", "setup.ctl.inviteGuildWords"),
-  toggle("settings.autoSocialAcceptFriends", "setup.ctl.acceptFriends"),
-  toggle("settings.autoSocialAcceptGuild", "setup.ctl.acceptGuild", { hintKey = "setup.ctl.acceptGuildHint" }),
-})
-
--- Sharing: a row per function of the opt-in register that can show up (the first nine; the rest is in the
--- Settings tab), send and receive for its first audience. Nothing is on until the player switches it on.
+-- A row per function of the opt-in register that can show up (the first nine; the rest is in the settings
+-- tab), send and receive for its first audience. Nothing is on until the player switches it on.
 local MAX_SHARING = 9
 local sharing = {}
 for _, def in ipairs(ns.Consent and ns.Consent.List() or {}) do
@@ -601,11 +324,39 @@ for _, def in ipairs(ns.Consent and ns.Consent.List() or {}) do
     }
   end
 end
-step("sharing", 75, sharing, {
-  tab = "sharing",
+step("sharing", sharing, {
+  tab = "privacy",
   since = "0.5.0",
   layout = { "title", "text", "privacy", "bulk", "controls", "allSettings" },
 })
 
--- Closes every run: lists what was changed and where to change it later.
-step("done", 80, {}, { closing = true, layout = { "title", "summary", "info", "community", "text" } })
+-- 10: done -----------------------------------------------------------------------------------------------
+
+-- Closes every run: lists what was changed and where to change it later. The menu step lists its own changes.
+step("done", {
+  action(function(view)
+    return ns.SetupWizardRows.PencilLine(view)
+  end),
+  action(function(view)
+    local row = ns.SetupWizardRows.Row(view.content, {
+      id = "pencil",
+      nameKey = "setup.done.pencil",
+      button = {
+        key = "page.settings",
+        tooltip = "page.settings",
+        opens = true,
+        onClick = function()
+          ns.Main.Show("settings")
+          ns.SetupWizardUI.Reveal()
+        end,
+        width = 140,
+      },
+    })
+    view.stack:Add(row, { gap = 10 })
+    return row
+  end),
+}, {
+  closing = true,
+  since = "0.1.0",
+  layout = { "title", "summary", "controls", "restart", "info", "community", "text" },
+})

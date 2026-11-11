@@ -130,17 +130,35 @@ function C.SplitEntry(text)
   return nil, text
 end
 
+-- A link target of a row: "instances" is a page of the router, "settings:chatname.main" a feature or card of the
+-- settings. Returns the router path ("instances", "settings/chatname.main"), the kind ("page" or "settings") and
+-- the id; nil for anything else.
+function C.Target(go)
+  if type(go) ~= "string" then
+    return nil
+  end
+  local id = go:match("^settings:([%w%.]+)$")
+  if id then
+    return "settings/" .. id, "settings", id
+  end
+  if go:match("^[%w%-]+$") then
+    return go, "page", go
+  end
+  return nil
+end
+
 -- The highlights of one version as { { head, text } } in the language of the locale, at most MAX_HIGHLIGHTS; an
--- entry without a headline or without a sentence is left out.
+-- entry without a headline or without a sentence is left out. go is the link target of the row or nil.
 function C.Highlights(list, locale)
   local out = {}
   for _, entry in ipairs(type(list) == "table" and list or {}) do
     if #out >= C.MAX_HIGHLIGHTS then
       break
     end
-    local head, text = type(entry) == "table" and C.Text(entry.head, locale), type(entry) == "table" and C.Text(entry.text, locale)
+    local head, text =
+      type(entry) == "table" and C.Text(entry.head, locale), type(entry) == "table" and C.Text(entry.text, locale)
     if head and text then
-      out[#out + 1] = { head = head, text = text }
+      out[#out + 1] = { head = head, text = text, go = C.Target(entry.go) and entry.go or nil }
     end
   end
   return out
@@ -156,7 +174,7 @@ function C.Headline(highlights)
 end
 
 -- The versions of the table as { version, date, beta, highlights = { { head, text } }, headline, sections = { {
--- key, lines = { text } } }, count }, newest first, at most `limit` (default MAX_VERSIONS). count is the number
+-- key, lines = { text }, go = { [line number] = target } } }, count }, newest first, at most `limit` (default MAX_VERSIONS). count is the number
 -- of lines in the sections (the highlights do not count). A version without a single line is left out, so are
 -- broken entries. The table is not changed.
 function C.Build(data, locale, limit)
@@ -167,16 +185,18 @@ function C.Build(data, locale, limit)
   end
   for _, item in ipairs(versions) do
     if type(item) == "table" and C.Parse(item.version) then
-      local view = { version = item.version, date = C.Date(item.date, locale), beta = item.beta == true, sections = {}, count = 0 }
+      local view =
+        { version = item.version, date = C.Date(item.date, locale), beta = item.beta == true, sections = {}, count = 0 }
       view.highlights = C.Highlights(item.highlights, locale)
       view.headline = C.Headline(view.highlights)
       for _, key in ipairs(C.SECTIONS) do
-        local lines = {}
+        local lines, go = {}, {}
         for _, entry in ipairs(type(item[key]) == "table" and item[key] or {}) do
           lines[#lines + 1] = C.Text(entry, locale)
+          go[#lines] = type(entry) == "table" and C.Target(entry.go) and entry.go or nil
         end
         if #lines > 0 then
-          view.sections[#view.sections + 1] = { key = key, lines = lines }
+          view.sections[#view.sections + 1] = { key = key, lines = lines, go = go }
           view.count = view.count + #lines
         end
       end

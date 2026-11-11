@@ -6,7 +6,7 @@ if not chat.hook then
 end
 
 chat.FG.AddLocale("enUS", {
-  ["chat.teams.reason.consent"] = "Team chats are off. Turn them on in the tab Share.",
+  ["chat.teams.reason.consent"] = "Team chats are off: Settings > Consents.",
   ["chat.teams.reason.unavailable"] = "Teams are not ready yet. Try again in a moment.",
   ["chat.teams.reason.notmember"] = "You are not a member of this team.",
   ["chat.teams.reason.notadmin"] = "Only admins can do this.",
@@ -33,7 +33,7 @@ chat.FG.AddLocale("enUS", {
   ["chat.kind.team"] = "Team",
 })
 chat.FG.AddLocale("deDE", {
-  ["chat.teams.reason.consent"] = "Team-Chats sind aus. Im Reiter Teilen einschalten.",
+  ["chat.teams.reason.consent"] = "Team-Chats aus: Einstellungen > Zustimmungen.",
   ["chat.teams.reason.unavailable"] = "Teams sind noch nicht bereit. Gleich erneut versuchen.",
   ["chat.teams.reason.notmember"] = "Du bist kein Mitglied dieses Teams.",
   ["chat.teams.reason.notadmin"] = "Das dürfen nur Admins.",

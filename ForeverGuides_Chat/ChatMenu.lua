@@ -16,7 +16,7 @@ chat.Menu = Menu
 
 Menu.ROW = 26
 -- Rows built up front: the longest menu has 14 entries.
-Menu.PREBUILD = 14
+Menu.PREBUILD = 15
 local PAD, GROUP_GAP, MIN_W, MAX_W = 4, 6, 220, 380
 
 local pop, blocker, prompt
@@ -211,7 +211,9 @@ local function choose(item)
   if ok and id == "markUnread" then
     chat.Window.Deselect(key)
   end
-  if why == "prompt" then
+  if why == "copyAll" then
+    chat.LineActions.CopyAll(conv)
+  elseif why == "prompt" then
     Menu.Ask(id == "nickname" and "nicknames" or "notes", key)
   elseif why == "confirm" then
     FG.Dialogs.Confirm("chat.menu.clear.title", "chat.menu.clear.text", function()

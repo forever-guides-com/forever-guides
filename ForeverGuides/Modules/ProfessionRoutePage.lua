@@ -297,12 +297,21 @@ local function paintStep(row, item)
   local chips = {}
   for _, m in ipairs(type(step.mats) == "table" and step.mats or {}) do
     local info = type(data.items) == "table" and data.items[m[1]] or {}
-    chips[#chips + 1] = {
+    local chip = {
       icon = iconPath(info.icon),
       name = ns.T({ de = info.de, en = info.en }) or ("item:" .. tostring(m[1])),
       meta = tostring((m[2] or 1) * (step.crafts or 1)),
       tip = string.format(L["profroute.perCraft"], m[2] or 1),
     }
+    -- A material the route buys at a vendor names the nearest vendor, a click sets the waypoint there.
+    local best = info.buy == "vendor" and ns.VendorSource and ns.VendorSource.Best(m[1], false) or nil
+    if best then
+      chip.tip = chip.tip .. "\n" .. string.format(L["vendor.where"], best.text) .. "\n" .. L["vendor.listTip"]
+      chip.onClick = function()
+        ns.VendorSource.SetWaypoint(best.place)
+      end
+    end
+    chips[#chips + 1] = chip
   end
   row.chips:SetChips(chips)
   row.src:SetText(sourceText(data, step))

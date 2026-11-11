@@ -72,6 +72,14 @@ function BM.DisplayId(inst, boss)
   return type(id) == "number" and id > 0 and id or nil
 end
 
+-- The creature ID of a boss that has no display ID in the data: the small portrait asks the client for its model.
+function BM.CreatureId(inst, boss)
+  local id = boss and boss.npc
+  if BM.DisplayId(inst, boss) == nil and type(id) == "number" and id > 0 then
+    return id
+  end
+end
+
 function BM.Has(inst, boss)
   return BM.DisplayId(inst, boss) ~= nil
 end

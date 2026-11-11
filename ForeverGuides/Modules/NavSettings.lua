@@ -57,4 +57,4 @@ ns.On("FG_NAV_SCOPE", function()
   end
 end)
 
-ns.SettingsPage.Add(NS.AddSettings, "window")
+ns.SettingsPage.Add(NS.AddSettings, "window", "menu.main")

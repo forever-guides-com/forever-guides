@@ -24,6 +24,7 @@ ns.On("PLAYER_LOGIN", function()
   -- Second probe: optional libraries may come from addons that loaded after us.
   ns.ProbeCapabilities()
   ns.MinimapButton.Init()
+  ns.AddonCategory.Register()
   ns.Dock.Restore()
   ns.Log.info("loaded %s", ns.version)
 end)
@@ -31,6 +32,7 @@ end)
 -- Client language until SavedVariables are read.
 ns.SetLocale("auto")
 BINDING_HEADER_FOREVERGUIDES = "Forever Guides"
+BINDING_HEADER_FOREVERGUIDES_FISHING = ns.L["subaddon.fishing.title"]
 BINDING_NAME_FOREVERGUIDES_TOGGLE = ns.L["binding.toggle"]
 BINDING_NAME_FOREVERGUIDES_SEARCH = ns.L["binding.search"]
 BINDING_NAME_FOREVERGUIDES_DOCK = ns.L["binding.dock"]

@@ -1,14 +1,12 @@
--- Card "GildenManager" in the settings tab "Guild and contacts": the switch of the optional add-on for
--- this character, its state and a link to the tab "Settings" of the add-on on the guild page. The
--- options themselves live in that tab, so this card works without the add-on being loaded. Loading
--- belongs to ns.SubAddons, this file only reads its State and flips the character switch.
+-- Card "GildenManager options" in the settings tab "Guild": a link to the tab "Settings" of the add-on on the
+-- guild page. The options themselves live in that tab, so this card works without the add-on being loaded.
+-- The switch of the add-on sits in the card above it (Modules/AddonSettings.lua).
 local _, ns = ...
 local W = ns.W
 
 local S = {}
 ns.GuildManagerSettings = S
 
-local ID = "guildmanager"
 -- Id of the tab the add-on registers through ns.GuildExt.
 local TAB = "settings"
 local BUTTON_W = 200
@@ -16,16 +14,12 @@ local BUTTON_W = 200
 ns.AddLocale("enUS", {
   ["gmset.title"] = "GuildManager",
   ["gmset.help"] = "Guild tools for officers.\nSettings sit in the tab Settings of the guild page.",
-  ["gmset.enable"] = "Use GuildManager",
-  ["gmset.enable.hint"] = "Applies to this character",
   ["gmset.open"] = "Open settings",
   ["gmset.open.wait"] = "Opens once the GuildManager runs",
 })
 ns.AddLocale("deDE", {
   ["gmset.title"] = "GildenManager",
   ["gmset.help"] = "Gildenwerkzeuge für Offiziere.\nEinstellungen im Reiter Optionen der Gildenseite.",
-  ["gmset.enable"] = "GildenManager nutzen",
-  ["gmset.enable.hint"] = "Gilt für diesen Charakter",
   ["gmset.open"] = "Einstellungen öffnen",
   ["gmset.open.wait"] = "Öffnet, sobald der GildenManager läuft",
 })
@@ -42,52 +36,20 @@ end
 
 local built = {}
 
--- The switch and its state are read when they can change (build, FG_SUBADDON_CHANGED), not on every
--- repaint: the stored key belongs to the tab "Addons", which lists every switch of the sub-add-ons.
-local state = { on = false, text = "", color = "textMuted" }
-
-local function read()
-  state.on = ns.SubAddons.Enabled(ID)
-  state.text, state.color = ns.AddonSettings.StatusText(ID)
-end
-
 -- Fills the card it gets.
 function S.Add(card)
-  read()
   local s = card.stack
   local row = CreateFrame("Frame", nil, card.content)
   local info = W.InfoButton(row, "gmset.title", "gmset.help")
   info.fgId = "gm-card-help"
   info:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, 0)
-  local title = W.Text(row, { key = "gmset.title", role = "h3", family = "heading", color = "accent2" })
+  local title = W.Text(row, { key = "settings.card.guild.manager", role = "h3", family = "heading", color = "accent2" })
   title:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -1)
   function row:fgGridLayout(width)
     title:SetWidth(math.max(width - W.INFO_SIZE - 6, 1))
     return math.max(W.INFO_SIZE, math.ceil(title:GetStringHeight()) + 2)
   end
   s:Add(row, { gap = 6 })
-
-  local toggle = W.Toggle(card.content, {
-    key = "gmset.enable",
-    get = function()
-      return state.on
-    end,
-    set = function(v)
-      ns.SubAddons.SetEnabled(ID, v == true, "char")
-    end,
-    tooltip = "gmset.title",
-    tooltipText = "gmset.enable.hint",
-  })
-  toggle.fgId = "gm-card-enable"
-  s:Add(toggle, { height = 24, gap = 4 })
-
-  local status = W.Text(card.content, { role = "small", wrap = true })
-  status.fgId = "gm-card-state"
-  function status.Refresh()
-    status:SetText(state.text)
-    W.SetColor(status, state.color)
-  end
-  s:Add(status, { gap = 8 })
 
   local open = W.Action(card.content, {
     key = "gmset.open",
@@ -112,12 +74,10 @@ function S.Add(card)
   end
   built[#built + 1] = { card = card, open = open }
   open.Refresh()
-  status.Refresh()
 end
 
 -- The switch changed or the add-on registered its tab: every card reads its state again.
 local function refresh()
-  read()
   for _, entry in ipairs(built) do
     entry.card:Refresh()
     if entry.open:IsVisible() then
@@ -128,4 +88,4 @@ end
 ns.On("FG_SUBADDON_CHANGED", refresh)
 ns.On("FG_GUILDEXT_CHANGED", refresh)
 
-ns.SettingsPage.Add(S.Add, "social")
+ns.SettingsPage.Add(S.Add, "guild", "guild.manager")

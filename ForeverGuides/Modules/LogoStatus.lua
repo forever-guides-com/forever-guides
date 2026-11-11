@@ -1,7 +1,8 @@
 -- Status report of the logo chain for support: /fg diag (one block inside the report) and /fg diag chat (the same
 -- lines in the chat). It answers the questions that decide whether a logo shows: which client and version,
 -- what the player allowed to send and to receive, what went out and what came in (counts and reasons, never
--- names), whether the chat windows carry the wrapper and which other chat add-ons are loaded. Reads memory and
+-- names), whether the chat windows carry the wrapper, which other chat add-ons are loaded and the last sends of
+-- Forever Chat (no texts, no names). Reads memory and
 -- settings only: nothing is sent, nobody is asked.
 local _, ns = ...
 local Consent = ns.Consent
@@ -277,6 +278,16 @@ local function traceLines()
   return out
 end
 
+-- The last sends of Forever Chat (time, chat type, way, result, reason; no text and no name), newest first. Forever Chat
+-- registers the function while it runs.
+local function sendLines()
+  local trail = ns.ChatSendTrace
+  if type(trail) ~= "function" then
+    return "send: Forever Chat is not loaded"
+  end
+  return trail()
+end
+
 -- The lines of the report. A part that fails shows a question mark and never stops the others.
 function D.Lines()
   local out = {}
@@ -289,6 +300,7 @@ function D.Lines()
     trafficLine,
     chatLines,
     traceLines,
+    sendLines,
   }) do
     local ok, result = pcall(part)
     if not ok then

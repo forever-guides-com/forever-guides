@@ -107,4 +107,4 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
   end
 end)
 
-ns.SettingsPage.Add(S.Add, "social")
+ns.SettingsPage.Add(S.Add, "social", "chathistory.main")

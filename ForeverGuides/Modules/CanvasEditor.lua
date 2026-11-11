@@ -4322,8 +4322,23 @@ local function buildSide(f)
   ui.lockNote = W.Text(c, { role = "small", color = "textMuted", wrap = true })
   ui.lockNote:SetWidth(G.contentW)
   ui.headEl:SetWidth(G.contentW)
-  ui.elementParts =
-    { ui.headEl, ui.name, ui.remove, ui.dup, ui.copyEl, ui.shareEl, ui.anchorBox, ui.fx, ui.fy, ui.fw, ui.fh, ui.desc, ui.groupDd, ui.outdent, ui.indent }
+  ui.elementParts = {
+    ui.headEl,
+    ui.name,
+    ui.remove,
+    ui.dup,
+    ui.copyEl,
+    ui.shareEl,
+    ui.anchorBox,
+    ui.fx,
+    ui.fy,
+    ui.fw,
+    ui.fh,
+    ui.desc,
+    ui.groupDd,
+    ui.outdent,
+    ui.indent,
+  }
 
   ui.headCanvas = heading("canvas.settings")
   local function canvasNumber(key, prop, lo, hi)

@@ -143,6 +143,13 @@ function Queue.Release(id)
   return ok, reason
 end
 
+-- Takes a held job out without telling the sender (it is about to go on by another way). Returns the job, or nil
+-- when it is not held.
+function Queue.Take(id)
+  local i = indexOf(id)
+  return i and table.remove(jobs, i) or nil
+end
+
 -- Releases every waiting job in the order they were held (failed ones need their own click). Returns the
 -- number released and the number that stayed.
 function Queue.ReleaseAll()

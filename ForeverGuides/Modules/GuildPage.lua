@@ -785,7 +785,7 @@ function P.AddSettings(view)
     height = 26,
     opens = true,
     onClick = function()
-      ns.SettingsPage.Select("sharing")
+      ns.SettingsPage.Select("privacy")
     end,
   })
   open.fgId = "guild-share-open"

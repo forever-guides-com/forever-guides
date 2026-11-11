@@ -87,17 +87,21 @@ ns.AddLocale("deDE", {
   ["xpbar.set.reset"] = "Sitzung zurücksetzen",
 })
 
+-- The stable id of a control: the locale key with dashes, the search and the jumps know it by this.
+local function idOf(key)
+  return (key:gsub("%.", "-"))
+end
+
 local function toggle(view, labelKey, tipKey, get, set)
-  view.stack:Add(
-    W.Toggle(view.content, {
-      key = labelKey,
-      get = get,
-      set = set,
-      tooltip = labelKey,
-      tooltipText = tipKey,
-    }),
-    { height = 24, gap = 6 }
-  )
+  local control = W.Toggle(view.content, {
+    key = labelKey,
+    get = get,
+    set = set,
+    tooltip = labelKey,
+    tooltipText = tipKey,
+  })
+  control.fgId = idOf(labelKey)
+  view.stack:Add(control, { height = 24, gap = 6 })
 end
 
 -- A toggle on one flag of settings.xpBar; the window repairs the value through Config().
@@ -150,6 +154,7 @@ local function addChatTargets(view)
         end
       end,
     })
+    box.fgId = idOf(def[2])
     view.stack:Add(box, { height = 22, gap = 4, indent = 24 })
     S.chatBoxes[#S.chatBoxes + 1] = box
   end
@@ -165,9 +170,6 @@ function S.Add(view, opts)
     ns.AddParagraph(view, "xpbar.set.hint", { role = "micro", color = "textMuted" })
   end
   toggle(view, "xpbar.set.show", "xpbar.set.showTip", XW.IsWanted, XW.SetWanted)
-  toggle(view, "xpbar.set.pin", "xpbar.set.pinTip", function()
-    return XW.Config().pinned
-  end, XW.SetPinned)
 
   -- The list is refilled in place on every read: layouts come and go while the card is open.
   local options = {}
@@ -189,36 +191,39 @@ function S.Add(view, opts)
     end,
     set = XW.SetLayout,
   })
+  layout.fgId = "xpbar-set-layout"
   view.stack:Add(layout, { height = 46, width = 240 })
   S.layoutChoices[#S.layoutChoices + 1] = layout
-  view.stack:Add(
-    ns.LayoutSet.BuildButtons(view.content, XW.LayoutSet),
-    { height = ns.LayoutSet.BUTTONS_H, width = ns.LayoutSet.BUTTONS_W, gap = 8 }
-  )
-  view.stack:Add(
-    W.Button(view.content, {
-      key = "xpbar.set.edit",
-      width = 190,
-      opens = true,
-      onClick = XW.Edit,
-    }),
-    { height = 26, width = 190, gap = 8 }
-  )
+  local edit = W.Button(view.content, {
+    key = "xpbar.set.edit",
+    width = 190,
+    opens = true,
+    onClick = XW.Edit,
+  })
+  edit.fgId = "xpbar-set-edit"
+  view.stack:Add(edit, { height = 26, width = 190, gap = 8 })
 
-  flag(view, "chatLevelUp", "xpbar.set.chat", "xpbar.set.chatTip")
-  addChatTargets(view)
-  flag(view, "autoPause", "xpbar.set.autoPause", "xpbar.set.autoPauseTip")
-  flag(view, "sessionResetOnLogin", "xpbar.set.newSession", "xpbar.set.newSessionTip")
-  flag(view, "hideInCombat", "xpbar.set.combat")
-  flag(view, "showAtMax", "xpbar.set.maxLevel", "xpbar.set.maxLevelTip")
-  view.stack:Add(
-    W.Button(view.content, {
-      key = "xpbar.set.reset",
-      width = 240,
-      onClick = ns.XpTracker.ResetSession,
-    }),
-    { height = 26, width = 240 }
-  )
+  -- The page of the bar has room for everything, the card keeps the rest behind "More settings".
+  local more = opts and opts.page and view or W.Accordion(view, { id = view.id or "xpbar.main" })
+  toggle(more, "xpbar.set.pin", "xpbar.set.pinTip", function()
+    return XW.Config().pinned
+  end, XW.SetPinned)
+  local buttons = ns.LayoutSet.BuildButtons(more.content, XW.LayoutSet)
+  buttons.fgId = "xpbar-set-layoutButtons"
+  more.stack:Add(buttons, { height = ns.LayoutSet.BUTTONS_H, width = ns.LayoutSet.BUTTONS_W, gap = 8 })
+  flag(more, "chatLevelUp", "xpbar.set.chat", "xpbar.set.chatTip")
+  addChatTargets(more)
+  flag(more, "autoPause", "xpbar.set.autoPause", "xpbar.set.autoPauseTip")
+  flag(more, "sessionResetOnLogin", "xpbar.set.newSession", "xpbar.set.newSessionTip")
+  flag(more, "hideInCombat", "xpbar.set.combat")
+  flag(more, "showAtMax", "xpbar.set.maxLevel", "xpbar.set.maxLevelTip")
+  local reset = W.Button(more.content, {
+    key = "xpbar.set.reset",
+    width = 240,
+    onClick = ns.XpTracker.ResetSession,
+  })
+  reset.fgId = "xpbar-set-reset"
+  more.stack:Add(reset, { height = 26, width = 240 })
 end
 
 -- The layout list follows every change of the layouts, whoever made it.
@@ -233,4 +238,4 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
   end
 end)
 
-ns.SettingsPage.Add(S.Add, "general")
+ns.SettingsPage.Add(S.Add, "general", "xpbar.main")

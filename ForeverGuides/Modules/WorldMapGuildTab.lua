@@ -2,7 +2,7 @@
 -- the map (show, online per guild list, level range, rank), the legend of the symbols and the own side of
 -- the function: the hint for sending, "Invisible" and the accuracy. While receiving is off the hint with
 -- its button stands in place of the filters. The bar calls Layout(avail) and gets the height the tab
--- needs. Everything is written through the settings (Store.set), the display follows by its events.
+-- needs (it ignores avail: the bar puts the tab in a scroll area when it is taller). Everything is written through the settings (Store.set), the display follows by its events.
 local _, ns = ...
 local W, L, Store, GLG = ns.W, ns.L, ns.Store, ns.WorldMapGuildLogic
 local B = ns.BlizzardLinks
@@ -37,6 +37,10 @@ ns.AddLocale("enUS", {
   ["wm.guild.accuracy.exact"] = "Exact",
   ["wm.guild.accuracy.grid"] = "Grid (5 percent of the map)",
   ["wm.guild.accuracy.zone"] = "Zone only",
+  ["wm.guild.minLevelTip"] = "Hides members below this level. The upper limit moves along so the range never turns around.",
+  ["wm.guild.maxLevelTip"] = "Hides members above this level. The lower limit moves along so the range never turns around.",
+  ["wm.guild.rankTip"] = "Shows only members of this guild rank and higher. Members of a high rank get strokes above their symbol.",
+  ["wm.guild.accuracyTip"] = "How exactly your position is sent to guild members: exact, rounded to a grid or only the zone.",
 })
 ns.AddLocale("deDE", {
   ["wm.guild.tab.title"] = "Gildenmitglieder",
@@ -65,6 +69,10 @@ ns.AddLocale("deDE", {
   ["wm.guild.accuracy.exact"] = "Genau",
   ["wm.guild.accuracy.grid"] = "Raster (5 Prozent der Karte)",
   ["wm.guild.accuracy.zone"] = "Nur Zone",
+  ["wm.guild.minLevelTip"] = "Blendet Mitglieder unter dieser Stufe aus. Die Obergrenze zieht mit, damit der Bereich nie verkehrt herum ist.",
+  ["wm.guild.maxLevelTip"] = "Blendet Mitglieder über dieser Stufe aus. Die Untergrenze zieht mit, damit der Bereich nie verkehrt herum ist.",
+  ["wm.guild.rankTip"] = "Zeigt nur Mitglieder dieses Gildenrangs und höher. Mitglieder mit hohem Rang bekommen Striche über ihrem Symbol.",
+  ["wm.guild.accuracyTip"] = "Wie genau deine Position an Gildenmitglieder geht: genau, auf ein Raster gerundet oder nur die Zone.",
 })
 
 Tab.ACCURACY = { "exact", "grid", "zone" }
@@ -133,6 +141,8 @@ function Tab.Create(parent, width, opts)
   local function slider(key, name, other)
     local s = W.Slider(pg, {
       key = key,
+      tooltip = key,
+      tooltipText = key .. "Tip",
       min = GLG.SPEC[name][3],
       max = GLG.SPEC[name][4],
       step = 1,
@@ -176,6 +186,8 @@ function Tab.Create(parent, width, opts)
   Tab.FillRanks(parts.rankOptions)
   parts.rank = leave(W.Dropdown(pg, {
     key = "wm.guild.rank",
+    tooltip = "wm.guild.rank",
+    tooltipText = "wm.guild.rankTip",
     width = width,
     options = parts.rankOptions,
     get = function()
@@ -223,6 +235,8 @@ function Tab.Create(parent, width, opts)
   end
   parts.accuracy = leave(W.Dropdown(pg, {
     key = "wm.guild.accuracy",
+    tooltip = "wm.guild.accuracy",
+    tooltipText = "wm.guild.accuracyTip",
     width = width,
     options = accuracy,
     get = function()

@@ -49,6 +49,20 @@ ns.AddLocale("enUS", {
   ["wm.set.button"] = "Button in the world map",
   ["wm.set.bar"] = "Marker and route bar in the world map",
   ["wm.set.pins"] = "Show own markers in the world map",
+  ["wm.tip.tab.markers"] = "Your markers on this map: set new ones and pick them from the list.",
+  ["wm.tip.tab.route"] = "Plan a route between two known places. The fastest way shows as a short list of steps.",
+  ["wm.tip.tab.flights"] = "The flight points nearest to you with their distance. A click sets a waypoint.",
+  ["wm.tip.tab.gather"] = "Ore and herb spots on the map and the explored look of the map.",
+  ["wm.place.tip"] = "Switches the click on the map to setting markers. Click the map to set one, click here again to stop.",
+  ["wm.start.title"] = "Start",
+  ["wm.dest.title"] = "Destination",
+  ["wm.start.tip"] = "Choose where the route begins. Opens a search over the known places, click again to close it.",
+  ["wm.dest.tip"] = "Choose where the route ends. Opens a search over the known places, click again to close it.",
+  ["wm.swap.tip"] = "Swaps start and destination.",
+  ["wm.calc.tip"] = "Calculates the fastest route from the start to the destination.",
+  ["wm.search.tip"] = "Type part of a name. Enter takes the first result, Esc closes the search.",
+  ["wm.pick.tip"] = "Click to use this place.",
+  ["wm.route.showTip"] = "Opens this route on the Map & Route page of the addon.",
 })
 
 ns.AddLocale("deDE", {
@@ -82,6 +96,20 @@ ns.AddLocale("deDE", {
   ["wm.set.button"] = "Button in der Weltkarte",
   ["wm.set.bar"] = "Marker und Routen-Leiste in der Weltkarte",
   ["wm.set.pins"] = "Eigene Marker in der Weltkarte anzeigen",
+  ["wm.tip.tab.markers"] = "Deine Marker auf dieser Karte: neue setzen und aus der Liste wählen.",
+  ["wm.tip.tab.route"] = "Plane eine Route zwischen zwei bekannten Orten. Der schnellste Weg erscheint als kurze Liste von Etappen.",
+  ["wm.tip.tab.flights"] = "Die nächsten Flugpunkte mit ihrer Entfernung. Ein Klick setzt einen Wegpunkt.",
+  ["wm.tip.tab.gather"] = "Fundorte von Erzen und Kräutern auf der Karte und die erkundete Darstellung der Karte.",
+  ["wm.place.tip"] = "Schaltet den Klick auf die Karte auf Marker setzen um. Karte anklicken setzt einen Marker, hier erneut klicken beendet es.",
+  ["wm.start.title"] = "Start",
+  ["wm.dest.title"] = "Ziel",
+  ["wm.start.tip"] = "Wähle, wo die Route beginnt. Öffnet eine Suche über die bekannten Orte, erneut klicken schließt sie.",
+  ["wm.dest.tip"] = "Wähle, wo die Route endet. Öffnet eine Suche über die bekannten Orte, erneut klicken schließt sie.",
+  ["wm.swap.tip"] = "Tauscht Start und Ziel.",
+  ["wm.calc.tip"] = "Berechnet die schnellste Route vom Start zum Ziel.",
+  ["wm.search.tip"] = "Einen Teil des Namens tippen. Enter nimmt den ersten Treffer, Esc schließt die Suche.",
+  ["wm.pick.tip"] = "Klicken, um diesen Ort zu nehmen.",
+  ["wm.route.showTip"] = "Öffnet diese Route auf der Seite Karte & Route des Addons.",
 })
 
 local WML = {}
@@ -198,6 +226,14 @@ end
 -- Frame level of our controls on the map: above the canvas and Blizzard's overlays.
 function WML.UILevel()
   return level(LEVELS.ui)
+end
+
+-- Lifts a control of ours (button, bar) above the parts of Blizzard's window, measured: its border frame and
+-- title strip can lie above a level that is only "map level plus a constant".
+function WML.Lift(frame)
+  if map and frame then
+    ns.Layer.Panel(frame, map, WML.UILevel(), field(map, "ScrollContainer"))
+  end
 end
 
 -- Frame level of the layer `key` of WML.LEVELS on the canvas.
@@ -821,7 +857,8 @@ local function ensureButton()
     end,
   })
   B.LeaveFocusRing(button)
-  button:SetFrameLevel(WML.UILevel())
+  ns.Layer.Own(button)
+  WML.Lift(button)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   button.icon:ClearAllPoints()
   button.icon:SetPoint("TOPLEFT", 2, -2)

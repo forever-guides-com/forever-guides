@@ -1,0 +1,49 @@
+## Interface: 16001
+## Title: Forever Guides: Fishing helper
+## Title-deDE: Forever Guides: Angelhilfe
+## Notes: Cast and reel in with one key or a double click, louder sound, hidden names and automatic looting while you fish. Off by default.
+## Notes-deDE: Auswerfen und Einholen mit einer Taste oder einem Doppelklick, lauterer Ton, ausgeblendete Namen und automatisches Plündern beim Angeln. Standardmäßig aus.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 0.7.0
+## Dependencies: ForeverGuides
+## DefaultState: disabled
+## LoadOnDemand: 1
+## SavedVariables: ForeverGuidesFishingDB
+## X-Forever-Guides-Addon: fishing
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Fishing
+
+Core.lua
+Locale.lua
+Options.lua
+Conditions.lua
+Trustee.lua
+BindMachine.lua
+DoubleClick.lua
+Recast.lua
+Loans.lua
+MarkLogic.lua
+Blockade.lua
+Status.lua
+LootLogic.lua
+CatchStore.lua
+CatchRules.lua
+JournalLogic.lua
+FishUses.lua
+FishingPlaces.lua
+PlacesLogic.lua
+Uses.lua
+FishNames.lua
+Game.lua
+Mark.lua
+Controller.lua
+Recorder.lua
+JournalDetail.lua
+JournalView.lua
+PlacesView.lua
+Card.lua
+Hook.lua

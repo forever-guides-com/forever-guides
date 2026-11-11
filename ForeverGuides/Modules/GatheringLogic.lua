@@ -87,6 +87,50 @@ function G.ZoneName(mapId)
   return "#" .. tostring(mapId)
 end
 
+-- Every name a zone goes by, without duplicates: the English and German name of the travel data and the
+-- client's map name. For lookups by name (the fishing areas), not for display.
+function G.ZoneNames(mapId)
+  local out, seen = {}, {}
+  local function add(name)
+    if type(name) == "string" and name ~= "" and not seen[name] then
+      seen[name] = true
+      out[#out + 1] = name
+    end
+  end
+  local z = travelZones()[mapId]
+  if z and type(z.n) == "table" then
+    add(z.n.en)
+    add(z.n.de)
+  end
+  local api = rawget(_G, "C_Map")
+  if type(api) == "table" and type(api.GetMapInfo) == "function" then
+    local ok, info = pcall(api.GetMapInfo, mapId)
+    if ok and type(info) == "table" then
+      add(info.name)
+    end
+  end
+  return out
+end
+
+-- The map of the travel data that carries one of the names (English or German, compared without case): a zone
+-- or a place inside a zone (its map is the zone map). nil when none does. Several maps with one name: the lowest id.
+function G.MapIdForName(names)
+  local wanted = {}
+  for _, name in ipairs(listOf(names)) do
+    if type(name) == "string" and name ~= "" then
+      wanted[name:lower()] = true
+    end
+  end
+  local best
+  for mapId, z in pairs(travelZones()) do
+    local n = listOf(z.n)
+    if (best == nil or mapId < best) and ((n.en and wanted[n.en:lower()]) or (n.de and wanted[n.de:lower()])) then
+      best = mapId
+    end
+  end
+  return best
+end
+
 -- "A", "H", "N" (neutral) or "C" (contested) of a zone, nil when the travel data does not know it.
 function G.ZoneFaction(mapId)
   local z = travelZones()[mapId]

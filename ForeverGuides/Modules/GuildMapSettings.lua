@@ -127,7 +127,7 @@ local function number(v)
   return tostring(math.floor(v + 0.5))
 end
 
-local function dropdown(view, key, options, get, set)
+local function dropdown(view, name, key, options, get, set)
   local control = W.Dropdown(view.content, {
     key = key,
     width = 240,
@@ -135,6 +135,7 @@ local function dropdown(view, key, options, get, set)
     get = get,
     set = set,
   })
+  control.fgId = "guildmap-set-" .. name
   view.stack:Add(control, { height = 46, width = 240, gap = 4 })
   return control
 end
@@ -151,32 +152,35 @@ function S.Add(view)
   view.stack:Add(recv, { gap = 6 })
   toggle(view, "showWorld")
   toggle(view, "showMini")
-  slider(view, "worldSize", "guildmap.set.worldSize", percent, "guildmap.set.sizeTip")
-  slider(view, "miniSize", "guildmap.set.miniSize", percent, "guildmap.set.sizeTip")
-  toggle(view, "showClass")
-  toggle(view, "showRank")
-  toggle(view, "showLevel")
-  toggle(view, "showName")
-  toggle(view, "group")
   toggle(view, "onlineOnly")
-  slider(view, "minLevel", "guildmap.set.minLevel", number)
-  slider(view, "maxLevel", "guildmap.set.maxLevel", number)
+  -- Everything else is rarely changed: behind "More settings".
+  local more = W.Accordion(view, { id = view.id or "map.guild" })
+  slider(more, "worldSize", "guildmap.set.worldSize", percent, "guildmap.set.sizeTip")
+  slider(more, "miniSize", "guildmap.set.miniSize", percent, "guildmap.set.sizeTip")
+  toggle(more, "showClass")
+  toggle(more, "showRank")
+  toggle(more, "showLevel")
+  toggle(more, "showName")
+  toggle(more, "group")
+  slider(more, "minLevel", "guildmap.set.minLevel", number)
+  slider(more, "maxLevel", "guildmap.set.maxLevel", number)
   local ranks = {}
   ns.WorldMapGuildTab.FillRanks(ranks)
-  dropdown(view, "guildmap.set.rank", ranks, function()
+  dropdown(more, "rank", "guildmap.set.rank", ranks, function()
     return GLG.Current().rankFilter
   end, function(v)
     Store.set("settings." .. setting("rankFilter"), v)
   end)
-  ns.AddHeading(view, "guildmap.set.own", { role = "ui" })
-  local send = ns.OptInNotice.Banner(view.content, {
+  ns.AddHeading(more, "guildmap.set.own", { role = "ui" })
+  local send = ns.OptInNotice.Banner(more.content, {
     fn = "guildMap",
     dir = "send",
     aud = "guild",
     textKey = "wm.guild.needSend",
   })
-  view.stack:Add(send, { gap = 6 })
-  local invisible = W.Toggle(view.content, {
+  send.fgId = "guildmap-set-sendNotice"
+  more.stack:Add(send, { gap = 6 })
+  local invisible = W.Toggle(more.content, {
     key = "wm.guild.invisible",
     tooltip = "wm.guild.invisible",
     tooltipText = "wm.guild.invisibleTip",
@@ -188,14 +192,14 @@ function S.Add(view)
     end,
   })
   invisible.fgId = "guildmap-set-invisible"
-  view.stack:Add(invisible, { height = 24, gap = 4 })
+  more.stack:Add(invisible, { height = 24, gap = 4 })
   local accuracy = {}
   for i, id in ipairs(ns.WorldMapGuildTab.ACCURACY) do
     accuracy[i] = { value = id, key = "wm.guild.accuracy." .. id }
   end
-  dropdown(view, "wm.guild.accuracy", accuracy, ns.GuildMapComm.Accuracy, function(v)
+  dropdown(more, "accuracy", "wm.guild.accuracy", accuracy, ns.GuildMapComm.Accuracy, function(v)
     Store.set("settings.guildMapAccuracy", v)
   end)
 end
 
-ns.SettingsPage.Add(S.Add, "map")
+ns.SettingsPage.Add(S.Add, "map", "map.guild")

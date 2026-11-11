@@ -59,10 +59,10 @@ end
 -- Relevance ------------------------------------------------------------------------------------------------------
 
 -- Whether the colour of the state without a count matters. A cooldown draws it only while ready is visible
--- (the rules "always" and "ready") or when the end pulses in it; an aura while its missing state can show
--- (any condition but "while active") or when its end pulses.
+-- (the rules "always" and "ready") or when the end pulses in it; an aura or a weapon enchantment while its missing
+-- state can show (any condition but "while active") or when its end pulses.
 function P.ReadyColorShown(kind, p)
-  if kind == "aura" then
+  if kind == "aura" or kind == "weapon" then
     return p.when ~= "active" or p.pulseOnEnd ~= false
   end
   return p.showWhen == "always" or p.showWhen == "ready" or p.warn ~= "off"
