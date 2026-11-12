@@ -29,7 +29,7 @@ C.INTERVAL = 0.25
 -- A mouse binding that was never released (the button up got lost) is dropped after this time.
 C.WATCHDOG = 2
 
-local db, trustee, detector, watch, recast, keyWatcher
+local db, trustee, detector, watch, recast, keyWatcher, lastStopAt, lastStartAt, lastLootAt, pressAt, pressPos, firstPos
 -- The options while the saved data is not there (the start did not run yet): a switch the player flips
 -- is kept here and written into the saved data at the start, so a click is never lost.
 local memory, touched = Options.Clean(nil), {}
@@ -282,6 +282,14 @@ local function wantedMode()
   if mode == "cast" and recast and recast:Holding() then
     return "off"
   end
+  -- An open loot window takes the press for itself: a throw would close it before the loot is taken.
+  if mode ~= "off" and game().LootOpen() then
+    return "off"
+  end
+  -- A second press right after a throw would cut the fresh line short.
+  if mode ~= "off" and recast and recast:CastGuarded() then
+    return "off"
+  end
   return mode
 end
 
@@ -366,6 +374,7 @@ function C.Refresh()
     recast:Tick()
     -- The offer ends by itself: look again when its time is up.
     if recast:Armed() and not armedWatched then
+      FG.Log.info("fishing: recast armed: pause over and loot taken")
       look(Recast.ARM_TIMEOUT)
     end
     armedWatched = recast:Armed()
@@ -511,11 +520,16 @@ end
 -- The click that throws a line that was offered after the reel in.
 local function onOfferedClick(g)
   if g.InCombat() or g.MouseDown("LeftButton") or g.LootOpen() or not g.OverWorld() then
+    if g.LootOpen() then
+      FG.Log.info("fishing: recast blocked: loot window open")
+    end
     return
   end
   if not recast:Consume() then
+    FG.Log.info("fishing: recast blocked: %s", tostring(recast:Why() or recast:State()))
     return
   end
+  FG.Log.info("fishing: recast fired: plain click after loot")
   detector:Cast()
   mouseArmed = "cast"
   -- The binding stays until the button comes up: the throw is the click itself.
@@ -528,23 +542,56 @@ end
 
 local function onMouseDown(buttonName)
   local options = C.Options()
+  if options.doubleClick == true and not blocked and buttonName == "LeftButton" then
+    -- Another button in between ends a begun pair.
+    detector:Reset()
+  end
   if options.doubleClick ~= true or blocked or buttonName ~= "RightButton" then
     return
   end
   local g = game()
+  pressAt, pressPos = g.Now(), g.CursorPosition()
   if recast:Tick() == "armed" and restBound then
     onOfferedClick(g)
     return
   end
   if g.InCombat() or g.MouseDown("LeftButton") or g.LootOpen() or not g.OverWorld() then
+    if not g.OverWorld() then
+      FG.Log.info("fishing: click ignored: not on the world")
+    end
     detector:Reset()
     return
   end
-  if not detector:Click() then
+  local doubled, firstAt = detector:Click()
+  if not doubled then
+    firstPos = pressPos
+    return
+  end
+  if DoubleClick.TooFar(firstPos, pressPos) then
+    -- Two clicks in different places are no pair: this one starts a new pair.
+    FG.Log.info("fishing: click ignored: pair too far apart")
+    detector:Click()
+    firstPos = pressPos
     return
   end
   local channeling = state.channeling or g.Channeling()
   local action, again = DoubleClick.Action(channeling, options, modifierHeld())
+  if action == "cast" and lastStopAt and firstAt and lastStopAt >= firstAt then
+    -- The first click reeled in natively and the loot is on its way: this click must not throw over it.
+    FG.Log.info("fishing: double click blocked: the first click reeled in, waiting for the loot")
+    if DoubleClick.WantsRecast(options, modifierHeld()) and recast:Request("mouse", lastStopAt) then
+      FG.Log.info("fishing: recast armed: wish kept after the double click")
+      look(C.Options().recastPause)
+    end
+    return
+  end
+  if action == "cast" and recast:Holding() then
+    FG.Log.info("fishing: double click blocked: recast %s", tostring(recast:Why()))
+    if DoubleClick.WantsRecast(options, modifierHeld()) then
+      recast:Request("mouse")
+    end
+    return
+  end
   if action == "cast" then
     local facts = g.Facts()
     if not Conditions.Evaluate(facts, { mountedOk = options.doubleClickMounted == true }) then
@@ -562,6 +609,9 @@ local function onMouseDown(buttonName)
     elseif again then
       -- The line is reeled in now, the throw comes with the next click after the loot.
       recast:Request("mouse")
+      FG.Log.info("fishing: recast armed: wish kept after the double click")
+    elseif action == "reel" and Options.RecastOn(options) then
+      recast:Reeling()
     end
     -- The release of the button normally ends it, this catches a release that never arrives.
     g.After(C.WATCHDOG, function()
@@ -572,10 +622,55 @@ local function onMouseDown(buttonName)
   end
 end
 
+-- The release decides whether the press was a click or the camera. A first click that was none ends the
+-- pair. The second click already acted at its press, only the binding is given back (its action can not
+-- be taken back, so a long second click that already threw stays thrown).
 local function onMouseUp(buttonName)
-  if buttonName == "RightButton" and mouseArmed then
+  if buttonName ~= "RightButton" then
+    return
+  end
+  if pressAt and C.Options().doubleClick == true then
+    local g = game()
+    local ok, why = DoubleClick.JudgeClick(g.Now() - pressAt, pressPos, g.CursorPosition())
+    if not ok then
+      FG.Log.info("fishing: click ignored: %s", why)
+      if not mouseArmed then
+        detector:Reset()
+      end
+    end
+  end
+  pressAt = nil
+  if mouseArmed then
     releaseMouse()
   end
+end
+
+-- What a press of the key does right now: idle throws, channel interacts (reel in), loot window, guard and
+-- the pause do nothing. The line names the state and the seconds since the last events, to be read in the game.
+local function keyState()
+  local g = game()
+  if g.LootOpen() then
+    return "loot", "none"
+  end
+  if recast:CastGuarded() or recast:Holding() then
+    return "guard", "none"
+  end
+  if state.channeling then
+    return "channel", "interact"
+  end
+  return "idle", state.allowed and "cast" or "none"
+end
+
+local function since(t)
+  return t and string.format("%+.2fs", game().Now() - t) or "-"
+end
+
+local function logKeyState()
+  local st, action = keyState()
+  FG.Log.info(
+    "fishing: key state=%s action=%s t=%s since channel stop, %s since cast, %s since loot open",
+    st, action, since(lastStopAt), since(lastStartAt), since(lastLootAt)
+  )
 end
 
 -- The press of a key while the throw after the reel in is on. The press itself does its work through the
@@ -598,12 +693,25 @@ function C.OnKey(key)
   if not ours then
     return
   end
-  if state.channeling then
+  logKeyState()
+  if state.channeling and recast:CastGuarded() then
+    FG.Log.info("fishing: key press blocked: cast guard")
+  elseif state.channeling then
+    FG.Log.info("fishing: key press: reel in")
+    if DoubleClick.WantsRecast(options, modifierHeld()) then
+      recast:Request("key")
+    else
+      recast:Reeling()
+    end
+  elseif recast:Consume() then
+    FG.Log.info("fishing: key press fired: recast after pause and loot")
+    C.Refresh()
+  elseif recast:Holding() then
+    -- The binding rests on "off" while held, so this press changes nothing in the game.
+    FG.Log.info("fishing: key press blocked: %s", tostring(recast:Why()))
     if DoubleClick.WantsRecast(options, modifierHeld()) then
       recast:Request("key")
     end
-  elseif recast:Consume() then
-    C.Refresh()
   end
 end
 
@@ -611,6 +719,7 @@ end
 
 local function onLoot()
   local g = game()
+  lastLootAt = g.Now()
   if recast then
     recast:LootOpened()
   end
@@ -701,14 +810,18 @@ function C.OnEvent(event, ...)
       end
       if fishing then
         recast:ChannelStarted()
+        lastStartAt = game().Now()
+        FG.Log.info("fishing: cast guard: %.1f s", Recast.CAST_GUARD)
+        look(Recast.CAST_GUARD)
       end
       setChanneling(fishing)
     end
   elseif event == "UNIT_SPELLCAST_CHANNEL_STOP" then
     if (...) == "player" then
+      lastStopAt = game().Now()
       recast:ChannelStopped()
       if recast:Holding() then
-        look(C.Options().recastPause)
+        look(math.max(C.Options().recastPause, Recast.LOOT_GRACE))
       end
       setChanneling(false)
     end
@@ -722,6 +835,7 @@ function C.OnEvent(event, ...)
     onMouseUp((...))
   elseif event == "LOOT_OPENED" then
     onLoot()
+    C.Refresh()
   elseif event == "LOOT_CLOSED" then
     recast:LootClosed()
     C.Refresh()
@@ -752,6 +866,13 @@ function C.Start(saved)
   stopped = false
   db = type(saved) == "table" and saved or {}
   db.version = 1
+  -- The default of the pause went from 1.0 to 0.3 s: stored old defaults move once.
+  if not db.recastPauseMoved then
+    db.recastPauseMoved = true
+    if type(db.options) == "table" and db.options.recastPause == 1 then
+      db.options.recastPause = 0.3
+    end
+  end
   db.options = Options.Clean(db.options)
   for id in pairs(touched) do
     db.options[id] = memory[id]

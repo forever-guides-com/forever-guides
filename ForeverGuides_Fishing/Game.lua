@@ -559,6 +559,15 @@ function G.OverWorld()
   return true
 end
 
+-- The pointer in physical pixels (independent of the interface scale), nil when the client can not tell.
+function G.CursorPosition()
+  local ok, x, y = pcall(GetCursorPosition)
+  if ok and type(x) == "number" and type(y) == "number" then
+    return { x, y }
+  end
+  return nil
+end
+
 -- Secure frames ------------------------------------------------------------------------------------------------
 
 local COMBAT_STATE = "fishcombat"

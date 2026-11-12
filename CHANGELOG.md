@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.3
+
+### Changed
+
+- Fishing: the pause before a recast now defaults to 0.3 seconds, a saved pause of 1.0 second is adjusted once.
+- Fishing: the settings texts are rewritten and say clearly that every cast needs a real key press.
+
+### Fixed
+
+- Fishing: a second quick press or click no longer disturbs reeling in and looting and does not cast again by mistake.
+- Fishing: a double click only counts for short clicks on the game world, long holds and drags are ignored.
+
 ## 0.7.2
 
 ### Fixed

@@ -31,7 +31,7 @@ O.RECORD = { "recordCatches" }
 -- Slider limits. The step is also the grid a stored value snaps to.
 O.SLIDERS = {
   doubleClickTime = { min = 0.1, max = 0.8, step = 0.05, default = 0.2, decimals = 2 },
-  recastPause = { min = 0, max = 3, step = 0.1, default = 1, decimals = 1 },
+  recastPause = { min = 0, max = 3, step = 0.1, default = 0.3, decimals = 1 },
   soundVolume = { min = 0, max = 100, step = 5, default = 100, decimals = 0 },
   effectVolume = { min = 0, max = 100, step = 5, default = 100, decimals = 0 },
   -- Pixels of the own bobber icon below the name plate anchor of the bobber. The default is derived from

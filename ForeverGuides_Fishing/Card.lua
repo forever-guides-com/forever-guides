@@ -91,6 +91,7 @@ end
 function Card.AddCast(view)
   Controller.Bootstrap()
   FG.AddHeading(view, "settings.card.fishing.cast")
+  FG.AddParagraph(view, "fishing.set.neverAuto", { role = "micro", color = "textMuted" })
   toggle(view, "oneKey")
   toggle(view, "doubleClick")
   local more = W.Accordion(view, { id = view.id or "fishing.cast" })

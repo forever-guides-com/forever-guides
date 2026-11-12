@@ -4,6 +4,18 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.3] - 2026-11-12
+
+### Changed
+
+- Fishing: the pause before a recast now defaults to 0.3 seconds, a saved pause of 1.0 second is adjusted once.
+- Fishing: the settings texts are rewritten and say clearly that every cast needs a real key press.
+
+### Fixed
+
+- Fishing: a second quick press or click no longer disturbs reeling in and looting and does not cast again by mistake.
+- Fishing: a double click only counts for short clicks on the game world, long holds and drags are ignored.
+
 ## [0.7.2] - 2026-11-12
 
 ### Fixed
@@ -475,6 +487,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.6.0...v0.7.0
