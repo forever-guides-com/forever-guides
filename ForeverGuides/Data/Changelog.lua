@@ -5,7 +5,17 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.2",
+      highlights = {
+      },
+      fixed = {
+        { de = "Schlafsack: Die Leiste startet auch im Sack eines anderen Spielers sofort beim Hinlegen.", en = "Sleeping bag: the bar also starts at once in another player's bag.", go = "settings:sleepbag.main" },
+        { de = "Schlafsack: Legst du dich nach dem Aufstehen wieder in einen Sack, startet die Leiste sofort, Gasthäuser und Städte lösen sie nicht aus.", en = "Sleeping bag: lying down again in a bag starts the bar at once, inns and cities do not trigger it.", go = "settings:sleepbag.main" },
+      },
+    },
+    {
       version = "0.7.1",
+      date = "2026-11-12",
       highlights = {
       },
       fixed = {
@@ -269,17 +279,6 @@ ns.Data.Changelog = {
         { de = "Zonenübergänge: Der Pfeil wird mit Linien gezeichnet und zeigt statt der Pfeilform nicht mehr den Buchstaben Z.", en = "Zone transitions: the arrow is drawn with lines and no longer shows a letter Z instead of the arrow shape." },
         { de = "Exporte: Fenster- und Zonenübergang-Zeichenketten verlieren nach einem senkrechten Strich keinen Buchstaben mehr, ältere Zeichenketten werden weiter gelesen. Ein senkrechter Strich im Pin-Text überlebt den JSON-Export.", en = "Exports: window and zone transition strings no longer lose a letter after a pipe character, and older strings are still read. A pipe character in pin text survives the JSON export." },
         { de = "Fensterstil: Das Titelband und die obere Randlinie des Stils WoW Forever sitzen jetzt bündig am Fensterrand.", en = "Window style: the title band and the top border line of the WoW Forever style now sit flush with the window edge." },
-      },
-    },
-    {
-      version = "0.2.0",
-      date = "2026-10-19",
-      highlights = {
-        { head = { de = "Erfahrungsleiste", en = "Experience bar" }, text = { de = "Ein Fenster zeigt deine EP als Leiste mit Texten, die du selbst platzierst.", en = "A window shows your XP as a bar with texts you place yourself." } },
-        { head = { de = "Mauszeiger-Ring", en = "Mouse cursor ring" }, text = { de = "Ein Ring, eine Form oder ein Fadenkreuz folgt dem Mauszeiger, mit Zeitgebern und Bereichsanzeige.", en = "A ring, shape or crosshair follows your cursor and can show timers and range." } },
-      },
-      changed = {
-        { de = "Versionsnummer: Diese Fassung hat denselben Inhalt wie 0.1.8 und trägt die Minor-Nummer, weil die Erfahrungsleiste und der Mauszeiger-Ring zwei neue Bereiche sind.", en = "Version number: this version has the same content as 0.1.8 and carries the minor number because the experience bar and the mouse cursor ring are two new areas." },
       },
     },
   },

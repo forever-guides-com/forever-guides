@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.2
+
+### Fixed
+
+- Sleeping bag: the bar also starts at once in another player's bag.
+- Sleeping bag: lying down again in a bag starts the bar at once, inns and cities do not trigger it.
+
 ## 0.7.1
 
 ### Fixed

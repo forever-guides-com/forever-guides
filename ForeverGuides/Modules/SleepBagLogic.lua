@@ -8,18 +8,26 @@
 --   4. From lying down every REST_SECONDS the aura "Gut erholt" (RESTED_AURA, 7200 s) gains one stack, up to
 --      MAX_STACKS. Every stack renews the duration. Lying down again after a new cast adds stacks the same way; at
 --      MAX_STACKS lying only renews the duration.
--- Phases: off (setting off), ready, casting, walking, lying, aura. The walk shows "settling" (lying down) once the
+-- Phases: off (setting off), ready, candidate, casting, walking, lying, aura. The walk shows "settling" (lying down) once the
 -- player has stopped after moving. While lying the display counts the stacks: the number comes from the aura
 -- (applications) and, when the game hides it, from the own count of one stack per REST_SECONDS (marked "~").
 -- Every REST_SECONDS of lying something happens: a stack comes, or at the full number the duration is renewed. The
 -- renewal is seen as the end time of the aura (expirationTime) jumping up; it restarts the countdown, so the
 -- countdown runs for every number of stacks, also at 3/3.
 -- As long as the aura lasts the display stays: standing up (also because of a mob) keeps it in the phase "aura"
--- (stack and time left) at any number of stacks. Only the cast starts a run: a resting flag without it (cities,
--- inns set the same flag) starts nothing. A standing aura is adopted as internal state only (the bar stays hidden while
--- standing). Standing up with no stack and no aura ends the run, the machine still watches
--- for a late first stack a little longer. While lying the run is exported (Record) and put back after a /reload
--- (Restore); a standing aura is adopted again (Adopt).
+-- (stack and time left) at any number of stacks.
+-- Lying down starts the run at once, with or without the own cast, with or without the aura (StandLie): the resting
+-- flag came while the player STANDS (the bag sets it 0.0 to 0.3 s after the stop, see STOP_TOLERANCE), so it is a bag,
+-- own or of another player. A flag that comes while the player moves is a rest zone (inn, city) and starts nothing; a
+-- flag that stays on while moving ends the run silently (ZoneEnd). Standing up and lying down again starts a new run
+-- every time. The own cast is the other way in (phases casting, walking, then lying); the own bag is also remembered
+-- (BagNear, OwnRelie) for the probe log. Only where the movement is unknown (nil) the flag opens a "candidate":
+-- nothing is shown until the aura changes (a new stack, or the end time jumping up), which turns it into a run
+-- (back-dated to the flag); it ends when the player stands up or the aura it saw is gone. A candidate also covers the
+-- flag right after login or a loading screen, where an inn is entered standing. A standing aura is adopted as
+-- internal state only (the bar stays hidden while standing). Standing up with no stack and no aura ends the run, the
+-- machine still watches for a late first stack a little longer. While lying the run is exported (Record) and put
+-- back after a /reload (Restore); a standing aura is adopted again (Adopt).
 -- REST_SECONDS is the measured value; after every observed first stack the median of the last MEASURE_KEEP runs
 -- replaces it.
 local _, ns = ...
@@ -52,6 +60,26 @@ L.MEASURE_KEEP, L.MEASURE_MIN, L.MEASURE_MAX = 5, 10, 600
 L.RECORD_RESTED_MAX = 7200 + 600
 -- The end time of the aura jumping up by more than this many seconds is a renewal.
 L.RENEW_JUMP = 1
+-- The own bag: how long the add-on trusts that it still lies after the cast (seconds on the server clock). UNMEASURED:
+-- the real time a rolled-out bag stays in the game is not known; this is a guess that bounds wrong matches.
+L.BAG_LIFE = 20 * 60
+-- Yards at most between the cast spot and the player to count as standing at the own bag. UNMEASURED: lying down on
+-- the own bag measured a distance of practically 0, an inn bed 10 to 20 yards away was wrongly accepted at 0.004.
+L.BAG_NEAR_YARDS = 5
+-- Without the world size of the map: map coordinates (0 to 1 per zone), about 6 to 8 yards.
+L.BAG_NEAR = 0.0015
+-- Without a known position (instances) only the age counts: a bag younger than this many seconds is taken as near.
+L.BAG_BLIND_LIFE = 10 * 60
+-- A resting flag that comes while the player moves is a rest zone (inn, city), not the bag. MEASURED (Ratchet, 1413):
+-- lying down on the bag sets the flag 0.0 to 0.3 s after PLAYER_STOPPED_MOVING, standing up clears it 0.7 to 1.0 s
+-- after PLAYER_STARTED_MOVING; in a rest zone the flag comes during the movement and stays on while the player moves.
+-- A stop this recent (seconds) counts as standing, the two events arrive in any order.
+L.STOP_TOLERANCE = 0.6
+-- A flag that is still on this many seconds after the player began to move belongs to a rest zone (the bag clears it
+-- after 0.7 to 1.0 s).
+L.ZONE_MOVE_GRACE = 1.5
+-- A flag this many seconds after login or a loading screen is no lying down: an inn is entered standing there.
+L.LOGIN_GRACE = 5
 -- Seconds between two paints of the display.
 L.TICK = 1
 
@@ -193,9 +221,10 @@ function L.Active(st)
   return p == "casting" or p == "walking" or p == "lying" or p == "aura"
 end
 
--- True while the machine needs its events and timer: a run, or the wait for a late stack after an early end.
+-- True while the machine needs its events and timer: a run, a candidate, or the wait for a late stack after an
+-- early end.
 function L.Running(st)
-  return L.Active(st) or st.watch ~= nil
+  return L.Active(st) or st.phase == "candidate" or st.watch ~= nil
 end
 
 local function reset(st)
@@ -203,6 +232,7 @@ local function reset(st)
   st.moving, st.arrived = nil, nil
   st.auraBefore, st.stacksBefore, st.measurable, st.watch = nil, nil, nil, nil
   st.stacks, st.counted, st.stackAt, st.exp = nil, nil, nil, nil
+  st.cand = nil
 end
 
 function L.Enable(st, on)
@@ -313,7 +343,7 @@ end
 -- UNIT_SPELLCAST_SUCCEEDED. After a cast it ends the cast. Without a start event (the add-on loaded during the
 -- cast) the run begins here with the walk to the bag, nothing else is lost: the timer counts from lying down.
 function L.Succeeded(st, now, resting, aura)
-  if st.phase == "ready" or st.phase == "aura" then
+  if st.phase == "ready" or st.phase == "aura" or st.phase == "candidate" then
     reset(st)
     noteBefore(st, aura)
     walk(st, now, resting, aura)
@@ -350,17 +380,139 @@ function L.Aborted(st, now)
   end
 end
 
+-- What the aura held when the candidate began: present, the stacks (nil when hidden) and the end time.
+local function candidate(st, now, aura)
+  local present = aura and aura.present == true
+  -- A standing display (phase "aura") comes back when the candidate ends without a bag.
+  local prev = st.phase == "aura" and { stacks = st.stacks, counted = st.counted, exp = st.exp } or nil
+  reset(st)
+  st.phase, st.restAt = "candidate", now
+  st.cand = {
+    present = present,
+    stacks = present and aura.stacks or nil,
+    exp = present and aura.expiration or nil,
+    prev = prev,
+  }
+  return "candidate"
+end
+
+-- A resting flag with no run and no cast: the player may lie in a bag of someone else (see the header).
+-- Returns "candidate" when one began. `aura` is the reading now.
+function L.Candidate(st, now, aura)
+  if (st.phase == "ready" and st.watch == nil) or st.phase == "aura" then
+    return candidate(st, now, aura)
+  end
+end
+
 -- PLAYER_UPDATE_RESTING. True after the walk: the player lies, the timer starts. A resting flag without the cast of
--- the bag starts nothing: cities and inns set the same flag, and only the bag gives the aura its stacks. False while
--- lying: standing up. Lying down again in the bag takes a new cast and walk.
+-- the bag starts no run: cities and inns set the same flag, and only the bag gives the aura its stacks. It begins
+-- a candidate instead (see L.Aura). False while lying: standing up; a candidate just ends. Lying down again in the
+-- bag takes a new cast and walk, or, in a bag of someone else, a new candidate.
 function L.Resting(st, now, resting, aura)
   if resting then
     if st.phase == "walking" then
       lie(st, now, aura)
       return "lying"
     end
+    return L.Candidate(st, now, aura)
   elseif st.phase == "lying" then
     return finish(st, now, "early")
+  elseif st.phase == "candidate" then
+    local info = { reason = "stood", elapsed = math.max(0, now - st.restAt) }
+    local prev = st.cand and st.cand.prev
+    reset(st)
+    st.phase = "ready"
+    if prev then
+      st.phase, st.stacks, st.counted, st.exp = "aura", prev.stacks, prev.counted, prev.exp
+    end
+    return "candidateEnded", info
+  end
+end
+
+-- Is the player at the bag he cast himself? `bag` is { time, map, x, y } (server clock), `now` the server time and
+-- map, x, y the position of the player (nil when unknown) and `size` ({ width, height } of the map in yards, nil
+-- when unknown). Returns true or false, the reason ("near", "blind", "far", "othermap", "expired", "unknown",
+-- "none"), the number behind it (distance in map units or age in seconds) and the distance in yards (when known).
+function L.BagNear(bag, now, map, x, y, size)
+  if type(bag) ~= "table" or not finite(bag.time) or not finite(now) then
+    return false, "none"
+  end
+  local age = now - bag.time
+  if age < 0 or age > L.BAG_LIFE then
+    return false, "expired", age
+  end
+  if bag.map ~= nil and map ~= nil and bag.map ~= map then
+    return false, "othermap"
+  end
+  if bag.map ~= nil and bag.map == map and finite(bag.x) and finite(bag.y) and finite(x) and finite(y) then
+    local dx, dy = bag.x - x, bag.y - y
+    local dist = math.sqrt(dx ^ 2 + dy ^ 2)
+    local yards
+    if type(size) == "table" and finite(size.width) and finite(size.height) and size.width > 0 and size.height > 0 then
+      yards = math.sqrt((dx * size.width) ^ 2 + (dy * size.height) ^ 2)
+    end
+    local near
+    if yards then
+      near = yards <= L.BAG_NEAR_YARDS
+    else
+      near = dist <= L.BAG_NEAR
+    end
+    return near, near and "near" or "far", dist, yards
+  end
+  if age <= L.BAG_BLIND_LIFE then
+    return true, "blind", age
+  end
+  return false, "unknown", age
+end
+
+-- The player lies down again at the own bag with the aura on and no new cast: the add-on knows the bag, so the run
+-- starts now (no candidate, no wait for a change of the aura). The countdown starts at the stacks the aura has.
+function L.OwnRelie(st, now, aura)
+  if not ((st.phase == "ready" and st.watch == nil) or st.phase == "aura") or not (aura and aura.present) then
+    return nil
+  end
+  reset(st)
+  noteBefore(st, aura)
+  lie(st, now, aura)
+  return "lying"
+end
+
+-- The resting flag came while the player stands: he lies down in a bag (own or of another player), the run starts
+-- now, with or without the aura. Works from ready (also while a late stack is awaited) and from the standing display.
+function L.StandLie(st, now, aura)
+  if not ((st.phase == "ready") or st.phase == "aura") then
+    return nil
+  end
+  reset(st)
+  noteBefore(st, aura)
+  lie(st, now, aura)
+  return "lying"
+end
+
+-- Does the player stand? `moving` is what the game says (nil when unknown), `sinceStop` the seconds since the last
+-- PLAYER_STOPPED_MOVING (nil when none). Returns true, false or nil (unknown).
+function L.Standing(moving, sinceStop)
+  if moving == nil then
+    return nil
+  end
+  if moving and sinceStop and sinceStop >= 0 and sinceStop <= L.STOP_TOLERANCE then
+    return true
+  end
+  return not moving
+end
+
+-- The flag stayed on while the player moves for ZONE_MOVE_GRACE: a rest zone. The run or candidate ends without a
+-- message (reason "idle"); the own bag stays remembered, it is not gone.
+function L.ZoneEnd(st, now)
+  if st.phase == "lying" then
+    local result, info = finish(st, now, "idle")
+    st.watch = nil
+    return result, info
+  elseif st.phase == "candidate" then
+    return L.Resting(st, now, false)
+  elseif st.phase == "ready" and st.watch then
+    -- The first step already ended the run; a zone gives no late stack.
+    st.watch = nil
   end
 end
 
@@ -495,17 +647,54 @@ local function watched(st, now, aura)
   return "stacked", measured
 end
 
+-- A reading of the aura during a candidate. A stack above the one seen, an end time that jumped up, or an aura that
+-- was missing and is there now: the bag did it, the candidate becomes a run (back-dated to lying down; the stack or
+-- renewal happened now). The aura it saw gone ends the candidate. Anything else (the aura only running down) only
+-- updates what was seen. Returns "confirmed" with { from, to, refresh } or "candidateEnded" with { reason }.
+function L.CandidateAura(st, now, aura)
+  local c = st.cand
+  if st.phase ~= "candidate" or not c then
+    return nil
+  end
+  if not (aura and aura.present) then
+    if c.present then
+      local info = { reason = "aura", elapsed = math.max(0, now - st.restAt) }
+      reset(st)
+      st.phase = "ready"
+      return "candidateEnded", info
+    end
+    return nil
+  end
+  local seen, exp = aura.stacks, aura.expiration
+  local fresh = not c.present
+  local rose = seen ~= nil and c.stacks ~= nil and seen > c.stacks
+  local jumped = finite(exp) and finite(c.exp) and exp > c.exp + L.RENEW_JUMP
+  if not (fresh or rose or jumped) then
+    c.present, c.stacks, c.exp = true, seen, finite(exp) and exp or c.exp
+    return nil
+  end
+  local restAt = st.restAt
+  local info = { from = fresh and 0 or c.stacks, to = seen, refresh = not (fresh or rose) }
+  reset(st)
+  st.phase, st.restAt, st.stackAt = "lying", restAt, now
+  st.stacks, st.counted, st.exp = seen or 1, seen == nil, finite(exp) and exp or nil
+  st.measurable = false
+  return "confirmed", info
+end
+
 -- UNIT_AURA of the player with the reading of the aura. Returns "stacked" and whether the time counts as a
 -- measurement, "reset" (the aura ended while lying) or "faded" (the aura ended after standing up).
 function L.Aura(st, now, aura)
-  if st.phase == "ready" and st.watch then
+  if st.phase == "candidate" then
+    return L.CandidateAura(st, now, aura)
+  elseif st.phase == "ready" and st.watch then
     return watched(st, now, aura)
   elseif st.phase == "lying" or st.phase == "aura" then
     return observe(st, now, aura)
   end
 end
 
--- A timer step (once a second while the machine runs): runs that lost their end events end here, the own count
+-- A timer step (once a second while the machine runs): a candidate looks at the aura, runs that lost their end events end here, the own count
 -- advances, and the reading of the aura (`aura`, nil when not read) catches up with missed events.
 function L.Tick(st, now, aura)
   local phase = st.phase
@@ -522,6 +711,10 @@ function L.Tick(st, now, aura)
       event = event or "stacked"
     end
     return event, measured
+  elseif phase == "candidate" then
+    if aura ~= nil then
+      return L.CandidateAura(st, now, aura)
+    end
   elseif st.watch then
     if aura ~= nil and aura.present then
       return watched(st, now, aura)

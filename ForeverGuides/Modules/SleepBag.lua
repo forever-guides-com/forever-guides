@@ -9,7 +9,7 @@
 -- The game calls live here, the state machine and the texts in Modules/SleepBagLogic.lua. Nothing runs while
 -- the setting is off or no run is on: the cast events and PLAYER_UPDATE_RESTING (the lying down after the walk starts
 -- the run) are registered while the setting is on, the events of moving, fights and auras and the one second timer
--- only while a run (or the wait for a late aura) lasts. The window is no protected frame,
+-- only while a run, a candidate (resting without the own cast) or the wait for a late aura lasts. The window is no protected frame,
 -- so it shows and moves in combat. Position: ns.db.frames.sleepBag, runs: ns.db.sleepBagTimes.
 local _, ns = ...
 local W, L, U = ns.W, ns.L, ns.U
@@ -94,9 +94,11 @@ local CAST_EVENTS = {
   "UNIT_SPELLCAST_INTERRUPTED",
   "UNIT_SPELLCAST_FAILED",
 }
--- PLAYER_UPDATE_RESTING is registered while the setting is on: lying down with the aura on starts a run.
-local REST_EVENTS = { "PLAYER_UPDATE_RESTING" }
-local RUN_EVENTS = { "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING", "PLAYER_REGEN_DISABLED" }
+-- PLAYER_UPDATE_RESTING is registered while the setting is on: it opens a candidate (a bag of someone else) that
+-- the first change of the aura turns into a run.
+-- The movement events are on with it: the bag shows itself by the player standing when the flag comes.
+local REST_EVENTS = { "PLAYER_UPDATE_RESTING", "PLAYER_STARTED_MOVING", "PLAYER_STOPPED_MOVING" }
+local RUN_EVENTS = { "PLAYER_REGEN_DISABLED" }
 -- The resting flag can lag behind the loading screen after a /reload: the saved run is tried again after these delays.
 local RESTORE_DELAYS = { 1, 4 }
 
@@ -407,6 +409,128 @@ local function syncRun()
   end
 end
 
+-- Movement ---------------------------------------------------------------------------------------------------------
+
+-- The last movement event ("start" or "stop") and the times of the last start and stop (GetTime).
+local lastMove, lastStart, lastStop
+-- The time of a resting flag that was ignored because the player moved (a stop right after still counts).
+local pendingFlag
+-- Counts the zone timers; a timer only acts while its number is the current one.
+local zoneTimer = 0
+
+-- Standing (true), moving (false) or unknown (nil): IsPlayerMoving, else the last movement event.
+local function standingNow(now)
+  local fn = rawget(_G, "IsPlayerMoving")
+  local moving
+  if type(fn) == "function" then
+    local ok, value = pcall(fn)
+    if ok and type(value) == "boolean" then
+      moving = value
+    end
+  end
+  if moving == nil and lastMove then
+    moving = lastMove == "start"
+  end
+  -- A stop only counts as recent when no start came after it.
+  return SL.Standing(moving, lastMove == "stop" and lastStop and now - lastStop or nil)
+end
+
+local function since(time, now)
+  return time and string.format("%.1fs", now - time) or "-"
+end
+
+-- The own bag ------------------------------------------------------------------------------------------------------
+
+-- Where and when the player rolled out the bag: { time (server clock), map, x, y }. Kept in memory and in
+-- ns.charDB.sleepBagOwn (four numbers) so a /reload does not lose it. It lets lying down again at the own bag start
+-- the run at once (SleepBagLogic.OwnRelie); the position fields stay nil where the game hides them (instances).
+local ownBag
+
+local function plainNumber(value)
+  return type(value) == "number" and not isSecret(value) and value == value and value or nil
+end
+
+local function playerMapPosition()
+  local api = rawget(_G, "C_Map")
+  if type(api) ~= "table" or type(api.GetBestMapForUnit) ~= "function" then
+    return nil
+  end
+  local ok, map = pcall(api.GetBestMapForUnit, "player")
+  map = ok and plainNumber(map) or nil
+  if not map or type(api.GetPlayerMapPosition) ~= "function" then
+    return map
+  end
+  local posOk, pos = pcall(api.GetPlayerMapPosition, map, "player")
+  if not posOk or type(pos) ~= "table" or type(pos.GetXY) ~= "function" then
+    return map
+  end
+  local xyOk, x, y = pcall(pos.GetXY, pos)
+  if xyOk and plainNumber(x) and plainNumber(y) then
+    return map, x, y
+  end
+  return map
+end
+
+-- Width and height of the map in yards, nil when the client cannot say.
+local function mapSize(map)
+  local api = rawget(_G, "C_Map")
+  if not map or type(api) ~= "table" or type(api.GetMapWorldSize) ~= "function" then
+    return nil
+  end
+  local ok, width, height = pcall(api.GetMapWorldSize, map)
+  if ok and plainNumber(width) and plainNumber(height) then
+    return { width = width, height = height }
+  end
+end
+
+-- Raw line for the developer probe (/fg dev sleepprobe), only while it is armed.
+local function probeNote(text)
+  local probe = rawget(ns, "SleepProbe")
+  if type(probe) == "table" and type(probe.Note) == "function" then
+    pcall(probe.Note, text)
+  end
+end
+
+local function forgetBag()
+  ownBag = nil
+  if ns.charDB then
+    ns.charDB.sleepBagOwn = nil
+  end
+end
+
+local function rememberBag()
+  local time = serverNow()
+  if not plainNumber(time) then
+    return
+  end
+  local map, x, y = playerMapPosition()
+  ownBag = { time = time, map = map, x = x, y = y }
+  if ns.charDB then
+    ns.charDB.sleepBagOwn = { time = time, map = map, x = x, y = y }
+  end
+  local function round(v)
+    return v and string.format("%.3f", v) or "?"
+  end
+  probeNote(string.format("OWN BAG remembered (map %s, x %s, y %s)", tostring(map), round(x), round(y)))
+end
+
+local function currentBag()
+  if ownBag == nil and ns.charDB and type(ns.charDB.sleepBagOwn) == "table" then
+    local saved = ns.charDB.sleepBagOwn
+    ownBag = { time = plainNumber(saved.time), map = plainNumber(saved.map), x = plainNumber(saved.x), y = plainNumber(saved.y) }
+  end
+  return ownBag
+end
+
+local function inCombat()
+  local fn = rawget(_G, "UnitAffectingCombat")
+  if type(fn) ~= "function" then
+    return false
+  end
+  local ok, value = pcall(fn, "player")
+  return ok and value == true
+end
+
 -- Keeps the saved run equal to the machine: written when it changes, removed when the run is over.
 local function saveRun()
   local db = ns.charDB
@@ -455,12 +579,139 @@ local function settle(result, info)
   if result == "stacked" and info then
     ns.db.sleepBagTimes = state.measures
   end
+  if result == "faded" or result == "reset" then
+    forgetBag()
+  end
   syncRun()
   saveRun()
   SB.Paint()
   if result == "ended" then
     message(info)
   end
+end
+
+local function yardText(yards)
+  return yards and string.format("%.1f yd, ", yards) or ""
+end
+
+-- The resting flag without a new cast: is it the own bag that is still on the ground? Returns true when the run
+-- started (the bag is near), logs the verdict for the probe.
+local function relieAtOwnBag(now, aura)
+  local bag = currentBag()
+  if not bag or inCombat() or not (aura and aura.present) or not (state.phase == "aura" or state.phase == "ready") then
+    return nil
+  end
+  local map, x, y = playerMapPosition()
+  local near, reason, number, yards = SL.BagNear(bag, serverNow(), map, x, y, mapSize(map))
+  if reason == "none" then
+    return nil
+  end
+  local clock = SL.Clock(number)
+  if near then
+    local result, info = SL.OwnRelie(state, now, aura)
+    if result then
+      probeNote(
+        reason == "near" and string.format("OWN BAG relie: near (%sdist %.4f), run started", yardText(yards), number)
+          or string.format("OWN BAG relie: position unknown, age %s, run started", clock or "?")
+      )
+    end
+    return result, info
+  end
+  if reason == "far" then
+    probeNote(string.format("OWN BAG relie skipped: far (%sdist %.4f)", yardText(yards), number))
+  elseif reason == "othermap" then
+    probeNote("OWN BAG relie skipped: other map")
+  elseif reason == "expired" then
+    probeNote("OWN BAG relie skipped: expired")
+  else
+    probeNote(string.format("OWN BAG relie skipped: position unknown, age %s", clock or "?"))
+  end
+  return nil
+end
+
+-- The flag came while the player stands: a bag of any owner. Starts the run at once.
+local function standLie(now, aura)
+  if inCombat() then
+    return nil
+  end
+  local result, info = SL.StandLie(state, now, aura)
+  if result then
+    probeNote("STAND LIE started (foreign or own bag, standing)")
+  end
+  return result, info
+end
+
+-- Seconds on the GetTime clock of the last world entry (login, reload, loading screen).
+local enteredAt
+
+-- A flag (true) came while the player moves: nothing starts, and a stop right after still counts (see pendingFlag).
+local function restFlag(now)
+  local lies = resting()
+  if not lies then
+    zoneTimer, pendingFlag = zoneTimer + 1, nil
+  end
+  local standing
+  if lies then
+    standing = standingNow(now)
+  end
+  probeNote(
+    string.format(
+      "REST CHANGE %s moving=%s sinceStop=%s sinceStart=%s zone-or-bag=?",
+      tostring(lies),
+      standing == nil and "?" or (standing and "0" or "1"),
+      since(lastStop, now),
+      since(lastStart, now)
+    )
+  )
+  if standing == false and (state.phase == "ready" or state.phase == "aura") then
+    pendingFlag = now
+    probeNote("REST START ignored: the player moves")
+    return nil
+  end
+  pendingFlag = nil
+  local aura = lies and readAura() or nil
+  local result, info
+  if lies then
+    result, info = relieAtOwnBag(now, aura)
+  end
+  if lies and not result and standing == true then
+    if enteredAt and now - enteredAt <= SL.LOGIN_GRACE then
+      probeNote("STAND LIE skipped: right after world entry")
+      if ns.charDB and ns.charDB.sleepBagRun ~= nil then
+        return nil
+      end
+    else
+      result, info = standLie(now, aura)
+    end
+  end
+  if not result then
+    result, info = SL.Resting(state, now, lies, aura)
+  end
+  return result, info
+end
+
+local function zoneExpired(token)
+  if token ~= zoneTimer or not resting() then
+    return
+  end
+  local result, info = SL.ZoneEnd(state, nowSeconds())
+  if result then
+    probeNote(string.format("RESTZONE detected: resting stays true while moving (%s s)", tostring(SL.ZONE_MOVE_GRACE)))
+  end
+  settle(result, info)
+end
+
+-- The player begins to move with a run or candidate on: if the flag is still on after ZONE_MOVE_GRACE it is a zone.
+local function watchZone()
+  local phase, after = state.phase, rawget(_G, "C_Timer")
+  if (phase ~= "lying" and phase ~= "candidate") or not resting() or type(after) ~= "table" then
+    return
+  end
+  zoneTimer = zoneTimer + 1
+  local token = zoneTimer
+  pcall(after.After, SL.ZONE_MOVE_GRACE, function()
+    ns.Safe("sleepbag-zone", zoneExpired, token)
+  end)
 end
 
 local function plainId(value)
@@ -491,15 +742,23 @@ local function onEvent(_, event, unit, _, spellId)
       result, info = SL.Aura(state, now, readAura())
     end
   elseif event == "PLAYER_UPDATE_RESTING" then
-    local lies = resting()
-    result, info = SL.Resting(state, now, lies, lies and readAura() or nil)
+    result, info = restFlag(now)
   elseif event == "PLAYER_REGEN_DISABLED" then
     result, info = SL.Combat(state, now)
   elseif event == "PLAYER_STARTED_MOVING" then
+    lastMove, lastStart = "start", now
+    watchZone()
     result, info = SL.Moved(state, now)
   elseif event == "PLAYER_STOPPED_MOVING" then
+    lastMove, lastStop = "stop", now
     result, info = SL.Arrived(state)
+    if pendingFlag and now - pendingFlag <= SL.STOP_TOLERANCE and resting() then
+      result, info = restFlag(now)
+    end
   elseif unit == "player" and plainId(spellId) == SL.UNROLL_SPELL then
+    if event == "UNIT_SPELLCAST_SUCCEEDED" then
+      rememberBag()
+    end
     result, info = onCast(event)
   else
     return
@@ -511,7 +770,7 @@ end
 
 -- One step of the timer: stale runs end, the display repaints.
 function SB.Tick()
-  local reads = state.phase == "lying" or state.phase == "aura" or state.watch ~= nil
+  local reads = state.phase == "lying" or state.phase == "aura" or state.phase == "candidate" or state.watch ~= nil
   local result, info = SL.Tick(state, nowSeconds(), reads and readAura() or nil)
   settle(result, info)
 end
@@ -547,6 +806,9 @@ function SB.Apply()
     setEvents(on, REST_EVENTS)
   end
   SL.Enable(state, on)
+  if not on then
+    zoneTimer, pendingFlag = zoneTimer + 1, nil
+  end
   if not on and ns.charDB then
     ns.charDB.sleepBagRun = nil
   end
@@ -568,6 +830,19 @@ function SB.Restore(final)
     db.sleepBagRun = nil
   end
   return restored
+end
+
+-- The player rests after a /reload or login with no saved run (a bag of someone else): a candidate like the
+-- resting flag would have opened it. The moment of lying down is lost, so it counts from now.
+function SB.Candidate()
+  if not SB.Enabled() or not resting() or standingNow(nowSeconds()) == false then
+    return false
+  end
+  local result = SL.Candidate(state, nowSeconds(), readAura())
+  if result then
+    settle(result)
+  end
+  return result ~= nil
 end
 
 -- A standing aura with no run behind it (login, /reload, the setting turned on) is kept as the phase "aura" (internal
@@ -606,12 +881,17 @@ local function restoreOrAdopt(final)
   if SB.Restore(final) then
     return
   end
-  if final then
+  if final and not SB.Candidate() then
     SB.Adopt()
   end
 end
 
 ns.On("PLAYER_ENTERING_WORLD", function()
+  enteredAt = nowSeconds()
+  local bag, map = currentBag(), playerMapPosition()
+  if bag and bag.map ~= nil and map ~= nil and bag.map ~= map then
+    forgetBag()
+  end
   if SB.Restore(false) then
     return
   end
@@ -629,7 +909,7 @@ end)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and path:find("^settings%.sleepBag") then
     SB.Apply()
-    if not (ns.charDB and ns.charDB.sleepBagRun ~= nil) then
+    if not (ns.charDB and ns.charDB.sleepBagRun ~= nil) and not SB.Candidate() then
       SB.Adopt()
     end
   end
