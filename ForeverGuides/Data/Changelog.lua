@@ -5,7 +5,16 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.1",
+      highlights = {
+      },
+      fixed = {
+        { de = "Tooltips: Tooltips liegen im Einrichtungsfenster und anderen Fenstern über dem Fensterrahmen.", en = "Tooltips: tooltips sit above the frame in the setup window and other windows." },
+      },
+    },
+    {
       version = "0.7.0",
+      date = "2026-11-11",
       highlights = {
         { head = { de = "Chat-Name", en = "Chat name" }, text = { de = "Auf Wunsch steht dein Name vor deinen Nachrichten, mit Klammern, Profil und Klassenfarbe.", en = "Your name can stand in front of your messages, with brackets, a profile and class color." }, go = "settings:chatname.main" },
         { head = { de = "Angeln mit Hilfe und Journal", en = "Fishing with help and a journal" }, text = { de = "Eine Taste wirft aus und holt ein, das Journal zeigt jeden Fang und jeden Angelplatz mit Chancen.", en = "One key casts and reels in, and the journal shows every catch and fishing place with its chances." }, go = "settings:fishing.cast" },
@@ -271,47 +280,6 @@ ns.Data.Changelog = {
       },
       changed = {
         { de = "Versionsnummer: Diese Fassung hat denselben Inhalt wie 0.1.8 und trägt die Minor-Nummer, weil die Erfahrungsleiste und der Mauszeiger-Ring zwei neue Bereiche sind.", en = "Version number: this version has the same content as 0.1.8 and carries the minor number because the experience bar and the mouse cursor ring are two new areas." },
-      },
-    },
-    {
-      version = "0.1.8",
-      date = "2026-10-19",
-      highlights = {
-        { head = { de = "Neue Erfahrungsleiste", en = "New experience bar" }, text = { de = "Vier Vorlagen, Pause und Reset für die Sitzung und Prozente über mehrere Stufen.", en = "Four presets, pause and reset for the session, and percentages across several levels." } },
-        { head = { de = "Mauszeiger-Ring", en = "Mouse cursor ring" }, text = { de = "Ein Ring, eine Form oder ein Fadenkreuz folgt dem Mauszeiger, standardmäßig ist er aus.", en = "A ring, shape or crosshair follows the mouse cursor, and it is off by default." } },
-        { head = { de = "Layout-Editor", en = "Layout editor" }, text = { de = "Leisten, Texte und Rechtecke setzt du mit Farben, Schrift und Platzhaltern selbst.", en = "Place bars, texts and rectangles yourself, with colors, fonts and placeholders." } },
-        { head = { de = "Zeitgeber am Zeiger", en = "Timers at the cursor" }, text = { de = "Globale Abklingzeit, Zauberleiste und Waffenschlag erscheinen als Ring oder Balken am Zeiger.", en = "Global cooldown, casting and weapon swing show as a ring or a bar at the cursor." } },
-      },
-      added = {
-        { de = "Erfahrungsleiste: Ein neues Fenster zeigt die Erfahrung als Leiste mit frei platzierbaren Texten, die Prozente rechnen über mehrere Stufen.", en = "A new experience bar window shows your XP as a bar with texts you place yourself, and percentages count across several levels." },
-        { de = "Erfahrungsleiste: Vier Vorlagen, ein Klick auf die Leiste öffnet ein Menü mit Symbolen, Anheften fixiert die Position, ein Stift-Knopf öffnet den Layout-Editor.", en = "The experience bar has four presets. A click on it opens a menu, pinning fixes the position, and a pencil button opens the layout editor." },
-        { de = "Layout-Editor: Balken, Texte und Rechtecke mit Farben, Schrift, Größe und Platzhaltern, ein Text kann einen Hintergrund haben, eine Warnung nennt zu wenig Kontrast.", en = "Layout editor: set bars, texts and rectangles with colors, font, size and placeholders. A text can have a background, and a warning names too little contrast." },
-        { de = "Mauszeiger-Ring: Ein Ring, eine Form oder ein Fadenkreuz folgt dem Mauszeiger, mit Vorlagen und eigenen Layouts aus dem Layout-Editor. Er ist standardmäßig aus, dann läuft nichts dafür.", en = "Mouse cursor ring: a ring, shape or crosshair follows the mouse cursor, with presets and layouts of your own from the layout editor. It is off by default, and while it is off nothing runs for it." },
-        { de = "Mauszeiger-Ring: Zeitgeber für die globale Abklingzeit, für Zaubern und Kanalisieren (mit Blitz bei Abbruch) und für den Schwung je Waffe (Waffenhand, Schildhand, Fernkampf) als Ring oder Balken.", en = "Mouse cursor ring: timers for the global cooldown, for casting and channeling (with a flash on interrupt) and for the swing of each weapon (main hand, off hand, ranged) as a ring or a bar." },
-        { de = "Mauszeiger-Ring: Elementtyp Spur (kurzlebige Teilchen oder Blitze hinter dem Zeiger, bei reduzierter Bewegung aus) und Elementtyp Klick-Effekt (wachsender Ring bei Links- und Rechtsklick).", en = "Mouse cursor ring: the Trail element shows particles or lightning behind the pointer, and the Click effect element a growing ring on left and right click. Reduced motion turns the trail off." },
-        { de = "Mauszeiger-Ring: Das Element Reichweite zeigt, ob das Ziel in Reichweite, außer Reichweite oder unbekannt ist, als Ring, als Punkt, als Text mit dem Entfernungsbereich (0-5 bis 35+ Meter) oder beides.", en = "Mouse cursor ring: the range element shows whether the target is in range, out of range or unknown, as a ring, a dot, text with the distance band (0-5 up to 35+ yards) or both." },
-        { de = "Erfahrungsleiste: Ohne Titelleiste und Rahmen, gelöst ziehst du die Leiste selbst, ein Griff unten rechts skaliert, ein Klick holt das Fenster nach vorn.", en = "The experience bar has no title bar or frame. Unpinned, drag the bar itself and scale it with the grip at the bottom right. A click brings the window to the front." },
-        { de = "Erfahrungsleiste: Sitzung pausieren und zurücksetzen, Zeit je Stufe aus der Spielzeit, Prozente, Rested und Ziele enden auf der höchsten Stufe, die dein Spiel erlaubt.", en = "Pause and reset the session and see the time per level from your played time. Percentages, rested XP and targets end at the highest level your game allows." },
-        { de = "Erfahrungsleiste: Optionale Chat-Meldung beim Stufenaufstieg, wahlweise im eigenen Chatfenster, an die Gruppe, die Gilde oder per Sagen (das Spiel sperrt Sagen für Addons meist, dann gibt es einen Hinweis).", en = "An optional chat message at a level up goes to your own chat window, the group, the guild or Say. The game usually blocks Say for add-ons, so you get a hint and the line in your own window." },
-        { de = "Erfahrungsleiste: Eine eigene Seite im Bereich Werkzeuge bündelt alle Einstellungen, dazu der Befehl /fg erfahrung (auch xp, xpbar), eine Tastenbindung und eine Einstellungskarte im Reiter Allgemein.", en = "A page in the tools area gathers all experience bar settings. The command /fg xp (also erfahrung, xpbar) takes pause, reset, edit, time and chat, and a key binding and a settings card are included." },
-        { de = "Erfahrungsleiste: Layouts lassen sich anlegen, duplizieren, umbenennen und löschen, auf der Seite, im Klickmenü und im Layout-Editor.", en = "Experience bar layouts can be created, duplicated, renamed and deleted, on the page, in the click menu and in the layout editor." },
-        { de = "Layout-Editor: Ein schmales Band unter der Titelleiste vereint Speichern, Rückgängig, Wiederholen, Zurücksetzen, Export und Import, daneben steht die Layout-Liste, ein Stern markiert ungespeicherte Änderungen, ein Dialog fragt vor dem Wechsel.", en = "Layout editor: a slim band under the title bar holds save, undo, redo, reset, export and import, and the layout list sits beside it. A star marks unsaved changes, and a dialog asks before you switch." },
-        { de = "Layout-Editor: Acht Griffe ändern Breite und Höhe in der Vorschau, der Rand hat eine eigene Deckkraft, Live, Info, Raster und echte Werte stehen in einer Zeile.", en = "Layout editor: eight handles change width and height in the preview, the border has its own opacity, and Live, info, grid and real values sit in one row." },
-        { de = "Layout-Editor: Elemente lassen sich hinzufügen, entfernen (Papierkorb, Strg+Z holt sie zurück) und umbenennen (F2), Namen bleiben bei Export und Import erhalten, jeder Typ hat eine kurze Beschreibung.", en = "Layout editor: add, remove (trash button, Ctrl+Z brings it back) and rename elements (F2). Names survive export and import, and every element type has a short description." },
-        { de = "Mauszeiger-Ring: Farbe, Deckkraft, Drehung, Überblendung, Linienstärke (1 bis 64 Pixel) und eine eigene Füllung sind einstellbar, alle acht Formen gibt es auch gefüllt.", en = "Mouse cursor ring: color, opacity, rotation, blending, line thickness (1 to 64 pixels) and an inner fill are adjustable, and all eight shapes also exist filled." },
-        { de = "Mauszeiger-Ring: Sichtbarkeitsregeln für Kampf, Instanzen, Ziel, Reittier und Fahrzeug, die Wahl der Bildschirmebene und das Verhalten beim Drehen der Kamera.", en = "Mouse cursor ring: visibility rules for combat, instances, target, mount and vehicle, the screen layer, and the behavior while the camera turns (hide, keep at the cursor, screen center)." },
-        { de = "Mauszeiger-Ring: Befehl /fg mauszeiger (auch cursor, ring) mit an, aus, edit und reset, dazu eine Tastenbindung, eine Einstellungskarte im Reiter Allgemein und eine Seite im Bereich Werkzeuge.", en = "Mouse cursor ring: the command /fg cursor (also mauszeiger, ring) takes on, off, edit and reset. A key binding, a settings card on the General tab and a page in the tools area are included." },
-        { de = "Mauszeiger-Ring: Sind die eigenen Schwungleisten des Spiels an, weist das Panel des Schwung-Zeitgebers darauf hin und ändert die Einstellung nie.", en = "Mouse cursor ring: when the game's own swing bars are on, the panel of the swing timer points it out and never changes the setting." },
-        { de = "Mauszeiger-Ring: Lebensring und Ressourcenring mit Startpunkt, Richtung und Farben, bei wenig Leben rot. Das Spiel verbirgt diese Werte vor Addons, darum zeigen die Ringe keine Zahlen.", en = "Mouse cursor ring: a health ring and a resource ring with start point, direction and colors, red at low health. The game hides these values from add-ons, so the rings show no numbers." },
-        { de = "Mauszeiger-Ring: Die Reichweite fragt automatisch zuerst deine Zauber, dann Gegenstände und die Interaktion, oder nach Wahl Nahkampf, eine Entfernung oder einen Zauber, die Statuszeile nennt die antwortende Quelle.", en = "Mouse cursor ring: the range check asks your spells first, then items and the interact distance, or you choose melee, a distance or a spell. The status line names the source." },
-        { de = "Mauszeiger-Ring: Weitere Vorlagen (Ring mit Spur, Ring mit Klick-Effekt, Zeitgeber, Schwung-Zeitgeber, Leben, Ressource und Reichweite, Entfernungstext) und im Editor eine Vorschau mit Simulation.", en = "Mouse cursor ring: more presets (ring with trail, ring with click effect, timers, swing timer, health, resource and range, distance text) and an editor preview with simulation." },
-      },
-      changed = {
-        { de = "Auswahllisten: Zwischen Beschriftung und Feld ist etwas mehr Abstand.", en = "Dropdowns have a little more space between the label and the field." },
-      },
-      fixed = {
-        { de = "Tastendruck im Kampf bei offenem Fenster: Die Fehlerliste bekommt keine Einträge mehr.", en = "Pressing keys in combat with a window open no longer adds entries to the error list." },
-        { de = "Schieberegler folgen dem Mauszeiger, solange die Maustaste gehalten wird, das Mausrad scrollt die Seite, außer ein Regler wurde angeklickt.", en = "Sliders follow the pointer while you hold the mouse button, and the mouse wheel scrolls the page unless a slider was pressed." },
       },
     },
   },

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.1
+
+### Fixed
+
+- Tooltips: tooltips sit above the frame in the setup window and other windows.
+
 ## 0.7.0
 
 ### Added

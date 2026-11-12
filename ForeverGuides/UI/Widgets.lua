@@ -219,9 +219,13 @@ local function specItem(spec)
   end
 end
 
--- Puts the shared tooltip over its owner: another add-on may have moved it out of the top strata, and a
+-- Puts the shared tooltip over its owner's window: another add-on may have moved it out of the top strata, and a
 -- popup in the TOOLTIP strata would otherwise sit above the tooltip of its own entries. Every code path
 -- that fills GameTooltip itself calls this after SetOwner (tests/test_strata.lua).
+-- In the TOOLTIP strata the level is the engine maximum (TopLayer.LEVEL_CAP): window borders, edge frames and
+-- the overlays of TopLayer (pinned window around 9000 plus up to five layers) all lie below it.
+Tooltip.TOP_LEVEL = 10000
+
 function Tooltip.Lift(tip, owner)
   if not tip then
     return
@@ -230,7 +234,7 @@ function Tooltip.Lift(tip, owner)
     tip:SetFrameStrata("TOOLTIP")
   end
   if owner and owner.GetFrameStrata and owner:GetFrameStrata() == "TOOLTIP" and tip.SetFrameLevel then
-    tip:SetFrameLevel(owner:GetFrameLevel() + 10)
+    tip:SetFrameLevel(Tooltip.TOP_LEVEL)
   end
 end
 

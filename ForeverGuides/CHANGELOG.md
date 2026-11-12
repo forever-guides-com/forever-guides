@@ -4,6 +4,12 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.1] - 2026-11-12
+
+### Fixed
+
+- Tooltips: tooltips sit above the frame in the setup window and other windows.
+
 ## [0.7.0] - 2026-11-11
 
 ### Added
@@ -462,6 +468,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.5...v0.6.0
 [0.5.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.5.4...v0.5.5
