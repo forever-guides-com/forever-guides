@@ -74,6 +74,18 @@
   <Binding name="FOREVERGUIDES_FARMHUD" category="BINDING_HEADER_FOREVERGUIDES">
     ForeverGuides.KeyBindings.FarmHud()
   </Binding>
+  <Binding name="FOREVERGUIDES_FARMHUD_ZOOM_IN" category="BINDING_HEADER_FOREVERGUIDES">
+    ForeverGuides.KeyBindings.FarmHudZoomIn()
+  </Binding>
+  <Binding name="FOREVERGUIDES_FARMHUD_ZOOM_OUT" category="BINDING_HEADER_FOREVERGUIDES">
+    ForeverGuides.KeyBindings.FarmHudZoomOut()
+  </Binding>
+  <Binding name="FOREVERGUIDES_FARMHUD_BIGGER" category="BINDING_HEADER_FOREVERGUIDES">
+    ForeverGuides.KeyBindings.FarmHudBigger()
+  </Binding>
+  <Binding name="FOREVERGUIDES_FARMHUD_SMALLER" category="BINDING_HEADER_FOREVERGUIDES">
+    ForeverGuides.KeyBindings.FarmHudSmaller()
+  </Binding>
   <Binding name="FOREVERGUIDES_FISHING_CAST" category="BINDING_HEADER_FOREVERGUIDES">
     ForeverGuides.KeyBindings.Fishing()
   </Binding>

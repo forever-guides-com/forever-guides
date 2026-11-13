@@ -19,7 +19,6 @@ Logic.TEXTURE_IDS = { Logic.STAR_TEXTURE, Logic.GLOW_TEXTURE }
 Logic.AUTO_PREFERS_MODEL = false
 Logic.TEXTURE_FALLBACK = "Interface\\Cooldown\\star4"
 
-Logic.STYLES = { "auto", "original", "particles" }
 Logic.CATEGORIES = { "ore", "herbs", "quest" }
 
 -- Timing in seconds: poll of the soft target, hold time before a state change, cross fade between
@@ -32,12 +31,12 @@ Logic.FADE_OUT = 0.3
 Logic.STEP = 1 / 30
 
 -- Look of the effect in a state: color and brightness, plus the dark color of the layer behind the glow
--- (it keeps the effect readable on bright ground, where additive light vanishes). Gold when ready,
+-- (it keeps the effect readable on bright ground, where additive light vanishes). Warm amber white when ready,
 -- dimmed when too far, gray when the skill is too low. No state is fainter than MIN_ALPHA once faded in.
 Logic.MIN_ALPHA = 0.5
 local LOOKS = {
-  ready = { r = 1, g = 0.88, b = 0.52, a = 1, dr = 0.45, dg = 0.3, db = 0.04 },
-  far = { r = 1, g = 0.88, b = 0.52, a = 0.6, dr = 0.35, dg = 0.24, db = 0.03 },
+  ready = { r = 1, g = 0.93, b = 0.76, a = 1, dr = 0.42, dg = 0.31, db = 0.12 },
+  far = { r = 1, g = 0.93, b = 0.76, a = 0.6, dr = 0.33, dg = 0.25, db = 0.09 },
   locked = { r = 0.62, g = 0.62, b = 0.62, a = 0.5, dr = 0.2, dg = 0.2, db = 0.2 },
 }
 Logic.LOOKS = LOOKS
@@ -51,6 +50,534 @@ Logic.RADIUS = 46
 Logic.HOST_SIZE = 128
 Logic.HOST_STRATA = "HIGH"
 Logic.HOST_LEVEL = 500
+
+-- The selectable styles, in the order of the dropdown. Every entry has the key and the locale key of its
+-- name. kind "sprites" draws count textures (textures are file data ids of the client, used in turn;
+-- sizeMin and sizeMax in pixels at 100 percent size, radius the spread; atlas is tried first where the
+-- client knows it; fallback is the id drawn when neither resolves, nil keeps the cooldown star). Their
+-- motion is a driver with parameters: none or "fade" lets the sprites fade in and out at random places
+-- (life stretches the fade times, drift is the speed in pixels per second, rise or sink point the drift
+-- up or down, glow adds the dark layer and the pulsing glow of the original look), "spot" keeps them at
+-- fixed places and pulses them (see Logic.Pose), "loop" flies them along a closed path with an optional
+-- trail, "ping" lets a ring or flash expand and fade, "fall" lets sprites sink along a lane and fade at both
+-- ends (sway, spin). sheet = { cols, rows, fps } animates the frames of a sprite sheet through TexCoord;
+-- sheet.fixed gives every sprite one cell for good instead (step cells apart, 0 keeps them all on the first). maxCount caps the count setting, extras are more layers drawn with
+-- the same drivers (count "main" follows the first layer). allowed lists the kinds (Logic.KINDS keys) that may
+-- use the style, nil allows every kind. kind "beam" draws one tall beam (atlas first, the texture when the
+-- client lacks it, width and height in pixels at 100 percent size) with a spark at its foot. "auto" and
+-- "original" draw no textures of their own. hidden keeps a style out of the gallery (no preview possible).
+-- Ids marked "unverified" were named by the owner and could not be checked without the game.
+Logic.NODE_SPARKLE = 984391
+local NODE_SPARKLE = Logic.NODE_SPARKLE
+Logic.STYLE_CATALOG = {
+  { key = "auto", label = "sparkles.style.auto" },
+  { key = "original", label = "sparkles.style.original", hidden = true },
+  {
+    key = "particles",
+    label = "sparkles.style.particles",
+    kind = "sprites",
+    textures = { Logic.STAR_TEXTURE },
+    blend = "ADD",
+    count = Logic.PARTICLES,
+    sizeMin = Logic.STAR_SIZE_MIN,
+    sizeMax = Logic.STAR_SIZE_MAX,
+    radius = Logic.RADIUS,
+    glow = true,
+  },
+  {
+    key = "glints",
+    label = "sparkles.style.glints",
+    kind = "sprites",
+    textures = { 131010, 131011 },
+    blend = "ADD",
+    count = 9,
+    sizeMin = 22,
+    sizeMax = 38,
+    radius = Logic.RADIUS,
+  },
+  {
+    key = "lightbeam",
+    label = "sparkles.style.lightbeam",
+    kind = "beam",
+    atlas = "GarrisonFX-StarBurst",
+    textures = { 984391 },
+    blend = "ADD",
+    width = 44,
+    height = Logic.HOST_SIZE * 3,
+    sparkTexture = 131010,
+    sparkSize = 34,
+  },
+  {
+    key = "fireflies",
+    label = "sparkles.style.fireflies",
+    kind = "sprites",
+    textures = { 190732 },
+    blend = "ADD",
+    count = 6,
+    sizeMin = 18,
+    sizeMax = 28,
+    radius = 52,
+    life = 4,
+    drift = 9,
+  },
+  {
+    key = "dust",
+    label = "sparkles.style.dust",
+    kind = "sprites",
+    textures = { 984391 },
+    blend = "ADD",
+    count = 10,
+    sizeMin = 8,
+    sizeMax = 16,
+    radius = Logic.RADIUS,
+    life = 3,
+    drift = 7,
+    rise = true,
+  },
+  {
+    key = "twinkle",
+    label = "sparkles.style.twinkle",
+    kind = "sprites",
+    motion = "spot",
+    textures = { NODE_SPARKLE },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 6,
+    sizeMin = 30,
+    sizeMax = 30,
+    radius = Logic.RADIUS,
+    period = 2.4,
+    alphaMin = 0.25,
+    scaleMin = 0.6,
+    extras = {
+      {
+        motion = "spot",
+        textures = { NODE_SPARKLE },
+        fallback = NODE_SPARKLE,
+        count = "main",
+        sizeMin = 12,
+        sizeMax = 12,
+        period = 2.4,
+        alphaMin = 0.5,
+        scaleMin = 0.8,
+      },
+    },
+  },
+  {
+    key = "pollen",
+    label = "sparkles.style.pollen",
+    kind = "sprites",
+    atlas = "BonusChest-CircleGlow",
+    textures = { NODE_SPARKLE },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 12,
+    sizeMin = 8,
+    sizeMax = 14,
+    radius = 54,
+    life = 4,
+    drift = 6,
+  },
+  {
+    key = "starcrown",
+    label = "sparkles.style.starcrown",
+    kind = "sprites",
+    motion = "loop",
+    path = "ellipse",
+    textures = { 131010 },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 3,
+    maxCount = 3,
+    sizeMin = 18,
+    sizeMax = 18,
+    radius = 38,
+    ry = 12,
+    cy = 44,
+    period = 6,
+    extras = {
+      {
+        motion = "spot",
+        atlas = "GarrisonFX-StarBurst",
+        textures = { NODE_SPARKLE },
+        fallback = NODE_SPARKLE,
+        count = 1,
+        sizeMin = 64,
+        sizeMax = 64,
+        radius = 1,
+        cy = 8,
+        period = 3.2,
+        alphaMin = 0.55,
+        scaleMin = 0.85,
+        sublevel = -1,
+      },
+    },
+  },
+  {
+    key = "wisp",
+    label = "sparkles.style.wisp",
+    kind = "sprites",
+    motion = "loop",
+    path = "eight",
+    textures = { NODE_SPARKLE },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 2,
+    maxCount = 3,
+    sizeMin = 22,
+    sizeMax = 22,
+    radius = 40,
+    ry = 22,
+    period = 5,
+    trail = 5,
+    trailStep = 0.09,
+  },
+  {
+    key = "settledust",
+    label = "sparkles.style.settledust",
+    kind = "sprites",
+    textures = { NODE_SPARKLE },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 10,
+    sizeMin = 6,
+    sizeMax = 12,
+    radius = 46,
+    life = 3.5,
+    drift = 6,
+    sink = true,
+  },
+  {
+    key = "lens",
+    label = "sparkles.style.lens",
+    kind = "sprites",
+    motion = "spot",
+    textures = { 1109038 },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 3,
+    maxCount = 6,
+    sizeMin = 34,
+    sizeMax = 34,
+    radius = 32,
+    period = 2.6,
+    alphaMin = 0.4,
+    scaleMin = 0.6,
+    extras = {
+      {
+        motion = "spot",
+        textures = { 219371 },
+        fallback = NODE_SPARKLE,
+        count = 1,
+        sizeMin = 70,
+        sizeMax = 70,
+        radius = 1,
+        period = 3.4,
+        alphaMin = 0.35,
+        scaleMin = 0.8,
+        sublevel = -1,
+      },
+    },
+  },
+  {
+    key = "orbglow",
+    label = "sparkles.style.orbglow",
+    allowed = { "chests", "quests" },
+    kind = "sprites",
+    motion = "spot",
+    textures = { 918928 },
+    fallback = NODE_SPARKLE,
+    sheet = { cols = 4, rows = 4, fps = 10 },
+    blend = "ADD",
+    count = 3,
+    maxCount = 5,
+    sizeMin = 26,
+    sizeMax = 26,
+    radius = 30,
+    period = 3,
+    alphaMin = 0.5,
+    scaleMin = 0.8,
+    extras = {
+      {
+        motion = "spot",
+        textures = { 166232 },
+        fallback = NODE_SPARKLE,
+        count = "main",
+        sizeMin = 46,
+        sizeMax = 46,
+        period = 3,
+        alphaMin = 0.3,
+        scaleMin = 0.8,
+        sublevel = -1,
+      },
+    },
+  },
+  {
+    key = "halo",
+    label = "sparkles.style.halo",
+    allowed = { "others", "bobber" },
+    kind = "sprites",
+    motion = "ping",
+    textures = { 167071 },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 2,
+    maxCount = 3,
+    sizeMin = 84,
+    sizeMax = 84,
+    radius = 1,
+    period = 3,
+    power = 1.2,
+    scaleMin = 0.4,
+    extras = {
+      {
+        motion = "spot",
+        textures = { 166232 },
+        fallback = NODE_SPARKLE,
+        count = 1,
+        sizeMin = 34,
+        sizeMax = 34,
+        radius = 1,
+        period = 3,
+        alphaMin = 0.4,
+        scaleMin = 0.8,
+      },
+    },
+  },
+  {
+    key = "tumble",
+    label = "sparkles.style.tumble",
+    kind = "sprites",
+    motion = "spot",
+    textures = { 1397441 },
+    fallback = NODE_SPARKLE,
+    sheet = { cols = 4, rows = 4, fps = 12 },
+    blend = "ADD",
+    count = 6,
+    maxCount = 12,
+    sizeMin = 24,
+    sizeMax = 24,
+    radius = 40,
+    period = 2.2,
+    alphaMin = 0.5,
+    scaleMin = 0.8,
+  },
+  {
+    key = "prism",
+    label = "sparkles.style.prism",
+    kind = "sprites",
+    motion = "spot",
+    textures = { 166970 },
+    fallback = NODE_SPARKLE,
+    sheet = { cols = 2, rows = 2, fixed = true, step = 0 },
+    blend = "ADD",
+    count = 3,
+    maxCount = 5,
+    sizeMin = 40,
+    sizeMax = 40,
+    radius = 32,
+    period = 2.8,
+    alphaMin = 0.3,
+    scaleMin = 0.5,
+  },
+  {
+    key = "snowfall",
+    label = "sparkles.style.snowfall",
+    kind = "sprites",
+    textures = { 166914 },
+    fallback = NODE_SPARKLE,
+    blend = "BLEND",
+    count = 8,
+    maxCount = 16,
+    sizeMin = 10,
+    sizeMax = 18,
+    radius = 48,
+    life = 4,
+    drift = 8,
+    sink = true,
+  },
+  {
+    key = "flare",
+    label = "sparkles.style.flare",
+    allowed = { "ore", "chests" },
+    kind = "sprites",
+    motion = "spot",
+    atlas = "OBJFX_StarBurst",
+    textures = { 166976 },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 2,
+    maxCount = 3,
+    sizeMin = 52,
+    sizeMax = 52,
+    radius = 22,
+    period = 2.4,
+    alphaMin = 0.4,
+    scaleMin = 0.7,
+  },
+  {
+    key = "petals",
+    label = "sparkles.style.petals",
+    allowed = { "herbs" },
+    kind = "sprites",
+    motion = "fall",
+    textures = { 646587 },
+    fallback = NODE_SPARKLE,
+    sheet = { cols = 8, rows = 2, fixed = true, step = 5 },
+    blend = "BLEND",
+    count = 6,
+    maxCount = 10,
+    sizeMin = 16,
+    sizeMax = 16,
+    radius = 38,
+    ry = 70,
+    cy = 14,
+    period = 7,
+    sway = 8,
+    spin = 0.8,
+  },
+  {
+    key = "leaves",
+    label = "sparkles.style.leaves",
+    allowed = { "herbs" },
+    kind = "sprites",
+    motion = "fall",
+    textures = { 979604 },
+    fallback = NODE_SPARKLE,
+    sheet = { cols = 2, rows = 2, fixed = true, step = 1 },
+    blend = "BLEND",
+    count = 4,
+    maxCount = 8,
+    sizeMin = 22,
+    sizeMax = 22,
+    radius = 36,
+    ry = 70,
+    cy = 14,
+    period = 9,
+    sway = 10,
+    spin = 0.5,
+  },
+  {
+    key = "emberspark",
+    label = "sparkles.style.emberspark",
+    allowed = { "ore" },
+    kind = "sprites",
+    textures = { NODE_SPARKLE },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 8,
+    maxCount = 14,
+    sizeMin = 8,
+    sizeMax = 14,
+    radius = 38,
+    life = 1.2,
+    drift = 26,
+    extras = {
+      {
+        motion = "ping",
+        textures = { 131011 },
+        fallback = NODE_SPARKLE,
+        count = 1,
+        sizeMin = 70,
+        sizeMax = 70,
+        radius = 1,
+        period = 2.2,
+        power = 3,
+        scaleMin = 0.5,
+      },
+    },
+  },
+  {
+    key = "goldglint",
+    label = "sparkles.style.goldglint",
+    allowed = { "chests" },
+    kind = "sprites",
+    motion = "spot",
+    textures = { 2449274 },
+    fallback = NODE_SPARKLE,
+    sheet = { cols = 8, rows = 2, fps = 14 },
+    blend = "BLEND",
+    count = 3,
+    maxCount = 4,
+    sizeMin = 30,
+    sizeMax = 30,
+    radius = 36,
+    period = 2.8,
+    alphaMin = 0.8,
+    scaleMin = 1,
+    bob = 4,
+  },
+  {
+    key = "beacon",
+    label = "sparkles.style.beacon",
+    allowed = { "quests" },
+    kind = "sprites",
+    motion = "spot",
+    textures = { 132049 },
+    fallback = NODE_SPARKLE,
+    blend = "BLEND",
+    count = 1,
+    maxCount = 1,
+    sizeMin = 34,
+    sizeMax = 34,
+    radius = 1,
+    cy = 20,
+    period = 1.6,
+    alphaMin = 1,
+    scaleMin = 1,
+    bob = 6,
+  },
+  {
+    key = "glowmark",
+    label = "sparkles.style.glowmark",
+    kind = "sprites",
+    motion = "ping",
+    textures = { 136440 },
+    fallback = NODE_SPARKLE,
+    blend = "ADD",
+    count = 2,
+    maxCount = 2,
+    sizeMin = 70,
+    sizeMax = 70,
+    radius = 1,
+    period = 2.4,
+    power = 1.5,
+    scaleMin = 0.3,
+  },
+}
+
+Logic.STYLES = {}
+local SPECS = {}
+for _, entry in ipairs(Logic.STYLE_CATALOG) do
+  Logic.STYLES[#Logic.STYLES + 1] = entry.key
+  SPECS[entry.key] = entry
+end
+
+-- Style keys of earlier versions and the style that took their place, so a saved choice survives the rename.
+Logic.STYLE_ALIASES = {
+  butterflies = "petals",
+  flies = "wisp",
+  pickaxe = "emberspark",
+  coins = "goldglint",
+  questmark = "beacon",
+}
+
+-- The current key of a saved style key: an old key becomes its replacement, anything else stays as it is.
+function Logic.CanonicalStyle(key)
+  return Logic.STYLE_ALIASES[key] or key
+end
+
+-- The catalog entry of a style key, nil for "auto", "original" (no textures of their own) and unknown keys.
+function Logic.StyleSpec(key)
+  local spec = SPECS[key]
+  return spec and spec.kind and spec or nil
+end
+
+-- The kinds a style is limited to (keys of Logic.KINDS), nil when it may be used for every kind.
+function Logic.StyleAllowed(key)
+  local spec = SPECS[key]
+  return spec and spec.allowed or nil
+end
 
 -- The effect is a child of the name plate, so it takes over the scale the client gives the plate with
 -- the distance of the object: a fixed gap in plate units sits right at every camera distance. OFFSET is
@@ -73,17 +600,18 @@ function Logic.CleanOffset(value)
 end
 
 -- Size of all textures of the effect in percent of the base sizes (the host frame keeps its size), and
--- the soft target range in yards. The range setting is "max" (the most the game offers) or a number of
--- yards below that.
+-- the soft target range in yards. The range setting is "max" (RANGE_TOP) or a number of yards from
+-- RANGE_MIN to RANGE_TOP.
 Logic.SIZE_DEFAULT = 75
 Logic.SIZE_MIN = 30
 Logic.SIZE_MAX = 150
 Logic.SIZE_STEP = 5
-Logic.RANGE_MIN = 0
-Logic.RANGE_STEP = 1
+Logic.RANGE_MIN = 10
+Logic.RANGE_STEP = 5
+Logic.RANGE_DEFAULT = 30
 Logic.RANGE_MAX_SETTING = "max"
--- Measured in the Forever client 1.60.1 (build 70338): larger values of SoftTargetInteractRange change nothing.
-Logic.RANGE_GAME_MAX = 16
+-- The highest value the module writes. What the client keeps of it is read back (see RangeReadback).
+Logic.RANGE_TOP = 60
 
 local function clampSetting(value, default, min, max)
   if not isNumber(value) then
@@ -96,19 +624,22 @@ function Logic.CleanSize(value)
   return clampSetting(value, Logic.SIZE_DEFAULT, Logic.SIZE_MIN, Logic.SIZE_MAX)
 end
 
--- Yards for SoftTargetInteractRange: the game maximum for nil, "max" and anything that is no number, a
--- number inside 0 to the game maximum.
+-- Yards for SoftTargetInteractRange: RANGE_TOP for "max", the number cut to RANGE_MIN up to RANGE_TOP,
+-- RANGE_DEFAULT for nil and anything else.
 function Logic.EffectiveRange(setting)
-  if not isNumber(setting) then
-    return Logic.RANGE_GAME_MAX
+  if setting == Logic.RANGE_MAX_SETTING then
+    return Logic.RANGE_TOP
   end
-  return math.min(Logic.RANGE_GAME_MAX, math.max(Logic.RANGE_MIN, setting))
+  if not isNumber(setting) then
+    return Logic.RANGE_DEFAULT
+  end
+  return math.min(Logic.RANGE_TOP, math.max(Logic.RANGE_MIN, setting))
 end
 
--- The stored setting with numbers from the time of larger ranges (60, 95, 100) made "max".
+-- The stored setting: numbers outside RANGE_MIN to RANGE_TOP are cut, everything valid stays as it is.
 function Logic.NormalizeRange(setting)
-  if isNumber(setting) and setting >= Logic.RANGE_GAME_MAX then
-    return Logic.RANGE_MAX_SETTING
+  if isNumber(setting) then
+    return math.min(Logic.RANGE_TOP, math.max(Logic.RANGE_MIN, setting))
   end
   return setting
 end
@@ -120,10 +651,26 @@ end
 
 -- The setting a slider position stands for: the top is "max", below it the yards.
 function Logic.RangeSetting(position)
-  if not isNumber(position) or position >= Logic.RANGE_GAME_MAX then
+  if not isNumber(position) or position >= Logic.RANGE_TOP then
     return Logic.RANGE_MAX_SETTING
   end
   return math.max(Logic.RANGE_MIN, position)
+end
+
+-- What the client keeps of the range we asked for, as one line for the diagnosis. held is the value the
+-- variable has after the write (text or number, nil when the client does not tell), managed is false
+-- while the module does not write the variable at all.
+function Logic.RangeReadback(requested, held, managed)
+  local now = tonumber(held)
+  local heldText = now ~= nil and string.format("%g", now) or "unknown"
+  if not managed then
+    return string.format("not written (module idle), client holds %s", heldText)
+  end
+  local text = string.format("requested %g, client holds %s", requested, heldText)
+  if now ~= nil and now ~= requested then
+    text = string.format("%s (client clamps to %s)", text, heldText)
+  end
+  return text
 end
 
 -- A base size in pixels scaled by the size setting (percent, kept inside its range): whole pixels, at least 1.
@@ -161,16 +708,18 @@ Logic.GLOW_PERIOD = 2.4
 Logic.GLOW_ALPHA_MIN = 0.5
 Logic.GLOW_ALPHA_MAX = 0.9
 Logic.DARK_ALPHA = 0.55
--- Seconds between two looks at a soft target the kind of which is not known yet, and how many looks.
+-- Seconds between two polls of the watcher (a soft target without a known kind is looked at on every
+-- poll) and between two looks at a target whose kind is known (to follow its state).
 Logic.WATCH = 0.12
-Logic.RECHECKS = 3
+Logic.RECHECK_KNOWN = 1
 -- Placement of the original model in its frame, to tune in the game.
 Logic.MODEL = { scale = 1, x = 0, y = 0, z = 0, facing = 0 }
 
 -- Kind of object ---------------------------------------------------------------------------------
 
--- The category of an object and whether it is locked, from the name of its cursor icon (a path or an
--- atlas name, any case). A number or anything unknown gives nil: the caller tries the tooltip next.
+-- The category of an object and whether its cursor icon says "unable" (not gatherable right now), from
+-- the name of the icon (a path or an atlas name, any case). The client shows "unable" for a node out of
+-- reach as well, see Logic.IsLocked. A number or anything unknown gives nil: the caller tries the tooltip next.
 local function iconName(texture, atlas)
   if type(atlas) == "string" and atlas ~= "" then
     return atlas:lower()
@@ -179,20 +728,60 @@ local function iconName(texture, atlas)
   end
 end
 
+-- The words of a cursor icon name (lower case) that name a category, in the order they are tried. Data, so
+-- more icon names can be added: only "mine" and the quest icons are confirmed by the client ("unable" is a
+-- word of its own, see below). "chests" is weak: loot icons also appear on quest items on the ground, so it only
+-- counts when the quest checks found nothing (see Logic.WEAK_CATEGORY).
+Logic.ICON_WORDS = {
+  { "ore", { "mine" } },
+  { "herbs", { "gather", "herb" } },
+  { "skinning", { "skin" } },
+  { "bobber", { "fish" } },
+  { "quest", { "quest" } },
+  { "chests", { "pickup", "loot", "chest" } },
+}
+Logic.WEAK_CATEGORY = "chests"
+
 function Logic.Classify(texture, atlas)
   local name = iconName(texture, atlas)
   if not name then
     return nil, false
   end
-  local locked = name:find("unable", 1, true) ~= nil
-  if name:find("mine", 1, true) then
-    return "ore", locked
-  elseif name:find("gather", 1, true) or name:find("herb", 1, true) then
-    return "herbs", locked
-  elseif name:find("quest", 1, true) then
-    return "quest", locked
+  local unable = name:find("unable", 1, true) ~= nil
+  for _, entry in ipairs(Logic.ICON_WORDS) do
+    for _, word in ipairs(entry[2]) do
+      if name:find(word, 1, true) then
+        return entry[1], unable
+      end
+    end
   end
-  return nil, locked
+  return nil, unable
+end
+
+-- The words of an object name (lower case, both languages) that name a category. Data, extend as needed.
+Logic.NAME_WORDS = {
+  { "bobber", { "bobber", "schwimmer" } },
+  { "chests", { "chest", "truhe", "kiste" } },
+}
+
+function Logic.ClassifyName(name)
+  if type(name) ~= "string" then
+    return nil
+  end
+  name = name:lower()
+  for _, entry in ipairs(Logic.NAME_WORDS) do
+    for _, word in ipairs(entry[2]) do
+      if name:find(word, 1, true) then
+        return entry[1]
+      end
+    end
+  end
+end
+
+-- An "unable" icon is a lock only in interact reach (skill too low or profession missing). Out of reach
+-- or with an unknown range the client shows it for any node, so it says nothing about the skill.
+function Logic.IsLocked(unable, inRange)
+  return unable == true and inRange == true
 end
 
 -- Fallback when the kind is not recognized: a world object (a game object, neither player nor creature)
@@ -229,12 +818,15 @@ function Logic.ClassifyObject(guid, isPlayer, creatureType, texture, atlas)
   return Logic.OBJECT
 end
 
--- Whether the settings allow a category: the fallback object counts as ore or herbs.
-function Logic.CategoryOn(category, cfg)
-  if category == Logic.OBJECT then
-    return cfg.ore == true or cfg.herbs == true
+-- Last resort for a world object: the fallback "object" (see ClassifyObject), else "others" (a plain
+-- interaction: doors, mailboxes, benches). nil for anything that is no world object.
+Logic.OTHERS = "others"
+
+function Logic.ClassifyWorldObject(guid, isPlayer, creatureType, texture, atlas)
+  if not Logic.IsWorldObject(guid, isPlayer, creatureType) then
+    return nil
   end
-  return cfg[category] == true
+  return Logic.ClassifyObject(guid, isPlayer, creatureType, texture, atlas) or Logic.OTHERS
 end
 
 -- The profession a tooltip line asks for: "Requires Mining (150)", "Benötigt Kräuterkunde" or a line
@@ -245,6 +837,8 @@ local PROFESSIONS = {
   { "herbalism", "herbs" },
   { "kräuterkunde", "herbs" },
   { "kraeuterkunde", "herbs" },
+  { "skinning", "skinning" },
+  { "kürschnerei", "skinning" },
 }
 local REQUIRES = { "requires", "benötigt", "erfordert" }
 
@@ -257,11 +851,15 @@ local function hasAny(text, words)
   return false
 end
 
-function Logic.ClassifyTooltip(lines)
+-- extraSkinning: further texts (lower case) of a skinnable creature, e.g. the global string of the client.
+function Logic.ClassifyTooltip(lines, extraSkinning)
   for i = 2, #(lines or {}) do
     local line = lines[i]
     if type(line) == "string" then
       local text = line:lower()
+      if text:find("skinnable", 1, true) or (extraSkinning and hasAny(text, extraSkinning)) then
+        return "skinning"
+      end
       local bare = text:gsub("%(%d+%)", ""):gsub("^%s+", ""):gsub("%s+$", "")
       for _, entry in ipairs(PROFESSIONS) do
         if text:find(entry[1], 1, true) and (bare == entry[1] or hasAny(text, REQUIRES)) then
@@ -337,19 +935,30 @@ end
 
 -- State machine -----------------------------------------------------------------------------------
 
--- The state to show: nil without target, "far" out of reach, "locked" in reach with too low a skill,
--- else "ready". inRange nil (the client cannot tell) counts as in reach.
-function Logic.WantedState(inRange, locked)
-  if inRange == false then
+-- The state to show: nil without target, "far" out of reach, "locked" in reach with an "unable" icon,
+-- else "ready". With a normal icon an unknown range (nil) counts as in reach; with an "unable" icon it
+-- counts as out of reach (see Logic.IsLocked).
+function Logic.WantedState(inRange, unable)
+  if inRange == false or (unable and inRange ~= true) then
     return "far"
   end
-  return locked and "locked" or "ready"
+  return unable and "locked" or "ready"
 end
 
--- Whether a target gets an effect at all: a locked object (skill too low or profession missing) only
--- when the player asked for it (lockedNodes).
+-- Whether a target gets an effect at all: a locked object (see Logic.IsLocked) only when the player
+-- asked for it (lockedNodes).
 function Logic.ShowsTarget(locked, lockedNodes)
   return not locked or lockedNodes == true
+end
+
+-- The decision about an "unable" icon in words for the report.
+function Logic.LockReason(unable, inRange)
+  if unable ~= true then
+    return "open"
+  elseif inRange == true then
+    return "locked: in reach and unable"
+  end
+  return "far: unable out of reach"
 end
 
 function Logic.NewState()
@@ -375,6 +984,8 @@ function Logic.Update(s, want, dt, instant)
     else
       s.held = s.held + dt
       if s.held >= Logic.HOLD[want] then
+        -- Far to ready: the node came into gathering reach, the caller flashes once.
+        s.flash = s.shown == "far" and want == "ready"
         s.from, s.shown, s.mix, s.cand, s.held = s.shown, want, 0, nil, 0
         -- Back to ready: the caller restarts all sparks together, a short burst as feedback.
         s.burst = want == "ready"
@@ -395,9 +1006,45 @@ function Logic.Update(s, want, dt, instant)
   end
 end
 
+-- The flash when a node comes into reach: a starburst of the game, additive, fading out while it grows.
+-- Returns alpha (1 to 0) and scale at the age in seconds, nil once it is over.
+Logic.FLASH_TEXTURE = 131011
+Logic.FLASH_TIME = 0.35
+Logic.FLASH_SIZE = 110
+function Logic.FlashLook(age)
+  if type(age) ~= "number" or age < 0 or age >= Logic.FLASH_TIME then
+    return nil
+  end
+  local p = age / Logic.FLASH_TIME
+  return 1 - p, 0.6 + 0.6 * p
+end
+
+-- The color of a state: the color of the kind (nil = the gold of LOOKS) for ready and far, gray stays gray.
+local function stateColor(look, key, color)
+  if not color or key == "locked" then
+    return look.r, look.g, look.b
+  end
+  return color.r, color.g, color.b
+end
+
+-- The dark layer follows the color of the kind by a third of its distance from the gold it was made for (so the
+-- default color changes nothing and a blue kind gets a bluish shadow).
+Logic.DARK_TINT = 0.35
+
+local function stateDark(look, key, color)
+  if not color or key == "locked" then
+    return look.dr, look.dg, look.db
+  end
+  local gold = LOOKS.ready
+  local function shifted(dark, value, base)
+    return math.min(1, math.max(0, dark + (value - base) * Logic.DARK_TINT))
+  end
+  return shifted(look.dr, color.r, gold.r), shifted(look.dg, color.g, gold.g), shifted(look.db, color.b, gold.b)
+end
+
 -- Color and brightness of the moment (cross fade of the last two states, times the fade in). The
--- brightness never falls below MIN_ALPHA before the fade in.
-function Logic.Look(s)
+-- brightness never falls below MIN_ALPHA before the fade in. color: { r, g, b } of the kind, nil for the gold.
+function Logic.Look(s, color)
   local cur = LOOKS[s.shown]
   if not cur then
     return 1, 1, 1, 0
@@ -405,18 +1052,22 @@ function Logic.Look(s)
   local prev = LOOKS[s.from] or cur
   local m = s.mix
   local alpha = math.max(Logic.MIN_ALPHA, prev.a + (cur.a - prev.a) * m)
-  return prev.r + (cur.r - prev.r) * m, prev.g + (cur.g - prev.g) * m, prev.b + (cur.b - prev.b) * m, alpha * s.alpha
+  local pr, pg, pb = stateColor(prev, s.from, color)
+  local cr, cg, cb = stateColor(cur, s.shown, color)
+  return pr + (cr - pr) * m, pg + (cg - pg) * m, pb + (cb - pb) * m, alpha * s.alpha
 end
 
 -- The dark color of the layer behind the glow, cross faded like Look.
-function Logic.DarkLook(s)
+function Logic.DarkLook(s, color)
   local cur = LOOKS[s.shown]
   if not cur then
     return 0, 0, 0
   end
   local prev = LOOKS[s.from] or cur
   local m = s.mix
-  return prev.dr + (cur.dr - prev.dr) * m, prev.dg + (cur.dg - prev.dg) * m, prev.db + (cur.db - prev.db) * m
+  local pr, pg, pb = stateDark(prev, s.from, color)
+  local cr, cg, cb = stateDark(cur, s.shown, color)
+  return pr + (cr - pr) * m, pg + (cg - pg) * m, pb + (cb - pb) * m
 end
 
 -- 0 to 1 wave of the glow pulse at the time t in seconds; nil gives the middle (reduced motion).
@@ -440,6 +1091,7 @@ end
 -- Style ----------------------------------------------------------------------------------------------
 
 function Logic.CleanStyle(value)
+  value = Logic.CanonicalStyle(value)
   for _, style in ipairs(Logic.STYLES) do
     if value == style then
       return style
@@ -460,12 +1112,18 @@ function Logic.ModelLoaded(setOk, hasGetter, fileId)
   return setOk == true and (not hasGetter or fileId ~= nil)
 end
 
--- The style to draw: "original" or "particles". Automatic means particles while AUTO_PREFERS_MODEL is off.
+-- The style to draw: "original" or the key of a texture style. kindKey is the kind of the target: a style the
+-- kind does not allow counts as automatic, and automatic means the default of the kind (Logic.AutoStyle, the
+-- particles without a kind) while AUTO_PREFERS_MODEL is off. A model that does not load gives the particles, the
+-- closest look to it.
 -- The second result is true when the player asked for the original model and it did not load (one chat line).
-function Logic.ResolveStyle(choice, modelLoaded)
+function Logic.ResolveStyle(choice, modelLoaded, kindKey)
   choice = Logic.CleanStyle(choice)
+  if kindKey and not Logic.KindAllows(kindKey, choice) then
+    choice = "auto"
+  end
   if not Logic.WantsModel(choice) then
-    return "particles", false
+    return choice == "auto" and Logic.AutoStyle(kindKey) or choice, false
   end
   if modelLoaded then
     return "original", false
@@ -484,17 +1142,19 @@ Logic.QUEST_ITEM_CVARS = {
   { "RAIDOutlineEngineMode", "0" },
 }
 
--- Soft targeting reaches objects up to the game maximum or the lower setting. The range entry is a
+-- Soft targeting reaches objects up to the range setting. The range entry is a
 -- placeholder, Desired takes the effective range.
 Logic.TARGET_CVARS = {
   { "SoftTargetInteract", "3" },
-  { "SoftTargetInteractRange", tostring(Logic.RANGE_GAME_MAX) },
+  { "SoftTargetInteractRange", tostring(Logic.RANGE_DEFAULT) },
   { "SoftTargetInteractArc", "2" },
   { "SoftTargetInteractOnlyInRange", "0" },
   { "SoftTargetIconInteract", "1" },
   { "SoftTargetIconGameObject", "1" },
   { "SoftTargetLowPriorityIcons", "1" },
 }
+-- Not written any more: the plate of a world object exists with the player's value. Still read for the
+-- report, and an original saved by an earlier version is put back.
 Logic.NAMEPLATE_CVAR = "SoftTargetNameplateInteract"
 Logic.RANGE_CVAR = "SoftTargetInteractRange"
 -- Earlier versions saved the original of this variable; ApplyLegacy puts it back once.
@@ -531,8 +1191,8 @@ function Logic.ManagedNames()
 end
 
 -- The values that should be set now. opts: enabled, questItems, ore, herbs, quest, gameIcons (the
--- settings, gameIcons only counts as off when it is false), range (the setting), sparkling (an object sparkles right now). Soft targeting is only changed while a
--- category is on, the name plate of the soft target only while an object sparkles. An empty result means: restore all.
+-- settings, gameIcons only counts as off when it is false), other (any further kind is on), range (the setting). Soft targeting is only
+-- changed while a category is on. An empty result means: restore all.
 function Logic.Desired(opts)
   local out = {}
   if not opts.enabled then
@@ -543,7 +1203,7 @@ function Logic.Desired(opts)
       out[entry[1]] = entry[2]
     end
   end
-  if opts.ore or opts.herbs or opts.quest then
+  if opts.ore or opts.herbs or opts.quest or opts.other then
     for _, entry in ipairs(Logic.TARGET_CVARS) do
       out[entry[1]] = entry[2]
     end
@@ -553,8 +1213,6 @@ function Logic.Desired(opts)
         out[name] = "0"
       end
     end
-    -- Names only for the object the player wants to see; open when the client hides the target.
-    out[Logic.NAMEPLATE_CVAR] = opts.sparkling and "1" or "0"
   end
   return out
 end
@@ -615,20 +1273,36 @@ end
 -- Particles -----------------------------------------------------------------------------------------
 
 -- Gives a particle a new place, size and timing; a negative age is a short wait before it appears.
-function Logic.Respawn(p, rnd, wait)
+-- spec (an entry of Logic.STYLE_CATALOG) is kept on the particle, none means the particles style.
+function Logic.Respawn(p, rnd, wait, spec)
+  p.spec = spec or p.spec
+  spec = p.spec or SPECS.particles
   local angle = rnd() * 2 * math.pi
-  local radius = Logic.RADIUS * math.sqrt(rnd())
+  local radius = spec.radius * math.sqrt(rnd())
   p.x, p.y = math.cos(angle) * radius, math.sin(angle) * radius
-  p.size = Logic.STAR_SIZE_MIN + (Logic.STAR_SIZE_MAX - Logic.STAR_SIZE_MIN) * rnd()
-  p.fin, p.hold, p.fout = 0.1 + rnd() * 0.15, 0.05 + rnd() * 0.15, 0.2 + rnd() * 0.3
+  p.size = spec.sizeMin + (spec.sizeMax - spec.sizeMin) * rnd()
+  local life = spec.life or 1
+  p.fin, p.hold, p.fout = (0.1 + rnd() * 0.15) * life, (0.05 + rnd() * 0.15) * life, (0.2 + rnd() * 0.3) * life
   p.age = wait and -rnd() * wait or 0
+  if spec.drift then
+    local heading = rnd() * 2 * math.pi
+    if spec.rise or spec.sink then
+      heading = (spec.rise and 1 or -1) * math.pi / 2 + (rnd() - 0.5) * 0.8
+    end
+    local speed = spec.drift * (0.5 + rnd())
+    p.vx, p.vy = math.cos(heading) * speed, math.sin(heading) * speed
+  end
 end
 
--- Advances a particle by dt; true when it got a new place (the caller moves its texture).
+-- Advances a particle by dt; true when it got a new place or drifts (the caller moves its texture).
 function Logic.StepParticle(p, dt, rnd)
   p.age = p.age + dt
   if p.age >= p.fin + p.hold + p.fout then
     Logic.Respawn(p, rnd, 0.4)
+    return true
+  end
+  if p.vx and p.age > 0 then
+    p.x, p.y = p.x + p.vx * dt, p.y + p.vy * dt
     return true
   end
   return false
@@ -648,10 +1322,131 @@ function Logic.Envelope(p)
 end
 
 -- Fixed place and brightness of particle i of n without motion (reduced motion).
-function Logic.StaticSpot(i, n)
+function Logic.StaticSpot(i, n, spreadRadius)
   local angle = (i - 1) / n * 2 * math.pi
-  local radius = Logic.RADIUS * (i % 2 == 0 and 0.75 or 0.45)
+  local radius = (spreadRadius or Logic.RADIUS) * (i % 2 == 0 and 0.75 or 0.45)
   return math.cos(angle) * radius, math.sin(angle) * radius, 0.75
+end
+
+-- Layers and poses ----------------------------------------------------------------------------------------
+
+local function copyFields(source)
+  local out = {}
+  for key, value in pairs(source) do
+    out[key] = value
+  end
+  return out
+end
+
+-- The layers a style draws for a count and a spread (percent of the radius), built once per effect: the
+-- first layer is the style itself (its count is the setting, capped by maxCount), extras follow it. Every
+-- layer is a flat table with the fields the drivers read.
+function Logic.ExpandLayers(entry, count, spreadPercent)
+  local spread = spreadPercent / 100
+  local main = copyFields(entry)
+  main.extras = nil
+  main.count = math.max(1, math.min(math.floor(count or entry.count), entry.maxCount or math.huge))
+  main.radius = entry.radius * spread
+  local list = { main }
+  for _, extra in ipairs(entry.extras or {}) do
+    local layer = copyFields(extra)
+    layer.blend = extra.blend or entry.blend
+    layer.count = extra.count == "main" and main.count or extra.count
+    layer.radius = (extra.radius or entry.radius) * spread
+    list[#list + 1] = layer
+  end
+  return list
+end
+
+local TAU = 2 * math.pi
+local GOLDEN_ANGLE = 2.399963229728653
+
+-- 0 to 1 wave with the period in seconds and a phase in cycles; nil time gives the middle (reduced motion).
+local function wave(t, period, phase)
+  if t == nil then
+    return 0.5
+  end
+  return 0.5 + 0.5 * math.sin((t / period + phase) * TAU)
+end
+
+-- Pose of sprite i of n (j > 0 is a trail sprite) of a layer at the time t in seconds; nil t is the still
+-- first frame of reduced motion. Returns x, y in pixels from the center, alpha (0 to 1, before the state
+-- brightness), scale and the stretch of the width (a wing beat). No allocation: it runs per sprite and frame.
+-- "spot": fixed places on a golden angle spread that pulse in alpha and scale (period, alphaMin, scaleMin) and
+-- bob by bob pixels, shifted up by cy. "loop": a closed path ("ellipse" or a figure "eight", rx = radius, ry,
+-- centered at cy) walked in period seconds, sprites a cycle apart, trail sprites lag trailStep seconds each
+-- and fade; flap beats the width flapRate times a second. "ping": a ring or flash that grows from scaleMin to
+-- full size while it fades (power shapes the fade), sprites a cycle apart. "fall": each sprite sinks ry pixels
+-- from the top (centered at cy) in period seconds on a lane across radius that changes every cycle, sways by
+-- sway pixels, fades in and out at the ends and turns spin radians a second. The sixth value is the rotation
+-- in radians, 0 where a layer has no spin.
+function Logic.Pose(layer, i, n, j, t)
+  local motion = layer.motion
+  local period = layer.period or 2.4
+  local cy = layer.cy or 0
+  if motion == "loop" then
+    local lag = (j or 0) * (layer.trailStep or 0.07) / period
+    local a = ((t and t / period or 0) + (i - 1) / n - lag) * TAU
+    local rx, ry = layer.radius, layer.ry or layer.radius * 0.6
+    local x, y
+    if layer.path == "eight" then
+      x, y = rx * math.sin(a), ry * math.sin(2 * a)
+    else
+      x, y = rx * math.cos(a), ry * math.sin(a)
+    end
+    local alpha, scale = 1, 1
+    if j and j > 0 then
+      local fall = 1 - j / ((layer.trail or 1) + 1)
+      alpha, scale = fall * fall, 0.4 + 0.6 * fall
+    end
+    local stretch = 1
+    if t and layer.flap then
+      stretch = 1 - layer.flap * (0.5 + 0.5 * math.sin(t * (layer.flapRate or 2) * TAU + i))
+    end
+    return x, y + cy, alpha, scale, stretch
+  elseif motion == "ping" then
+    local p = t and (t / period + (i - 1) / n) % 1 or 0.4
+    local alpha = math.min(1, p / 0.12) * (1 - p) ^ (layer.power or 1)
+    return 0, cy, alpha, (layer.scaleMin or 0.3) + (1 - (layer.scaleMin or 0.3)) * p, 1
+  elseif motion == "fall" then
+    local cycles = t and t / period + (i - 1) / n or (i - 0.5) / n
+    local p = cycles % 1
+    local lane = ((i * 0.618 + math.floor(cycles) * 0.382) % 1 - 0.5) * 2
+    local sway = (layer.sway or 0) * math.sin((p * 2 + i * 0.31) * TAU)
+    local alpha = math.min(1, p / 0.15, (1 - p) / 0.25)
+    local ry = layer.ry or 60
+    return lane * layer.radius + sway, cy + ry * (0.5 - p), alpha, 1, 1, (layer.spin or 0) * (t or 0) + i
+  end
+  local x, y = 0, 0
+  if n > 1 then
+    local radius = layer.radius * math.sqrt((i - 0.5) / n)
+    x, y = math.cos(i * GOLDEN_ANGLE) * radius, math.sin(i * GOLDEN_ANGLE) * radius
+  end
+  local phase = (i * 0.37) % 1
+  local w = wave(t, period, phase)
+  local alphaMin, scaleMin = layer.alphaMin or 0.3, layer.scaleMin or 0.7
+  local bob = t and layer.bob and layer.bob * math.sin((t / period + phase) * TAU) or 0
+  return x, y + cy + bob, alphaMin + (1 - alphaMin) * w, scaleMin + (1 - scaleMin) * w, 1
+end
+
+-- Frame (0 based) of a sprite sheet animation of sprite i at the time t; sprites start five frames apart so
+-- they do not turn in step. nil t (reduced motion) is the first frame. A fixed sheet gives sprite i the cell
+-- (i - 1) * step at any time.
+function Logic.SheetFrame(layer, i, t)
+  local sheet = layer.sheet
+  if sheet and sheet.fixed then
+    return ((i - 1) * (sheet.step or 1)) % (sheet.cols * sheet.rows)
+  end
+  if not sheet or t == nil then
+    return 0
+  end
+  return (math.floor(t * sheet.fps) + (i - 1) * 5) % (sheet.cols * sheet.rows)
+end
+
+-- TexCoord rectangle (left, right, top, bottom) of a frame in a sheet read row by row from the top left.
+function Logic.SheetCoords(sheet, frame)
+  local col, row = frame % sheet.cols, math.floor(frame / sheet.cols)
+  return col / sheet.cols, (col + 1) / sheet.cols, row / sheet.rows, (row + 1) / sheet.rows
 end
 
 -- Support report ------------------------------------------------------------------------------------
@@ -799,6 +1594,21 @@ function Logic.SampleReady(m, obs)
   return nil
 end
 
+-- The soft target icon the game draws on the plate as short text: icon = { frame, shown, iconShown,
+-- texture, atlas } or nil when the plate has none.
+function Logic.PlateIconText(icon, words)
+  if type(icon) ~= "table" or not icon.frame then
+    return "none"
+  end
+  return string.format(
+    "shown=%s iconShown=%s texture=%s atlas=%s",
+    show(icon.shown, words),
+    show(icon.iconShown, words),
+    show(icon.texture, words),
+    show(icon.atlas, words)
+  )
+end
+
 -- The lines of the sparkle section of the support report from what the module read (see GatherSparkles.DiagInfo).
 -- Every field may be nil. words = { yes, no }.
 function Logic.DiagLines(info, words)
@@ -852,6 +1662,27 @@ function Logic.DiagLines(info, words)
       v(cursor.atlas)
     ),
     string.format(
+      "sparkles flow: token=%s gameObject=%s plate=%s plateIcon=%s",
+      v(info.unitExists),
+      v(info.unitIsGameObject),
+      v(info.plate),
+      Logic.PlateIconText(info.plateIcon, words)
+    ),
+    string.format(
+      "sparkles flow: cursor=%s call=%s kind=%s cat=%s want=%s state=%s inRange=%s rechecks=%s locked=%s unable=%s reason=%s",
+      v(cursor.atlas or cursor.file or "none"),
+      v(cursor.call),
+      v(info.kindKey or info.category),
+      v(info.cat),
+      v(info.want),
+      v(info.state),
+      v(info.inRange),
+      v(info.rechecks),
+      v(info.locked),
+      v(info.unable),
+      Logic.LockReason(info.unable, info.inRange)
+    ),
+    string.format(
       "sparkles host: shown=%s visible=%s size=%sx%s alpha=%s strata=%s level=%s",
       v(host.shown),
       v(host.visible),
@@ -885,12 +1716,34 @@ function Logic.DiagLines(info, words)
   lines[#lines + 1] = string.format(
     "sparkles reach: size=%s range=%s effective=%s SoftTargetInteractRange=%s distance=%s distSeen=%s",
     v(info.size),
-    v(info.range == nil and Logic.RANGE_MAX_SETTING or info.range),
+    v(info.range == nil and Logic.RANGE_DEFAULT or info.range),
     v(info.effective),
     v(info.rangeNow),
     v(info.distance),
     info.distSeen == nil and info.distTried and words.noDistance or v(info.distSeen)
   )
+  -- The settings of the kind of the current target (nil without one) and the general options.
+  local k, general = info.kindCfg or {}, info.general or {}
+  local color = k.color
+  lines[#lines + 1] = string.format(
+    "sparkles config: kind=%s style=%s colour=%s size=%s height=%s count=%s | general: brightness=%s reachLook=%s combatHide=%s instanceHide=%s myProf=%s rare=%s sound=%s gatherDim=%s finish=%s",
+    v(info.configKind or "none"),
+    v(k.style),
+    color and string.format("%s,%s,%s", v(color.r), v(color.g), v(color.b)) or "nil",
+    v(k.size),
+    v(k.height),
+    v(k.count),
+    v(general.brightness),
+    v(general.reachLook),
+    v(general.combatHide),
+    v(general.instanceHide),
+    v(general.myProfessionsOnly),
+    v(general.rareGlow),
+    v(general.sound),
+    v(general.gatherDim),
+    v(general.finish)
+  )
+  lines[#lines + 1] = "sparkles range: " .. Logic.RangeReadback(info.effective, info.rangeHeld, info.rangeManaged)
   -- Distances only, never a position (the report is shared).
   local measure = info.measure or {}
   lines[#lines + 1] = string.format(

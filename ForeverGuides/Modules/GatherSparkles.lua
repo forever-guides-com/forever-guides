@@ -41,21 +41,33 @@ local MAX_CATCH_UP = 0.25
 local LOGIN_DELAY = 2
 
 local state = Logic.NewState()
-local target = { cat = nil, locked = false, guid = nil, checks = 0 }
+-- kind: what identify() found before the settings were asked (nil: not known yet); cat: the kind the
+-- settings let sparkle; checks: looks since the target changed (support report).
+local target = { cat = nil, kind = nil, locked = false, unable = false, reach = nil, guid = nil, checks = 0 }
 local host, probeTexture, attached, watcher
 local activeUnits, directWorks, retarget = {}, false, false
-local seenExists, seenGuid, unknownTarget = nil, nil, false
-local dots = {}
-local glow, dark
+local seenExists, seenGuid = nil, nil
+local dots, spare = {}, {}
+local glow, dark, beam, spark, spec
 local want, style, modelLoaded, built
-local sparkling, pendingApply, modelWarned = false, false, false
+-- What the effect was built for (style, sprite count, spread): another kind with other values builds it anew.
+local builtStyle, builtCount, builtSpread
+local pendingApply, modelWarned = false, false
 -- The distances seen to soft targets (largest plausible one, samples taken).
 local distSeen, distTried = nil, 0
 -- The measurement of the detection range (see Logic.SampleReady) and where the last position came from.
 local measure, posSource = Logic.NewMeasure(), "none"
-local acc, pollAcc, clock, watchAcc = 0, 0, 0, 0
+local acc, pollAcc, clock, watchAcc, knownAcc = 0, 0, 0, 0, 0
 local staticPlaced, paused = false, false
 local lastR, lastG, lastB
+-- General options at work: the player is in a fight (PLAYER_REGEN_*), a gather cast runs and how far the effect
+-- is dimmed for it (0 to 1), the finish effect that runs (kind, age in seconds), its textures, the target it
+-- ran for (the effect stays away from it), the rare glow texture and the professions of the player
+-- (false = not read yet, nil = the client could not tell).
+local fight, gathering, dimMix = false, false, 0
+local finishKind, finishAge, finishedGuid, finishParts = nil, 0, nil, {}
+local rare
+local ownProfessions = false
 
 local function global(name)
   return rawget(_G, name)
@@ -93,6 +105,33 @@ local function active()
   return c ~= nil and c.enabled == true
 end
 
+-- The settings model as the module reads it (see Modules/GatherSparklesModel.lua): every kind cleaned and the
+-- general options, built once per change and not per frame. modelReady goes false when a setting changes.
+local model, modelReady = { kinds = {}, general = nil }, false
+
+local function readModel()
+  local c = config()
+  model.kinds = {}
+  for _, entry in ipairs(Logic.KINDS) do
+    model.kinds[entry.key] = Logic.KindSettings(entry.key, c and type(c.kinds) == "table" and c.kinds[entry.key])
+  end
+  model.general = Logic.General(c and c.general, c)
+  modelReady = true
+end
+
+local function cfg()
+  if not modelReady then
+    readModel()
+  end
+  return model
+end
+
+-- The settings of the kind of the current target (the defaults while there is none).
+local function kindCfg()
+  local kinds = cfg().kinds
+  return kinds[target.cat] or kinds.herbs
+end
+
 local function reduced()
   return ns.Theme ~= nil and ns.Theme.reduceMotion() == true
 end
@@ -104,6 +143,15 @@ local function inCombat()
   end
   local ok, result = pcall(f)
   return ok and result == true
+end
+
+local function inInstance()
+  local f = global("IsInInstance")
+  if type(f) ~= "function" then
+    return false
+  end
+  local ok, inside = pcall(f)
+  return ok and readable(inside) == true
 end
 
 -- Console variables -----------------------------------------------------------------------------------
@@ -137,6 +185,23 @@ local function setCVar(name, value)
   return ok and result ~= false
 end
 
+-- The range the client holds after our last write (text), nil before the first one.
+local rangeHeld
+
+local function desiredCVars(c)
+  local kinds = cfg().kinds
+  return Logic.Desired({
+    enabled = c.enabled == true,
+    questItems = c.questItems == true,
+    ore = kinds.ore.on,
+    herbs = kinds.herbs.on,
+    quest = kinds.quests.on,
+    other = kinds.chests.on or kinds.others.on or kinds.bobber.on or kinds.skinning.on,
+    gameIcons = c.gameIcons ~= false,
+    range = c.range,
+  })
+end
+
 -- Writes the variables the settings ask for and puts the originals back for the rest. In combat it
 -- waits for the end of the fight.
 function G.Apply()
@@ -162,26 +227,16 @@ function G.Apply()
   for _, name in ipairs(Logic.ManagedNames()) do
     current[name] = getCVar(name)
   end
-  local plan = Logic.PlanCVars(
-    c.saved,
-    current,
-    Logic.Desired({
-      enabled = c.enabled == true,
-      questItems = c.questItems == true,
-      ore = c.ore == true,
-      herbs = c.herbs == true,
-      quest = c.quest == true,
-      gameIcons = c.gameIcons ~= false,
-      range = c.range,
-      sparkling = sparkling or unknownTarget,
-    })
-  )
+  local desired = desiredCVars(c)
+  local plan = Logic.PlanCVars(c.saved, current, desired)
   for name, value in pairs(plan.remember) do
     c.saved[name] = value
   end
   for name, value in pairs(plan.set) do
     setCVar(name, value)
   end
+  -- The client may keep less than we ask for: what it holds is shown in the diagnosis.
+  rangeHeld = desired[Logic.RANGE_CVAR] ~= nil and getCVar(Logic.RANGE_CVAR) or nil
   for name, value in pairs(plan.restore) do
     if setCVar(name, value) then
       c.saved[name] = nil
@@ -217,13 +272,6 @@ local function unitExists()
   return Logic.Exists(unitFlag("UnitExists"), unitFlag("UnitIsGameObject")) == true
 end
 
--- True when the client hides the answer: the module then leaves the target of the game alone.
-local function targetUnknown()
-  local exists, secretA = unitFlag("UnitExists")
-  local isObject, secretB = unitFlag("UnitIsGameObject")
-  return Logic.Exists(exists, isObject) == nil and (secretA or secretB)
-end
-
 -- A creature or corpse: only world objects get the effect.
 local function isCreature()
   return unitFlag("UnitExists") == true and unitFlag("UnitIsGameObject") == false
@@ -239,9 +287,10 @@ local function targetGuid()
 end
 
 -- The cursor icon of the target lands in a texture nobody sees: its file or atlas names the object.
--- Where the client takes a second argument (low priority icons) it is tried first, then the plain call.
--- Returns file, atlas and what the client said (for the support report): { ok, ret }.
-local CURSOR_CALLS = { { true }, {} }
+-- SetUnitCursorTexture(texture, unit [, style [, includeLowPriority]]): a soft target out of reach is low
+-- priority and names nothing without the last flag. Older calls (the flag in the style slot, then the plain
+-- call) stay as fallbacks. Returns file, atlas and what the client said (for the support report): { ok, ret }.
+local CURSOR_CALLS = { { n = 2, nil, true }, { n = 1, true }, { n = 0 } }
 
 local function cursorName()
   local set = global("SetUnitCursorTexture")
@@ -254,16 +303,17 @@ local function cursorName()
     probeTexture = frame:CreateTexture(nil, "ARTWORK")
   end
   local tex = probeTexture
-  local file, atlas, said
-  for _, extra in ipairs(CURSOR_CALLS) do
+  local file, atlas, said, call
+  for index, extra in ipairs(CURSOR_CALLS) do
     pcall(tex.SetTexture, tex, nil)
-    local ok, result = pcall(set, tex, UNIT, unpack(extra))
+    local ok, result = pcall(set, tex, UNIT, unpack(extra, 1, extra.n))
     said = said or { ok = ok, ret = ok and readable(result) or nil }
     local okAtlas, gotAtlas = pcall(tex.GetAtlas, tex)
     local okFile, gotFile = pcall(tex.GetTexture, tex)
     atlas = okAtlas and readable(gotAtlas) or nil
     file = okFile and readable(gotFile) or nil
     if file ~= nil or atlas ~= nil then
+      call = index
       break
     end
   end
@@ -275,7 +325,7 @@ local function cursorName()
       file = okPath and readable(name) or file
     end
   end
-  said.file, said.atlas = file, atlas
+  said.file, said.atlas, said.call = file, atlas, call
   return file, atlas, said
 end
 
@@ -423,40 +473,64 @@ local function questChecks(data, lines)
   return checks
 end
 
--- Category ("ore", "herbs", "quest", the fallback "object" or nil), whether the object is locked for the
--- player, where the answer came from and what the cursor call said. Ore and herbs come
--- first (cursor icon, tooltip), then the quest checks for every other world object, whatever its cursor
--- icon says (a quest object often shows the plain interaction). The fallback is the last resort: a world
--- object the cursor icon of which names neither a quest nor a plain interaction. The settings are not
--- looked at here: the kind is known with a switch off, only the effect depends on it.
-local function identify()
+-- Category (ore, herbs, skinning, bobber, quest, chests, the fallback "object", "others" or nil), whether the
+-- object is locked for the player, where the answer came from and what the cursor call said. Order: cursor
+-- icon, tooltip, then the quest checks for every other world object, whatever its cursor icon says (a quest
+-- object often shows the plain interaction), then the weak chest icon, the name of the object, the fallback
+-- (a world object whose icon names neither a quest nor a plain interaction) and last "others". creature: the
+-- target is a creature, only a skinnable corpse counts then. The settings are not looked at here: the kind is
+-- known with a switch off, only the effect depends on it.
+local function skinnableTexts()
+  local text = global("UNIT_SKINNABLE_LEATHER")
+  return type(text) == "string" and text ~= "" and { text:lower() } or nil
+end
+
+local function identify(inRange, creature)
   local file, atlas, cursor = cursorName()
-  local category, locked = Logic.Classify(file, atlas)
+  local category, unable = Logic.Classify(file, atlas)
+  local locked = Logic.IsLocked(unable, inRange)
+  local weak
+  if category == Logic.WEAK_CATEGORY then
+    weak, category = category, nil
+  end
+  if creature then
+    if category == "skinning" then
+      return category, locked, "cursor", cursor, unable
+    elseif Logic.ClassifyTooltip(tooltipLines(tooltipData()), skinnableTexts()) == "skinning" then
+      return "skinning", locked, "tooltip", cursor, unable
+    end
+    return nil, locked, nil, cursor, unable
+  end
   if category then
-    return category, locked, "cursor", cursor
+    return category, locked, "cursor", cursor, unable
   end
   local data = tooltipData()
   local lines = tooltipLines(data)
-  category = Logic.ClassifyTooltip(lines)
+  category = Logic.ClassifyTooltip(lines, skinnableTexts())
   if category then
-    return category, locked, "tooltip", cursor
+    return category, locked, "tooltip", cursor, unable
   end
-  if not isCreature() then
-    local quest = questChecks(data, lines)
-    local source = Logic.QuestSource(quest.related, quest.tooltipLine, quest.nameMatch)
-    if source then
-      return "quest", locked, "quest-" .. source, cursor
-    end
+  local quest = questChecks(data, lines)
+  local source = Logic.QuestSource(quest.related, quest.tooltipLine, quest.nameMatch)
+  if source then
+    return "quest", locked, "quest-" .. source, cursor, unable
+  end
+  if weak then
+    return weak, locked, "cursor", cursor, unable
+  end
+  category = Logic.ClassifyName(lines[1] or unitCall("UnitName"))
+  if category then
+    return category, locked, "name", cursor, unable
   end
   local creatureType, known = unitCall("UnitCreatureType")
   if not known then
     creatureType = "?"
   end
-  category = Logic.ClassifyObject(targetGuid(), unitCall("UnitIsPlayer"), creatureType, file, atlas)
+  category = Logic.ClassifyWorldObject(targetGuid(), unitCall("UnitIsPlayer"), creatureType, file, atlas)
   if category then
-    return category, locked, "object", cursor
+    return category, locked, category == Logic.OTHERS and "others" or "object", cursor, unable
   end
-  return nil, locked, nil, cursor
+  return nil, locked, nil, cursor, unable
 end
 
 -- Effect ----------------------------------------------------------------------------------------------
@@ -520,8 +594,7 @@ local function place(plate)
     host:SetFrameLevel(level)
   end
   host:ClearAllPoints()
-  local c = config() or {}
-  if not pcall(host.SetPoint, host, "CENTER", plate, "CENTER", 0, Logic.CleanOffset(c.offsetY)) then
+  if not pcall(host.SetPoint, host, "CENTER", plate, "CENTER", 0, kindCfg().height) then
     return false
   end
   host:SetIgnoreParentAlpha(true)
@@ -531,12 +604,53 @@ end
 -- All sparks start anew at once.
 local function restartDots()
   for _, d in ipairs(dots) do
-    Logic.Respawn(d.p, math.random)
+    if not d.layer.motion then
+      Logic.Respawn(d.p, math.random)
+    end
   end
   staticPlaced = false
 end
 
--- Sets the wanted state from the range of the target (nil when it is gone).
+-- The professions of the player as Logic.ProfessionsFrom gives them, nil when the client cannot tell (then
+-- "only my professions" shows everything). Read once, again after SKILL_LINES_CHANGED.
+local function professions()
+  if ownProfessions ~= false then
+    return ownProfessions
+  end
+  ownProfessions = nil
+  local get, info = global("GetProfessions"), global("GetProfessionInfo")
+  if type(get) ~= "function" or type(info) ~= "function" then
+    return nil
+  end
+  local ok, list = pcall(function()
+    return { get() }
+  end)
+  if not ok then
+    return nil
+  end
+  local rows = {}
+  for slot = 1, 6 do
+    if type(list[slot]) == "number" then
+      local okInfo, name, _, _, _, _, _, line = pcall(info, list[slot])
+      if okInfo then
+        rows[#rows + 1] = { name = readable(name), id = readable(line) }
+      end
+    end
+  end
+  ownProfessions = Logic.ProfessionsFrom(rows)
+  return ownProfessions
+end
+
+-- One soft chime when a node first comes into reach, where the client has the sound kit.
+local function playSound()
+  local play, kit = global("PlaySound"), global("SOUNDKIT")
+  if type(play) == "function" and type(kit) == "table" and kit.UI_MAP_WAYPOINT_SUPER_TRACK_ON then
+    pcall(play, kit.UI_MAP_WAYPOINT_SUPER_TRACK_ON)
+  end
+end
+
+-- Sets the wanted state from the range of the target (nil when it is gone). Without the reach look "far" shows
+-- as "ready"; the flash then follows the range itself. The chime plays once per target, in reach.
 local function poll()
   if not unitExists() then
     want = nil
@@ -553,7 +667,20 @@ local function poll()
       end
     end
   end
-  want = Logic.WantedState(inRange, target.locked)
+  local general = cfg().general
+  want = Logic.ReachState(Logic.WantedState(inRange, target.unable), general.reachLook)
+  if inRange == true and not target.unable then
+    if not general.reachLook and general.reachFlash and Logic.ReachEntered(target.reachSeen, true) then
+      state.flash = true
+    end
+    if general.sound and not target.soundDone then
+      target.soundDone = true
+      playSound()
+    end
+  end
+  if inRange ~= nil then
+    target.reachSeen = inRange
+  end
 end
 
 local function paintModel(r, g, b, a)
@@ -571,8 +698,12 @@ end
 
 -- A texture size in pixels with the size setting applied (the host frame is never scaled).
 local function scaled(base)
-  local c = config()
-  return Logic.ScaledSize(base, c and c.size)
+  return Logic.ScaledSize(base, kindCfg().size)
+end
+
+-- The range the client holds right now in yards (what it kept of our last write), nil when it does not tell.
+function G.RangeHeld()
+  return tonumber(rangeHeld or getCVar(Logic.RANGE_CVAR))
 end
 
 -- The size setting changed: every texture of the effect takes the new size at once, no rebuild.
@@ -581,39 +712,94 @@ function G.Resize()
     dark:SetSize(scaled(Logic.DARK_SIZE), scaled(Logic.DARK_SIZE))
     glow:SetSize(scaled(Logic.GLOW_SIZE), scaled(Logic.GLOW_SIZE))
   end
-  for _, d in ipairs(dots) do
-    local size = scaled(staticPlaced and Logic.STAR_SIZE_MAX or d.p.size)
-    d.tex:SetSize(size, size)
+  if not spec then
+    return
   end
+  if spec.kind == "beam" then
+    beam:SetSize(scaled(spec.width), scaled(spec.height))
+    spark:SetSize(scaled(spec.sparkSize), scaled(spec.sparkSize))
+    return
+  end
+  for _, d in ipairs(dots) do
+    d.tex:SetSize(scaled(d.w), scaled(d.h))
+  end
+end
+
+-- The beam and its spark: both pulse together, still under reduced motion.
+local function paintBeam(r, g, b, a, reduce)
+  local t = not reduce and clock or nil
+  beam:SetVertexColor(r, g, b, Logic.GlowAlpha(a, t) * 0.8)
+  spark:SetVertexColor(r, g, b, Logic.GlowAlpha(a, t and t * 2.3))
+end
+
+-- Puts a sprite at x, y with its size in pixels at 100 percent (w wide, h high).
+local function placeDot(d, x, y, w, h)
+  d.w, d.h = w, h
+  d.tex:SetPoint("CENTER", host, "CENTER", x, y)
+  d.tex:SetSize(scaled(w), scaled(h))
+end
+
+-- A sprite of a driver style (see Logic.Pose): its place, size and sprite sheet frame at the clock, nothing
+-- when reduced motion already placed it. Returns the alpha of the pose.
+local function paintPosed(d, layer, reduce)
+  local t = not reduce and clock or nil
+  local x, y, alpha, scale, stretch, rotation = Logic.Pose(layer, d.i, d.n, d.j, t)
+  if d.sheeted then
+    local frame = Logic.SheetFrame(layer, d.i, t)
+    if frame ~= d.frame then
+      d.frame = frame
+      d.tex:SetTexCoord(Logic.SheetCoords(layer.sheet, frame))
+    end
+  end
+  if layer.spin and d.tex.SetRotation then
+    d.tex:SetRotation(rotation)
+  end
+  if not (reduce and staticPlaced) then
+    placeDot(d, x, y, layer.sizeMax * scale * stretch, layer.sizeMax * scale)
+  end
+  return alpha
+end
+
+-- A fading sprite (see Logic.StepParticle); reduced motion holds it at a fixed spot.
+local function paintFading(d, i, layer, reduce)
+  if reduce then
+    if not staticPlaced then
+      local x, y = Logic.StaticSpot(i, #dots, layer.radius)
+      placeDot(d, x, y, layer.sizeMax, layer.sizeMax)
+    end
+    return 0.75
+  end
+  if Logic.StepParticle(d.p, STEP, math.random) or staticPlaced then
+    placeDot(d, d.p.x, d.p.y, d.p.size, d.p.size)
+  end
+  return Logic.Envelope(d.p)
 end
 
 local function paintDots(r, g, b, a, reduce)
   local t = not reduce and clock or nil
-  local dr, dg, db = Logic.DarkLook(state)
-  dark:SetVertexColor(dr, dg, db, Logic.DarkAlpha(a))
-  glow:SetVertexColor(r, g, b, Logic.GlowAlpha(a, t))
+  if dark and spec.glow then
+    local dr, dg, db = Logic.DarkLook(state, kindCfg().color)
+    dark:SetVertexColor(dr, dg, db, Logic.DarkAlpha(a))
+    glow:SetVertexColor(r, g, b, Logic.GlowAlpha(a, t))
+  end
   for i = 1, #dots do
     local d = dots[i]
-    local envelope = 0.75
-    if reduce then
-      if not staticPlaced then
-        local x, y = Logic.StaticSpot(i, #dots)
-        d.tex:SetPoint("CENTER", host, "CENTER", x, y)
-        local size = scaled(Logic.STAR_SIZE_MAX)
-        d.tex:SetSize(size, size)
-      end
+    local layer = d.layer
+    local envelope
+    if layer.motion then
+      envelope = paintPosed(d, layer, reduce)
     else
-      if Logic.StepParticle(d.p, STEP, math.random) or staticPlaced then
-        d.tex:SetPoint("CENTER", host, "CENTER", d.p.x, d.p.y)
-        local size = scaled(d.p.size)
-        d.tex:SetSize(size, size)
-      end
-      envelope = Logic.Envelope(d.p)
+      envelope = paintFading(d, i, layer, reduce)
     end
     d.tex:SetVertexColor(r, g, b, envelope * a)
   end
   staticPlaced = reduce
 end
+
+-- The flash of a node coming into reach (see Logic.FlashLook), defined with the textures below.
+local startFlash, stopFlash, paintFlash
+-- Rare glow and the finish of a gather, defined with the textures below.
+local paintRare, paintFinish, hideFinish
 
 local function step()
   local reduce = reduced()
@@ -623,18 +809,42 @@ local function step()
     state.burst = false
     restartDots()
   end
-  local r, g, b, a = Logic.Look(state)
+  if state.flash then
+    state.flash = false
+    startFlash()
+  end
+  local general = cfg().general
+  dimMix = Logic.DimStep(dimMix, general.gatherDim and gathering, STEP, reduce)
+  local bright = general.brightness / 100
+  local factor = bright * Logic.GatherFactor(dimMix)
+  if finishKind then
+    factor = factor * Logic.FinishFade(finishKind, finishAge)
+  end
+  local r, g, b, a = Logic.Look(state, kindCfg().color)
+  a = a * factor
   if style == "original" then
     if reduce ~= paused and type(host.model.SetPaused) == "function" then
       paused = reduce
       pcall(host.model.SetPaused, host.model, reduce)
     end
     paintModel(r, g, b, a)
+  elseif spec.kind == "beam" then
+    paintBeam(r, g, b, a, reduce)
   else
     paintDots(r, g, b, a, reduce)
   end
+  paintFlash(r, g, b, bright)
+  paintRare(a, reduce)
+  paintFinish(r, g, b, bright, reduce)
   if want == nil and state.alpha <= 0 then
+    stopFlash()
     host:Hide()
+  end
+  -- The finish is over: the effect stays away from this target until it changes.
+  if finishKind and finishAge >= Logic.FINISH_TIME then
+    hideFinish()
+    finishKind, finishedGuid = nil, target.guid
+    G.Refresh()
   end
 end
 
@@ -700,82 +910,266 @@ local function loadModel()
   return modelLoaded
 end
 
--- A texture of the effect: the id of the client, the fallback star when the client does not know it.
+-- Whether the client knows an atlas; false when it cannot tell (the texture id is the safe way then).
+local function atlasKnown(name)
+  local api = global("C_Texture")
+  if type(api) ~= "table" or type(api.GetAtlasInfo) ~= "function" then
+    return false
+  end
+  local ok, info = pcall(api.GetAtlasInfo, name)
+  return ok and info ~= nil
+end
+
+-- Gives a texture its picture: the atlas when the client has it, else the id of the client, else the id
+-- named as fallback (the style degrades to it), else the cooldown star. Returns "atlas", "id" for the
+-- own picture and nil for a fallback, so a sprite sheet is only cut where its own picture is drawn.
+local function paint(tex, id, atlas, fallback)
+  if atlas and atlasKnown(atlas) and pcall(tex.SetAtlas, tex, atlas) then
+    return "atlas"
+  end
+  tex:SetTexCoord(0, 1, 0, 1)
+  local ok, known = pcall(tex.SetTexture, tex, id)
+  if ok and known ~= false then
+    return "id"
+  end
+  if fallback and fallback ~= id then
+    ok, known = pcall(tex.SetTexture, tex, fallback)
+    if ok and known ~= false then
+      return nil
+    end
+  end
+  tex:SetTexture(Logic.TEXTURE_FALLBACK)
+end
+
+-- The effect window draws its style previews with the same texture choice.
+G.PaintTexture = paint
+
+-- A texture of the effect, centered on the host.
 local function glowTexture(layer, sublevel, id, blend, size)
   local tex = host:CreateTexture(nil, layer, nil, sublevel)
   tex.fgLayer = true
   tex:SetBlendMode(blend)
-  local ok, known = pcall(tex.SetTexture, tex, id)
-  if not ok or known == false then
-    tex:SetTexture(Logic.TEXTURE_FALLBACK)
-  end
+  paint(tex, id)
   tex:SetPoint("CENTER", host, "CENTER", 0, 0)
   size = scaled(size)
   tex:SetSize(size, size)
   return tex
 end
 
--- From the back: a dark layer (blend, readable on bright ground), the soft glow (additive, pulses) and
--- the stars (additive, flash).
-local function buildDots()
-  if #dots > 0 then
-    return
-  end
-  dark = glowTexture("BACKGROUND", 0, Logic.GLOW_TEXTURE, "BLEND", Logic.DARK_SIZE)
-  glow = glowTexture("ARTWORK", 0, Logic.GLOW_TEXTURE, "ADD", Logic.GLOW_SIZE)
-  for i = 1, Logic.PARTICLES do
-    local tex = host:CreateTexture(nil, "OVERLAY")
-    tex:SetBlendMode("ADD")
-    local ok, known = pcall(tex.SetTexture, tex, Logic.STAR_TEXTURE)
-    if not ok or known == false then
-      tex:SetTexture(Logic.TEXTURE_FALLBACK)
-    end
-    local p = {}
-    Logic.Respawn(p, math.random, 1)
-    tex:SetPoint("CENTER", host, "CENTER", p.x, p.y)
-    local size = scaled(p.size)
-    tex:SetSize(size, size)
-    dots[i] = { tex = tex, p = p }
+-- The flash of a node coming into reach (see Logic.FlashLook): one texture, made on the first flash.
+local flash, flashAge
+
+function stopFlash()
+  flashAge = nil
+  if flash then
+    flash:Hide()
   end
 end
 
-local function showDots(on)
+function startFlash()
+  if not cfg().general.reachFlash or reduced() then
+    return
+  end
+  if not flash then
+    flash = glowTexture("OVERLAY", 2, Logic.FLASH_TEXTURE, "ADD", Logic.FLASH_SIZE)
+    flash.fgFlash = true
+  end
+  flashAge = 0
+end
+
+function paintFlash(r, g, b, bright)
+  if not flashAge then
+    return
+  end
+  local alpha, scale = Logic.FlashLook(flashAge)
+  if not alpha then
+    stopFlash()
+    return
+  end
+  local size = scaled(Logic.FLASH_SIZE * scale)
+  flash:SetSize(size, size)
+  flash:SetVertexColor(r, g, b, alpha * bright)
+  flash:Show()
+  flashAge = flashAge + STEP
+end
+
+-- The second soft glow of a rare node, slower and paler than the glow behind it.
+function paintRare(a, reduce)
+  if not (target.rare and cfg().general.rareGlow) then
+    if rare then
+      rare:Hide()
+    end
+    return
+  end
+  if not rare then
+    rare = glowTexture("BACKGROUND", 1, Logic.GLOW_TEXTURE, "ADD", Logic.RARE_SIZE)
+    rare.fgRare = true
+  end
+  local size = scaled(Logic.RARE_SIZE)
+  rare:SetSize(size, size)
+  local color = Logic.RARE_COLOR
+  rare:SetVertexColor(color.r, color.g, color.b, Logic.GlowAlpha(a, not reduce and clock * 0.6 or nil) * 0.8)
+  rare:Show()
+end
+
+function hideFinish()
+  for _, tex in ipairs(finishParts) do
+    tex:Hide()
+  end
+end
+
+-- A gather completed: the running effect fades and the parts of the chosen finish play (see Logic.FinishPart).
+local function startFinish(kind)
+  finishKind, finishAge = kind, 0
+  local part = Logic.FINISH_PARTS[kind]
+  for i = 1, part and part.count or 0 do
+    local tex = finishParts[i]
+    if not tex then
+      tex = glowTexture("OVERLAY", 3, part.texture, "ADD", part.size)
+      tex.fgFinish = true
+      finishParts[i] = tex
+    end
+    paint(tex, part.texture)
+  end
+end
+
+function paintFinish(r, g, b, bright, reduce)
+  if not finishKind then
+    return
+  end
+  for i, tex in ipairs(finishParts) do
+    local x, y, alpha, size = Logic.FinishPart(finishKind, finishAge, i, reduce)
+    if x then
+      tex:ClearAllPoints()
+      tex:SetPoint("CENTER", host, "CENTER", x, y)
+      local px = scaled(size)
+      tex:SetSize(px, px)
+      tex:SetVertexColor(r, g, b, alpha * bright)
+      tex:Show()
+    else
+      tex:Hide()
+    end
+  end
+  finishAge = finishAge + STEP
+end
+
+local function hideSprites()
   for i = 1, #dots do
-    dots[i].tex:SetShown(on)
+    dots[i].tex:Hide()
   end
-  if dark then
-    dark:SetShown(on)
-    glow:SetShown(on)
+  for _, part in pairs({ dark = dark, glow = glow, beam = beam, spark = spark }) do
+    part:Hide()
   end
+end
+
+-- The catalog entry with the layers for the count and the spread of the kind (see Logic.ExpandLayers).
+local function effectiveSpec(entry, k)
+  local out = {}
+  for key, value in pairs(entry) do
+    out[key] = value
+  end
+  if entry.kind == "sprites" then
+    out.layers = Logic.ExpandLayers(entry, k.count, k.spread)
+  end
+  return out
+end
+
+-- Draws the style of the catalog entry: the dots (from the back a dark layer, the soft glow and the stars
+-- for the particles style, only stars for the others) or the beam with its spark. Textures are reused when
+-- the style changes.
+local function buildSprites(entry)
+  spec = entry
+  hideSprites()
+  if entry.kind == "beam" then
+    if not beam then
+      beam = glowTexture("ARTWORK", 0, entry.textures[1], entry.blend, entry.width)
+      spark = glowTexture("OVERLAY", 0, entry.sparkTexture, entry.blend, entry.sparkSize)
+    end
+    paint(beam, entry.textures[1], entry.atlas)
+    beam:SetBlendMode(entry.blend)
+    beam:ClearAllPoints()
+    beam:SetPoint("BOTTOM", host, "CENTER", 0, 0)
+    beam:SetSize(scaled(entry.width), scaled(entry.height))
+    spark:SetSize(scaled(entry.sparkSize), scaled(entry.sparkSize))
+    beam:Show()
+    spark:Show()
+    return
+  end
+  if entry.glow then
+    dark = dark or glowTexture("BACKGROUND", 0, Logic.GLOW_TEXTURE, "BLEND", Logic.DARK_SIZE)
+    glow = glow or glowTexture("ARTWORK", 0, Logic.GLOW_TEXTURE, "ADD", Logic.GLOW_SIZE)
+    dark:Show()
+    glow:Show()
+  end
+  local used = 0
+  for _, layer in ipairs(entry.layers) do
+    for i = 1, layer.count do
+      for j = 0, layer.trail or 0 do
+        used = used + 1
+        local d = dots[used]
+        if not d then
+          d = table.remove(spare) or { tex = host:CreateTexture(nil, "OVERLAY"), p = {} }
+          dots[used] = d
+        end
+        d.layer, d.i, d.n, d.j, d.frame = layer, i, layer.count, j, nil
+        d.tex:SetBlendMode(layer.blend)
+        d.tex:SetDrawLayer("OVERLAY", layer.sublevel or 0)
+        local source = paint(d.tex, layer.textures[(i - 1) % #layer.textures + 1], layer.atlas, layer.fallback)
+        d.sheeted = layer.sheet ~= nil and source ~= nil
+        if d.tex.SetRotation then
+          d.tex:SetRotation(0)
+        end
+        if layer.motion then
+          d.w, d.h = layer.sizeMax, layer.sizeMax
+        else
+          Logic.Respawn(d.p, math.random, 1, layer)
+          d.w, d.h = d.p.size, d.p.size
+        end
+        d.tex:ClearAllPoints()
+        d.tex:SetPoint("CENTER", host, "CENTER", layer.motion and 0 or d.p.x, layer.motion and 0 or d.p.y)
+        d.tex:SetSize(scaled(d.w), scaled(d.h))
+        d.tex:Show()
+      end
+    end
+  end
+  while #dots > used do
+    spare[#spare + 1] = table.remove(dots)
+  end
+end
+
+-- What the effect is built from: the style of the kind, for automatic the default of the kind of the target.
+local function builtKey(k)
+  return k.style == "auto" and Logic.AutoStyle(target.cat) or k.style
 end
 
 -- Chooses the style once per settings change and shows only its parts.
 local function buildEffect()
   buildHost()
-  local c = config()
-  local choice = c and c.style
+  local k = kindCfg()
+  local choice = k.style
   local loaded
   if Logic.WantsModel(choice) then
     loaded = loadModel()
   end
-  local resolved, warn = Logic.ResolveStyle(choice, loaded)
+  local resolved, warn = Logic.ResolveStyle(choice, loaded, target.cat)
   if warn and not modelWarned then
     modelWarned = true
     ns.Notify.chat(ns.L["sparkles.noModel"])
   end
   style = resolved
   if resolved == "original" then
-    showDots(false)
+    spec = nil
+    hideSprites()
     host.model:Show()
   else
-    buildDots()
     if host.model then
       host.model:Hide()
     end
-    showDots(true)
+    buildSprites(effectiveSpec(Logic.StyleSpec(resolved), k))
     staticPlaced = false
   end
   built = true
+  builtStyle, builtCount, builtSpread = builtKey(k), k.count, k.spread
 end
 
 local function stopEffect()
@@ -784,6 +1178,11 @@ local function stopEffect()
   end
   want = nil
   state = Logic.NewState()
+  finishKind = nil
+  hideFinish()
+  if rare then
+    rare:Hide()
+  end
   release()
 end
 
@@ -803,7 +1202,8 @@ function G.Attach()
     release()
     return
   end
-  if not built then
+  local k = kindCfg()
+  if not built or builtKey(k) ~= builtStyle or k.count ~= builtCount or k.spread ~= builtSpread then
     buildEffect()
   end
   local fresh = plate ~= attached
@@ -830,31 +1230,50 @@ end
 -- Looks at the soft target again: its kind decides whether anything sparkles. Called when the target
 -- changes and when the settings change; recheck is true for the later looks of the watcher.
 local function refresh(recheck)
+  knownAcc = 0
   local c = config()
   if not c then
     return
   end
-  local exists = c.enabled == true and unitExists() and not isCreature()
-  local unknown = c.enabled == true and targetUnknown()
-  local category, locked
+  local m = cfg()
+  local present = c.enabled == true and unitExists()
+  local creature = present and isCreature()
+  local blocked = present and (m.general.combatHide and (fight or inCombat()) or m.general.instanceHide and inInstance())
+  local exists = present and not blocked and (not creature or m.kinds.skinning.on)
+  local category, locked, unable, reach, key, rareNode
   if exists then
+    reach = unitFlag("UnitIsInInteractRange")
     -- The kind is found with every switch off; only the effect asks the settings.
-    category, locked = identify()
-    if category and not (Logic.CategoryOn(category, c) and Logic.ShowsTarget(locked, c.lockedNodes)) then
-      category = nil
+    local _
+    category, locked, _, _, unable = identify(reach, creature)
+    key = Logic.KindOf(category, m.kinds)
+    if key and not Logic.ShowsTarget(locked, m.general.grayTooHard) then
+      key = nil
+    end
+    if key and not Logic.ProfessionAllows(key, m.general.myProfessionsOnly, m.general.myProfessionsOnly and professions()) then
+      key = nil
+    end
+    if key and m.general.rareGlow and next(Logic.RARE_NAMES) then
+      rareNode = Logic.IsRare(unitCall("UnitName") or tooltipLines(tooltipData())[1])
     end
   end
   target.checks = recheck and target.checks + 1 or 0
-  local guid = category and targetGuid() or nil
+  local raw = exists and targetGuid() or nil
+  if finishedGuid then
+    if raw ~= nil and raw == finishedGuid then
+      key = nil
+    else
+      finishedGuid = nil
+    end
+  end
+  local guid = key and raw or nil
   if guid ~= target.guid then
     state = Logic.NewState()
+    target.reachSeen, target.soundDone = nil, false
   end
-  target.cat, target.locked, target.guid = category, locked == true, guid
-  local now = category ~= nil
-  if now ~= sparkling or unknown ~= unknownTarget then
-    sparkling, unknownTarget = now, unknown
-    G.Apply()
-  end
+  target.rare = rareNode == true
+  target.cat, target.kind, target.locked, target.guid = key, category, locked == true, guid
+  target.unable, target.reach, target.creature = unable == true, reach, creature == true
   G.Attach()
   if c.enabled == true and not watcher then
     watcher = CreateFrame("Frame", nil, UIParent)
@@ -895,15 +1314,6 @@ local function sampleDistance()
 end
 
 -- Detection range measurement ---------------------------------------------------------------------------
-
-local function inInstance()
-  local f = global("IsInInstance")
-  if type(f) ~= "function" then
-    return false
-  end
-  local ok, inside = pcall(f)
-  return ok and readable(inside) == true
-end
 
 -- UnitPosition answers y, x, z and the instance in yards where the client has it, nothing in some places.
 local function unitPosition()
@@ -1012,12 +1422,15 @@ local function sampleReach(c, object, guid)
 end
 
 -- While a soft target exists: the plate may come after the event (or not at all for a moment) and the
--- cursor icon may follow a frame later, so look again a few times and anchor again when the plate moved.
+-- cursor icon follows when the client rates the object (an object out of reach is rated late), so look
+-- again at every poll while the kind is unknown and once a second while it is known. The plate is
+-- anchored again when it moved.
 function G.Watch(_, elapsed)
   watchAcc = watchAcc + (elapsed or 0)
   if watchAcc < Logic.WATCH then
     return
   end
+  knownAcc = knownAcc + watchAcc
   watchAcc = 0
   if not active() then
     return
@@ -1037,11 +1450,21 @@ function G.Watch(_, elapsed)
   if changed or not exists then
     return
   end
-  if target.cat == nil then
-    if target.checks < Logic.RECHECKS then
+  -- An "unable" icon is locked in reach and far out of it: a reach change looks again at once.
+  if target.unable and unitFlag("UnitIsInInteractRange") ~= target.reach then
+    refresh(true)
+  end
+  if target.kind == nil then
+    -- A creature is rated once a second (only skinning looks at it), a world object at every poll.
+    if not isCreature() or knownAcc >= Logic.RECHECK_KNOWN then
       refresh(true)
     end
-  elseif attached == nil or plateOfTarget() ~= attached then
+    return
+  end
+  if knownAcc >= Logic.RECHECK_KNOWN then
+    refresh(true)
+  end
+  if target.cat ~= nil and (attached == nil or plateOfTarget() ~= attached) then
     G.Attach()
   end
 end
@@ -1060,25 +1483,56 @@ local function frameValue(frame, method, ...)
   return readable(value)
 end
 
+-- The soft target icon of the game on a plate (UnitFrame.SoftTargetFrame.Icon): what is readable of it,
+-- nil when the plate has no such frame. Missing and secret fields stay nil.
+local function plateIcon(plate)
+  local function field(owner, name)
+    if type(owner) ~= "table" then
+      return nil
+    end
+    local ok, value = pcall(function()
+      return owner[name]
+    end)
+    return ok and readable(value) or nil
+  end
+  local soft = field(field(plate, "UnitFrame"), "SoftTargetFrame") or field(plate, "SoftTargetFrame")
+  if type(soft) ~= "table" then
+    return nil
+  end
+  local icon = field(soft, "Icon")
+  return {
+    frame = true,
+    shown = frameValue(soft, "IsShown"),
+    iconShown = frameValue(icon, "IsShown"),
+    texture = frameValue(icon, "GetTexture"),
+    atlas = frameValue(icon, "GetAtlas"),
+  }
+end
+
 -- What the support report prints about the module (see Logic.DiagLines). Reads the soft target anew, changes nothing.
 function G.DiagInfo()
   local c = config() or {}
   local info = {
     enabled = c.enabled == true,
-    ore = c.ore == true,
-    herbs = c.herbs == true,
-    quest = c.quest == true,
-    lockedNodes = c.lockedNodes == true,
+    ore = cfg().kinds.ore.on,
+    herbs = cfg().kinds.herbs.on,
+    quest = cfg().kinds.quests.on,
+    lockedNodes = cfg().general.grayTooHard,
     styleSetting = c.style,
     styleActual = style,
     cursorApi = type(global("SetUnitCursorTexture")) == "function",
     soft = unitExists(),
     state = state.shown,
+    want = want,
+    cat = target.cat,
+    rechecks = target.checks,
     kept = target.cat ~= nil,
-    offsetY = c.offsetY,
-    size = c.size,
+    offsetY = kindCfg().height,
+    size = kindCfg().size,
     range = c.range,
     rangeNow = getCVar(Logic.RANGE_CVAR),
+    rangeHeld = rangeHeld or getCVar(Logic.RANGE_CVAR),
+    rangeManaged = desiredCVars(c)[Logic.RANGE_CVAR] ~= nil,
     effective = Logic.EffectiveRange(c.range),
     distSeen = distSeen,
     distTried = distTried > 0,
@@ -1093,6 +1547,10 @@ function G.DiagInfo()
     unitIsGameObject = unitFlag("UnitIsGameObject"),
     cvars = {},
   }
+  local key = target.cat or Logic.KindKey(target.kind)
+  info.kindCfg = key and cfg().kinds[key]
+  info.configKind = info.kindCfg and key or nil
+  info.general = cfg().general
   -- Where a position comes from right now (no coordinates leave this function).
   playerYards()
   info.posSource = posSource
@@ -1103,24 +1561,26 @@ function G.DiagInfo()
   info.activeUnits = units
   if info.soft then
     info.name = unitCall("UnitName")
-    info.category, info.locked, info.source, info.cursor = identify()
-    local data = tooltipData()
-    info.questCheck = questChecks(data, tooltipLines(data))
     local inRange = unitCall("UnitIsInInteractRange")
     if inRange == true or inRange == false then
       info.inRange = inRange
     end
+    info.category, info.locked, info.source, info.cursor, info.unable = identify(info.inRange, isCreature())
+    info.kindKey = Logic.KindKey(info.category)
+    local data = tooltipData()
+    info.questCheck = questChecks(data, tooltipLines(data))
   end
   local plate = plateOfTarget()
   info.plate = plate ~= nil
   if plate then
     info.plateSecret = frameValue(plate, "IsAnchoringSecret")
+    info.plateIcon = plateIcon(plate)
   end
   if host then
     local lit = 0
-    if style == "particles" and state.alpha > 0 then
+    if spec and spec.kind == "sprites" and state.alpha > 0 then
       for _, d in ipairs(dots) do
-        if Logic.Envelope(d.p) > 0 then
+        if d.layer.motion or Logic.Envelope(d.p) > 0 then
           lit = lit + 1
         end
       end
@@ -1191,23 +1651,60 @@ ns.On("PLAYER_LOGIN", function()
   end
 end)
 ns.On("PLAYER_REGEN_ENABLED", function()
+  fight = false
   if pendingApply then
     G.Apply()
   end
   G.Refresh()
 end)
--- The name plate gate cannot change in combat: open it before the fight where the lock is not on yet,
--- so objects still sparkle during it (the rest waits for the end of the fight).
+-- A fight hides the effect when the player asked for it (nothing protected is touched).
 ns.On("PLAYER_REGEN_DISABLED", function()
-  local c = config()
-  if not (c and c.enabled == true and (c.ore or c.herbs or c.quest)) then
+  fight = true
+  if cfg().general.combatHide then
+    G.Refresh()
+  end
+end)
+-- The professions are read again at the next look.
+ns.On("SKILL_LINES_CHANGED", function()
+  ownProfessions = false
+end)
+
+-- The gather cast of the player: dims the effect while it runs, and a success plays the finish. Only the
+-- own unit is registered, so other players casting cost nothing.
+local CAST_EVENTS = {
+  "UNIT_SPELLCAST_START",
+  "UNIT_SPELLCAST_SUCCEEDED",
+  "UNIT_SPELLCAST_FAILED",
+  "UNIT_SPELLCAST_INTERRUPTED",
+}
+
+local function spellName(id)
+  local api = global("C_Spell")
+  local get = type(api) == "table" and api.GetSpellName or global("GetSpellInfo")
+  if type(get) ~= "function" then
+    return nil
+  end
+  local ok, name = pcall(get, id)
+  return ok and readable(name) or nil
+end
+
+local function onCast(_, event, unit, _, spellId)
+  local id = readable(spellId)
+  if readable(unit) ~= "player" or not Logic.IsGatherSpell(id, Logic.IsNumber(id) and spellName(id) or nil) then
     return
   end
-  if not inCombat() and getCVar(Logic.NAMEPLATE_CVAR) ~= "1" then
-    setCVar(Logic.NAMEPLATE_CVAR, "1")
+  gathering = event == "UNIT_SPELLCAST_START"
+  local finish = cfg().general.finish
+  if event == "UNIT_SPELLCAST_SUCCEEDED" and finish ~= "none" and target.cat and host and host:IsShown() then
+    startFinish(finish)
   end
-  pendingApply = true
-end)
+end
+
+local castFrame = CreateFrame("Frame")
+castFrame:SetScript("OnEvent", ns.Wrap("sparkles-cast", onCast))
+for _, event in ipairs(CAST_EVENTS) do
+  pcall(castFrame.RegisterUnitEvent, castFrame, event, "player")
+end
 -- The client hands a plate on from one target to the next without a trace on the frame: a change
 -- between two readable targets while the effect hangs lets it go and hang anew.
 ns.On("PLAYER_SOFT_INTERACT_CHANGED", function(_, old, new)
@@ -1250,19 +1747,31 @@ ns.On("CVAR_UPDATE", function(_, name)
   end
 end)
 ns.On("FG_SETTING_CHANGED", function(_, path)
-  if type(path) ~= "string" then
+  if type(path) ~= "string" or not path:find("^settings%.sparkles") then
     return
   end
-  -- The gap, size and range sliders change the effect only (no rebuild), so they may run live while the thumb is dragged.
-  if path == "settings.sparkles.offsetY" then
-    G.Reposition()
-  elseif path == "settings.sparkles.size" then
-    G.Resize()
-  elseif path == "settings.sparkles.range" then
-    G.Apply()
-  elseif path == "settings.sparkles.measureChat" or path == "settings.sparkles.measure" then
+  local sub = path:match("^settings%.sparkles%.(.+)$") or ""
+  local top = sub:match("^[^.]+")
+  if top == "measureChat" or top == "measure" then
     return
-  elseif path:find("^settings%.sparkles") then
+  end
+  -- The flat keys of the first version (the old controls, the setup assistant, the dev tools) still write: the
+  -- model takes them over.
+  local c = config()
+  if top and c then
+    Logic.SyncLegacy(c, top)
+  end
+  modelReady = false
+  -- The gap, size and range sliders change the effect only (no rebuild), so they may run live while the thumb is dragged.
+  if top == "offsetY" or sub:find("^kinds%.[^.]+%.height$") then
+    G.Reposition()
+  elseif top == "size" or sub:find("^kinds%.[^.]+%.size$") then
+    G.Resize()
+  elseif top == "range" then
+    G.Apply()
+  elseif sub:find("^kinds%.[^.]+%.color") or sub == "general.brightness" then
+    return
+  else
     onSettings()
   end
 end)

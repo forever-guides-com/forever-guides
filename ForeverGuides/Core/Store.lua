@@ -9,6 +9,20 @@ ns.Store = Store
 Store.SCHEMA = 7
 Store.CHAR_SCHEMA = 1
 
+-- Default settings of one kind of gathering sparkles (the module's amber white, size and height of the first version, the
+-- stars of the particle style).
+local function sparkleKind(on)
+  return {
+    on = on,
+    style = "auto",
+    color = { r = 1, g = 0.93, b = 0.76 },
+    size = 75,
+    height = -45,
+    count = 7,
+    spread = 100,
+  }
+end
+
 Store.defaults = {
   settings = {
     locale = "auto",
@@ -113,17 +127,18 @@ Store.defaults = {
     -- alpha, none) with its alpha, zoom step while on (-1 keeps it), hiding in combat and in instances, own
     -- compass and gather ring, factor on the pin sizes.
     farmhud = {
-      scale = 1,
+      scale = 0.6,
       strata = "BACKGROUND",
       terrain = "auto",
       alpha = 0.3,
       zoom = 0,
       hideInCombat = false,
       hideInInstance = true,
+      hideOtherIcons = true,
       compass = true,
       compassSize = 14,
-      compassColor = "white",
-      ring = false,
+      compassColor = { 1, 1, 1 },
+      ring = true,
       ringYards = 20,
       pinScale = 1,
     },
@@ -276,13 +291,43 @@ Store.defaults = {
     areas = { items = {}, layouts = {}, newCharShown = true },
     -- Gathering sparkles (Modules/GatherSparkles.lua): on, ore, herbs, quest objects, quest item glitter
     -- (graphics settings), locked nodes shown without the profession, icons of the game over objects,
-    -- style (auto, original, particles), gap of the effect below the plate center (offsetY, plate
+    -- flash when a node comes into gathering reach (reachFlash),
+    -- style (auto, original and the keys of Logic.STYLE_CATALOG), gap of the effect below the plate center (offsetY, plate
     -- units, -200 to 0), size of the effect textures in percent (size, 30 to 150), range of the soft target
-    -- in yards (range, "max" = the 16 yards the game offers at most, or 0 up to 15), the original console
+    -- in yards (range, 10 to 60, "max" = 60), the original console
     -- variable values kept while the module changes them (saved), the notice after the update shown
     -- (noticed), the measured detection range as counters only
     -- (measure = { n, min, max, sum, last, at }, empty until measured) and its chat line (measureChat).
+    -- model: number of the settings model (Logic.MODEL_VERSION). kinds = { [herbs, ore, chests, quests, others,
+    -- bobber, skinning] = { on, style, color = { r, g, b }, size, height, count, spread } } is the source of truth for
+    -- what sparkles and how (Modules/GatherSparklesModel.lua): size in percent, height like offsetY, count the
+    -- number of sprites, spread the spread in percent. general = { brightness (0 to 100), reachLook, combatHide,
+    -- instanceHide, myProfessionsOnly, rareGlow, sound, gatherDim, finish }. reachFlash, lockedNodes (gray too hard) and
+    -- gameIcons stay flat, they are the source of those options. The flat keys ore, herbs, quest, style, offsetY and
+    -- size are carried into kinds by Store.migrateSparkles and by the module while a control writes them, and stay
+    -- readable for older versions.
     sparkles = {
+      model = 2,
+      kinds = {
+        herbs = sparkleKind(true),
+        ore = sparkleKind(true),
+        chests = sparkleKind(true),
+        quests = sparkleKind(false),
+        others = sparkleKind(false),
+        bobber = sparkleKind(false),
+        skinning = sparkleKind(false),
+      },
+      general = {
+        brightness = 100,
+        reachLook = true,
+        combatHide = true,
+        instanceHide = false,
+        myProfessionsOnly = false,
+        rareGlow = false,
+        sound = false,
+        gatherDim = true,
+        finish = "fade",
+      },
       enabled = true,
       ore = true,
       herbs = true,
@@ -290,10 +335,11 @@ Store.defaults = {
       questItems = true,
       lockedNodes = false,
       gameIcons = true,
+      reachFlash = true,
       style = "auto",
       offsetY = -45,
       size = 75,
-      range = "max",
+      range = 30,
       saved = {},
       noticed = false,
       measure = {},
@@ -764,6 +810,8 @@ Store.charDefaults = {
   -- for this character only; a missing field means "like the account".
   -- flightKnown (flight points learned at flight masters, Modules/FlightKnown.lua) is absent until the first
   -- flight map was read: no default, an absent key means "no data yet".
+  -- farmhudOn (Modules/FarmHud.lua) is absent until the player switches the Farm HUD on or off: the switch as the
+  -- player left it, read after a /reload only.
   -- consent (Core/Consent.lua) is absent until this character overrides a flag of the account register.
   -- nav (navigation layout of this character) is absent until the user edits the menu for this
   -- character only; an empty table would count as an override that wins over the account layout.
@@ -1055,6 +1103,16 @@ function Store.cleanChatName(account, char)
   end
 end
 
+-- Gathering sparkles: the flat keys of the first version become settings.sparkles.kinds once (marked by model),
+-- and the model is cleaned on every start. Runs before the defaults are filled in; the module is loaded by
+-- ADDON_LOADED. A database without the table gets the defaults, which carry the marker.
+function Store.migrateSparkles(account)
+  local s = type(account.settings) == "table" and account.settings.sparkles
+  if type(s) == "table" and ns.GatherSparklesLogic and ns.GatherSparklesLogic.Migrate then
+    ns.GatherSparklesLogic.Migrate(s)
+  end
+end
+
 function Store.init(account, char)
   account = type(account) == "table" and account or {}
   char = type(char) == "table" and char or {}
@@ -1066,6 +1124,7 @@ function Store.init(account, char)
   Store.migrateHostSkin(account)
   Store.migrateXpSession(account)
   Store.migrateSaveHint(account)
+  Store.migrateSparkles(account)
   Store.migrateInviteStyle(account)
   Store.cleanFontScales(account)
   if ns.Consent then

@@ -106,12 +106,39 @@ function SJ.Focusable(frame)
   return nil
 end
 
+-- True while the mark lies fully inside the viewport of the page. Measured from the offset inside the content
+-- and the scroll position, so it does not depend on when the client solved the frames after a scroll.
+local function inViewport(view, hl)
+  local top, bottom, contentTop = hl:GetTop(), hl:GetBottom(), view.content:GetTop()
+  local scroll, height = view.area:GetVerticalScroll(), view.area:GetHeight()
+  if not (top and bottom and contentTop and scroll and height) then
+    return true
+  end
+  local offset = contentTop - top
+  return offset >= scroll and offset + (top - bottom) <= scroll + height
+end
+
+-- The client does not always clip the children of the scroll content: the mark is drawn only while its control
+-- is inside the viewport, and comes back when the page scrolls back.
+function SJ.Fit(view)
+  local hl = view.fgMark
+  if hl then
+    hl:SetShown(hl.fgActive == true and inViewport(view, hl))
+  end
+end
+
 local function mark(view)
   local hl = view.fgMark
   if hl then
     return hl
   end
   hl = CreateFrame("Frame", nil, view.content)
+  view.area:HookScript("OnVerticalScroll", function()
+    SJ.Fit(view)
+  end)
+  view.area:HookScript("OnHide", function()
+    SJ.ClearMark(view)
+  end)
   W.Fill(hl, "accent2", 0.14)
   hl.border = W.Border(hl, "accent2", 1, 2)
   hl:EnableMouse(false)
@@ -131,10 +158,12 @@ function SJ.Mark(view, frame)
   hl:SetFrameLevel(owner:GetFrameLevel() + 4)
   hl.fgToken = (hl.fgToken or 0) + 1
   local token = hl.fgToken
-  hl:Show()
+  hl.fgActive = true
+  SJ.Fit(view)
   if not ns.Theme.reduceMotion() then
     C_Timer.After(SJ.MARK_SECONDS, function()
       if hl.fgToken == token then
+        hl.fgActive = false
         hl:Hide()
       end
     end)
@@ -145,6 +174,7 @@ end
 function SJ.ClearMark(view)
   if view.fgMark then
     view.fgMark.fgToken = (view.fgMark.fgToken or 0) + 1
+    view.fgMark.fgActive = false
     view.fgMark:Hide()
   end
 end
@@ -169,6 +199,7 @@ function SJ.Go(view, card, ref, relayout)
   C_Timer.After(0, function()
     if frame:IsVisible() then
       view.area:ScrollTo(SJ.ScrollTarget(card, frame))
+      SJ.Fit(view)
     end
   end)
   return frame

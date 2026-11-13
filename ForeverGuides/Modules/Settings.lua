@@ -713,6 +713,8 @@ register("map.world", worldMapSection)
 register("flight.main", flightSection)
 register("gathering.pins", call("GatheringSettings", "Add"))
 register("gathering.sparkles", call("GatherSparklesSettings", "Add"))
+register("gathering.sparkles.kinds", call("GatherSparklesSettings", "AddKinds"))
+register("gathering.sparkles.general", call("GatherSparklesSettings", "AddGeneral"))
 register("fishing.enable", call("AddonSettings", "AddEnable", "fishing"))
 register("quests.main", call("AutomationSettings", "AddQuests"))
 register("quests.exceptions", call("AutomationSettings", "AddQuestExceptions"))
@@ -938,11 +940,11 @@ local function build(container)
       ns.charDB.settingsFeature, ns.charDB.settingsTab = id, nil
     end
     for featureId, v in pairs(self.features) do
+      ns.SettingsJump.ClearMark(v)
       v.area:SetShown(featureId == id)
     end
     nav:SetCurrent(id)
     refresh(view)
-    ns.SettingsJump.ClearMark(view)
     self:Layout()
     if card then
       scrollToCard(view, card)

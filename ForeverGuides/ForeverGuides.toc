@@ -3,7 +3,7 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.7.3
+## Version: 0.7.4
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -353,8 +353,10 @@ Modules\CanvasEditor.lua
 Modules\CursorAssets.lua
 Modules\BadgeAssets.lua
 Modules\GatherSparklesLogic.lua
+Modules\GatherSparklesModel.lua
 Modules\GatherSparkles.lua
 Modules\GatherSparklesSettings.lua
+Modules\GatherSparklesWindow.lua
 Modules\ItemInfo.lua
 Modules\ItemLevelOverlay.lua
 Modules\ItemLevelSettings.lua
@@ -534,6 +536,7 @@ Modules\GatheringSettings.lua
 Modules\MinimapPinLogic.lua
 Modules\MinimapLayer.lua
 Modules\FarmHudLogic.lua
+Modules\FarmHudIcons.lua
 Modules\FarmHud.lua
 Modules\FarmHudSettings.lua
 Modules\InstanceResetLogic.lua

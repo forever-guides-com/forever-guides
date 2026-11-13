@@ -734,16 +734,16 @@ function G.NewMark(size, strata)
   return ok and type(mark) == "table" and mark or nil
 end
 
--- The icon of the game for the soft target goes into the texture. Where the client takes a second argument
--- (low priority icons) it is tried first. Returns true when the texture holds something afterwards.
+-- The icon of the game for the soft target goes into the texture. SetUnitCursorTexture(texture, unit [, style
+-- [, includeLowPriority]]): the documented call comes first, older calls follow. Returns true when the texture holds something afterwards.
 local function paintFromGame(tex)
   local set = rawget(_G, "SetUnitCursorTexture")
   if type(set) ~= "function" then
     return false
   end
-  for _, extra in ipairs({ { true }, {} }) do
+  for _, extra in ipairs({ { n = 2, nil, true }, { n = 1, true }, { n = 0 } }) do
     pcall(tex.SetTexture, tex, nil)
-    if pcall(set, tex, SOFT, unpack(extra)) then
+    if pcall(set, tex, SOFT, unpack(extra, 1, extra.n)) then
       local okAtlas, atlas = pcall(tex.GetAtlas, tex)
       local okFile, file = pcall(tex.GetTexture, tex)
       if (okAtlas and Guard.Safe(atlas) ~= nil) or (okFile and Guard.Safe(file) ~= nil) then

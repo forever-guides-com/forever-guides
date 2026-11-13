@@ -29,6 +29,10 @@ ns.AddLocale("enUS", {
   ["farmhud.dir.S"] = "S",
   ["farmhud.dir.W"] = "W",
   ["binding.farmHud"] = "Farm HUD on or off",
+  ["binding.farmHudZoomIn"] = "Farm HUD zoom in",
+  ["binding.farmHudZoomOut"] = "Farm HUD zoom out",
+  ["binding.farmHudBigger"] = "Farm HUD bigger",
+  ["binding.farmHudSmaller"] = "Farm HUD smaller",
 })
 ns.AddLocale("deDE", {
   ["farmhud.on"] = "Farm-HUD an.",
@@ -43,6 +47,10 @@ ns.AddLocale("deDE", {
   ["farmhud.dir.S"] = "S",
   ["farmhud.dir.W"] = "W",
   ["binding.farmHud"] = "Farm-HUD ein oder aus",
+  ["binding.farmHudZoomIn"] = "Farm-HUD hineinzoomen",
+  ["binding.farmHudZoomOut"] = "Farm-HUD herauszoomen",
+  ["binding.farmHudBigger"] = "Farm-HUD größer",
+  ["binding.farmHudSmaller"] = "Farm-HUD kleiner",
 })
 
 -- Seconds between two looks at the compass and the ring, and between two checks that the minimap is still
@@ -58,7 +66,7 @@ local wanted, suspended = false, false
 -- Settings the dev test overrides without storing them: { terrain, alpha }.
 local override
 local snapshot
-local hud, overlay, letters, ring
+local hud, overlay, border, letters, ring
 local notes = {}
 local acc, sinceVerify = 0, 0
 local needsRefit = false
@@ -173,6 +181,47 @@ function H.ReadSnapshot()
   return snap
 end
 
+-- Rotation ----------------------------------------------------------------------------------------------------
+
+-- The real minimap tiles only turn with the CVar rotateMinimap, so the HUD sets it for its own mode while it is
+-- on and puts the player's value back in leave(). The pins and the compass read the same CVar and stay aligned.
+local function setRotateCVar(value)
+  local api = rawget(_G, "C_CVar")
+  local set = type(api) == "table" and api.SetCVar or rawget(_G, "SetCVar")
+  if not try(set, "rotateMinimap", value) then
+    return
+  end
+  local update = rawget(_G, "Minimap_UpdateRotationSetting")
+  if type(update) == "function" then
+    try(update)
+  end
+end
+
+local function applyRotation(s)
+  local before = call(rawget(_G, "GetCVar"), "rotateMinimap")
+  if before ~= "0" and before ~= "1" then
+    note("rotateMinimap is not readable: the rotation stays as it is")
+    return
+  end
+  state.rotationBefore = before
+  local target = FH.RotationCVar(s.rotation)
+  if before ~= target then
+    setRotateCVar(target)
+  end
+end
+
+-- Idempotent: also called at logout when the minimap itself cannot be touched (the CVar is not protected).
+local function restoreRotation()
+  local before = state.rotationBefore
+  if not before then
+    return
+  end
+  state.rotationBefore = nil
+  if call(rawget(_G, "GetCVar"), "rotateMinimap") ~= before then
+    setRotateCVar(before)
+  end
+end
+
 -- Put back --------------------------------------------------------------------------------------------------
 
 local RESTORE = {
@@ -262,8 +311,13 @@ local function leave()
   if hud then
     hud:Hide()
   end
+  restoreRotation()
+  ns.FarmHudIcons.Restore()
   state.attached, state.shown, state.groundChanged = false, false, nil
   snapshot = nil
+  if ns.MinimapButton then
+    ns.MinimapButton.Suspend(false)
+  end
   Layer.SetScale(1)
   Layer.Refit()
   return ok
@@ -272,12 +326,12 @@ end
 -- Frames -------------------------------------------------------------------------------------------------------
 
 local function compassStyle(s)
-  local key = s.compassSize .. s.compassColor
+  local color = s.compassColor
+  local key = string.format("%s %.3f %.3f %.3f", tostring(s.compassSize), color[1], color[2], color[3])
   if key == lettersKey then
     return
   end
   lettersKey = key
-  local color = FH.COMPASS_COLORS[s.compassColor] or FH.COMPASS_COLORS.white
   for _, fs in ipairs(letters) do
     local path, _, flags = fs:GetFont()
     fs:SetFont(path or rawget(_G, "STANDARD_TEXT_FONT") or "Fonts\\FRIZQT__.TTF", s.compassSize, flags or "OUTLINE")
@@ -332,6 +386,9 @@ end
 
 local function onUpdate(_, dt)
   dt = tonumber(dt) or 0
+  if state.attached and state.settings and state.settings.hideOtherIcons then
+    ns.Safe("farmhud-icons", ns.FarmHudIcons.Tick, dt)
+  end
   acc, sinceVerify = acc + dt, sinceVerify + dt
   if acc < TICK or not state.attached then
     return
@@ -366,6 +423,13 @@ local function ensureFrames()
     letters[i] = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     letters[i]:Hide()
   end
+  -- Above the minimap and below its pins and the overlay.
+  border = CreateFrame("Frame", nil, hud)
+  border:SetAllPoints(hud)
+  border:EnableMouse(false)
+  border.texture = border:CreateTexture(nil, "ARTWORK")
+  border.texture:SetAllPoints(border)
+  border:Hide()
   ring = overlay:CreateTexture(nil, "ARTWORK")
   ring:SetPoint("CENTER", hud, "CENTER")
   ring:Hide()
@@ -404,6 +468,26 @@ local function place(mm, s)
   mm:EnableMouse(false)
   mm:EnableMouseWheel(false)
   overlay:SetFrameLevel(level + LEVEL_ABOVE + 2)
+  border:SetFrameStrata(s.strata)
+  border:SetFrameLevel(level + 3)
+end
+
+-- The frame around the HUD shape: a baked ring texture of the nearest stroke, colored, shown only when wanted.
+local function drawBorder(s)
+  local assets = ns.CursorAssets
+  local size = readable(call(hud.GetWidth, hud))
+  local shape = FH.FrameShape(call(rawget(_G, "GetMinimapShape")))
+  local stroke = FH.FrameStroke(s.frameThickness, s.scale)
+  local stem = s.frame and size and assets and assets.NearestStroke(shape, stroke, size)
+  local path = stem and assets.Path(stem)
+  if not path then
+    border:Hide()
+    return
+  end
+  local color = s.frameColor
+  border.texture:SetTexture(path)
+  border.texture:SetVertexColor(color[1], color[2], color[3], 1)
+  border:Show()
 end
 
 -- The parts that may fail without harm: each on its own, a failure is a note.
@@ -434,8 +518,16 @@ local function dress(mm, s)
 end
 
 local function attach(mm, s)
+  if ns.MinimapButton then
+    ns.MinimapButton.Suspend(true)
+  end
   place(mm, s)
+  if s.hideOtherIcons then
+    try(ns.FarmHudIcons.Sweep)
+  end
   dress(mm, s)
+  try(drawBorder, s)
+  applyRotation(s)
   local effective = readable(call(mm.GetEffectiveScale, mm))
   Layer.SetScale(FH.PinFactor(s.pinScale, snapshot.effective, effective))
   Layer.Refit()
@@ -488,6 +580,14 @@ end
 -- Does what the plan says: moves the minimap in or back (outside of combat), shows or hides our frames (also in
 -- combat), waits (in combat). A change of the settings or of the screen while the HUD is on goes through a
 -- put back and a new move, outside of combat.
+-- The player's own switch, kept per character so a /reload can bring the HUD back. Automatic leaves (combat,
+-- instance, loading screen, logout) never write it.
+local function rememberSwitch(on)
+  if ns.charDB and ns.charDB.farmhudOn ~= on then
+    ns.Store.setChar("farmhudOn", on)
+  end
+end
+
 function H.Update()
   local s = settings()
   local ctx = context(s)
@@ -496,6 +596,7 @@ function H.Update()
     local ok, reason = enter()
     if not ok then
       wanted = false
+      rememberSwitch(false)
       note("start failed: " .. tostring(reason))
       ns.Notify.chat(string.format(ns.L["farmhud.failed"], tostring(reason)))
     end
@@ -513,6 +614,7 @@ function H.Update()
       local ok, reason = enter()
       if not ok then
         wanted = false
+        rememberSwitch(false)
         ns.Notify.chat(string.format(ns.L["farmhud.failed"], tostring(reason)))
       end
     end
@@ -522,6 +624,7 @@ end
 
 function H.SetWanted(on)
   wanted = on == true
+  rememberSwitch(wanted)
   return H.Update()
 end
 
@@ -537,6 +640,7 @@ function H.Release()
   if state.attached and mm and ns.ProtectedAllowed(mm) then
     leave()
   end
+  restoreRotation()
 end
 
 function H.IsWanted()
@@ -544,7 +648,7 @@ function H.IsWanted()
 end
 
 -- What is going on, for the tests and the dev test: { wanted, suspended, attached, shown, terrain (the plan),
--- settings, hud, overlay, notes, pending (a change waits for the end of the combat) }.
+-- settings, hud, overlay, border, notes, pending (a change waits for the end of the combat) }.
 function H.State()
   local pending = false
   if wanted ~= state.attached then
@@ -559,6 +663,7 @@ function H.State()
     settings = state.settings,
     hud = hud,
     overlay = overlay,
+    border = border,
     notes = notes,
     pending = pending,
     snapshot = snapshot,
@@ -620,8 +725,12 @@ ns.On("PLAYER_LEAVING_WORLD", function()
   end
 end)
 
-ns.On("PLAYER_ENTERING_WORLD", function()
-  if suspended then
+-- Only a /reload brings the switch back (arg 2 of the event): a login or a zone change does not.
+ns.On("PLAYER_ENTERING_WORLD", function(_, _, isReloadingUi)
+  if isReloadingUi == true and not wanted and ns.charDB and ns.charDB.farmhudOn == true then
+    wanted = true
+    H.Update()
+  elseif suspended then
     suspended = false
     H.Update()
   elseif wanted then
@@ -651,9 +760,32 @@ ns.On("FG_SETTING_CHANGED", function(_, path)
   end
 end)
 
--- Key binding, appended to the list of Modules/KeyBindings.lua (Bindings.xml calls it).
+-- Zoom and size from the keys: only the stored setting changes, the HUD follows through FG_SETTING_CHANGED
+-- (a new move of the minimap, outside of combat), so a press in combat touches nothing of Blizzard's.
+function H.Zoom(dir)
+  local mm = minimap()
+  local live = mm and readable(call(mm.GetZoom, mm))
+  ns.Store.set("settings.farmhud.zoom", FH.StepZoom(settings().zoom, dir, live))
+end
+
+function H.Resize(dir)
+  ns.Store.set("settings.farmhud.scale", FH.StepScale(settings().scale, dir))
+end
+
+-- Key bindings, appended to the list of Modules/KeyBindings.lua (Bindings.xml calls it).
 ns.KeyBindings.list[#ns.KeyBindings.list + 1] =
   { name = "FOREVERGUIDES_FARMHUD", label = "binding.farmHud", fn = "FarmHud" }
 ns.KeyBindings.FarmHud = function()
   ns.Safe("binding:FarmHud", H.Slash, "")
+end
+for _, b in ipairs({
+  { "FOREVERGUIDES_FARMHUD_ZOOM_IN", "binding.farmHudZoomIn", "FarmHudZoomIn", H.Zoom, 1 },
+  { "FOREVERGUIDES_FARMHUD_ZOOM_OUT", "binding.farmHudZoomOut", "FarmHudZoomOut", H.Zoom, -1 },
+  { "FOREVERGUIDES_FARMHUD_BIGGER", "binding.farmHudBigger", "FarmHudBigger", H.Resize, 1 },
+  { "FOREVERGUIDES_FARMHUD_SMALLER", "binding.farmHudSmaller", "FarmHudSmaller", H.Resize, -1 },
+}) do
+  ns.KeyBindings.list[#ns.KeyBindings.list + 1] = { name = b[1], label = b[2], fn = b[3] }
+  ns.KeyBindings[b[3]] = function()
+    ns.Safe("binding:" .. b[3], b[4], b[5])
+  end
 end

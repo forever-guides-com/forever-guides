@@ -140,6 +140,16 @@ A.STEMS = {
   "ring-star8-40",
   "ring-star8-52",
   "ring-star8-64",
+  "ring-circle-hd-1",
+  "ring-circle-hd-2",
+  "ring-circle-hd-3",
+  "ring-circle-hd-4",
+  "ring-circle-hd-6",
+  "ring-circle-hd-8",
+  "ring-circle-hd-12",
+  "ring-circle-hd-16",
+  "ring-circle-hd-24",
+  "ring-circle-hd-32",
   "fill-circle",
   "fill-square",
   "fill-rounded",
@@ -160,6 +170,11 @@ A.STEMS = {
 -- increasing, about 1.25 times the one before).
 A.BAKED_SIZE = 256
 A.STROKES = { 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 26, 32, 40, 52, 64 }
+
+-- 1024 px circle rings for elements shown at HD_FROM px or more: a 256 px bake stretched that far shows as a
+-- polygon. The strokes are px at 1024 px.
+A.HD_SIZE, A.HD_FROM = 1024, 512
+A.HD_STROKES = { 1, 2, 3, 4, 6, 8, 12, 16, 24, 32 }
 
 -- Shapes: id, label key, ring strokes in px at 256 px. Every shape has a ring per stroke (ring-<id>-<px>)
 -- and a filled twin (fill-<id>).
@@ -224,14 +239,22 @@ function A.NearestStroke(shape, thickness, size)
   if not (finite(thickness) and finite(size) and size > 0 and A.RingStem(shape)) then
     return nil
   end
-  local first, last = A.STROKES[1], A.STROKES[#A.STROKES]
-  local wanted = math.min(math.max(thickness / size * A.BAKED_SIZE, first), last)
+  local hd = shape == "circle" and size >= A.HD_FROM
+  local strokes, baked = A.STROKES, A.BAKED_SIZE
+  if hd then
+    strokes, baked = A.HD_STROKES, A.HD_SIZE
+  end
+  local first, last = strokes[1], strokes[#strokes]
+  local wanted = math.min(math.max(thickness / size * baked, first), last)
   local best, bestGap
-  for _, stroke in ipairs(A.STROKES) do
+  for _, stroke in ipairs(strokes) do
     local gap = math.abs(math.log(stroke) - math.log(wanted))
     if not bestGap or gap < bestGap then
       best, bestGap = stroke, gap
     end
+  end
+  if hd then
+    return "ring-circle-hd-" .. best
   end
   return A.RingStem(shape, best)
 end

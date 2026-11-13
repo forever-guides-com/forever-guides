@@ -78,6 +78,8 @@ SF.FEATURES = {
   feature("gathering", "world", {
     { "gathering.pins", "gather.set.heading" },
     { "gathering.sparkles", "sparkles.set.heading" },
+    { "gathering.sparkles.kinds", "sparkles.cfg.kindsHeading" },
+    { "gathering.sparkles.general", "sparkles.cfg.generalHeading" },
   }),
   feature("fishing", "world", {
     { "fishing.enable", "subaddon.fishing.title" },
@@ -180,6 +182,9 @@ SF.CONTROLS = {
   ["xpbar.set.show"] = "xpbar.main",
   ["cursor.set.enabled"] = "cursor.main",
   ["farmhud.set.enabled"] = "farmhud.main",
+  ["farmhud.set.scale"] = "farmhud.main",
+  ["farmhud.set.zoom"] = "farmhud.main",
+  ["sparkles.cfg.openWindow"] = "gathering.sparkles.kinds",
   ["auto.set.heading"] = "automation.control",
   ["lfg.set.panel"] = "invites.lfg",
   ["auto.set.ignoreQuests"] = "quests.exceptions",
@@ -206,6 +211,9 @@ SF.CONTROL_IDS = {
   ["settings.scale"] = "setting-scale",
   ["settings.resetWindow"] = "button-settings-resetWindow",
   ["farmhud.set.enabled"] = "farmhud-set-enabled",
+  ["farmhud.set.scale"] = "farmhud-set-scale",
+  ["farmhud.set.zoom"] = "farmhud-set-zoom",
+  ["sparkles.cfg.openWindow"] = "sparkles-kind-open",
   ["lfg.set.panel"] = "lfg-panel",
   ["chatname.heading"] = "chatname-enable",
   ["guildmap.set.showWorld"] = "guildmap-set-showWorld",
@@ -243,17 +251,19 @@ SF.SEE = {
 -- ids of the controls (fgId). The search and the jumps know them from here, a test keeps the list equal to
 -- what the card builds.
 SF.MORE = {
-  ["gathering.sparkles"] = {
-    "sparkles-lockedNodes",
-    "sparkles-quest",
-    "sparkles-questItems",
+  ["gathering.sparkles.general"] = {
+    "sparkles-instanceHide",
     "sparkles-gameIcons",
-    "sparkles-offsetY",
-    "sparkles-size",
+    "sparkles-sound",
+    "sparkles-myProfessionsOnly",
+    "sparkles-lockedNodes",
+    "sparkles-rareGlow",
+  },
+  ["gathering.sparkles"] = {
+    "sparkles-questItems",
     "sparkles-measureStatus",
     "sparkles-measureReset",
     "sparkles-measureChat",
-    "sparkles-style",
   },
   ["map.world"] = {
     "setting-mapMarkersWorld",
@@ -345,6 +355,9 @@ SF.MORE = {
     "farmhud-set-compassColor",
     "farmhud-set-ring",
     "farmhud-set-ringYards",
+    "farmhud-set-frame",
+    "farmhud-set-frameColor",
+    "farmhud-set-frameThickness",
     "farmhud-set-pinScale",
   },
   ["map.guild"] = {

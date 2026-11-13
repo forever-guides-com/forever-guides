@@ -5,7 +5,38 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.4",
+      date = "2026-11-13",
+      highlights = {
+        { head = { de = "Sammelstellen-Effekte", en = "Gathering spot effects" }, text = { de = "Jede Art Sammelstelle bekommt einen eigenen Effekt mit Stil, Farbe, Größe und Höhe.", en = "Every kind of gathering spot gets its own effect with style, color, size and height." }, go = "settings:gathering.sparkles.kinds" },
+        { head = { de = "Eigenes Effekt-Fenster", en = "Own effects window" }, text = { de = "Eine Galerie mit Live-Vorschau zeigt alle Stile, du wählst einen per Klick.", en = "A gallery with live previews shows all styles, and you pick one with a click." }, go = "settings:gathering.sparkles.kinds" },
+        { head = { de = "Farm-HUD nach deinem Geschmack", en = "Farm HUD your way" }, text = { de = "Rahmen und Kompass haben eigene Farben, Symbole anderer Addons verschwinden.", en = "Frame and compass have their own colors, and icons of other add-ons disappear." }, go = "settings:farmhud.main" },
+      },
+      added = {
+        { de = "Sammelstellen: Kräuter, Erze, Truhen, Questobjekte, sonstige Objekte, Angelschwimmer und abbalgbare Kreaturen haben je einen Schalter, Stil, Farbe, Größe, Höhe, Anzahl und Streuung.", en = "Gathering spots: herbs, ore, chests, quest objects, other objects, fishing bobbers and skinnable creatures each have a switch, style, color, size, height, count and spread.", go = "settings:gathering.sparkles.kinds" },
+        { de = "Sammelstellen-Effekte: Ein eigenes Fenster mit Stilgalerie und Live-Vorschau, geöffnet über den Knopf in den Einstellungen oder mit /fg sammelstellen und einer Art.", en = "Gathering spot effects: a window of its own with a style gallery and live previews, opened with the button in the settings or with /fg sammelstellen and a kind.", go = "settings:gathering.sparkles.kinds" },
+        { de = "Sammelstellen: Viele neue Stile, zum Beispiel Glitzern, Lichtstrahl, Glühwürmchen und Schwebestaub.", en = "Gathering spots: many new styles, for example glitter, light beam, fireflies and floating dust.", go = "settings:gathering.sparkles.kinds" },
+        { de = "Sammelstellen: Beim Sammeln läuft ein Abschlusseffekt, und die Stelle blitzt auf, sobald du in Reichweite kommst.", en = "Gathering spots: an ending effect plays when you gather, and the spot flashes as soon as you come within range.", go = "settings:gathering.sparkles.general" },
+        { de = "Farm-HUD: Rahmen und Kompass lassen sich über die Farbauswahl des Spiels einfärben, der Rahmen hat eine einstellbare Dicke.", en = "Farm HUD: frame and compass can be colored with the game's color picker, and the frame has an adjustable thickness.", go = "settings:farmhud.main" },
+        { de = "Farm-HUD: Symbole anderer Addons an der Minimap werden ausgeblendet, solange das HUD läuft, auf Wunsch abschaltbar.", en = "Farm HUD: icons of other add-ons on the minimap are hidden while the HUD is on, and you can switch this off.", go = "settings:farmhud.main" },
+        { de = "Farm-HUD: Vier neue Tastenbelegungen für Zoom näher und weiter sowie Größe größer und kleiner.", en = "Farm HUD: four new key bindings for zooming in and out and for making it bigger and smaller.", go = "settings:farmhud.main" },
+        { de = "Farm-HUD: Die Drehung der Karte lässt sich wählen (Blickrichtung oben oder Norden oben), und das HUD bleibt nach einem Neuladen an.", en = "Farm HUD: you can choose how the map turns (heading up or north up), and the HUD stays on after a reload.", go = "settings:farmhud.main" },
+      },
+      changed = {
+        { de = "Sammelstellen: Die allgemeinen Optionen sind in Karten gruppiert (Sichtbarkeit, Unterwegs, Beim Sammeln, Filter, Reichweite).", en = "Gathering spots: the general options are grouped into cards (visibility, on the move, when gathering, filters, range).", go = "settings:gathering.sparkles.general" },
+        { de = "Sammelstellen: Die Reichweite lässt sich wieder von 10 bis 60 Yards einstellen, der Standard ist 30.", en = "Gathering spots: the range can be set from 10 to 60 yards again, and the default is 30.", go = "settings:gathering.sparkles.general" },
+        { de = "Sammelstellen: Gespeicherte alte Stile werden automatisch übernommen, Schmetterlinge werden zum Beispiel zu Blütenblättern.", en = "Gathering spots: saved old styles are migrated automatically, for example butterflies become petals.", go = "settings:gathering.sparkles.kinds" },
+        { de = "Sammelstellen: Der experimentelle Stil \"Originalmodell\" entfällt, gespeicherte Einstellungen nutzen dann Partikel.", en = "Gathering spots: the experimental \"original model\" style is gone, and saved settings use particles instead.", go = "settings:gathering.sparkles.kinds" },
+      },
+      fixed = {
+        { de = "Sammelstellen: Eine Sammelstelle außerhalb der Reichweite gilt nicht mehr fälschlich als gesperrt.", en = "Gathering spots: a gathering spot out of range no longer counts as locked by mistake.", go = "settings:gathering.sparkles.general" },
+        { de = "Farm-HUD: Die runden Minimap-Knöpfe wandern nicht mehr in die Bildschirmmitte, solange das HUD läuft.", en = "Farm HUD: the round minimap buttons no longer move to the middle of the screen while the HUD is on.", go = "settings:farmhud.main" },
+        { de = "Einstellungen: Die Markierung beim Sprung zu einer Einstellung erscheint nicht mehr über Kopfzeile und Minimap.", en = "Settings: the mark after jumping to a setting no longer shows over the header and the minimap." },
+      },
+    },
+    {
       version = "0.7.3",
+      date = "2026-11-12",
       highlights = {
       },
       changed = {
@@ -222,18 +253,6 @@ ns.Data.Changelog = {
       },
       changed = {
         { de = "Speicher-Erinnerung: Die Benachrichtigung über ungesicherte Daten mit dem Neuladen-Knopf ist jetzt standardmäßig aus und wurde beim Update einmal ausgeschaltet. Unter Einstellungen, Speichern lässt sie sich einschalten.", en = "Save reminder: the notice about unsaved data with its reload button is now off by default and was switched off once on update. Turn it on in Settings under Saving to be reminded." },
-      },
-    },
-    {
-      version = "0.5.1",
-      date = "2026-11-05",
-      highlights = {
-        { head = { de = "Gildeneinladung ohne Warnung", en = "Guild invite without a warning" }, text = { de = "Das Fenster des Spiels fragt zuerst und sendet die Einladung nach deiner Bestätigung.", en = "The game's own window asks first and sends the invite after you confirm." } },
-        { head = { de = "Stichwörter zählen einmal", en = "Keywords count once" }, text = { de = "Ein doppelt getipptes Stichwort wie ginvginv gilt jetzt nur einmal.", en = "A keyword typed twice, such as ginvginv, now counts once." } },
-      },
-      fixed = {
-        { de = "Einladungen per Flüstern: Im Forever-Client zeigt die Gildeneinladung keine Blockade-Warnung mehr. Das Fenster des Spiels fragt zuerst und sendet die Einladung nach deiner Bestätigung.", en = "Whisper invites: on the Forever client the guild invite no longer shows a blocked warning. The game's own window asks first and sends the invite when you confirm." },
-        { de = "Einladungen per Flüstern: Ein Stichwort, das doppelt im Einstellungsfeld stand, etwa ginvginv, zählt jetzt einmal.", en = "Whisper invites: a keyword that ended up typed twice in the settings field, such as ginvginv, now counts once." },
       },
     },
   },

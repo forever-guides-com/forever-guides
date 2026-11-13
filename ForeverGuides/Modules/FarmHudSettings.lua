@@ -34,23 +34,31 @@ ns.AddLocale("enUS", {
   ["farmhud.set.hideInCombatHint"] = "Hides the HUD during a fight and shows it afterwards. The minimap is gone while it is hidden.",
   ["farmhud.set.hideInInstance"] = "Hide in instances",
   ["farmhud.set.hideInInstanceHint"] = "Inside instances the game gives no position. The minimap goes back to its place there and returns outside.",
+  ["farmhud.set.hideOtherIcons"] = "Hide other add-on icons",
+  ["farmhud.set.hideOtherIconsHint"] = "Hides the minimap buttons of other add-ons while the HUD is on, so none sits on top of you.",
   ["farmhud.set.compass"] = "Compass",
   ["farmhud.set.compassHint"] = "The four directions at the edge. North is up unless the minimap turns with you.",
   ["farmhud.set.compassSize"] = "Compass size",
   ["farmhud.set.compassSizeHint"] = "Height of the letters in pixels.",
   ["farmhud.set.compassColor"] = "Compass color",
-  ["farmhud.set.color.white"] = "White",
-  ["farmhud.set.color.yellow"] = "Yellow",
-  ["farmhud.set.color.green"] = "Green",
-  ["farmhud.set.color.red"] = "Red",
-  ["farmhud.set.color.blue"] = "Blue",
-  ["farmhud.set.ring"] = "Gather ring",
-  ["farmhud.set.ringHint"] = "A circle around you that shows how far you reach.",
-  ["farmhud.set.ringYards"] = "Gather ring radius",
-  ["farmhud.set.ringYardsHint"] = "Radius of the ring in yards.",
+  ["farmhud.set.compassColorHint"] = "Opens the color picker for the compass letters.",
+  ["farmhud.set.ring"] = "Distance ring",
+  ["farmhud.set.ringHint"] = "A circle around you at a fixed distance, to judge how far away a node is.",
+  ["farmhud.set.ringYards"] = "Distance ring radius",
+  ["farmhud.set.ringYardsHint"] = "Distance of the circle from you in yards (5 to 100).",
   ["farmhud.set.pinScale"] = "Pin size on the HUD",
   ["farmhud.set.pinScaleHint"] = "Factor on the pin size. 100 % keeps the size the pins have on the small minimap.",
   ["farmhud.set.yards"] = "%d yd",
+  ["farmhud.set.rotation"] = "Rotation",
+  ["farmhud.set.rotationHint"] = "Heading up turns the map with you and the player arrow always points up. North up keeps the map still and the arrow turns. The HUD sets this for itself and puts your minimap setting back when it goes off.",
+  ["farmhud.set.rotation.heading"] = "Heading up (map turns)",
+  ["farmhud.set.rotation.north"] = "North up (arrow turns)",
+  ["farmhud.set.frame"] = "Frame around the HUD",
+  ["farmhud.set.frameHint"] = "A line around the edge of the HUD while it is on. It follows the shape of the minimap and sits below the pins.",
+  ["farmhud.set.frameColor"] = "Frame color",
+  ["farmhud.set.frameColorHint"] = "Opens the color picker for the frame.",
+  ["farmhud.set.frameThickness"] = "Frame thickness",
+  ["farmhud.set.frameThicknessHint"] = "Thickness of the frame in pixels at normal HUD size. It grows and shrinks with the HUD.",
 })
 ns.AddLocale("deDE", {
   ["farmhud.set.heading"] = "Farm-HUD",
@@ -79,23 +87,31 @@ ns.AddLocale("deDE", {
   ["farmhud.set.hideInCombatHint"] = "Blendet das HUD während eines Kampfs aus und danach wieder ein. Solange es ausgeblendet ist, fehlt die Minimap.",
   ["farmhud.set.hideInInstance"] = "In Instanzen ausblenden",
   ["farmhud.set.hideInInstanceHint"] = "In Instanzen gibt das Spiel keine Position. Die Minimap geht dort an ihren Platz zurück und kommt draußen wieder.",
+  ["farmhud.set.hideOtherIcons"] = "Symbole anderer Addons ausblenden",
+  ["farmhud.set.hideOtherIconsHint"] = "Blendet die Minimap-Symbole anderer Addons aus, solange das HUD an ist, damit keines auf dir liegt.",
   ["farmhud.set.compass"] = "Kompass",
   ["farmhud.set.compassHint"] = "Die vier Himmelsrichtungen am Rand. Norden ist oben, solange sich die Minimap nicht mit dir dreht.",
   ["farmhud.set.compassSize"] = "Kompassgröße",
   ["farmhud.set.compassSizeHint"] = "Höhe der Buchstaben in Pixeln.",
   ["farmhud.set.compassColor"] = "Kompassfarbe",
-  ["farmhud.set.color.white"] = "Weiß",
-  ["farmhud.set.color.yellow"] = "Gelb",
-  ["farmhud.set.color.green"] = "Grün",
-  ["farmhud.set.color.red"] = "Rot",
-  ["farmhud.set.color.blue"] = "Blau",
-  ["farmhud.set.ring"] = "Sammelring",
-  ["farmhud.set.ringHint"] = "Ein Kreis um dich, der zeigt, wie weit du reichst.",
-  ["farmhud.set.ringYards"] = "Radius des Sammelrings",
-  ["farmhud.set.ringYardsHint"] = "Radius des Rings in Yards.",
+  ["farmhud.set.compassColorHint"] = "Öffnet die Farbauswahl für die Kompassbuchstaben.",
+  ["farmhud.set.ring"] = "Entfernungsring",
+  ["farmhud.set.ringHint"] = "Ein Kreis um dich mit festem Abstand, damit du siehst, wie weit ein Fundort weg ist.",
+  ["farmhud.set.ringYards"] = "Radius des Entfernungsrings",
+  ["farmhud.set.ringYardsHint"] = "Abstand des Kreises von dir in Yards (5 bis 100).",
   ["farmhud.set.pinScale"] = "Pin-Größe auf dem HUD",
   ["farmhud.set.pinScaleHint"] = "Faktor auf die Pin-Größe. 100 % behält die Größe, die die Pins auf der kleinen Minimap haben.",
   ["farmhud.set.yards"] = "%d Yards",
+  ["farmhud.set.rotation"] = "Drehung",
+  ["farmhud.set.rotationHint"] = "Blickrichtung oben dreht die Karte mit dir und der Spielerpfeil zeigt immer nach oben. Norden oben hält die Karte still und der Pfeil dreht sich. Das HUD stellt das für sich ein und setzt deine Minimap-Einstellung beim Ausschalten zurück.",
+  ["farmhud.set.rotation.heading"] = "Blickrichtung oben (Karte dreht)",
+  ["farmhud.set.rotation.north"] = "Norden oben (Pfeil dreht)",
+  ["farmhud.set.frame"] = "Rahmen um das HUD",
+  ["farmhud.set.frameHint"] = "Eine Linie um den Rand des HUDs, solange es an ist. Sie folgt der Form der Minimap und liegt unter den Pins.",
+  ["farmhud.set.frameColor"] = "Rahmenfarbe",
+  ["farmhud.set.frameColorHint"] = "Öffnet die Farbauswahl für den Rahmen.",
+  ["farmhud.set.frameThickness"] = "Rahmenstärke",
+  ["farmhud.set.frameThicknessHint"] = "Stärke des Rahmens in Pixeln bei normaler HUD-Größe. Sie wächst und schrumpft mit dem HUD.",
 })
 
 local FH_PATH = "settings.farmhud."
@@ -184,6 +200,89 @@ local function dropdown(view, id, values, labelKey, get)
   end
 end
 
+-- Opens the game's color picker on { r, g, b }. The picker reports every step while it is open, so the choice is
+-- stored once when it closes (not when it was cancelled): a stored change reloads the HUD.
+local pending, hooked
+local function openPicker(color, commit)
+  local picker = rawget(_G, "ColorPickerFrame")
+  if not picker then
+    return
+  end
+  pending = nil
+  if not hooked and type(picker.HookScript) == "function" then
+    hooked = true
+    picker:HookScript("OnHide", ns.Wrap("farmhud-color", function()
+      local done = pending
+      pending = nil
+      if done then
+        done.commit({ done.r, done.g, done.b })
+      end
+    end))
+  end
+  local function apply()
+    local r, g, b = picker:GetColorRGB()
+    pending = { r = r, g = g, b = b, commit = commit }
+  end
+  local function cancel()
+    pending = nil
+  end
+  if picker.SetupColorPickerAndShow then
+    picker:SetupColorPickerAndShow({
+      r = color[1],
+      g = color[2],
+      b = color[3],
+      hasOpacity = false,
+      swatchFunc = apply,
+      cancelFunc = cancel,
+    })
+  else
+    picker:SetColorRGB(color[1], color[2], color[3])
+    picker.hasOpacity = false
+    picker.func = apply
+    picker.cancelFunc = cancel
+    picker:Show()
+  end
+end
+
+-- A button with the setting's name and a swatch of the stored color; a click opens the color picker.
+local function colorPicker(view, id)
+  local function current()
+    return stored(id)
+  end
+  local FH = option()
+  local control
+  control = W.Button(view.content, {
+    key = "farmhud.set." .. id,
+    width = 240,
+    height = 28,
+    tooltip = "farmhud.set." .. id,
+    tooltipText = "farmhud.set." .. id .. "Hint",
+    onClick = function()
+      openPicker(current(), function(color)
+        Store.set(FH_PATH .. id, FH.Color(color, current()))
+        control.Refresh()
+      end)
+    end,
+  })
+  -- A light edge keeps a dark swatch visible on the dark button.
+  local edge = control:CreateTexture(nil, "ARTWORK")
+  edge:SetSize(20, 20)
+  edge:SetPoint("RIGHT", control, "RIGHT", -8, 0)
+  edge:SetColorTexture(1, 1, 1, 0.9)
+  local swatch = control:CreateTexture(nil, "OVERLAY")
+  swatch:SetSize(16, 16)
+  swatch:SetPoint("CENTER", edge, "CENTER")
+  function control.Refresh()
+    local c = current()
+    swatch:SetColorTexture(c[1], c[2], c[3], 1)
+  end
+  control.swatch = swatch
+  control.Refresh()
+  control.fgId = "farmhud-set-" .. id
+  view.stack:Add(control, { height = 28, width = 240, gap = 6 })
+  return control
+end
+
 function S.Add(view)
   local FH, H = option(), ns.FarmHud
   ns.AddHeading(view, "farmhud.set.heading")
@@ -221,7 +320,11 @@ function S.Add(view)
       return math.floor(value + 0.5) / 100
     end
   )
+  dropdown(view, "rotation", FH.ROTATIONS, "farmhud.set.rotation.", function()
+    return stored("rotation")
+  end)
   stateToggle(view, "hideInCombat")
+  stateToggle(view, "hideOtherIcons")
   -- Everything else is rarely changed: behind "More settings".
   local more = W.Accordion(view, { id = view.id or "farmhud.main" })
   dropdown(more, "strata", FH.STRATA, "farmhud.set.strata.", function()
@@ -247,14 +350,21 @@ function S.Add(view)
   end, function(value)
     return math.floor(value + 0.5)
   end)
-  dropdown(more, "compassColor", FH.COMPASS_ORDER, "farmhud.set.color.", function()
-    return stored("compassColor")
-  end)
+  colorPicker(more, "compassColor")
   stateToggle(more, "ring")
   slider(more, "ringYards", FH.RING_YARDS_MIN, FH.RING_YARDS_MAX, FH.RING_YARDS_STEP, function()
     return stored("ringYards")
   end, function(value)
     return string.format(ns.L["farmhud.set.yards"], math.floor(value + 0.5))
+  end, function(value)
+    return math.floor(value + 0.5)
+  end)
+  stateToggle(more, "frame")
+  colorPicker(more, "frameColor")
+  slider(more, "frameThickness", FH.FRAME_THICKNESS_MIN, FH.FRAME_THICKNESS_MAX, 1, function()
+    return stored("frameThickness")
+  end, function(value)
+    return string.format("%d px", math.floor(value + 0.5))
   end, function(value)
     return math.floor(value + 0.5)
   end)

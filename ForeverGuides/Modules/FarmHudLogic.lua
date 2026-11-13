@@ -11,7 +11,7 @@ ns.FarmHudLogic = FH
 
 -- Size factor (share of the smaller screen side), frame strata of the HUD (BACKGROUND lies behind the user
 -- interface and in front of the 3D world), terrain variants.
-FH.SCALE_MIN, FH.SCALE_MAX, FH.SCALE_DEFAULT = 0.5, 2, 1
+FH.SCALE_MIN, FH.SCALE_MAX, FH.SCALE_DEFAULT, FH.SCALE_STEP = 0.5, 2, 0.6, 0.05
 FH.STRATA = { "BACKGROUND", "LOW", "MEDIUM" }
 FH.STRATA_DEFAULT = "BACKGROUND"
 -- auto takes the first variant the client supports; ground switches the ground textures off, alpha fades the
@@ -21,18 +21,25 @@ FH.TERRAIN_DEFAULT = "auto"
 FH.ALPHA_MIN, FH.ALPHA_MAX, FH.ALPHA_DEFAULT = 0, 1, 0.3
 -- Zoom step set while the HUD is on; ZOOM_KEEP leaves the zoom alone. The old zoom comes back afterwards.
 FH.ZOOM_KEEP, FH.ZOOM_MIN, FH.ZOOM_MAX, FH.ZOOM_DEFAULT = -1, 0, 5, 0
+-- Rotation the HUD owns while it is on: heading = the map turns with the player and the player marker points
+-- up, north = the map stands still with north up and the marker turns.
+FH.ROTATIONS = { "heading", "north" }
+FH.ROTATION_DEFAULT = "heading"
 FH.PIN_SCALE_MIN, FH.PIN_SCALE_MAX, FH.PIN_SCALE_DEFAULT = 0.5, 2, 1
 FH.COMPASS_SIZE_MIN, FH.COMPASS_SIZE_MAX, FH.COMPASS_SIZE_DEFAULT = 8, 32, 14
-FH.COMPASS_COLORS = {
+-- The colour settings are { r, g, b } (0 to 1). The names are the old palette, read only to migrate a stored name.
+FH.LEGACY_COLORS = {
   white = { 1, 1, 1 },
   yellow = { 1, 0.82, 0.1 },
   green = { 0.3, 1, 0.3 },
   red = { 1, 0.3, 0.3 },
   blue = { 0.4, 0.7, 1 },
 }
-FH.COMPASS_ORDER = { "white", "yellow", "green", "red", "blue" }
-FH.COMPASS_COLOR_DEFAULT = "white"
+FH.COMPASS_COLOR_DEFAULT = FH.LEGACY_COLORS.white
 FH.RING_YARDS_MIN, FH.RING_YARDS_MAX, FH.RING_YARDS_STEP, FH.RING_YARDS_DEFAULT = 5, 100, 5, 20
+-- Frame around the HUD circle: thickness in px at size factor 1 (it grows with the HUD), colour picked by the player.
+FH.FRAME_THICKNESS_MIN, FH.FRAME_THICKNESS_MAX, FH.FRAME_THICKNESS_DEFAULT = 1, 8, 2
+FH.FRAME_COLOR_DEFAULT = FH.LEGACY_COLORS.yellow
 -- The compass letters sit at this share of the half size (the terrain ends a little inside the edge).
 FH.COMPASS_RATIO = 0.92
 
@@ -44,20 +51,28 @@ FH.DEFAULTS = {
   zoom = FH.ZOOM_DEFAULT,
   hideInCombat = false,
   hideInInstance = true,
+  hideOtherIcons = true,
   compass = true,
   compassSize = FH.COMPASS_SIZE_DEFAULT,
   compassColor = FH.COMPASS_COLOR_DEFAULT,
-  ring = false,
+  ring = true,
   ringYards = FH.RING_YARDS_DEFAULT,
   pinScale = FH.PIN_SCALE_DEFAULT,
+  rotation = FH.ROTATION_DEFAULT,
+  frame = false,
+  frameColor = FH.FRAME_COLOR_DEFAULT,
+  frameThickness = FH.FRAME_THICKNESS_DEFAULT,
 }
 
-local IS_STRATA, IS_TERRAIN = {}, {}
+local IS_STRATA, IS_TERRAIN, IS_ROTATION = {}, {}, {}
 for _, v in ipairs(FH.STRATA) do
   IS_STRATA[v] = true
 end
 for _, v in ipairs(FH.TERRAINS) do
   IS_TERRAIN[v] = true
+end
+for _, v in ipairs(FH.ROTATIONS) do
+  IS_ROTATION[v] = true
 end
 
 local function finite(v)
@@ -66,6 +81,30 @@ end
 
 local function choice(value, allowed, default)
   return allowed[value] and value or default
+end
+
+-- A colour setting as a new { r, g, b } table: a table has every channel clamped to 0..1 (a channel that is not a
+-- finite number takes the default's), an old palette name becomes its colour, anything else is the default.
+function FH.Color(raw, default)
+  local d = default or FH.COMPASS_COLOR_DEFAULT
+  if type(raw) == "string" then
+    local legacy = FH.LEGACY_COLORS[raw]
+    raw = legacy or d
+  end
+  if type(raw) ~= "table" then
+    return { d[1], d[2], d[3] }
+  end
+  local function channel(i, name)
+    local v = tonumber(raw[i])
+    if v == nil then
+      v = tonumber(raw[name])
+    end
+    if v ~= nil and (v == math.huge or v == -math.huge) then
+      v = nil
+    end
+    return ML.Clamp(v, 0, 1, d[i])
+  end
+  return { channel(1, "r"), channel(2, "g"), channel(3, "b") }
 end
 
 local function flag(value, default)
@@ -96,12 +135,19 @@ function FH.Settings(raw)
     zoom = zoom,
     hideInCombat = flag(raw.hideInCombat, d.hideInCombat),
     hideInInstance = flag(raw.hideInInstance, d.hideInInstance),
+    hideOtherIcons = flag(raw.hideOtherIcons, d.hideOtherIcons),
     compass = flag(raw.compass, d.compass),
     compassSize = ML.Clamp(raw.compassSize, FH.COMPASS_SIZE_MIN, FH.COMPASS_SIZE_MAX, d.compassSize),
-    compassColor = choice(raw.compassColor, FH.COMPASS_COLORS, d.compassColor),
+    compassColor = FH.Color(raw.compassColor, d.compassColor),
     ring = flag(raw.ring, d.ring),
     ringYards = math.floor(yards / FH.RING_YARDS_STEP + 0.5) * FH.RING_YARDS_STEP,
     pinScale = ML.Clamp(raw.pinScale, FH.PIN_SCALE_MIN, FH.PIN_SCALE_MAX, d.pinScale),
+    rotation = choice(raw.rotation, IS_ROTATION, d.rotation),
+    frame = flag(raw.frame, d.frame),
+    frameColor = FH.Color(raw.frameColor, d.frameColor),
+    frameThickness = math.floor(
+      ML.Clamp(raw.frameThickness, FH.FRAME_THICKNESS_MIN, FH.FRAME_THICKNESS_MAX, d.frameThickness) + 0.5
+    ),
   }
 end
 
@@ -126,6 +172,41 @@ function FH.PinFactor(pinScale, oldEffective, newEffective)
     return pinScale * oldEffective / newEffective
   end
   return pinScale
+end
+
+-- One key press of "bigger" or "smaller": the next size on the grid of SCALE_STEP, clamped.
+function FH.StepScale(current, dir)
+  local c = ML.Clamp(current, FH.SCALE_MIN, FH.SCALE_MAX, FH.SCALE_DEFAULT)
+  local n = math.floor(c / FH.SCALE_STEP + 0.5) + (dir >= 0 and 1 or -1)
+  return ML.Clamp(math.floor(n * FH.SCALE_STEP * 100 + 0.5) / 100, FH.SCALE_MIN, FH.SCALE_MAX, FH.SCALE_DEFAULT)
+end
+
+-- One key press of "zoom in" (dir 1, a higher step shows less ground) or "zoom out": the next zoom step,
+-- clamped. A setting that keeps the zoom starts from the zoom the minimap has now (live).
+function FH.StepZoom(current, dir, live)
+  local z = current
+  if not finite(z) or z < FH.ZOOM_MIN then
+    z = finite(live) and live or FH.ZOOM_DEFAULT
+  end
+  z = math.floor(z + 0.5) + (dir >= 0 and 1 or -1)
+  return math.min(math.max(z, FH.ZOOM_MIN), FH.ZOOM_MAX)
+end
+
+-- Value of the CVar rotateMinimap for a rotation mode ("1" turns the minimap with the player).
+function FH.RotationCVar(mode)
+  return choice(mode, IS_ROTATION, FH.ROTATION_DEFAULT) == "heading" and "1" or "0"
+end
+
+-- Shape of the frame: it follows the shape of the minimap (the convention GetMinimapShape() of add-ons that make
+-- it square), a round one otherwise.
+function FH.FrameShape(minimapShape)
+  return type(minimapShape) == "string" and minimapShape:upper():find("^SQUARE") and "square" or "circle"
+end
+
+-- Thickness of the frame on the screen in px: the setting grows and shrinks with the size factor of the HUD.
+function FH.FrameStroke(thickness, factor)
+  thickness = ML.Clamp(thickness, FH.FRAME_THICKNESS_MIN, FH.FRAME_THICKNESS_MAX, FH.FRAME_THICKNESS_DEFAULT)
+  return thickness * ML.Clamp(factor, FH.SCALE_MIN, FH.SCALE_MAX, FH.SCALE_DEFAULT)
 end
 
 -- Pixels from the center for yards, where the minimap shows `radius` yards up to `half` px.

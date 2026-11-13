@@ -5,7 +5,7 @@
 ## Notes-deDE: Fundorte von Erzen, Kräutern, Truhen und Fischschwärmen. Wird von selbst geladen, sobald eine Funktion sie braucht.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 0.7.3
+## Version: 0.7.4
 ## Dependencies: ForeverGuides
 ## LoadOnDemand: 1
 ## X-Website: https://forever-guides.com

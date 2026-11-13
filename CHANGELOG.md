@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.7.4
+
+### Added
+
+- Gathering spots: herbs, ore, chests, quest objects, other objects, fishing bobbers and skinnable creatures each have a switch, style, color, size, height, count and spread.
+- Gathering spot effects: a window of its own with a style gallery and live previews, opened with the button in the settings or with /fg sammelstellen and a kind.
+- Gathering spots: many new styles, for example glitter, light beam, fireflies and floating dust.
+- Gathering spots: an ending effect plays when you gather, and the spot flashes as soon as you come within range.
+- Farm HUD: frame and compass can be colored with the game's color picker, and the frame has an adjustable thickness.
+- Farm HUD: icons of other add-ons on the minimap are hidden while the HUD is on, and you can switch this off.
+- Farm HUD: four new key bindings for zooming in and out and for making it bigger and smaller.
+- Farm HUD: you can choose how the map turns (heading up or north up), and the HUD stays on after a reload.
+
+### Changed
+
+- Gathering spots: the general options are grouped into cards (visibility, on the move, when gathering, filters, range).
+- Gathering spots: the range can be set from 10 to 60 yards again, and the default is 30.
+- Gathering spots: saved old styles are migrated automatically, for example butterflies become petals.
+- Gathering spots: the experimental "original model" style is gone, and saved settings use particles instead.
+
+### Fixed
+
+- Gathering spots: a gathering spot out of range no longer counts as locked by mistake.
+- Farm HUD: the round minimap buttons no longer move to the middle of the screen while the HUD is on.
+- Settings: the mark after jumping to a setting no longer shows over the header and the minimap.
+
 ## 0.7.3
 
 ### Changed

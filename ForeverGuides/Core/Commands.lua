@@ -238,6 +238,17 @@ add({
   exec = "farmhud",
 })
 add({
+  id = "sparkleeffects",
+  area = "map",
+  example = { en = "/fg gatherspots", de = "/fg sammelstellen" },
+  public = true,
+  names = { "sammelstellen", "gatherspots", "effekte", "effects" },
+  usage = "/fg sammelstellen [Art]",
+  page = "settings",
+  control = "sparkles.cfg.openWindow",
+  exec = "sammelstellen",
+})
+add({
   id = "areas",
   area = "tools",
   example = { en = "/fg hudwindow new", de = "/fg hudfenster neu" },
@@ -806,6 +817,10 @@ C.bindings.FOREVERGUIDES_DURABILITY = { page = "durability", control = "page.dur
 C.bindings.FOREVERGUIDES_XPBAR = { page = "xpbar", control = "xpbar.set.show" }
 C.bindings.FOREVERGUIDES_CURSORRING = { page = "cursor", control = "cursor.set.enabled" }
 C.bindings.FOREVERGUIDES_FARMHUD = { page = "settings", control = "farmhud.set.enabled" }
+C.bindings.FOREVERGUIDES_FARMHUD_ZOOM_IN = { page = "settings", control = "farmhud.set.zoom" }
+C.bindings.FOREVERGUIDES_FARMHUD_ZOOM_OUT = { page = "settings", control = "farmhud.set.zoom" }
+C.bindings.FOREVERGUIDES_FARMHUD_BIGGER = { page = "settings", control = "farmhud.set.scale" }
+C.bindings.FOREVERGUIDES_FARMHUD_SMALLER = { page = "settings", control = "farmhud.set.scale" }
 C.bindings.FOREVERGUIDES_FISHING_CAST = { page = "settings", control = "subaddon.fishing.title" }
 
 local EN = {}
@@ -992,6 +1007,11 @@ desc(
   "gathering",
   "Ores and herbs page with zones for the map, optional item.",
   "Erze und Kräuter mit Gebieten für die Karte, optional Item."
+)
+desc(
+  "sparkleeffects",
+  "Window for the effect of each kind of gathering spot (style gallery, color, size). Optional kind to open on.",
+  "Fenster für den Effekt jeder Art von Sammelstelle (Stilgalerie, Farbe, Größe). Optional die Art zum Öffnen."
 )
 desc("guild", "Open the guild page.", "Öffnet die Gildenseite.")
 desc("social", "Open the contacts: players you have met.", "Öffnet die Kontakte: Spieler, die du getroffen hast.")
