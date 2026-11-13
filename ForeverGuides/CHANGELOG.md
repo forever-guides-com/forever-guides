@@ -4,6 +4,22 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.5] - 2026-11-13
+
+### Added
+
+- Forever Chat: new option "Keep chat open on Esc", on by default: Esc leaves the input box and closes open panels, and the window stays.
+
+### Changed
+
+- Forever Chat: forwarding opens the shared Share window titled "Forward", and the message is sent only after you click "Send".
+- Forever Chat: for a whisper you enter first and last name, and no realm is needed.
+- Forever Chat: when forwarding, the original writer always stands in a header line before the text, and the option for it is gone.
+
+### Fixed
+
+- Forever Chat: the bottom message in the chat window is now always fully visible, also with a larger font and with or without the byte counter.
+
 ## [0.7.4] - 2026-11-13
 
 ### Added
@@ -513,6 +529,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.1...v0.7.2

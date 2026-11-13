@@ -5,6 +5,24 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.5",
+      date = "2026-11-13",
+      highlights = {
+        { head = { de = "Weiterleiten im Teilen-Fenster", en = "Forwarding in the Share window" }, text = { de = "Eine Chatzeile weiterleiten öffnet das bekannte Teilen-Fenster und sendet erst nach \"Senden\".", en = "Forwarding a chat line opens the familiar Share window and sends only after \"Send\"." }, go = "settings:foreverchat.options" },
+      },
+      added = {
+        { de = "Forever Chat: Neue Option \"Chat bleibt bei Esc offen\", standardmäßig an: Esc verlässt das Eingabefeld und schließt offene Felder, das Fenster bleibt stehen.", en = "Forever Chat: new option \"Keep chat open on Esc\", on by default: Esc leaves the input box and closes open panels, and the window stays.", go = "settings:foreverchat.options" },
+      },
+      changed = {
+        { de = "Forever Chat: Weiterleiten öffnet das gemeinsame Teilen-Fenster mit dem Titel \"Weiterleiten\", die Nachricht geht erst nach dem Klick auf \"Senden\" hinaus.", en = "Forever Chat: forwarding opens the shared Share window titled \"Forward\", and the message is sent only after you click \"Send\".", go = "settings:foreverchat.options" },
+        { de = "Forever Chat: Beim Flüstern gibst du Vorname und Nachname ein, ein Realm ist nicht nötig.", en = "Forever Chat: for a whisper you enter first and last name, and no realm is needed.", go = "settings:foreverchat.options" },
+        { de = "Forever Chat: Beim Weiterleiten steht der ursprüngliche Absender immer als Kopfzeile vor dem Text, die Option dafür entfällt.", en = "Forever Chat: when forwarding, the original writer always stands in a header line before the text, and the option for it is gone.", go = "settings:foreverchat.options" },
+      },
+      fixed = {
+        { de = "Forever Chat: Die unterste Nachricht im Chatfenster ist jetzt immer ganz zu sehen, auch bei größerer Schrift und mit oder ohne Byte-Zähler.", en = "Forever Chat: the bottom message in the chat window is now always fully visible, also with a larger font and with or without the byte counter.", go = "settings:foreverchat.options" },
+      },
+    },
+    {
       version = "0.7.4",
       date = "2026-11-13",
       highlights = {
@@ -242,17 +260,6 @@ ns.Data.Changelog = {
       },
       fixed = {
         { de = "Speichern-Knopf: Das Neuladen funktioniert jetzt auch aus der Nachfrage in einer Gruppe, statt mit dem Hinweis zu enden, das Spiel habe es blockiert.", en = "Save button: the reload now works from the question that appears in a group, instead of ending in the notice that the game blocked it." },
-      },
-    },
-    {
-      version = "0.5.2",
-      date = "2026-11-06",
-      highlights = {
-        { head = { de = "Speicher-Erinnerung ist aus", en = "Save reminder is off" }, text = { de = "Die Meldung über ungesicherte Daten erscheint nur noch, wenn du sie einschaltest.", en = "The notice about unsaved data only appears when you switch it on." } },
-        { head = { de = "Wieder einschaltbar", en = "Can be switched back on" }, text = { de = "Das Update hat sie einmal ausgeschaltet, unter Einstellungen, Speichern schaltest du sie wieder ein.", en = "The update turned it off once, and you can turn it on again under Settings, Save." } },
-      },
-      changed = {
-        { de = "Speicher-Erinnerung: Die Benachrichtigung über ungesicherte Daten mit dem Neuladen-Knopf ist jetzt standardmäßig aus und wurde beim Update einmal ausgeschaltet. Unter Einstellungen, Speichern lässt sie sich einschalten.", en = "Save reminder: the notice about unsaved data with its reload button is now off by default and was switched off once on update. Turn it on in Settings under Saving to be reminded." },
       },
     },
   },

@@ -5,7 +5,7 @@
 -- settings and closes on Esc. Keys work while the mouse is over the window or after a click in it: Up, Down,
 -- Home, End pick a chat, Left and Right change the tab, Tab searches, Enter goes on to the input line
 -- (ChatInput.lua), Shift+F10 or the menu key opens the menu of the chat (ChatMenu.lua), PageUp and PageDown
--- scroll, Ctrl+R opens the reactions of the last line (add-on extras, opt-in), Ctrl+M switches the look, Ctrl+N writes a new message (ChatNew.lua), Esc closes (or clears the
+-- scroll, Ctrl+R opens the reactions of the last line (add-on extras, opt-in), Ctrl+M switches the look, Ctrl+N writes a new message (ChatNew.lua), Esc closes unless "keepOpenOnEsc" is on (or clears the
 -- search first). The gear in the title bar swaps the panes for the options (ChatSettings.lua).
 -- Nothing is built in combat; the window opens after it.
 local _, chat = ...
@@ -215,7 +215,7 @@ function Window.Layout(sync)
   local teamPanel = chat.TeamPanel and chat.TeamPanel.IsOpen()
   thread.frame:SetShown(not teamPanel)
   thread:SetBack(not side and state.page == "thread")
-  thread:SetViewSize(threadW, ch - Thread.HEAD - GAP - input - (input > 0 and GAP or 0))
+  thread:SetViewSize(threadW, ch - input - (input > 0 and GAP or 0))
   list:Layout(listW)
   -- The panel for a new message takes the place of the list while it is open.
   if chat.New.IsOpen() then
@@ -489,11 +489,28 @@ function Window.inputFocus()
   return f.input:Focus()
 end
 
+-- Whether Esc leaves the window open (the option "keepOpenOnEsc", on by default).
+local function keepOpenOnEsc()
+  local settings = chat.Settings
+  return not (settings and settings.Value) or settings.Value("keepOpenOnEsc") ~= false
+end
+
+-- The window keeps the keyboard (its keys) while shown; it takes part in the Esc stack only when Esc may close it.
+local function applyEsc(f)
+  Shell.SetEsc(f, true)
+  if keepOpenOnEsc() then
+    FG.EscStack.Remove(f)
+  end
+end
+
 local function handleKey(f, key)
   if key == "ESCAPE" then
     -- The panel of a team or the form closes first, the window with the next press.
     if chat.TeamPanel.Close() or chat.New.Close() then
       return true
+    end
+    if keepOpenOnEsc() then
+      return FG.Popups ~= nil and FG.Popups.close() == true
     end
     return FG.EscStack.Close(f)
   end
@@ -577,6 +594,7 @@ local function create()
     title = "chat.win.title",
     titleHeight = STRIP_H,
     shadow = true,
+    esc = false,
     onHead = function()
       fitHead(f)
       if f.ready then
@@ -755,7 +773,7 @@ local function create()
   f:SetScript(
     "OnShow",
     FG.Wrap("chat-show", function()
-      Shell.SetEsc(f, true)
+      applyEsc(f)
       roster = nil
       applyLook()
       Window.Layout(true)
@@ -901,6 +919,10 @@ FG.On("FG_CHAT_SETTING", function(_, id)
   end
   if id == "opacity" then
     applyLook()
+  elseif id == "keepOpenOnEsc" then
+    if frame:IsShown() then
+      applyEsc(frame)
+    end
   elseif id == "timeFormat" or id == "timeSeconds" or id == "defaultMode" or id == "views" or id == "classColors" then
     if frame:IsShown() then
       frame.thread:Refresh()

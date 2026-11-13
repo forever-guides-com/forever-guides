@@ -659,8 +659,14 @@ local function build()
 end
 
 -- link: nil for free text, else the NoteLink.Build result ({ msg, entry } or { err }).
-local function show(title, text, link)
+-- windowTitle: ready text for the window title instead of "Share in chat" (nil keeps the default).
+local function show(title, text, link, windowTitle)
   local d = build()
+  if windowTitle and windowTitle ~= "" then
+    W.SetText(d.title, nil, windowTitle)
+  else
+    W.SetText(d.title, "share.title")
+  end
   d.shareTitle = title or ""
   d.editable = text == nil and link == nil
   d.source = text or ""
@@ -726,8 +732,9 @@ end
 
 -- title: prefixed to the first message. text: plain text to send; nil opens
 -- the dialog with an empty, editable text box instead of a fixed preview.
-function Share.Open(title, text)
-  return show(title, text)
+-- opts.windowTitle: ready text for the window title (for example "Forward"), the sent text stays untouched.
+function Share.Open(title, text, opts)
+  return show(title, text, nil, type(opts) == "table" and opts.windowTitle or nil)
 end
 
 -- A note is shared as one link message (see NoteLink), never as text.

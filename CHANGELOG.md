@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.5
+
+### Added
+
+- Forever Chat: new option "Keep chat open on Esc", on by default: Esc leaves the input box and closes open panels, and the window stays.
+
+### Changed
+
+- Forever Chat: forwarding opens the shared Share window titled "Forward", and the message is sent only after you click "Send".
+- Forever Chat: for a whisper you enter first and last name, and no realm is needed.
+- Forever Chat: when forwarding, the original writer always stands in a header line before the text, and the option for it is gone.
+
+### Fixed
+
+- Forever Chat: the bottom message in the chat window is now always fully visible, also with a larger font and with or without the byte counter.
+
 ## 0.7.4
 
 ### Added

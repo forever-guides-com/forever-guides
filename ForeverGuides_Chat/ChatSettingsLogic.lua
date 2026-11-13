@@ -317,6 +317,7 @@ local builtin = {
   { id = "intake", group = "intake", type = "toggle", default = true, apply = syncIntake },
   { id = "gameInput", group = "input", type = "toggle", default = false },
   { id = "classColors", group = "view", type = "toggle", default = true },
+  { id = "keepOpenOnEsc", group = "view", type = "toggle", default = true },
   { id = "replyHead", group = "input", type = "toggle", default = true },
   { id = "localChat", group = "intake", type = "toggle", default = true, apply = syncIntake },
   { id = "archive", group = "history", type = "toggle", default = true, apply = syncArchive },

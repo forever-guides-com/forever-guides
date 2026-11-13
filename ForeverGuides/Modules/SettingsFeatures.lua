@@ -516,6 +516,7 @@ SF.MORE = {
     "chat-set-gameInput",
     "chat-set-replyHead",
     "chat-set-classColors",
+    "chat-set-keepOpenOnEsc",
     "chat-set-defaultMode",
     "chat-set-timeFormat",
     "chat-set-timeSeconds",

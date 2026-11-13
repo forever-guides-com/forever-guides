@@ -956,9 +956,20 @@ function Thread.Create(parent, win, shape)
     view.pool[#view.pool + 1] = newRow(view)
   end
 
-  -- Size of the view in pixels; the window computes it from its own size.
+  -- Height of the header plus the gap below it; 0 without a header. The head is scaled with the text size, so this
+  -- is read again on every layout and never taken from the unscaled base value.
+  function view:HeadSpace()
+    if view.headless then
+      return 0
+    end
+    return scaled(Thread.HEAD) + GAP
+  end
+
+  -- Size of the thread frame in pixels (header included); the window computes it from its own size. The part
+  -- the lines get is what the host really covers, whole pixels so the newest line is never cut.
   function view:SetViewSize(width, height)
-    view.width, view.viewH = math.max(20, width), math.max(0, height)
+    head:SetHeight(view.headless and 0 or scaled(Thread.HEAD))
+    view.width, view.viewH = math.max(20, width), math.max(0, math.floor(height - view:HeadSpace()))
   end
 
   function view:NeedsFrames()

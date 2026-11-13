@@ -25,16 +25,6 @@ chat.FG.AddLocale("enUS", {
   ["chat.reply.close"] = "Cancel reply",
   ["chat.reply.quote"] = "Reply to %s: %s",
   ["chat.reply.jump"] = "Jump to the original message",
-  ["chat.fwd.title"] = "Forward to",
-  ["chat.fwd.whisper"] = "Whisper to a player",
-  ["chat.fwd.name"] = "Name of the player",
-  ["chat.fwd.head"] = "With the sender in front",
-  ["chat.fwd.channel"] = "Channel %d %s",
-  ["chat.fwd.say"] = "Say",
-  ["chat.fwd.yell"] = "Yell",
-  ["chat.fwd.done"] = "It is in the chat box. Check it, Enter sends.",
-  ["chat.fwd.failed"] = "The chat box could not take the text.",
-  ["chat.fwd.close"] = "Close",
 })
 
 chat.FG.AddLocale("deDE", {
@@ -57,14 +47,4 @@ chat.FG.AddLocale("deDE", {
   ["chat.reply.close"] = "Antwort abbrechen",
   ["chat.reply.quote"] = "Antwort an %s: %s",
   ["chat.reply.jump"] = "Zur Originalnachricht springen",
-  ["chat.fwd.title"] = "Weiterleiten an",
-  ["chat.fwd.whisper"] = "Flüstern an einen Spieler",
-  ["chat.fwd.name"] = "Name des Spielers",
-  ["chat.fwd.head"] = "Mit Absender davor",
-  ["chat.fwd.channel"] = "Kanal %d %s",
-  ["chat.fwd.say"] = "Sagen",
-  ["chat.fwd.yell"] = "Rufen",
-  ["chat.fwd.done"] = "Es steht im Chatfeld. Prüfen, Enter sendet.",
-  ["chat.fwd.failed"] = "Das Chatfeld konnte den Text nicht aufnehmen.",
-  ["chat.fwd.close"] = "Schließen",
 })
