@@ -4,6 +4,13 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.8] - 2026-11-13
+
+### Fixed
+
+- Forever Chat: typing in the input box no longer slows the game down.
+- Forever Chat: when you start typing, the last message stays visible and is no longer covered.
+
 ## [0.7.7] - 2026-11-13
 
 ### Added
@@ -557,6 +564,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.4...v0.7.5

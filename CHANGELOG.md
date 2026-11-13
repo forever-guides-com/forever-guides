@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.8
+
+### Fixed
+
+- Forever Chat: typing in the input box no longer slows the game down.
+- Forever Chat: when you start typing, the last message stays visible and is no longer covered.
+
 ## 0.7.7
 
 ### Added

@@ -215,6 +215,7 @@ function Window.Layout(sync)
   local teamPanel = chat.TeamPanel and chat.TeamPanel.IsOpen()
   thread.frame:SetShown(not teamPanel)
   thread:SetBack(not side and state.page == "thread")
+  local viewBefore = thread.viewH
   thread:SetViewSize(threadW, ch - input - (input > 0 and GAP or 0))
   list:Layout(listW)
   -- The panel for a new message takes the place of the list while it is open.
@@ -230,7 +231,8 @@ function Window.Layout(sync)
       thread:Refresh()
     end
   end
-  if sync then
+  -- A changed view height is drawn at once, so no frame shows stale rows; only width drags wait.
+  if sync or thread.viewH ~= viewBefore then
     heavy()
   else
     FG.Debounce("chat-window-size", 0.05, heavy)

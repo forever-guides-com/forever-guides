@@ -26,6 +26,19 @@ chat.Input = Input
 
 local GAP, ROW, BUTTON = 6, 30, 28
 
+-- Text heights come back from the client as 32 bit floats: 12.000001 must not become 13 and a line that did not
+-- change must not look taller than before, or every key would lay out the whole window again.
+local function ceil(height)
+  return math.ceil(height - 0.01)
+end
+
+local function sameHeight(a, b)
+  return math.abs(a - b) < 0.01
+end
+
+-- The typing mark goes to the partner at most once a second (the sender keeps its own, longer gap).
+local TYPING_POLL = 1
+
 -- The one line of the window (tests find it here) and every line that exists (the events reach them all).
 local current
 local all = {}
@@ -223,7 +236,6 @@ function Input.Create(host, win, opts)
   line.send:SetPoint("RIGHT", row, "RIGHT", 0, 0)
   -- The counter has its own line above the row, so a narrow window keeps room for the box.
   line.counter = W.Text(host, { role = "micro", color = "textMuted", justify = "RIGHT" })
-  line.counter:Hide()
   line.box = W.EditBox(row, { placeholder = "chat.input.placeholder", height = ROW })
   line.box:SetPoint("LEFT", line.menu, "RIGHT", GAP, 0)
   line.box:SetPoint("RIGHT", line.send, "LEFT", -GAP, 0)
@@ -288,7 +300,7 @@ function Input.Create(host, win, opts)
       bar:ClearAllPoints()
       bar:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
       bar:SetPoint("TOPRIGHT", host, "TOPRIGHT", 0, 0)
-      local barH = math.max(18, math.ceil(bar.text:GetStringHeight()) + 4)
+      local barH = math.max(18, ceil(bar.text:GetStringHeight()) + 4)
       bar:SetHeight(barH)
       bar.close:ClearAllPoints()
       bar.close:SetPoint("RIGHT", bar, "RIGHT", 0, 0)
@@ -302,7 +314,7 @@ function Input.Create(host, win, opts)
       notice:ClearAllPoints()
       notice:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -top)
       notice:SetWidth(width)
-      top = top + math.ceil(notice:GetStringHeight()) + GAP
+      top = top + ceil(notice:GetStringHeight()) + GAP
     end
     if held:IsShown() then
       held:ClearAllPoints()
@@ -311,7 +323,7 @@ function Input.Create(host, win, opts)
       held.text:ClearAllPoints()
       held.text:SetPoint("TOPLEFT", held, "TOPLEFT", 0, 0)
       held.text:SetWidth(width)
-      local textH = math.ceil(held.text:GetStringHeight())
+      local textH = ceil(held.text:GetStringHeight())
       local cap = math.floor((width - GAP) / 2)
       held.release:ClearAllPoints()
       held.release:SetPoint("TOPLEFT", held.text, "BOTTOMLEFT", 0, -4)
@@ -323,13 +335,18 @@ function Input.Create(host, win, opts)
       held:SetHeight(heldH)
       top = top + heldH + GAP
     end
+    -- The counter line always holds its height, so the first typed character never moves the thread.
     local counter = self.counter
-    if counter:IsShown() then
-      counter:ClearAllPoints()
-      counter:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -top)
-      counter:SetWidth(width)
-      top = top + math.ceil(counter:GetStringHeight()) + 2
+    counter:ClearAllPoints()
+    counter:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -top)
+    counter:SetWidth(width)
+    local counterH = ceil(counter:GetStringHeight())
+    if counterH <= 0 then
+      counter:SetText(" ")
+      counterH = ceil(counter:GetStringHeight())
+      counter:SetText(self.counterText or "")
     end
+    top = top + counterH + 2
     local rowH = math.max(K.scaledHeight(ROW), BUTTON)
     row:ClearAllPoints()
     row:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -top)
@@ -392,7 +409,7 @@ function Input.Create(host, win, opts)
     end
     self:UpdateCounter()
     local height = self:Fit(host:GetWidth() or 0)
-    if height ~= before and not quiet then
+    if not sameHeight(height, before) and not quiet then
       win.Layout()
     end
   end
@@ -480,12 +497,17 @@ function Input.Create(host, win, opts)
       if not counter.measured then
         text = text .. L["chat.input.count.unmeasured"]
       end
-      self.counter:SetText(text)
+      if self.counterText ~= text then
+        self.counterText = text
+        self.counter:SetText(text)
+      end
       W.SetColor(self.counter, (counter.over or counter.parts > 1) and "warning" or "textMuted")
     else
-      self.counter:SetText("")
+      if self.counterText ~= "" then
+        self.counterText = ""
+        self.counter:SetText("")
+      end
     end
-    self.counter:SetShown(counter ~= nil)
   end
 
   -- Typing: the draft follows, an old refusal goes away.
@@ -495,8 +517,13 @@ function Input.Create(host, win, opts)
     end
     local text = edit:GetText()
     Store.Set(chat.db, "drafts", self.key, not IL.IsBlank(text) and text or nil)
-    if chat.Peer and self.host:IsVisible() then
-      FG.Safe("chat-peer-typing", chat.Peer.OnTyping, self.key, not IL.IsBlank(text))
+    local active = not IL.IsBlank(text)
+    local now = clock()
+    if chat.Peer and (active ~= self.typingActive or (active and now - (self.typingAt or -math.huge) >= TYPING_POLL)) then
+      self.typingActive, self.typingAt = active, now
+      if self.host:IsVisible() then
+        FG.Safe("chat-peer-typing", chat.Peer.OnTyping, self.key, active)
+      end
     end
     if self.refused then
       self.refused = nil
@@ -505,7 +532,7 @@ function Input.Create(host, win, opts)
     end
     self:UpdateCounter()
     local before = host:GetHeight() or 0
-    if self:Fit(host:GetWidth() or 0) ~= before then
+    if not sameHeight(self:Fit(host:GetWidth() or 0), before) then
       win.Layout()
     end
   end
@@ -526,6 +553,7 @@ function Input.Create(host, win, opts)
     end
     self:SaveDraft()
     self.key, self.refused, self.reply = key, nil, nil
+    self.typingActive = nil
     bar:Hide()
     IL.Reset(self.history)
     edit:SetText(key and chat.db.drafts[key] or "")

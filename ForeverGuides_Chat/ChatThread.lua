@@ -969,7 +969,12 @@ function Thread.Create(parent, win, shape)
   -- the lines get is what the host really covers, whole pixels so the newest line is never cut.
   function view:SetViewSize(width, height)
     head:SetHeight(view.headless and 0 or scaled(Thread.HEAD))
+    -- A view that follows the newest line keeps following it when the view gets taller or shorter.
+    local following = view.conv ~= nil and view:AtEnd()
     view.width, view.viewH = math.max(20, width), math.max(0, math.floor(height - view:HeadSpace()))
+    if following then
+      view.offset = TL.MaxOffset(view.contentH, view.viewH)
+    end
   end
 
   function view:NeedsFrames()
