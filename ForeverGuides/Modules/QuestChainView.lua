@@ -25,6 +25,8 @@ ns.AddLocale("enUS", {
   ["questlist.pre.other"] = "%d prequests",
   ["questlist.kind.dungeon"] = "Dungeon",
   ["questlist.kind.raid"] = "Raid",
+  ["questlist.start.in"] = "Start: inside",
+  ["questlist.start.out"] = "Start: outside",
 })
 
 ns.AddLocale("deDE", {
@@ -41,6 +43,8 @@ ns.AddLocale("deDE", {
   ["questlist.pre.other"] = "%d Vorquests",
   ["questlist.kind.dungeon"] = "Dungeon",
   ["questlist.kind.raid"] = "Schlachtzug",
+  ["questlist.start.in"] = "Start: drinnen",
+  ["questlist.start.out"] = "Start: draußen",
 })
 
 local QV = {}
@@ -89,7 +93,7 @@ function QV.LevelHex(level, bucket)
   return (Theme.readable(base, Theme.hex("surface3")))
 end
 
--- Texts of one list row: { level (colored), title, meta (faction and kind), label (plain, for the keyboard and
+-- Texts of one list row: { level (colored), title, meta (faction, kind and where it starts), label (plain, for the keyboard and
 -- readers) }.
 function QV.Describe(row)
   local entry = row.entry
@@ -100,11 +104,17 @@ function QV.Describe(row)
     meta[#meta + 1] = QW.FactionText(row.faction)
   end
   meta[#meta + 1] = L["questlist.kind." .. row.kind]
+  if row.start then
+    meta[#meta + 1] = L["questlist.start." .. row.start]
+  end
   local plain = { title, row.level and string.format(L["questchain.level"], row.level) or nil }
   if row.faction then
     plain[#plain + 1] = L["kit.faction." .. row.faction]
   end
   plain[#plain + 1] = L["questlist.kind." .. row.kind]
+  if row.start then
+    plain[#plain + 1] = L["questlist.start." .. row.start]
+  end
   return {
     level = row.level and string.format("|cff%s%s|r", QV.LevelHex(row.level, row.bucket):sub(2), number) or number,
     title = title,

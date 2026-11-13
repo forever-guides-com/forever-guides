@@ -141,6 +141,7 @@ local function entry(q, owner, direct)
     gold = whole(q.mo, 0),
     giver = type(q.sn) == "string" and q.sn ~= "" and q.sn or nil,
     zone = q.sz,
+    startItem = type(q.si) == "number" and q.si or nil,
     place = QC.HasPlace(q),
     direct = direct,
     access = q.ac == true,
@@ -160,8 +161,13 @@ end
 -- Whether the giver of a quest stands inside the instance: true, false (the zone is another place), nil when
 -- the quest has no zone. The zone counts as inside when it is a name of the instance (en, de or an alias),
 -- alone, followed by a part after a comma ("Hall of Thanes, Reliquary of Kings") or the common part of a
--- wing name (zone "Dire Maul" for "Dire Maul - East").
+-- wing name (zone "Dire Maul" for "Dire Maul - East"). The derived fact of the quest (st "in" or "out",
+-- tools/derive_quest_start.py) decides first.
 function QC.StartsInside(inst, item)
+  local st = item and item.quest and item.quest.st
+  if st == "in" or st == "out" then
+    return st == "in"
+  end
   local zone = item and item.zone
   if type(zone) ~= "table" or not inst then
     return nil

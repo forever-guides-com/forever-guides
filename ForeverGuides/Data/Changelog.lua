@@ -5,7 +5,19 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.7",
+      date = "2026-11-13",
+      highlights = {
+        { head = { de = "Wo eine Quest beginnt", en = "Where a quest starts" }, text = { de = "Die Instanz-Questliste zeigt bei jeder Quest, ob du sie vor der Instanz oder erst darin bekommst.", en = "The instance quest list shows for each quest whether you get it before the instance or only inside it." }, go = "instances" },
+      },
+      added = {
+        { de = "Instanzen: Jede Quest nennt in der Liste \"Start: drinnen\" oder \"Start: draußen\", wenn der Annahmeort bekannt ist.", en = "Instances: Each quest says \"Start: inside\" or \"Start: outside\" in the list when the place to accept it is known.", go = "instances" },
+        { de = "Instanzen: Die Details einer Quest zeigen unter \"Annahme\", ob sie in der Instanz beginnt (mit Geber oder Gegenstand) oder außerhalb (mit Geber und Zone).", en = "Instances: The details of a quest show under \"Accepted\" whether it starts inside the instance (with giver or item) or outside (with giver and zone).", go = "instances" },
+      },
+    },
+    {
       version = "0.7.6",
+      date = "2026-11-13",
       highlights = {
         { head = { de = "Quests wie im Questlog", en = "Quests like the quest log" }, text = { de = "Links die Instanz-Quests, rechts Ziel, Beschreibung und Belohnungen mit Gegenständen, EP und Gold.", en = "Instance quests on the left, objective, description and rewards with items, XP and gold on the right." }, go = "instances" },
         { head = { de = "Scharlachrotes Kloster in Flügeln", en = "Scarlet Monastery by wing" }, text = { de = "Friedhof, Bibliothek, Waffenkammer und Kathedrale haben eigene Karten mit Bossen und Quests.", en = "Graveyard, Library, Armory and Cathedral each have their own card with bosses and quests." }, go = "instances" },
@@ -248,23 +260,6 @@ ns.Data.Changelog = {
         { de = "Stufen-Übersicht: Beidhändigkeit (Jäger und Krieger Stufe 20, Schurke Stufe 10), Panzer (Jäger und Schamane Stufe 40) und Plattenpanzer (Krieger und Paladin Stufe 40) fehlten in der Liste, obwohl der Klassenlehrer sie beibringt. Sie stehen jetzt mit Lehrerpreis auf der richtigen Stufe, Waffen der Waffenmeister bleiben auf ihrer eigenen Seite. Auch Segen der Könige (Paladin Stufe 20) fehlte, weil ein anderer Eintrag derselben Stufe ihn verdeckte.", en = "Levels overview: Dual Wield, Mail, Plate Mail and Blessing of Kings were missing although the class trainer teaches them. They now appear at the right level with the trainer price." },
         { de = "Stufen-Übersicht: Der Hexenmeister-Zauber heißt im Spiel Omen der Verdammnis (Bane of Doom), die Liste zeigt jetzt diesen Namen mit dem richtigen Zauber, damit er als gelernt erkannt wird.", en = "Levels overview: the warlock spell Bane of Doom now shows the name used in the game and is recognized as learned." },
         { de = "Die Befehle /fg diag share und /fg diag chat zeigten bei ausgeschalteten Rückmeldungen nichts an. Sie öffnen jetzt ein Fenster, aus dem du den Text kopieren kannst.", en = "The commands /fg diag share and /fg diag chat showed nothing with feedback off. They now open a window you can copy the text from." },
-      },
-    },
-    {
-      version = "0.5.4",
-      date = "2026-11-06",
-      highlights = {
-        { head = { de = "Gildenmanager im Forever-Client", en = "Guild manager on the Forever client" }, text = { de = "Das Spiel lässt Addons die Gilde nicht ändern, darum zeigt jeder Schritt den Befehl zum Kopieren.", en = "The game does not let add-ons change the guild, so each step shows a command to copy." } },
-        { head = { de = "Lauf ohne Stillstand", en = "No more stalling" }, text = { de = "Der Gildenmanager wartet nicht mehr an der Gildenliste, sondern geht von selbst weiter.", en = "The guild manager no longer waits at the guild list and goes on by itself." } },
-        { head = { de = "Esc im Kampf", en = "Esc in combat" }, text = { de = "Fenster lösen keine blockierte Aktion mehr aus und schließen nach dem Kampf.", en = "Windows no longer trigger a blocked action and close when the combat ends." } },
-      },
-      changed = {
-        { de = "Gildenmanager im Forever-Client: Das Spiel lässt Addons die Gilde nicht ändern, jeder Schritt öffnet deshalb ein Feld mit dem Befehl zum Kopieren. Notizen und Rangsprünge gibt es dort nicht.", en = "Guild manager on the Forever client: the game does not let add-ons change the guild, so each step opens a box with the command to copy. Notes and rank jumps are not offered there." },
-      },
-      fixed = {
-        { de = "Gildenmanager: Der Lauf bleibt nicht mehr bei \"Wartet auf die Gildenliste\" stehen, er geht von selbst weiter, sobald die Liste frisch ist.", en = "Guild manager: the run no longer stops at waiting for the guild list, it goes on by itself once the list is fresh." },
-        { de = "Fenster lösen beim Drücken von Esc im Kampf keine blockierte Aktion mehr aus, sie schließen nach dem Kampf.", en = "Windows no longer trigger a blocked action when you press Esc in combat, they close when the combat ends." },
-        { de = "Spielermenü: Der Eintrag für die Gildeneinladung im Forever-Client löst keinen Fehler mehr aus, wenn das Spiel den Namen eines Spielers verbirgt.", en = "Player menu: the guild invite entry on the Forever client no longer raises an error when the game hides a player's name." },
       },
     },
   },

@@ -4,6 +4,13 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.7] - 2026-11-13
+
+### Added
+
+- Instances: Each quest says "Start: inside" or "Start: outside" in the list when the place to accept it is known.
+- Instances: The details of a quest show under "Accepted" whether it starts inside the instance (with giver or item) or outside (with giver and zone).
+
 ## [0.7.6] - 2026-11-13
 
 ### Added
@@ -550,6 +557,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.3...v0.7.4

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.7
+
+### Added
+
+- Instances: Each quest says "Start: inside" or "Start: outside" in the list when the place to accept it is known.
+- Instances: The details of a quest show under "Accepted" whether it starts inside the instance (with giver or item) or outside (with giver and zone).
+
 ## 0.7.6
 
 ### Added

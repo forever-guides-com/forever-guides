@@ -10,9 +10,10 @@ local _, ns = ...
 local W, L, Theme, QW, IV, QL = ns.W, ns.L, ns.Theme, ns.QuestChainWindow, ns.InstanceView, ns.QuestListLogic
 
 ns.AddLocale("enUS", {
-  ["questpanel.start"] = "Starts at",
+  ["questpanel.start"] = "Accepted",
   ["questpanel.start.inside"] = "Inside the instance",
   ["questpanel.start.outside"] = "Outside",
+  ["questpanel.start.item"] = "item %s",
   ["questpanel.finish"] = "Hand in at",
   ["questpanel.pre"] = "Requires",
   ["questpanel.next"] = "Then",
@@ -36,9 +37,10 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["questpanel.start"] = "Beginnt bei",
+  ["questpanel.start"] = "Annahme",
   ["questpanel.start.inside"] = "In der Instanz",
   ["questpanel.start.outside"] = "Außerhalb",
+  ["questpanel.start.item"] = "Gegenstand %s",
   ["questpanel.finish"] = "Abgeben bei",
   ["questpanel.pre"] = "Voraussetzung",
   ["questpanel.next"] = "Danach",
@@ -167,20 +169,24 @@ local function subLine(entry)
   return table.concat(bits, " · ")
 end
 
--- The giver with its zone, led by "Inside the instance" (accent color plus the words) or "Outside" when the
--- zone tells where the giver stands. Without a zone there is no marker.
+-- Where the quest is accepted, led by "Inside the instance" (accent color plus the words) or "Outside" when the
+-- data tells. Inside names the giver or the item that starts the quest, outside the giver with its zone. Without
+-- that knowledge the giver and zone stand alone, without a marker.
 local function startText(entry)
   local zone = entry.zone and ns.T(entry.zone)
   local text = entry.giver and (zone and string.format("%s (%s)", entry.giver, zone) or entry.giver) or zone
   local inside = ns.QuestChainLogic.StartsInside(entry.inst, entry)
-  if not text or inside == nil then
+  if inside == nil then
     return text
   end
   if inside then
-    -- The zone is the instance itself, the giver alone says enough.
-    return Theme.hexText("accent2", L["questpanel.start.inside"]) .. ": " .. (entry.giver or text)
+    local item = entry.startItem and string.format(L["questpanel.start.item"], IV.ItemName({ id = entry.startItem }))
+    local detail = entry.giver or item or text
+    local head = Theme.hexText("accent2", L["questpanel.start.inside"])
+    return detail and (head .. ": " .. detail) or head
   end
-  return L["questpanel.start.outside"] .. ": " .. text
+  local head = L["questpanel.start.outside"]
+  return text and (head .. ": " .. text) or head
 end
 
 local function moneyText(gold)

@@ -1,6 +1,6 @@
 -- Row and reward model of the instance quest list and its detail pane, without any game API (the frames are
 -- Modules/QuestChainView.lua and Modules/InstanceQuestPanel.lua). Quest fields read here: id, n, f, l, dg (server
--- tag 81 dungeon or 62 raid), rw ({ id, n, c, ch }), xp, mo (copper).
+-- tag 81 dungeon or 62 raid), st ("in" or "out": accepted inside or outside the instance), rw ({ id, n, c, ch }), xp, mo (copper).
 local _, ns = ...
 
 local QL = {}
@@ -83,7 +83,7 @@ end
 -- ("all", "A" or "H"; a quest of both factions stays), in the order of the entries.
 -- opts: player (level), grey (grey level of the client), pre = { [quest id] = number of prequests },
 -- text(entry) -> objective text. Each row: { entry, level, bucket, faction ("A", "H" or nil for both), kind,
--- pre, objectives }.
+-- start ("in", "out" or nil), pre, objectives }.
 function QL.Rows(entries, filter, opts)
   opts = opts or {}
   local rows = {}
@@ -95,6 +95,7 @@ function QL.Rows(entries, filter, opts)
         bucket = QL.Difficulty(e.level, opts.player, opts.grey),
         faction = e.faction ~= "B" and e.faction or nil,
         kind = QL.Kind(e),
+        start = e.quest and (e.quest.st == "in" or e.quest.st == "out") and e.quest.st or nil,
         pre = opts.pre and opts.pre[e.id or 0] or 0,
         objectives = QL.Objectives(opts.text and opts.text(e)),
       }
