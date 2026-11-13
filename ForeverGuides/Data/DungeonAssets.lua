@@ -40,7 +40,10 @@ ns.Data.DungeonAssets = {
     ["Razorfen Downs"] = { fid = 131864, src = "narrow" },
     ["Razorfen Kraul"] = { fid = 131865, src = "narrow" },
     ["Ruins of Lordaeron"] = { fid = 7963782, src = "main" },
-    ["Scarlet Monastery"] = { fid = 131852, src = "narrow" },
+    ["Scarlet Monastery - Armory"] = { fid = 131852, src = "narrow" },
+    ["Scarlet Monastery - Cathedral"] = { fid = 131852, src = "narrow" },
+    ["Scarlet Monastery - Graveyard"] = { fid = 131852, src = "narrow" },
+    ["Scarlet Monastery - Library"] = { fid = 131852, src = "narrow" },
     ["Scholomance"] = { fid = 131868, src = "narrow" },
     ["Shadowfang Keep"] = { fid = 131869, src = "narrow" },
     ["Shaper's Terrace"] = { fid = 7963783, src = "main" },
@@ -212,8 +215,63 @@ ns.Data.DungeonAssets = {
       tiles = { 7255712, 7255730, 7255748, 7255718, 7255736, 7255754, 7255724, 7255742, 7255760 },
       lo = 7963782,
     },
-    ["Scarlet Monastery"] = {
+    ["Scarlet Monastery - Armory"] = {
       folder = "ScarletMonastery",
+      note = "shared by the four wings, the floor to wing assignment is not in the file names",
+      alt = {
+        { folder = "ScarletMonasteryOld", floors = {
+            { fid = { 5333983, 5333984, 5333985, 5333986, 5333987, 5333988, 5333989, 5333990, 5333991, 5333992, 5333993, 5333994 } },
+            { fid = { 5333996, 5333997, 5333998, 5333999, 5334000, 5334001, 5334002, 5334003, 5334004, 5334005, 5334006, 5334007 } },
+            { fid = { 5334009, 5334010, 5334011, 5334012, 5334013, 5334014, 5334015, 5334016, 5334017, 5334018, 5334019, 5334020 } },
+            { fid = { 5334037, 5334038, 5334040, 5334041, 5334043, 5334044, 5334046, 5334047, 5334049, 5334050, 5334052, 5334053 } },
+          } },
+      },
+      floors = {
+        { fid = { 449760, 449764, 449765, 449766, 449767, 449768, 449769, 449770, 449771, 449761, 449762, 449763 } },
+        { fid = { 449772, 449776, 449777, 449778, 449779, 449780, 449781, 449782, 449783, 449773, 449774, 449775 } },
+        { fid = { 449784, 449788, 449789, 449790, 449791, 449792, 449793, 449794, 449795, 449785, 449786, 449787 } },
+        { fid = { 449796, 449800, 449801, 449802, 449803, 449804, 449805, 449806, 449807, 449797, 449798, 449799 } },
+      },
+    },
+    ["Scarlet Monastery - Cathedral"] = {
+      folder = "ScarletMonastery",
+      note = "shared by the four wings, the floor to wing assignment is not in the file names",
+      alt = {
+        { folder = "ScarletMonasteryOld", floors = {
+            { fid = { 5333983, 5333984, 5333985, 5333986, 5333987, 5333988, 5333989, 5333990, 5333991, 5333992, 5333993, 5333994 } },
+            { fid = { 5333996, 5333997, 5333998, 5333999, 5334000, 5334001, 5334002, 5334003, 5334004, 5334005, 5334006, 5334007 } },
+            { fid = { 5334009, 5334010, 5334011, 5334012, 5334013, 5334014, 5334015, 5334016, 5334017, 5334018, 5334019, 5334020 } },
+            { fid = { 5334037, 5334038, 5334040, 5334041, 5334043, 5334044, 5334046, 5334047, 5334049, 5334050, 5334052, 5334053 } },
+          } },
+      },
+      floors = {
+        { fid = { 449760, 449764, 449765, 449766, 449767, 449768, 449769, 449770, 449771, 449761, 449762, 449763 } },
+        { fid = { 449772, 449776, 449777, 449778, 449779, 449780, 449781, 449782, 449783, 449773, 449774, 449775 } },
+        { fid = { 449784, 449788, 449789, 449790, 449791, 449792, 449793, 449794, 449795, 449785, 449786, 449787 } },
+        { fid = { 449796, 449800, 449801, 449802, 449803, 449804, 449805, 449806, 449807, 449797, 449798, 449799 } },
+      },
+    },
+    ["Scarlet Monastery - Graveyard"] = {
+      folder = "ScarletMonastery",
+      note = "shared by the four wings, the floor to wing assignment is not in the file names",
+      alt = {
+        { folder = "ScarletMonasteryOld", floors = {
+            { fid = { 5333983, 5333984, 5333985, 5333986, 5333987, 5333988, 5333989, 5333990, 5333991, 5333992, 5333993, 5333994 } },
+            { fid = { 5333996, 5333997, 5333998, 5333999, 5334000, 5334001, 5334002, 5334003, 5334004, 5334005, 5334006, 5334007 } },
+            { fid = { 5334009, 5334010, 5334011, 5334012, 5334013, 5334014, 5334015, 5334016, 5334017, 5334018, 5334019, 5334020 } },
+            { fid = { 5334037, 5334038, 5334040, 5334041, 5334043, 5334044, 5334046, 5334047, 5334049, 5334050, 5334052, 5334053 } },
+          } },
+      },
+      floors = {
+        { fid = { 449760, 449764, 449765, 449766, 449767, 449768, 449769, 449770, 449771, 449761, 449762, 449763 } },
+        { fid = { 449772, 449776, 449777, 449778, 449779, 449780, 449781, 449782, 449783, 449773, 449774, 449775 } },
+        { fid = { 449784, 449788, 449789, 449790, 449791, 449792, 449793, 449794, 449795, 449785, 449786, 449787 } },
+        { fid = { 449796, 449800, 449801, 449802, 449803, 449804, 449805, 449806, 449807, 449797, 449798, 449799 } },
+      },
+    },
+    ["Scarlet Monastery - Library"] = {
+      folder = "ScarletMonastery",
+      note = "shared by the four wings, the floor to wing assignment is not in the file names",
       alt = {
         { folder = "ScarletMonasteryOld", floors = {
             { fid = { 5333983, 5333984, 5333985, 5333986, 5333987, 5333988, 5333989, 5333990, 5333991, 5333992, 5333993, 5333994 } },
@@ -425,15 +483,21 @@ ns.Data.DungeonAssets = {
       ["Overlord Ramtusk"] = 607736,
       ["Roogug"] = 607760,
     },
-    ["Scarlet Monastery"] = {
-      ["Arcanist Doan"] = 607545,
-      ["Bloodmage Thalnos"] = 607557,
+    ["Scarlet Monastery - Armory"] = {
       ["Herod"] = 607640,
+    },
+    ["Scarlet Monastery - Cathedral"] = {
       ["High Inquisitor Fairbanks"] = 607642,
       ["High Inquisitor Whitemane"] = 607643,
-      ["Houndmaster Loksey"] = 607648,
-      ["Interrogator Vishas"] = 607662,
       ["Scarlet Commander Mograine"] = 607764,
+    },
+    ["Scarlet Monastery - Graveyard"] = {
+      ["Bloodmage Thalnos"] = 607557,
+      ["Interrogator Vishas"] = 607662,
+    },
+    ["Scarlet Monastery - Library"] = {
+      ["Arcanist Doan"] = 607545,
+      ["Houndmaster Loksey"] = 607648,
     },
     ["Scholomance"] = {
       ["Darkmaster Gandling"] = 607582,

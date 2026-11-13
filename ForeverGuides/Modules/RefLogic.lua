@@ -467,12 +467,14 @@ function R.MergedQuests(inst)
   return out
 end
 
--- Named quests of an instance for the faction (merged, see R.MergedQuests), sorted by level then name.
+-- Named direct quests of an instance for the faction (merged, see R.MergedQuests), sorted by level then name.
+-- A chain link (direct = false, a quest the server does not tag as dungeon or raid quest) only shows up in the
+-- chains.
 function R.Quests(inst, faction)
   local out = {}
   for _, q in ipairs(R.MergedQuests(inst)) do
     -- A step known only by its ID (a quest of a chain, not named in the data) is no row of the list.
-    if q.n and factionOk(q.f, faction) then
+    if q.n and q.direct ~= false and factionOk(q.f, faction) then
       out[#out + 1] = q
     end
   end

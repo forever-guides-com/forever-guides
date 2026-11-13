@@ -1,12 +1,13 @@
--- Detail panel of the quests tab, right of the list of Modules/QuestChainView.lua: the fields of one quest
--- (levels, faction, giver with map buttons, hand-in, prerequisites and follow-ups as links, rewards with item
--- tooltips, experience, money) and the button that opens the share dialog. A field the data does not have is left
+-- Detail panel of the quests tab, right of the list of Modules/QuestChainView.lua, built like the quest log: title
+-- with the quest icon, objectives, description, rewards (choice and fixed items as tiles in two columns, then
+-- experience and money), then the fields of the quest (giver with map buttons, hand-in, prerequisites and
+-- follow-ups as links, the other wings that list it) and the button that opens the share dialog. A field the data does not have is left
 -- out, nothing is guessed. Description and goal come from Modules/QuestText.lua; for a quest in the own quest
 -- log the goal also lists the objective lines of the client.
 -- Nothing is sent from here: the share dialog sends after its own click, and the quest log call that pushes a
 -- quest to the group is never used (docs/TAINT-AUDIT.md).
 local _, ns = ...
-local W, L, Theme, QW, IV = ns.W, ns.L, ns.Theme, ns.QuestChainWindow, ns.InstanceView
+local W, L, Theme, QW, IV, QL = ns.W, ns.L, ns.Theme, ns.QuestChainWindow, ns.InstanceView, ns.QuestListLogic
 
 ns.AddLocale("enUS", {
   ["questpanel.start"] = "Starts at",
@@ -18,7 +19,11 @@ ns.AddLocale("enUS", {
   ["questpanel.chain"] = "Chain",
   ["questpanel.goal"] = "Goal",
   ["questpanel.desc"] = "Description",
-  ["questpanel.reward"] = "Reward",
+  ["questpanel.reward"] = "Rewards",
+  ["questpanel.rewardChoice"] = "You will be able to choose one of these rewards:",
+  ["questpanel.rewardFixed"] = "You will also receive:",
+  ["questpanel.also"] = "Also in",
+  ["questpanel.alsoTip"] = "Opens the quests of this wing.",
   ["questpanel.empty"] = "Pick a quest from the list.",
   ["questpanel.shareTip"] = "Opens the share dialog.\nNothing is sent before you click Send.",
   ["questpanel.linkSelect"] = "Shows this quest in the list.",
@@ -40,7 +45,11 @@ ns.AddLocale("deDE", {
   ["questpanel.chain"] = "Reihe",
   ["questpanel.goal"] = "Ziel",
   ["questpanel.desc"] = "Beschreibung",
-  ["questpanel.reward"] = "Belohnung",
+  ["questpanel.reward"] = "Belohnungen",
+  ["questpanel.rewardChoice"] = "Auf Euch wartet eine dieser Belohnungen:",
+  ["questpanel.rewardFixed"] = "Ihr bekommt außerdem:",
+  ["questpanel.also"] = "Auch in",
+  ["questpanel.alsoTip"] = "Öffnet die Quests dieses Flügels.",
   ["questpanel.empty"] = "Wähle eine Quest aus der Liste.",
   ["questpanel.shareTip"] = "Öffnet den Teilen-Dialog.\nGesendet wird erst nach Klick auf Senden.",
   ["questpanel.linkSelect"] = "Zeigt diese Quest in der Liste.",
@@ -58,6 +67,9 @@ ns.InstanceQuestPanel = P
 local PAD, GAP, ROW_GAP = 12, 8, 6
 local ICON = 24
 local BUTTON_H = 24
+-- Narrowest tile of the reward grid: icon plus a short name.
+local TILE_MIN = 120
+local QUEST_ICON = "Interface\\GossipFrame\\AvailableQuestIcon"
 
 local function ceil(fs)
   return math.ceil(fs:GetStringHeight())
@@ -229,22 +241,19 @@ local function makeReward(panel)
   return row
 end
 
-local function paintReward(row, r)
-  row.reward = r
-  row.itemName = IV.ItemName({ id = r.id, name = r.n })
-  row.quality = r.id and IV.ItemQuality(r.id) or nil
-  local label = row.itemName
-  if r.c and r.c > 1 then
-    label = r.c .. "x " .. label
-  end
-  local text = ns.ItemInfo.ColorName(label, row.quality)
-  if r.ch then
-    text = text .. "  " .. Theme.hexText("textSecondary", "(" .. L["instances.quest.choice"] .. ")")
+-- tile: a tile of QL.Rewards ({ id, name, count, choice }).
+local function paintReward(row, tile)
+  row.reward = tile
+  row.itemName = tile.name
+  row.quality = tile.id and IV.ItemQuality(tile.id) or nil
+  local label = tile.count and (tile.count .. "x " .. tile.name) or tile.name
+  -- The group heading says "choice", the keyboard name carries it too.
+  row.text:SetText(ns.ItemInfo.ColorName(label, row.quality))
+  if tile.choice then
     label = label .. " (" .. L["instances.quest.choice"] .. ")"
   end
   row.label = label
-  row.text:SetText(text)
-  row.icon:SetTexture(IV.ItemIcon(r.id))
+  row.icon:SetTexture(IV.ItemIcon(tile.id))
 end
 
 -- Panel -------------------------------------------------------------------------------------------------
@@ -294,6 +303,34 @@ local function makeLink(panel)
   return b
 end
 
+-- One button of the "Also in" field: opens the quests of another wing that lists the quest.
+local function makeAlso(panel)
+  local b
+  b = W.Action(panel, {
+    text = "",
+    variant = "secondary",
+    height = BUTTON_H,
+    wrap = "questpanel-also",
+    onClick = function()
+      if b.inst then
+        ns.Router:navigate("instances/" .. ns.RefLogic.InstanceSlug(b.inst) .. "/quests")
+      end
+    end,
+  })
+  b.fgName = function()
+    return b.inst and name(b.inst) or nil
+  end
+  bindTip(b, {
+    title = function()
+      return b.inst and name(b.inst) or ""
+    end,
+    text = function()
+      return L["questpanel.alsoTip"]
+    end,
+  })
+  return b
+end
+
 local function pooled(panel, pool, index, make)
   local item = pool[index]
   if not item then
@@ -310,9 +347,13 @@ end
 function P.Create(parent)
   local panel = CreateFrame("Frame", nil, parent)
   W.Fill(panel, "surface", 1)
-  panel.pre, panel.nxt, panel.rewards = {}, {}, {}
+  panel.pre, panel.nxt, panel.also, panel.rewards = {}, {}, {}, {}
+  panel.nChoice, panel.nTiles = 0, 0
 
   panel.empty = W.Text(panel, { key = "questpanel.empty", role = "ui", color = "textSecondary", wrap = true })
+  panel.icon = panel:CreateTexture(nil, "ARTWORK")
+  panel.icon:SetSize(ICON, ICON)
+  panel.icon:SetTexture(QUEST_ICON)
   panel.title = W.Text(panel, { role = "h3", color = "text", wrap = true })
   panel.sub = W.Text(panel, { role = "ui", color = "textSecondary", wrap = true })
   panel.weak = W.Text(panel, { role = "ui", color = "warning", wrap = true })
@@ -347,10 +388,18 @@ function P.Create(parent)
     pre = label("questpanel.pre"),
     next = label("questpanel.next"),
     chain = label("questpanel.chain"),
-    goal = label("questpanel.goal"),
+    also = label("questpanel.also"),
     desc = label("questpanel.desc"),
     reward = label("questpanel.reward"),
+    rewardChoice = label("questpanel.rewardChoice"),
+    rewardFixed = label("questpanel.rewardFixed"),
   }
+  for _, key in ipairs({ "desc", "reward" }) do
+    W.SetColor(panel.labels[key], "accent2")
+  end
+  for _, key in ipairs({ "rewardChoice", "rewardFixed" }) do
+    W.SetColor(panel.labels[key], "text")
+  end
   panel.values = { start = value(), finish = value(), goal = value(), desc = value(), reward = value() }
   panel.places = W.MapActionButtons(panel)
   panel.chainButton = W.Action(panel, {
@@ -382,7 +431,7 @@ function P.Create(parent)
 
   function panel:Stops()
     local out = { self.share, self.places.map, self.places.marker, self.chainButton }
-    for _, pool in ipairs({ self.pre, self.nxt, self.rewards }) do
+    for _, pool in ipairs({ self.pre, self.nxt, self.also, self.rewards }) do
       for _, item in ipairs(pool) do
         out[#out + 1] = item
       end
@@ -438,6 +487,7 @@ function P.Create(parent)
   function panel:SetQuest(entry, ctx)
     self.entry, self.ctx = entry, ctx
     local own = {
+      self.icon,
       self.title,
       self.sub,
       self.weak,
@@ -458,6 +508,10 @@ function P.Create(parent)
     if not entry then
       paintLinks(self.pre, {})
       paintLinks(self.nxt, {})
+      for i = 1, #self.also do
+        self.also[i].inst = nil
+        self.also[i]:Hide()
+      end
       for i = 1, #self.rewards do
         self.rewards[i].reward = nil
         self.rewards[i]:Hide()
@@ -491,15 +545,23 @@ function P.Create(parent)
     paintLinks(self.pre, pre)
     paintLinks(self.nxt, nxt)
     self.shown.pre, self.shown.next = #pre > 0, #nxt > 0
+    local also = ctx.also or {}
+    for i, other in ipairs(also) do
+      local b = pooled(panel, self.also, i, makeAlso)
+      b.inst = other
+      W.SetText(b.label, nil, name(other) or "?")
+      b:Show()
+    end
+    for i = #also + 1, #self.also do
+      self.also[i].inst = nil
+      self.also[i]:Hide()
+    end
+    self.shown.also = #also > 0
 
     local steps = ctx.chainLength or 1
     self.shown.chain = steps > 1
     if self.shown.chain then
-      W.SetText(
-        self.chainButton.label,
-        nil,
-        string.format(L["questchain.chainLen"]:gsub("^%l", string.upper), steps)
-      )
+      W.SetText(self.chainButton.label, nil, string.format(L["questchain.chainLen"]:gsub("^%l", string.upper), steps))
     end
 
     local desc, goal = ns.QuestText.Get(q.id)
@@ -513,17 +575,28 @@ function P.Create(parent)
 
     local pay = payText(entry)
     self.values.reward:SetText(pay or "")
-    local rewards = type(q.rw) == "table" and q.rw or {}
-    for i, r in ipairs(rewards) do
+    local model = QL.Rewards(q, function(id, stored)
+      return IV.ItemName({ id = id, name = stored })
+    end)
+    local tiles = {}
+    for _, tile in ipairs(model.choice) do
+      tiles[#tiles + 1] = tile
+    end
+    for _, tile in ipairs(model.fixed) do
+      tiles[#tiles + 1] = tile
+    end
+    for i, tile in ipairs(tiles) do
       local row = pooled(panel, self.rewards, i, makeReward)
-      paintReward(row, r)
+      paintReward(row, tile)
       row:Show()
     end
-    for i = #rewards + 1, #self.rewards do
+    for i = #tiles + 1, #self.rewards do
       self.rewards[i].reward = nil
       self.rewards[i]:Hide()
     end
-    self.shown.reward = pay ~= nil or #rewards > 0
+    self.nChoice, self.nTiles = #model.choice, #tiles
+    self.shown.rewardChoice, self.shown.rewardFixed = #model.choice > 0, #model.fixed > 0
+    self.shown.reward = pay ~= nil or #tiles > 0
     self.shown.pay = pay ~= nil
     self:SyncFocusOrder()
   end
@@ -554,6 +627,9 @@ function P.Create(parent)
     return cy + BUTTON_H
   end
 
+  -- Fields with a label left of the content, in contrast to the headings above them.
+  local FACTS = { "start", "finish", "pre", "next", "chain", "also" }
+
   function panel:fgGridLayout(width)
     local inner = math.max(60, width - 2 * PAD)
     if not self.entry then
@@ -566,8 +642,10 @@ function P.Create(parent)
     self.share:SetWidth(shareW)
     self.share:ClearAllPoints()
     self.share:SetPoint("TOPRIGHT", self, "TOPRIGHT", -PAD, -PAD)
-    local titleW = math.max(60, inner - shareW - GAP)
-    at(self.title, PAD, PAD, titleW)
+    self.icon:ClearAllPoints()
+    self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -PAD)
+    local titleW = math.max(60, inner - ICON - GAP - shareW - GAP)
+    at(self.title, PAD + ICON + GAP, PAD, titleW)
     local y = PAD + math.max(ceil(self.title), BUTTON_H) + 4
     at(self.sub, PAD, y, inner)
     y = y + ceil(self.sub) + 2
@@ -577,33 +655,73 @@ function P.Create(parent)
     end
     y = y + ROW_GAP
 
-    local shown = self.shown
-    -- Description and goal are long text: the label sits above it and the text takes the full width.
-    for _, key in ipairs({ "desc", "goal" }) do
-      local l, v = self.labels[key], self.values[key]
+    local shown, labels, values = self.shown, self.labels, self.values
+    for key, l in pairs(labels) do
       l:SetShown(shown[key] == true)
-      v:SetShown(shown[key] == true)
-      if shown[key] then
-        at(l, PAD, y, inner)
-        y = y + ceil(l) + 2
-        at(v, PAD, y, inner)
-        y = y + ceil(v) + ROW_GAP
-      end
     end
-    local labelW = 0
-    for key, l in pairs(self.labels) do
-      if key ~= "desc" and key ~= "goal" then
-        l:SetShown(shown[key] == true)
+    values.goal:SetShown(shown.goal == true)
+    values.desc:SetShown(shown.desc == true)
+    values.reward:SetShown(shown.pay == true)
+    values.finish:SetShown(shown.finish == true)
+    -- Objectives first, then the description under its heading.
+    if shown.goal then
+      at(values.goal, PAD, y, inner)
+      y = y + ceil(values.goal) + ROW_GAP
+    end
+    if shown.desc then
+      at(labels.desc, PAD, y, inner)
+      y = y + ceil(labels.desc) + 2
+      at(values.desc, PAD, y, inner)
+      y = y + ceil(values.desc) + ROW_GAP
+    end
+
+    -- Rewards: choice tiles, fixed tiles (two columns when the pane is wide enough), experience and money.
+    if shown.reward then
+      at(labels.reward, PAD, y, inner)
+      y = y + ceil(labels.reward) + 4
+      local cols = inner >= 2 * TILE_MIN + GAP and 2 or 1
+      local colW = cols == 2 and math.floor((inner - GAP) / 2) or inner
+      local function group(heading, from, to)
+        if to < from then
+          return
+        end
+        at(heading, PAD, y, inner)
+        y = y + ceil(heading) + 4
+        local rowH, col = 0, 0
+        for i = from, to do
+          local tile = self.rewards[i]
+          at(tile, PAD + col * (colW + GAP), y, colW)
+          local h = tile:fgLayout(colW)
+          tile:SetSize(colW, h)
+          rowH, col = math.max(rowH, h), col + 1
+          if col == cols then
+            y, rowH, col = y + rowH + 4, 0, 0
+          end
+        end
+        if col > 0 then
+          y = y + rowH + 4
+        end
       end
-      if shown[key] and key ~= "desc" and key ~= "goal" then
-        l:SetWidth(0)
-        labelW = math.max(labelW, math.ceil(l:GetStringWidth()))
+      group(labels.rewardChoice, 1, self.nChoice)
+      group(labels.rewardFixed, self.nChoice + 1, self.nTiles)
+      if shown.pay then
+        at(values.reward, PAD, y, inner)
+        y = y + ceil(values.reward) + 4
+      end
+      y = y + ROW_GAP - 4
+    end
+
+    local labelW = 0
+    for _, key in ipairs(FACTS) do
+      if shown[key] then
+        labels[key]:SetWidth(0)
+        labelW = math.max(labelW, math.ceil(labels[key]:GetStringWidth()))
       end
     end
     labelW = math.min(labelW, math.floor(inner * 0.4))
     local vx, vw = PAD + labelW + GAP, math.max(40, inner - labelW - GAP)
     local function head(key)
-      local l = self.labels[key]
+      local l = labels[key]
       l:SetWidth(labelW)
       at(l, PAD, y)
       return ceil(l)
@@ -611,7 +729,7 @@ function P.Create(parent)
 
     if shown.start then
       local h = head("start")
-      local text = self.values.start
+      local text = values.start
       text:SetShown(text:GetText() ~= "")
       local vh = 0
       if text:IsShown() then
@@ -626,11 +744,10 @@ function P.Create(parent)
     end
     if shown.finish then
       local h = head("finish")
-      at(self.values.finish, vx, y, vw)
-      y = y + math.max(h, ceil(self.values.finish)) + ROW_GAP
+      at(values.finish, vx, y, vw)
+      y = y + math.max(h, ceil(values.finish)) + ROW_GAP
     end
-    self.values.finish:SetShown(shown.finish == true)
-    for _, field in ipairs({ { "pre", self.pre }, { "next", self.nxt } }) do
+    for _, field in ipairs({ { "pre", self.pre }, { "next", self.nxt }, { "also", self.also } }) do
       if shown[field[1]] then
         local h = head(field[1])
         y = y + math.max(h, flow(field[2], vx, y, vw)) + ROW_GAP
@@ -643,24 +760,6 @@ function P.Create(parent)
       self.chainButton:SetWidth(w)
       at(self.chainButton, vx, y)
       y = y + math.max(h, BUTTON_H) + ROW_GAP
-    end
-    self.values.reward:SetShown(shown.pay == true)
-    if shown.reward then
-      local h = head("reward")
-      local vh = 0
-      if shown.pay then
-        at(self.values.reward, vx, y, vw)
-        vh = ceil(self.values.reward) + 4
-      end
-      for _, row in ipairs(self.rewards) do
-        if row:IsShown() then
-          at(row, vx, y + vh, vw)
-          local rh = row:fgLayout(vw)
-          row:SetSize(vw, rh)
-          vh = vh + rh + 4
-        end
-      end
-      y = y + math.max(h, vh - 4) + ROW_GAP
     end
     local height = y - ROW_GAP + PAD
     self:SetHeight(height)

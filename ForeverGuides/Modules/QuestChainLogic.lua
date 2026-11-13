@@ -1,8 +1,9 @@
 -- Quest chains of the instances page, without any game API (the window is Modules/QuestChainWindow.lua,
 -- the list Modules/QuestChainView.lua). Quest fields read here: id, n, f ("A", "H", "B" or nil = both),
 -- l (quest level), rq or ml (minimum level), av (available from, chain aware), pre and nxt (quest ids),
--- pair (counterpart of the other faction), ch ({ line, i }), ac (access quest), direct (true or false),
--- sn and sz (giver and zone), m, x, y (giver place), xp, mo. Today's data has no `direct` and no `av`.
+-- pair (counterpart of the other faction), ch ({ line, i }), ac (access quest), dg (server tag 81 or 62 of a
+-- direct quest), direct (false for a chain link), sn and sz (giver and zone), m, x, y (giver place), xp, mo.
+-- Today's data has no `av`.
 local _, ns = ...
 
 local QC = {}
@@ -111,14 +112,16 @@ local function leadsOn(quests)
   return out
 end
 
--- Direct dungeon quest: the data says so (`direct`, also `ac` for an access quest); without the flag a
--- quest is direct unless it only leads on to another quest of the list (a prerequisite). The flag
--- replaces the rule as soon as the data carries it.
+-- Direct dungeon quest: the data says so (`dg` is the server tag 81 dungeon or 62 raid, `direct = false` marks
+-- a chain link, also `ac` for an access quest); without the flag a quest is direct unless it only leads on to
+-- another quest of the list (a prerequisite). The flag replaces the rule as soon as the data carries it.
 function QC.IsDirect(q, leads)
-  if q.direct == true or q.ac == true then
+  if q.dg then
     return true
   elseif q.direct == false then
     return false
+  elseif q.direct == true or q.ac == true then
+    return true
   end
   return not (leads and leads[q.id or 0])
 end
@@ -388,7 +391,8 @@ function QC.Reference(inst, byId, id)
   return {
     id = id,
     name = (name and name ~= "") and name or ("#" .. id),
-    kind = hit.inst == inst and "select" or "open",
+    -- A chain link (direct = false) is no row of the list, so it opens its chain window like a quest of another instance.
+    kind = hit.inst == inst and hit.quest.direct ~= false and "select" or "open",
     quest = hit.quest,
     inst = hit.inst,
   }

@@ -37,6 +37,7 @@ ns.AddLocale("enUS", {
   ["instances.bosses.count.other"] = "%d bosses",
   ["instances.bosses.names"] = "Some boss names exist in one language only.",
   ["instances.quests.none"] = "No quests recorded for this instance. That does not mean it has none.",
+  ["instances.quests.noneDirect"] = "No instance quests known.",
   ["instances.quests.noneFaction"] = "No quests in the data for this faction.",
   ["instances.quest.head"] = "%s (quest level %s, from level %s)",
   ["instances.quest.start"] = "Starts at: %s",
@@ -91,6 +92,7 @@ ns.AddLocale("deDE", {
   ["instances.bosses.count.other"] = "%d Bosse",
   ["instances.bosses.names"] = "Einige Bossnamen nur in einer Sprache vorhanden.",
   ["instances.quests.none"] = "Für diese Instanz sind keine Quests erfasst. Das heißt nicht, dass es keine gibt.",
+  ["instances.quests.noneDirect"] = "Keine Instanz-Quests bekannt.",
   ["instances.quests.noneFaction"] = "Keine Quests für diese Fraktion in den Daten.",
   ["instances.quest.head"] = "%s (Quest-Stufe %s, ab Stufe %s)",
   ["instances.quest.start"] = "Beginnt bei: %s",
@@ -219,10 +221,19 @@ function ns.InstanceBossText(inst)
   return table.concat(lines, "\n")
 end
 
+-- Text of an empty quest list: the faction note only when the other faction has direct quests, a neutral text
+-- when the instance has only chain links.
+local function emptyQuestText(inst)
+  if #(inst.q or {}) == 0 then
+    return L["instances.quests.none"]
+  end
+  return L[#R.Quests(inst, nil) == 0 and "instances.quests.noneDirect" or "instances.quests.noneFaction"]
+end
+
 function ns.InstanceQuestText(inst, faction)
   local quests = R.Quests(inst, faction)
   if #quests == 0 then
-    return L[#(inst.q or {}) == 0 and "instances.quests.none" or "instances.quests.noneFaction"]
+    return emptyQuestText(inst)
   end
   local byId = {}
   for _, q in ipairs(inst.q) do
@@ -263,9 +274,10 @@ local function build(container)
     return choice ~= "all" and choice or nil
   end
 
-  ns.AddParagraph(view, "instances.intro", { role = "micro", gap = 6 })
+  -- The intro and the reset row belong to the cards; the detail level has the reset beside its back button.
+  local intro = ns.AddParagraph(view, "instances.intro", { role = "micro", gap = 6 })
 
-  -- The reset of the instances (chat command of the game) is for both levels.
+  -- The reset of the instances (chat command of the game).
   local resetRow = CreateFrame("Frame", nil, view.content)
   local resetBtn = ns.InstanceReset.Button(resetRow)
   resetBtn:SetPoint("TOPLEFT")
@@ -317,7 +329,31 @@ local function build(container)
       ns.Router:navigate("instances")
     end,
   })
-  s:Add(back, { width = 220, height = 26, gap = 8 })
+  local detailReset = ns.InstanceReset.Button(view.content)
+  detailReset:SetVariant("ghost")
+  -- Back and reset share one row, the reset wraps below the back button when the row is too narrow.
+  local backRow = CreateFrame("Frame", nil, view.content)
+  back:SetParent(backRow)
+  detailReset:SetParent(backRow)
+  function backRow:fgGridLayout(width)
+    local gap = 8
+    local bw, rw = back:Fit(width), detailReset:Fit(width)
+    back:SetWidth(bw)
+    detailReset:SetWidth(rw)
+    back:ClearAllPoints()
+    back:SetPoint("TOPLEFT")
+    detailReset:ClearAllPoints()
+    local h = math.max(back:GetHeight(), detailReset:GetHeight())
+    if bw + gap + rw <= width then
+      detailReset:SetPoint("TOPLEFT", back, "TOPRIGHT", gap, 0)
+    else
+      detailReset:SetPoint("TOPLEFT", back, "BOTTOMLEFT", 0, -gap)
+      h = back:GetHeight() + gap + detailReset:GetHeight()
+    end
+    self:SetHeight(h)
+    return h
+  end
+  s:Add(backRow, { gap = 8 })
 
   local header = IV.Header(view.content)
   K.Anchor("FG.Instances.Detail", header)
@@ -430,7 +466,9 @@ local function build(container)
   function showSections(stacked)
     local inst = state.inst
     cards:SetShown(inst == nil)
-    back:SetShown(inst ~= nil)
+    intro:SetShown(inst == nil)
+    resetRow:SetShown(inst == nil)
+    backRow:SetShown(inst ~= nil)
     header:SetShown(inst ~= nil)
     for _, sec in ipairs(order) do
       local on = inst ~= nil and (stacked or state.dtab == sec.id)
@@ -478,7 +516,7 @@ local function build(container)
       if dataStatus ~= DA.STATUS.ok then
         questNote:SetText(DA.Hint(dataStatus))
       else
-        questNote:SetText(L[#(inst.q or {}) == 0 and "instances.quests.none" or "instances.quests.noneFaction"])
+        questNote:SetText(emptyQuestText(inst))
       end
       questNote.fgOn = questList.count == 0
       access:SetInstance(inst, choice)
@@ -550,19 +588,30 @@ local function build(container)
     local slug = currentSlug()
     local changed = slug ~= nil and slug ~= hereSlug
     hereSlug = slug
+    if slug ~= state.overviewFor then
+      state.overviewFor = nil
+    end
     if changed and view.area:IsVisible() and selectCurrent() then
       showState()
     end
   end)
 
-  -- Leaving the page forgets the choice, so the next opening starts at the current instance again.
-  view.area:HookScript("OnHide", function()
-    state.slug = nil
+  -- onPage: the page was shown and neither another page nor a closed window came since. The container is hidden
+  -- and shown again on every route change, so OnHide cannot tell a new opening from a move inside the page.
+  local function leavePage()
+    state.onPage, state.overviewFor = false, nil
+  end
+  ns.On("FG_MAIN_HIDDEN", leavePage)
+  ns.On("FG_ROUTE_CHANGED", function(_, _, pageId)
+    if pageId ~= "instances" then
+      leavePage()
+    end
   end)
 
   -- A slug (and a tab) of the route: that instance, an unknown slug shows the cards. No slug: the instance the
-  -- player stands in, else the cards. Coming from an open instance (back button, back key, breadcrumb) always
-  -- shows the cards, so the way back is never undone.
+  -- player stands in, else the cards. An explicit move to "instances" from inside the page (back button, back
+  -- key, breadcrumb, sidebar) always shows the cards and keeps the current instance from opening again until
+  -- the player enters another one or opens the page anew.
   function view:Show(params)
     hereSlug = currentSlug()
     local inst = params and params[1] and R.FindInstance(params[1]) or nil
@@ -571,9 +620,16 @@ local function build(container)
     if inst then
       state.slug = R.InstanceSlug(inst)
     else
-      local leaving = state.slug ~= nil and ns.Router.current == "instances"
+      local bare = not (params and params[1])
+      local leaving = bare and state.onPage and ns.Router.current == "instances"
+      if leaving then
+        state.overviewFor = currentSlug()
+      elseif not state.onPage then
+        state.overviewFor = nil
+      end
+      local muted = state.overviewFor ~= nil and state.overviewFor == currentSlug()
       -- The boss tab of the instance the player stands in, unless the route names another tab.
-      local picked = not (params and params[1]) and not leaving and selectCurrent()
+      local picked = bare and not leaving and not muted and selectCurrent()
       if not picked then
         state.slug = nil
       end
@@ -581,6 +637,7 @@ local function build(container)
     if VALID_TAB[tab] then
       state.dtab = tab
     end
+    state.onPage = true
     showState()
   end
   return view

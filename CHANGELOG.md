@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.7.6
+
+### Added
+
+- Instances: The quests of an instance look like the quest log, with the list on the left and details on the right, rewards shown as tiles with tooltips.
+- Instances: Scarlet Monastery is split into Graveyard, Library, Armory and Cathedral, each wing with its own bosses and quests.
+- Instances: 13 more dungeon quests, among them in Gnomeregan, Uldaman, Blackrock Depths, Dire Maul and Scholomance.
+- Instances: A quest that needs several wings names the other wings, and one click switches there.
+- Quests: Titles, objectives and many descriptions appear in German in the German game.
+
+### Changed
+
+- Instances: The quest list shows only real dungeon and raid quests, and prequests are in the quest chain window.
+- Instances: Gold, experience and item rewards match the game.
+- Instances: The quests in Dire Maul and Blackrock Spire are listed under the right wing.
+- Instances page: Back always leads to the overview, reset sits beside "All instances", the detail page has no intro, and the level filter is clearer.
+
+### Removed
+
+- Instances: Quests the game no longer offers are removed from the lists.
+
 ## 0.7.5
 
 ### Added

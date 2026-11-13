@@ -66,12 +66,14 @@ end
 local function field(id, key)
   local all = rawget(ns, "InstanceQuestTexts")
   local row = type(all) == "table" and type(id) == "number" and all[id] or nil
-  local text = type(row) == "table" and ns.T(row[key]) or nil
+  local texts = type(row) == "table" and row[key] or nil
+  -- A German-only text never reaches a non-German client.
+  local text = type(texts) == "table" and (ns.GetActiveLocale() == "deDE" and (texts.de or texts.en) or texts.en) or nil
   return type(text) == "string" and text ~= "" and text or nil
 end
 
--- Description and goal of a quest in the language of the client (English when there is no translation), each
--- nil when the data has none. Needs the data add-on loaded (Modules/InstanceDataAccess.lua does that).
+-- Description and goal of a quest in the language of the client (English when there is no translation; a text
+-- that exists in German only shows on a German client), each nil when there is none. Needs the data add-on loaded (Modules/InstanceDataAccess.lua does that).
 function QT.Get(id, who)
   who = who or QT.Player()
   return QT.Fill(field(id, "d"), who), QT.Fill(field(id, "o"), who)

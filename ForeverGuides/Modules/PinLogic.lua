@@ -41,7 +41,9 @@ end
 -- Instances and bosses ----------------------------------------------------------------------
 
 -- Ordered bosses of an instance from Data.Instances, matched by instance id (number) or English name.
--- Returns { { idx, name = { en, de }, eid, npc, opt } } and the instance entry.
+-- Wings share one instance id (Scarlet Monastery, Dire Maul, Blackrock Spire): an id gives the bosses of all
+-- wings in data order, so a kill inside the dungeon finds its boss whichever wing it belongs to.
+-- Returns { { idx, name = { en, de }, eid, npc, opt } } and the first matching instance entry.
 function P.BossList(instKey)
   local out, found = {}, nil
   for _, inst in ipairs(data().Instances or {}) do
@@ -49,13 +51,16 @@ function P.BossList(instKey)
       (type(instKey) == "number" and inst.id == instKey)
       or (type(instKey) == "string" and inst.n and inst.n.en == instKey)
     then
-      found = inst
-      break
+      found = found or inst
+      for _, b in ipairs(inst.bo or {}) do
+        local n = b.n or {}
+        out[#out + 1] =
+          { idx = #out + 1, name = { en = n.en or n.de, de = n.de or n.en }, eid = b.eid, npc = b.npc, opt = b.opt }
+      end
+      if type(instKey) ~= "number" then
+        break
+      end
     end
-  end
-  for i, b in ipairs(found and found.bo or {}) do
-    local n = b.n or {}
-    out[i] = { idx = i, name = { en = n.en or n.de, de = n.de or n.en }, eid = b.eid, npc = b.npc, opt = b.opt }
   end
   return out, found
 end

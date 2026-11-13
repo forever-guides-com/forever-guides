@@ -1079,7 +1079,10 @@ S.RegisterSource("quest", function(add)
   end
   eachInstance(function(i, slug)
     for _, quest in ipairs(i.q or {}) do
-      add(quest.n, ns.T(i.n), "instances/" .. slug .. "/quests")
+      -- A chain link has no row in the quest list.
+      if quest.direct ~= false then
+        add(quest.n, ns.T(i.n), "instances/" .. slug .. "/quests")
+      end
     end
   end)
 end)

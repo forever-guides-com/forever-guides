@@ -14,7 +14,8 @@ ns.AddLocale("enUS", {
   ["instances.card.kind.all"] = "All",
   ["instances.card.kind.dungeon"] = "Dungeons",
   ["instances.card.kind.raid"] = "Raids",
-  ["instances.card.levelBox"] = "Level",
+  ["instances.card.levelBox"] = "Filter by level",
+  ["instances.card.levelBox.ph"] = "e.g. 25",
   ["instances.card.levelBox.tip"] = "Shows the instances that cover this level.",
   ["instances.card.onlyFav"] = "Favorites only",
   ["instances.card.favFirst"] = "Favorites first",
@@ -31,7 +32,8 @@ ns.AddLocale("deDE", {
   ["instances.card.kind.all"] = "Alle",
   ["instances.card.kind.dungeon"] = "Dungeons",
   ["instances.card.kind.raid"] = "Raids",
-  ["instances.card.levelBox"] = "Stufe",
+  ["instances.card.levelBox"] = "Stufe filtern",
+  ["instances.card.levelBox.ph"] = "z.B. 25",
   ["instances.card.levelBox.tip"] = "Zeigt die Instanzen, die diese Stufe abdecken.",
   ["instances.card.onlyFav"] = "Nur Favoriten",
   ["instances.card.favFirst"] = "Favoriten zuerst",
@@ -371,13 +373,27 @@ local function buildBar(self)
   })
   self.levelLabel = W.Text(bar, { key = "instances.card.levelBox", role = "ui", color = "textSecondary" })
   self.levelBox = W.EditBox(bar, {
-    placeholder = "instances.card.levelBox.tip",
+    placeholder = "instances.card.levelBox.ph",
+    tooltip = "instances.card.levelBox",
+    tooltipText = "instances.card.levelBox.tip",
     maxLetters = 2,
+    clear = true,
     onChange = function(text)
       f.level = IL.ParseLevel(text)
       changed()
     end,
   })
+  self.levelBox.fgName = function()
+    return L["instances.card.levelBox.tip"]
+  end
+  if self.levelBox.edit.SetNumeric then
+    self.levelBox.edit:SetNumeric(true)
+  end
+  -- The clear button sets the text from code, which does not report a change.
+  self.levelBox.clearButton:HookScript("OnClick", function()
+    f.level = nil
+    changed()
+  end)
   self.faction = K.FactionButtons(bar, {
     withAll = true,
     get = function()
@@ -453,8 +469,9 @@ local function layoutBar(self, width)
   pair(self.sortLabel, self.sortToggle, self.sortToggle:GetWidth(), self.sortToggle:GetHeight())
   newRow()
   put(self.kindToggle, self.kindToggle:GetWidth(), self.kindToggle:GetHeight())
-  self.levelBox:SetWidth(52)
-  pair(self.levelLabel, self.levelBox, 52, boxH)
+  local levelW = 84
+  self.levelBox:SetWidth(levelW)
+  pair(self.levelLabel, self.levelBox, levelW, boxH)
   newRow()
   self.faction:SetWidth(width)
   local fh = self.faction:fgGridLayout(width)

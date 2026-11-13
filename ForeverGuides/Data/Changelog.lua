@@ -5,6 +5,27 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.6",
+      highlights = {
+        { head = { de = "Quests wie im Questlog", en = "Quests like the quest log" }, text = { de = "Links die Instanz-Quests, rechts Ziel, Beschreibung und Belohnungen mit Gegenständen, EP und Gold.", en = "Instance quests on the left, objective, description and rewards with items, XP and gold on the right." }, go = "instances" },
+        { head = { de = "Scharlachrotes Kloster in Flügeln", en = "Scarlet Monastery by wing" }, text = { de = "Friedhof, Bibliothek, Waffenkammer und Kathedrale haben eigene Karten mit Bossen und Quests.", en = "Graveyard, Library, Armory and Cathedral each have their own card with bosses and quests." }, go = "instances" },
+        { head = { de = "Questtexte auf Deutsch", en = "Quest texts in German" }, text = { de = "Titel, Ziele und viele Beschreibungen der Instanz-Quests erscheinen im deutschen Spiel auf Deutsch.", en = "Titles, objectives and many descriptions of instance quests appear in German in the German game." }, go = "instances" },
+      },
+      added = {
+        { de = "Instanzen: Die Quests einer Instanz erscheinen wie im Questlog, links die Liste, rechts die Details mit Belohnungen als Kacheln samt Tooltip.", en = "Instances: The quests of an instance look like the quest log, with the list on the left and details on the right, rewards shown as tiles with tooltips.", go = "instances" },
+        { de = "Instanzen: Das Scharlachrote Kloster ist in Friedhof, Bibliothek, Waffenkammer und Kathedrale geteilt, jeder Flügel mit eigenen Bossen und Quests.", en = "Instances: Scarlet Monastery is split into Graveyard, Library, Armory and Cathedral, each wing with its own bosses and quests.", go = "instances" },
+        { de = "Instanzen: 13 weitere Dungeon-Quests, unter anderem in Gnomeregan, Uldaman, den Blackrocktiefen, Düsterbruch und Scholomance.", en = "Instances: 13 more dungeon quests, among them in Gnomeregan, Uldaman, Blackrock Depths, Dire Maul and Scholomance.", go = "instances" },
+        { de = "Instanzen: Eine Quest, die mehrere Flügel braucht, nennt die anderen Flügel, ein Klick wechselt dorthin.", en = "Instances: A quest that needs several wings names the other wings, and one click switches there.", go = "instances" },
+        { de = "Quests: Titel, Ziele und viele Beschreibungen erscheinen im deutschen Spiel auf Deutsch.", en = "Quests: Titles, objectives and many descriptions appear in German in the German game.", go = "instances" },
+      },
+      changed = {
+        { de = "Instanzen: Die Quest-Liste zeigt nur echte Dungeon- und Schlachtzug-Quests, Vorquests stehen im Fenster der Questreihe.", en = "Instances: The quest list shows only real dungeon and raid quests, and prequests are in the quest chain window.", go = "instances" },
+        { de = "Instanzen: Gold, Erfahrung und Gegenstände der Belohnungen stimmen mit dem Spiel überein.", en = "Instances: Gold, experience and item rewards match the game.", go = "instances" },
+        { de = "Instanzen: Die Quests in Düsterbruch und der Schwarzfelsspitze stehen beim richtigen Flügel.", en = "Instances: The quests in Dire Maul and Blackrock Spire are listed under the right wing.", go = "instances" },
+        { de = "Instanzen-Seite: Zurück führt immer zur Übersicht, Zurücksetzen steht neben \"Alle Instanzen\", die Detailseite kommt ohne Einleitung aus und der Stufenfilter ist klarer.", en = "Instances page: Back always leads to the overview, reset sits beside \"All instances\", the detail page has no intro, and the level filter is clearer.", go = "instances" },
+      },
+    },
+    {
       version = "0.7.5",
       date = "2026-11-13",
       highlights = {
@@ -244,22 +265,6 @@ ns.Data.Changelog = {
         { de = "Gildenmanager: Der Lauf bleibt nicht mehr bei \"Wartet auf die Gildenliste\" stehen, er geht von selbst weiter, sobald die Liste frisch ist.", en = "Guild manager: the run no longer stops at waiting for the guild list, it goes on by itself once the list is fresh." },
         { de = "Fenster lösen beim Drücken von Esc im Kampf keine blockierte Aktion mehr aus, sie schließen nach dem Kampf.", en = "Windows no longer trigger a blocked action when you press Esc in combat, they close when the combat ends." },
         { de = "Spielermenü: Der Eintrag für die Gildeneinladung im Forever-Client löst keinen Fehler mehr aus, wenn das Spiel den Namen eines Spielers verbirgt.", en = "Player menu: the guild invite entry on the Forever client no longer raises an error when the game hides a player's name." },
-      },
-    },
-    {
-      version = "0.5.3",
-      date = "2026-11-06",
-      highlights = {
-        { head = { de = "Einladungen im Forever-Client", en = "Invites on the Forever client" }, text = { de = "Das Spiel nimmt Gildeneinladungen nur an, wenn du sie selbst eingibst, ein Feld liefert den Befehl.", en = "The game only takes a guild invite that you enter yourself, so a box gives you the command." } },
-        { head = { de = "Einladen aus dem Spielermenü", en = "Invite from the player menu" }, text = { de = "Ein neuer Eintrag öffnet das Feld mit dem Befehl, ein Schalter öffnet es bei jeder Anfrage.", en = "A new entry opens the box with the command, and a switch opens it for every request." } },
-        { head = { de = "Neuladen in Gruppen", en = "Reload in groups" }, text = { de = "Der Speichern-Knopf lädt jetzt auch aus der Nachfrage in einer Gruppe neu.", en = "The save button now reloads from the question that appears in a group." } },
-      },
-      changed = {
-        { de = "Einladungen per Flüstern: Im Forever-Client nimmt das Spiel eine Gildeneinladung nur an, wenn du sie selbst eingibst. Der Knopf öffnet ein Feld mit dem Befehl zum Kopieren, und der Chat nennt die Schritte.", en = "Whisper invites: on the Forever client the game only takes a guild invite that you enter yourself. The button opens a box with the command to copy, and the chat tells you the steps." },
-        { de = "Einladungen per Flüstern: Im Forever-Client bekommen die Spielermenüs einen Eintrag, der das Feld mit dem Befehl öffnet, und ein neuer Schalter öffnet es bei jeder Anfrage (standardmäßig aus).", en = "Whisper invites: on the Forever client the player menus get an entry that opens the box with the command, and a new switch opens that box at every request (off by default)." },
-      },
-      fixed = {
-        { de = "Speichern-Knopf: Das Neuladen funktioniert jetzt auch aus der Nachfrage in einer Gruppe, statt mit dem Hinweis zu enden, das Spiel habe es blockiert.", en = "Save button: the reload now works from the question that appears in a group, instead of ending in the notice that the game blocked it." },
       },
     },
   },
