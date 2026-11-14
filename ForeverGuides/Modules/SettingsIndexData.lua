@@ -154,6 +154,7 @@ ns.SettingsIndexData = {
       { key = "keys.name.scaleSnap", kind = "choice", id = "keys-scaleSnap", hint = "keys.desc.scaleSnap" },
       { key = "keys.name.listToEdge", kind = "choice", id = "keys-listToEdge", hint = "keys.desc.listToEdge" },
       { key = "keys.name.rosterNote", kind = "choice", id = "keys-rosterNote", hint = "keys.desc.rosterNote" },
+      { key = "keys.name.rareFoundMove", kind = "choice", id = "keys-rareFoundMove", hint = "keys.desc.rareFoundMove" },
       { key = "keys.set.resetAll", kind = "action", id = "keys-reset-all", tip = "keys.set.resetAllTip" },
     },
   },
@@ -266,6 +267,20 @@ ns.SettingsIndexData = {
       { key = "zcr.set.notify", kind = "toggle", id = "setting-zoneCrossNotify" },
       { key = "fp.set.listCount", kind = "slider", id = "setting-flightListCount" },
       { key = "fp.set.onlyKnown", kind = "toggle", id = "setting-flightListOnlyKnown" },
+    },
+  },
+  {
+    id = "map.rares", feature = "map", title = "rare.set.heading",
+    controls = {
+      { key = "rare.set.enabled", kind = "toggle", id = "setting-rares", tip = "rare.set.enabledTip" },
+      { key = "rare.set.map", kind = "toggle", id = "setting-rareMapPins" },
+      { key = "rare.set.minimap", kind = "toggle", id = "setting-rareMinimapPins" },
+      { key = "rare.set.alert", kind = "toggle", id = "setting-rareAlert", tip = "rare.set.alertTip" },
+      { key = "rare.set.sound", kind = "toggle", id = "setting-rareSound" },
+      { key = "rare.set.window", kind = "toggle", id = "setting-rareWindow", tip = "rare.set.windowTip" },
+      { key = "rare.set.windowReset", kind = "action", id = "button-rare-set-windowReset" },
+      { key = "rare.set.center", kind = "toggle", id = "setting-rareCenterText" },
+      { key = "rare.set.chat", kind = "toggle", id = "setting-rareChat" },
     },
   },
   {

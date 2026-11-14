@@ -64,11 +64,13 @@ ns.AddLocale("enUS", {
 
   -- Step world
   ["setup.step.world"] = "Map and game world",
-  ["setup.step.world.text"] = "Extra symbols, gathering spots, flight times and fishing help.",
+  ["setup.step.world.text"] = "Symbols, gathering spots, rare enemies, flights and fishing.",
   ["setup.feature.map.text"] = "Instances, flight points and zone arrows on the map.",
   ["setup.feature.gathering.text"] = "Ore and herbs on the map and the minimap.",
   ["setup.feature.flight.text"] = "Flight times at the flight master and as a timer.",
   ["setup.feature.fishing.text"] = "Fishing helper. Off takes effect after /reload.",
+  ["setup.feature.rares"] = "Rare enemy scanner",
+  ["setup.feature.rares.text"] = "Rare enemies on map and minimap, with an alert nearby.",
   ["setup.ctl.mapReveal"] = "Show all map areas in color",
   ["setup.ctl.mapRevealHint"] = "Off: only explored areas, the rest dark.",
   ["setup.ctl.sparklesHint"] = "Sets game graphics, off puts them back (restart ends it).",
@@ -185,11 +187,13 @@ ns.AddLocale("deDE", {
 
   -- Step world
   ["setup.step.world"] = "Karte und Spielwelt",
-  ["setup.step.world.text"] = "Zusatzsymbole, Sammelpunkte, Flugzeiten und Angelhilfe.",
+  ["setup.step.world.text"] = "Symbole, Sammelpunkte, seltene Gegner, Flüge und Angeln.",
   ["setup.feature.map.text"] = "Instanzen, Flugpunkte und Zonenpfeile auf der Karte.",
   ["setup.feature.gathering.text"] = "Erz und Kräuter auf Karte und Minimap.",
   ["setup.feature.flight.text"] = "Flugzeiten am Flugmeister und als Zeitanzeige.",
   ["setup.feature.fishing.text"] = "Hilfen zum Angeln. Aus wirkt nach /reload.",
+  ["setup.feature.rares"] = "Scanner für seltene Gegner",
+  ["setup.feature.rares.text"] = "Seltene Gegner auf Karte und Minimap, mit Fundhinweis.",
   ["setup.ctl.mapReveal"] = "Alle Kartengebiete in Farbe zeigen",
   ["setup.ctl.mapRevealHint"] = "Aus: nur erkundete Gebiete, der Rest dunkel.",
   ["setup.ctl.sparklesHint"] = "Setzt Spiel-Grafik, Aus stellt sie zurück (mit Neustart).",

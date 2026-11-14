@@ -4,6 +4,15 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.8.0] - 2026-11-14
+
+### Added
+
+- Rare enemies: Scanner for 486 rare enemies with symbols on the world map and the minimap. Off by default, turn it on in the settings under Map or in the setup.
+- Rare enemies: A card shows portrait, level and status, on the world map also the loot with drop chance. One click pins it, small markers show the other spawn points.
+- Rare enemies: A rare nearby is recognised and reported with a window, a line in the screen center, a chat line and a sound. Left click on the window targets it, right click closes it.
+- Rare enemies: The add-on remembers which rares you have seen or killed. Those not seen yet carry a red circle.
+
 ## [0.7.12] - 2026-11-14
 
 ### Changed
@@ -612,6 +621,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.8.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.12...v0.8.0
 [0.7.12]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.9...v0.7.10

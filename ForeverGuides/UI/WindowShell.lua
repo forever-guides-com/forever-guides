@@ -642,8 +642,17 @@ function Shell.SetEsc(frame, on)
   if not frame:GetScript("OnKeyDown") then
     frame:SetScript("OnKeyDown", onEscKey)
   end
-  ns.PropagateKeys(frame, true)
-  pcall(frame.EnableKeyboard, frame, true)
+  -- Listening without propagation swallows every key, so the keyboard is only enabled when the frame
+  -- passes keys on (the client may refuse the switch, in combat or on a protected frame).
+  local passes = ns.PropagateKeys(frame, true)
+  local get = frame.GetPropagateKeyboardInput
+  if type(get) == "function" then
+    local ok, now = pcall(get, frame)
+    if ok and type(now) == "boolean" then
+      passes = now
+    end
+  end
+  pcall(frame.EnableKeyboard, frame, passes == true)
   Esc.Push(frame)
 end
 

@@ -135,7 +135,7 @@ local LEVEL_CAP = 9990
 -- and a piece drawn over it is the same picture. The pins lie over the exploration and the highlight (which
 -- would take their mouse and tooltips) and under the quest pins: spots, then zone transition arrows (they sit
 -- on the zone edge, flight points and instance markers win where they meet), flight points, instance markers,
--- guild members, and the waypoint pins on top, which count up per entry (room for about 500 before the quest
+-- guild members, rare enemies (their card must not hide under other markers), and the waypoint pins on top, which count up per entry (room for about 500 before the quest
 -- pins). The controls clear the client's quest pins, stay under the dungeon panel (3000) and keep room for
 -- the overlay at ui + 100.
 local LEVELS = {
@@ -145,6 +145,7 @@ local LEVELS = {
   flights = 2100,
   instances = 2110,
   guild = 2150,
+  rares = 2170,
   waypoints = 2200,
   ui = 2850,
 }

@@ -246,7 +246,7 @@ function ML.BuildIndex(points, frame, cell)
         bucket = {}
         index.buckets[key] = bucket
       end
-      bucket[#bucket + 1] = { wx = wx, wy = wy, itemId = p.itemId, own = p.own }
+      bucket[#bucket + 1] = { wx = wx, wy = wy, itemId = p.itemId, own = p.own, rare = p.rare, id = p.id }
       index.count = index.count + 1
     end
   end

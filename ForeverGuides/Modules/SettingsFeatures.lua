@@ -72,6 +72,7 @@ SF.FEATURES = {
 
   feature("map", "world", {
     { "map.world", "wm.set.heading" },
+    { "map.rares", "rare.set.heading" },
     { "map.guild", "guildmap.set.heading" },
   }),
   feature("flight", "world", { { "flight.main", "flightlabel.heading" } }),
@@ -264,6 +265,13 @@ SF.MORE = {
     "sparkles-measureStatus",
     "sparkles-measureReset",
     "sparkles-measureChat",
+  },
+  ["map.rares"] = {
+    "setting-rareSound",
+    "setting-rareWindow",
+    "button-rare-set-windowReset",
+    "setting-rareCenterText",
+    "setting-rareChat",
   },
   ["map.world"] = {
     "setting-mapMarkersWorld",
@@ -562,6 +570,7 @@ SF.MORE = {
     "keys-scaleSnap",
     "keys-listToEdge",
     "keys-rosterNote",
+    "keys-rareFoundMove",
     "keys-reset-all",
   },
   ["fishing.cast"] = {

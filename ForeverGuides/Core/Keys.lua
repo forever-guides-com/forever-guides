@@ -271,6 +271,8 @@ ns.AddLocale("enUS", {
   ["keys.desc.listToEdge"] = "Click on an arrow of a note or drawing moves it to the end of the list.",
   ["keys.name.rosterNote"] = "Characters: open note",
   ["keys.desc.rosterNote"] = "Click on a to-do cell opens its note (the right click does that as well).",
+  ["keys.name.rareFoundMove"] = "Rare find window: move",
+  ["keys.desc.rareFoundMove"] = "Dragging the find window of a rare enemy with this key moves it, a plain click targets the rare.",
 })
 ns.AddLocale("deDE", {
   ["keys.combo.none"] = "Keine Zusatztaste",
@@ -304,6 +306,8 @@ ns.AddLocale("deDE", {
   ["keys.desc.listToEdge"] = "Klick auf einen Pfeil bei Notiz oder Zeichnung schiebt sie ans Ende der Liste.",
   ["keys.name.rosterNote"] = "Charaktere: Notiz öffnen",
   ["keys.desc.rosterNote"] = "Klick auf eine Aufgabenzelle öffnet ihre Notiz (der Rechtsklick tut das ebenfalls).",
+  ["keys.name.rareFoundMove"] = "Fundfenster Seltene: verschieben",
+  ["keys.desc.rareFoundMove"] = "Ziehen des Fundfensters mit dieser Taste verschiebt es, ein einfacher Klick nimmt den Seltenen ins Ziel.",
 })
 
 K.Register({ id = "sellSwap", area = "merchant", kind = "click", default = "ctrl" })
@@ -314,3 +318,4 @@ K.Register({ id = "frameNativeDrag", area = "windows", kind = "drag", default = 
 K.Register({ id = "scaleSnap", area = "windows", kind = "drag", default = "shift", allowNone = true })
 K.Register({ id = "listToEdge", area = "lists", kind = "click", default = "shift" })
 K.Register({ id = "rosterNote", area = "lists", kind = "click", default = "shift" })
+K.Register({ id = "rareFoundMove", area = "windows", kind = "drag", default = "shift" })

@@ -31,7 +31,13 @@ local function isInternal(event)
 end
 
 -- Events some clients do not have. Their features have another trigger, so a missing one is logged as info.
-local OPTIONAL = { TRADE_SKILL_UPDATE = true, LEARNED_SPELL_IN_TAB = true, INSPECT_TALENT_READY = true }
+local OPTIONAL = {
+  TRADE_SKILL_UPDATE = true,
+  LEARNED_SPELL_IN_TAB = true,
+  INSPECT_TALENT_READY = true,
+  VIGNETTES_UPDATED = true,
+  VIGNETTE_MINIMAP_UPDATED = true,
+}
 
 function ns.On(event, fn)
   local list = listeners[event]

@@ -556,6 +556,24 @@ local function styleSection(view)
   ns.AddParagraph(view, "settings.reopenNoteWindowsHint", { role = "micro", color = "textMuted" })
 end
 
+-- Rare enemies: the main switch (off by default) in sight, the parts below it.
+local function raresSection(view)
+  ns.AddHeading(view, "rare.set.heading")
+  toggle(view, "rares", "rare.set.enabled", nil, "rare.set.enabledTip")
+  toggle(view, "rareMapPins", "rare.set.map")
+  toggle(view, "rareMinimapPins", "rare.set.minimap")
+  toggle(view, "rareAlert", "rare.set.alert", nil, "rare.set.alertTip")
+  -- How the alert looks is set once: behind "More settings".
+  view = W.Accordion(view, { id = view.id or "map.rares" })
+  toggle(view, "rareSound", "rare.set.sound")
+  toggle(view, "rareWindow", "rare.set.window", nil, "rare.set.windowTip")
+  button(view, "rare.set.windowReset", "act.reset", "reset", function()
+    ns.RareFound.ResetPosition()
+  end)
+  toggle(view, "rareCenterText", "rare.set.center")
+  toggle(view, "rareChat", "rare.set.chat")
+end
+
 local function worldMapSection(view)
   ns.AddHeading(view, "wm.set.heading")
   for _, item in ipairs({
@@ -710,6 +728,7 @@ register("keys.main", keysSection)
 register("mouse.main", call("KeysSettings", "Add"))
 register("farmhud.main", call("FarmHudSettings", "Add"))
 register("map.world", worldMapSection)
+register("map.rares", raresSection)
 register("flight.main", flightSection)
 register("gathering.pins", call("GatheringSettings", "Add"))
 register("gathering.sparkles", call("GatherSparklesSettings", "Add"))

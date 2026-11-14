@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.0
+
+### Added
+
+- Rare enemies: Scanner for 486 rare enemies with symbols on the world map and the minimap. Off by default, turn it on in the settings under Map or in the setup.
+- Rare enemies: A card shows portrait, level and status, on the world map also the loot with drop chance. One click pins it, small markers show the other spawn points.
+- Rare enemies: A rare nearby is recognised and reported with a window, a line in the screen center, a chat line and a sound. Left click on the window targets it, right click closes it.
+- Rare enemies: The add-on remembers which rares you have seen or killed. Those not seen yet carry a red circle.
+
 ## 0.7.12
 
 ### Changed

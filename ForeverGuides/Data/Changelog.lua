@@ -5,6 +5,20 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.8.0",
+      date = "2026-11-14",
+      highlights = {
+        { head = { de = "Seltene Gegner", en = "Rare enemies" }, text = { de = "Weltkarte und Minimap zeigen seltene Gegner mit Stufe, Beute und Spawnpunkten.", en = "The world map and the minimap show rare enemies with level, loot and spawn points." }, go = "settings:map.rares" },
+        { head = { de = "Fundhinweis", en = "Find alert" }, text = { de = "Taucht ein Seltener auf, zeigt ein Fenster Modell und Beute, ein Klick nimmt ihn ins Ziel.", en = "When a rare shows up, a window shows its model and loot, one click targets it." }, go = "settings:map.rares" },
+      },
+      added = {
+        { de = "Seltene Gegner: Scanner für 486 seltene Gegner mit Symbolen auf Weltkarte und Minimap. Ab Werk aus, einschalten in den Einstellungen unter Karte oder im Setup.", en = "Rare enemies: Scanner for 486 rare enemies with symbols on the world map and the minimap. Off by default, turn it on in the settings under Map or in the setup.", go = "settings:map.rares" },
+        { de = "Seltene Gegner: Eine Karte zeigt Porträt, Stufe und Status, auf der Weltkarte auch die Beute mit Dropchance. Ein Klick heftet sie an, kleine Marker zeigen die übrigen Spawnpunkte.", en = "Rare enemies: A card shows portrait, level and status, on the world map also the loot with drop chance. One click pins it, small markers show the other spawn points.", go = "settings:map.rares" },
+        { de = "Seltene Gegner: Ein Seltener in der Nähe wird erkannt und mit Fenster, Text in der Bildschirmmitte, Chatzeile und Ton gemeldet. Linksklick ins Fenster nimmt ihn ins Ziel, Rechtsklick schließt.", en = "Rare enemies: A rare nearby is recognised and reported with a window, a line in the screen center, a chat line and a sound. Left click on the window targets it, right click closes it.", go = "settings:map.rares" },
+        { de = "Seltene Gegner: Das Addon merkt sich, welche Seltenen du gesehen oder getötet hast. Noch nicht gesehene tragen einen roten Kreis.", en = "Rare enemies: The add-on remembers which rares you have seen or killed. Those not seen yet carry a red circle.", go = "settings:map.rares" },
+      },
+    },
+    {
       version = "0.7.12",
       date = "2026-11-14",
       highlights = {
@@ -149,20 +163,6 @@ ns.Data.Changelog = {
         { de = "Sammelstellen: Eine Sammelstelle außerhalb der Reichweite gilt nicht mehr fälschlich als gesperrt.", en = "Gathering spots: a gathering spot out of range no longer counts as locked by mistake.", go = "settings:gathering.sparkles.general" },
         { de = "Farm-HUD: Die runden Minimap-Knöpfe wandern nicht mehr in die Bildschirmmitte, solange das HUD läuft.", en = "Farm HUD: the round minimap buttons no longer move to the middle of the screen while the HUD is on.", go = "settings:farmhud.main" },
         { de = "Einstellungen: Die Markierung beim Sprung zu einer Einstellung erscheint nicht mehr über Kopfzeile und Minimap.", en = "Settings: the mark after jumping to a setting no longer shows over the header and the minimap." },
-      },
-    },
-    {
-      version = "0.7.3",
-      date = "2026-11-12",
-      highlights = {
-      },
-      changed = {
-        { de = "Angeln: Die Pause vor dem Neuwurf steht jetzt auf 0,3 Sekunden, eine gespeicherte Pause von 1,0 Sekunden wird einmalig angepasst.", en = "Fishing: the pause before a recast now defaults to 0.3 seconds, a saved pause of 1.0 second is adjusted once.", go = "settings:fishing.cast" },
-        { de = "Angeln: Die Texte der Einstellungen sind neu geschrieben und sagen klar, dass jeder Wurf einen echten Tastendruck braucht.", en = "Fishing: the settings texts are rewritten and say clearly that every cast needs a real key press.", go = "settings:fishing.cast" },
-      },
-      fixed = {
-        { de = "Angeln: Ein zweiter schneller Druck oder Klick stört das Einholen und Looten nicht mehr und wirft nicht versehentlich neu aus.", en = "Fishing: a second quick press or click no longer disturbs reeling in and looting and does not cast again by mistake.", go = "settings:fishing.cast" },
-        { de = "Angeln: Ein Doppelklick zählt nur bei kurzen Klicks auf der Spielwelt, langes Halten und Ziehen werden ignoriert.", en = "Fishing: a double click only counts for short clicks on the game world, long holds and drags are ignored.", go = "settings:fishing.cast" },
       },
     },
   },

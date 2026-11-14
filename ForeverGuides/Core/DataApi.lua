@@ -6,7 +6,7 @@ local _, ns = ...
 local D = {}
 ns.DataApi = D
 
-local spellById, chains
+local spellById, chains, rareMaps
 
 local function buildSpellIndex()
   spellById, chains = {}, {}
@@ -33,7 +33,7 @@ end
 
 -- Call after ns.Data.Spells changed (tests, data reload).
 function D.Reset()
-  spellById, chains = nil, nil
+  spellById, chains, rareMaps = nil, nil, nil
 end
 
 function D.Spell(id)
@@ -133,4 +133,36 @@ function D.TravelNode(slug)
       return n
     end
   end
+end
+
+-- Rare enemies (ns.Data.Rares): entry { l = level, e = 1 if elite, n = name, p = { [map id] = { x, y, ... } },
+-- i = { item id, chance, ... } }, nil when the id is no known rare.
+function D.Rare(npcId)
+  local data = ns.Data and ns.Data.Rares
+  return data and data.npcs[npcId] or nil
+end
+
+function D.IsRare(npcId)
+  return D.Rare(npcId) ~= nil
+end
+
+-- Rares with points on a UI map, lowest npc id first: { { id = npc id, rare = entry, points = { x, y, ... } } }.
+-- Points are percent of the map. Empty when the map has none.
+function D.RaresForMap(mapId)
+  if not rareMaps then
+    rareMaps = {}
+    for id, rare in pairs((ns.Data and ns.Data.Rares and ns.Data.Rares.npcs) or {}) do
+      for map, points in pairs(rare.p) do
+        local list = rareMaps[map] or {}
+        rareMaps[map] = list
+        list[#list + 1] = { id = id, rare = rare, points = points }
+      end
+    end
+    for _, list in pairs(rareMaps) do
+      table.sort(list, function(a, b)
+        return a.id < b.id
+      end)
+    end
+  end
+  return rareMaps[mapId] or {}
 end

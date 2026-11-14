@@ -17,6 +17,8 @@ ns.AddLocale("enUS", {
   ["wm.gather.showTip"] = "Main switch for ore veins, herbs, chests and fishing schools on the zone map of this window. The choice of materials, chests and schools below only applies while it is on.",
   ["wm.gather.reveal"] = "Show map as explored",
   ["wm.gather.revealTip"] = "Draws every area of a zone map as if you had explored it. Works on its own, independent of the spots. Off puts the normal look back.",
+  ["wm.gather.rares"] = "Rare enemy scanner (map, minimap, alert)",
+  ["wm.gather.raresTip"] = "Marks the known places of rare enemies on the zone map of this window. Hover a skull for level, elite status and loot.",
   ["wm.gather.spots"] = "Spots",
   ["wm.gather.spotsOffTip"] = 'The spots are switched off. Switch on "Show spots on the map" first, then the choice below takes effect.',
   ["wm.gather.hint"] = "Spots and explored areas show on zone maps, not on the world or continent map.",
@@ -27,6 +29,8 @@ ns.AddLocale("deDE", {
   ["wm.gather.showTip"] = "Hauptschalter für Erzadern, Kräuter, Truhen und Fischschwärme auf der Zonenkarte dieses Fensters. Die Auswahl von Materialien, Truhen und Schwärmen darunter wirkt nur, solange er an ist.",
   ["wm.gather.reveal"] = "Karte als erkundet zeigen",
   ["wm.gather.revealTip"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Wirkt für sich allein, unabhängig von den Fundorten. Aus stellt die normale Darstellung wieder her.",
+  ["wm.gather.rares"] = "Scanner für seltene Gegner (Karte, Minimap, Hinweis)",
+  ["wm.gather.raresTip"] = "Markiert die bekannten Orte seltener Gegner auf der Zonenkarte dieses Fensters. Fahre über einen Totenkopf für Stufe, Elite-Status und Beute.",
   ["wm.gather.spots"] = "Fundorte",
   ["wm.gather.spotsOffTip"] = 'Die Fundorte sind ausgeschaltet. Schalte zuerst "Fundorte auf der Karte zeigen" ein, dann wirkt die Auswahl darunter.',
   ["wm.gather.hint"] = "Fundorte und erkundete Gebiete erscheinen auf Zonenkarten, nicht auf der Welt- oder Kontinentkarte.",
@@ -65,7 +69,9 @@ function Tab.Create(parent, width, opts)
   end
   local show = check("wm.gather.show", "settings.gather.worldmap")
   local reveal = check("wm.gather.reveal", "settings.worldMapReveal")
-  show.fgId, reveal.fgId = "wm-gather-show", "wm-gather-reveal"
+  -- The quick switch of the map tab is the main switch of the scanner, so it also wakes it up from off.
+  local rares = check("wm.gather.rares", "settings.rares")
+  show.fgId, reveal.fgId, rares.fgId = "wm-gather-show", "wm-gather-reveal", "wm-gather-rares"
 
   local banner = ns.PackageUI.Banner(pg, ns.MapReveal.ADDON, {
     labelKey = "map.reveal.pkg",
@@ -93,6 +99,11 @@ function Tab.Create(parent, width, opts)
     reveal:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
     reveal:SetWidth(width)
     reveal:Refresh()
+    y = y + CHECK_H + GAP
+    rares:ClearAllPoints()
+    rares:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
+    rares:SetWidth(width)
+    rares:Refresh()
     y = y + CHECK_H + GAP
     local wanted = on("settings.worldMapReveal") and ns.MapReveal.BannerWanted(false)
     if banner:Update(wanted) then
@@ -138,6 +149,7 @@ function Tab.Create(parent, width, opts)
   pg.parts = {
     show = show,
     reveal = reveal,
+    rares = rares,
     banner = banner,
     hint = hint,
     filter = filter,

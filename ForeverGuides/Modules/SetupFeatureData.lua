@@ -107,6 +107,11 @@ row("gathering", "world", {
   },
   target = { feature = "gathering", card = "gathering.pins" },
 })
+row("rares", "world", {
+  nameKey = "setup.feature.rares",
+  switch = setting({ "settings.rares" }),
+  target = { feature = "map", card = "map.rares" },
+})
 row("flight", "world", {
   switch = setting({ "settings.flightLabels", "settings.flightTooltip", "settings.flightTimer" }),
   target = { feature = "flight", card = "flight.main" },

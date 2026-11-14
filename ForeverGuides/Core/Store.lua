@@ -191,6 +191,19 @@ Store.defaults = {
     -- dimming of undiscovered ones on the add-on map.
     mapFlightWorld = true,
     mapFlightAddonMap = true,
+    -- Rare enemies (Modules/WorldMapRarePins.lua, MinimapRareSource.lua, RareDetect.lua): pins on the world map
+    -- and the minimap, and the alert with its sound when one is found: the find window (RareFound.lua, position in
+    -- frames.rareFound once moved), the big line in the screen center and the line in chat.
+    -- rares is the main switch of all of it and starts off: the scanner runs only once the player turns it on
+    -- (settings or setup), the other switches choose the parts.
+    rares = false,
+    rareMapPins = true,
+    rareMinimapPins = true,
+    rareAlert = true,
+    rareSound = true,
+    rareWindow = true,
+    rareCenterText = true,
+    rareChat = true,
     -- Zone transition arrows (Modules/WorldMapZoneArrows.lua, Modules/MapZoneArrows.lua): on the maps, the
     -- estimated ones too (dashed, only between zones a path joins), and the recording of the crossings the
     -- player walks (Modules/ZoneCrossingRecorder.lua, kept on this computer, nothing is sent) with a short
@@ -762,6 +775,11 @@ Store.defaults = {
   -- Zone crossings per zone pair "a|b" on the world map: recorded while walking, set by hand, and the ids of
   -- deleted ones (Modules/ZoneCrossingLogic.lua), validated on every read.
   zoneCrossings = { v = 1, recorded = {}, items = {}, hidden = {} },
+  -- Rare enemies found, newest last, at most 500 { npc, map, x, y, t } (Modules/RareFoundLogic.lua), account wide,
+  -- kept on this computer, validated on every write.
+  rareSightings = { v = 1, items = {} },
+  -- Rare enemies killed, npc id -> last time, at most 500 (Modules/RareLogic.lua), account wide, validated on every write.
+  rareKills = { v = 1, items = {} },
   -- Loot seen in game per boss (Modules/LootCapture.lua), validated on first read.
   lootCapture = { v = 1, sinceBuild = "", npcs = {}, objects = {} },
   -- Character overview (Modules/CharRoster.lua, RosterTodos.lua): own todo rows, row switches

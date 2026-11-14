@@ -13,7 +13,8 @@
 -- at a world position, with a texture path and a kind ("mining", "herbalism", anything else is drawn plain).
 -- add returns false once the cap is reached, so a source can stop. A source may draw its own symbol:
 -- add(wx, wy, nil, kind, custom) with custom = { size (px), paint(pin, host, anchor, alpha, scale) -> shown,
--- hide(pin) }; the layer places the anchor and the source owns the textures it makes on the pin.
+-- hide(pin) }; the layer places the anchor and the source owns the textures it makes on the pin. The pin
+-- slot is shared: a source that gives a pin a mouse-enabled frame hides it again in hide(pin).
 -- Spots near the player are found in a grid per zone, so a layout looks at the points around the player
 -- only, also when the radius reaches into the next zone (the zone frames come from the corners of each map).
 local _, ns = ...
@@ -385,7 +386,13 @@ local function place(i, x, y, path, kind, alpha, view, style, custom)
     pin.icon:Hide()
     pin.ring:Hide()
     hideCircle(pin)
+    -- A slot that changes from one source's symbol to another's lets go of the parts of the first.
+    if pin.custom and pin.custom.hide ~= custom.hide then
+      clearCustom(pin)
+    end
     pin.custom = custom
+    -- Offset from the minimap center (the player) in px, for symbols that make room for the player arrow.
+    pin.cx, pin.cy = x, y
     local shown = custom.paint(pin, host, pin.icon, alpha, sizeScale)
     if not shown then
       clearCustom(pin)
