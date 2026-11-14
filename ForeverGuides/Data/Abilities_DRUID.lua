@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Learn list of DRUID.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -268,13 +268,6 @@ ns.Data.Abilities.DRUID = {
     sp="druid-restoration",
   },
   {
-    i="ability_mount_jungletiger",
-    l=24,
-    n={en="Tiger's Fury"},
-    rk={24,36,48,60},
-    sp="druid-feral-combat",
-  },
-  {
     i="spell_nature_nullifypoison_02",
     l=26,
     n={de="Vergiftung aufheben",en="Abolish Poison"},
@@ -304,14 +297,6 @@ ns.Data.Abilities.DRUID = {
     n={de="Ducken",en="Cower"},
     rk={28,40,52},
     sid=8998,
-    sp="druid-feral-combat",
-  },
-  {
-    ft=true,
-    i="spell_nature_faeriefire",
-    l=30,
-    n={en="Faerie Fire (Feral)"},
-    rk={30,42,54},
     sp="druid-feral-combat",
   },
   {

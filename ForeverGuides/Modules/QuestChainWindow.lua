@@ -1,5 +1,5 @@
--- The window of one quest of an instance: the chain of prequests in order (first quest first, the chosen quest
--- last), per step the faction, the levels, the experience, the giver with the zone and two buttons, "Set marker"
+-- The window of one quest of an instance: its chain in order (prequests first, then the chosen quest and the
+-- follow-up steps, branches as labelled groups), per step the faction, the levels, the experience, the giver with the zone and two buttons, "Set marker"
 -- (waypoint at the giver) and "Map" (opens the map at the giver). A step without a place keeps both buttons
 -- greyed out and says why in its text. The rules are in Modules/QuestChainLogic.lua. Nothing here is protected,
 -- the window closes with ns.SafeHide (Esc stack of the shell), so it works in combat.
@@ -44,6 +44,13 @@ ns.AddLocale("enUS", {
   ["questchain.noteTruncated"] = "The chain is long: only the last %d steps are shown.",
   ["questchain.noteCycle"] = "The data has a loop between quests. It was ignored.",
   ["questchain.noteMissing"] = "%d prequests are not in the data.",
+  ["questchain.class"] = "Class quest:",
+  ["questchain.repeatable"] = "repeatable",
+  ["questchain.excl"] = "Excludes: %s",
+  ["questchain.lane.faction"] = "%s branch",
+  ["questchain.lane.any"] = "One of these is enough",
+  ["questchain.lane.var"] = "Variant %d",
+  ["questchain.lane.var.sparklematic"] = "Machine %d",
   ["questchain.keys"] = "Up and Down move between the buttons, Enter presses, Esc closes.",
 })
 
@@ -83,6 +90,13 @@ ns.AddLocale("deDE", {
   ["questchain.noteTruncated"] = "Die Kette ist lang: Es werden nur die letzten %d Schritte gezeigt.",
   ["questchain.noteCycle"] = "Die Daten haben einen Kreis zwischen Quests. Er wurde ignoriert.",
   ["questchain.noteMissing"] = "%d Vorquests fehlen in den Daten.",
+  ["questchain.class"] = "Klassenquest:",
+  ["questchain.repeatable"] = "wiederholbar",
+  ["questchain.excl"] = "Schließt aus: %s",
+  ["questchain.lane.faction"] = "Zweig %s",
+  ["questchain.lane.any"] = "Eine davon genügt",
+  ["questchain.lane.var"] = "Variante %d",
+  ["questchain.lane.var.sparklematic"] = "Maschine %d",
   ["questchain.keys"] = "Pfeil hoch und runter wechseln zwischen den Knöpfen, Enter drückt, Esc schließt.",
 })
 
@@ -110,6 +124,68 @@ end
 function QW.FactionText(faction)
   local token = faction == "A" and "alliance" or faction == "H" and "horde" or "textMuted"
   return Theme.hexText(token, L["kit.faction." .. (faction == "B" and "all" or faction)])
+end
+
+local REPEAT_ICON = "Interface\\Buttons\\UI-RefreshButton"
+
+-- "Class quest: [icon] Warlock" with the class name in its class color (lifted to AA on the panel surface). The
+-- words carry the meaning, the color and the icon only add to them. Nil for a token that is no class.
+function QW.ClassText(class)
+  local K, R = ns.PageKit, ns.RefLogic
+  if type(class) ~= "string" or not (K and R and R.className(class) ~= class) then
+    return nil
+  end
+  local hex = Theme.readable(K.ClassColorHex(class), Theme.hex("surface3"))
+  local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
+  local icon = ""
+  if coords then
+    local px = function(v)
+      return math.floor(v * 256 + 0.5)
+    end
+    icon = string.format(
+      "|T%s:14:14:0:0:256:256:%d:%d:%d:%d|t ",
+      K.CLASS_ICON_SHEET,
+      px(coords[1]),
+      px(coords[2]),
+      px(coords[3]),
+      px(coords[4])
+    )
+  end
+  return string.format("%s %s|cff%s%s|r", L["questchain.class"], icon, hex:sub(2), R.className(class))
+end
+
+-- The same without any markup, for readers and the keyboard name.
+function QW.ClassPlain(class)
+  local R = ns.RefLogic
+  if type(class) ~= "string" or not (R and R.className(class) ~= class) then
+    return nil
+  end
+  return L["questchain.class"] .. " " .. R.className(class)
+end
+
+-- "[icon] repeatable".
+function QW.RepeatText()
+  return string.format("|T%s:12:12|t %s", REPEAT_ICON, L["questchain.repeatable"])
+end
+
+-- Header of a branch: "Alliance branch", "Machine 2", "One of these is enough".
+function QW.LaneText(lane)
+  if lane.kind == "faction" then
+    return string.format(L["questchain.lane.faction"], L["kit.faction." .. lane.faction])
+  elseif lane.kind == "var" then
+    local key = "questchain.lane.var." .. tostring(lane.grp)
+    return string.format(L[key] ~= key and L[key] or L["questchain.lane.var"], lane.var)
+  end
+  return L["questchain.lane.any"]
+end
+
+-- "Schließt aus: A, B" for the quests a step rules out, nil without any.
+function QW.ExclText(step)
+  local names = {}
+  for _, q in ipairs(step.exclQuests or {}) do
+    names[#names + 1] = name(q) or ("#" .. tostring(q.id))
+  end
+  return #names > 0 and string.format(L["questchain.excl"], table.concat(names, ", ")) or nil
 end
 
 -- "ab Stufe" text of one step (nil for a placeholder step).
@@ -161,6 +237,13 @@ function QW.Describe(step, inst, opts)
   if step.gold and step.gold > 0 and ns.CostLogic then
     bits[#bits + 1] = ns.CostLogic.Format(step.gold)
   end
+  if step.repeatable then
+    bits[#bits + 1] = QW.RepeatText()
+  end
+  local class = QW.ClassText(step.class)
+  if class then
+    bits[#bits + 1] = class
+  end
   local giver
   if not step.giver then
     giver = L["questchain.giverNone"]
@@ -176,16 +259,21 @@ function QW.Describe(step, inst, opts)
   if pair then
     giver = giver .. "\n" .. string.format(L["questchain.pair"], pair)
   end
+  local excl = QW.ExclText(step)
+  if excl then
+    giver = giver .. "\n" .. excl
+  end
   return {
     title = (name(step.quest) or "?") .. (#tags > 0 and ("  " .. table.concat(tags, "  ")) or ""),
     meta = table.concat(bits, " · "),
     giver = giver,
+    lane = step.laneStart and step.lane and QW.LaneText(step.lane) or nil,
   }
 end
 
 -- Header lines: the faction and the number of steps, then the levels of the chosen quest.
 function QW.HeadLines(chain)
-  local last = chain.steps[#chain.steps]
+  local last = chain.chosen or chain.steps[#chain.steps]
   local first = QW.FactionText(chain.faction) .. " · " .. plural(#chain.steps, "questchain.steps")
   local level = last and last.level and string.format(L["questchain.level"], last.level) or L["questchain.levelUnknown"]
   local from
@@ -243,6 +331,7 @@ local function makeRow(parent)
     row.bg:SetColorTexture(Theme.color("accent2", row.chosen and 0.14 or 0))
   end)
   row.number = W.Text(row, { role = "h3", family = "heading", color = "accent2", justify = "CENTER" })
+  row.lane = W.Text(row, { role = "ui", color = "accent2", wrap = true })
   row.title = W.Text(row, { role = "ui", color = "text", wrap = true })
   row.meta = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
   row.giver = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
@@ -275,10 +364,16 @@ local function makeRow(parent)
   function row:fgLayout(width)
     local textX = NUMBER_W + 6
     local textW = math.max(60, width - textX - BUTTON_W - 2 * PAD)
-    self.number:ClearAllPoints()
-    self.number:SetPoint("TOPLEFT", self, "TOPLEFT", 4, -PAD)
-    self.number:SetWidth(NUMBER_W)
     local y = PAD
+    if self.lane:IsShown() then
+      self.lane:ClearAllPoints()
+      self.lane:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -y)
+      self.lane:SetWidth(math.max(60, width - 2 * PAD - BUTTON_W))
+      y = y + ceil(self.lane) + 4
+    end
+    self.number:ClearAllPoints()
+    self.number:SetPoint("TOPLEFT", self, "TOPLEFT", 4, -y)
+    self.number:SetWidth(NUMBER_W)
     for _, fs in ipairs({ self.title, self.meta, self.giver }) do
       if fs:IsShown() then
         fs:ClearAllPoints()
@@ -303,6 +398,8 @@ local function paintRow(row, step, chain, inst)
   row.chosen = step.chosen == true
   row.place = QW.Place(step)
   row.number:SetText(tostring(step.number))
+  row.lane:SetText(text.lane or "")
+  row.lane:SetShown(text.lane ~= nil)
   row.title:SetText(text.title)
   row.meta:SetText(text.meta)
   row.meta:SetShown(text.meta ~= "")
@@ -385,7 +482,7 @@ local function handleKey(f, key)
     if mine then
       return ns.Focus.activate()
     elseif key == "ENTER" and f.chain then
-      local last = f.chain.steps[#f.chain.steps]
+      local last = f.chain.chosen or f.chain.steps[#f.chain.steps]
       local place = last and QW.Place(last)
       if place then
         ns.PageKit.PlaceMarker(place)

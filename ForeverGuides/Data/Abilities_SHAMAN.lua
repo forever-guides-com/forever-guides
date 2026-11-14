@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-04.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Learn list of SHAMAN.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -16,13 +16,6 @@ ns.Data.Abilities.SHAMAN = {
     l=0,
     n={de="Ruf der Elemente",en="Call of the Elements"},
     sid=66842,
-    sp="shaman-elemental",
-  },
-  {
-    i="spell_fire_sealoffire",
-    l=0,
-    n={de="Feuernova",en="Fire Nova"},
-    sid=408341,
     sp="shaman-elemental",
   },
   {
@@ -145,8 +138,9 @@ ns.Data.Abilities.SHAMAN = {
   {
     i="spell_fire_sealoffire",
     l=12,
-    n={en="Fire Nova Totem"},
+    n={de="Feuernova",en="Fire Nova"},
     rk={12,22,32,42,52},
+    sid=408341,
     sp="shaman-elemental",
   },
   {
@@ -396,12 +390,5 @@ ns.Data.Abilities.SHAMAN = {
     rk={42,56,60},
     sid=8835,
     sp="shaman-enhancement",
-  },
-  {
-    i="spell_nature_brilliance",
-    l=50,
-    n={en="Tranquil Air Totem"},
-    rk={50},
-    sp="shaman-restoration",
   },
 }

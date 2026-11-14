@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.12
+
+### Changed
+
+- Instances: The quest list shows only the start of each chain. Steps are numbered in the details and the chain window, Alliance and Horde apart. The Sparklematic is one row.
+- Instances: Class quests carry "Class quest:" with the class icon and the class name in its class color, repeatable quests the word "repeatable" with an icon.
+
+### Fixed
+
+- Instances: Faction, level, prequests and class of the dungeon and raid quests checked and corrected in all instances, among them 11 wrong factions and 46 missing levels.
+- Level overview: Abilities that no longer exist in the game are removed, among them Tiger's Fury for druids. Curse of Agony is now Bane of Agony, Fire Nova Totem is now Fire Nova.
+
 ## 0.7.11
 
 ### Changed

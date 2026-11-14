@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-03.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Learn list of PALADIN.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -180,13 +180,6 @@ ns.Data.Abilities.PALADIN = {
     sp="paladin-holy",
   },
   {
-    i="spell_holy_sealofsalvation",
-    l=26,
-    n={en="Blessing of Salvation"},
-    rk={26},
-    sp="paladin-protection",
-  },
-  {
     i="spell_shadow_sealofkings",
     l=28,
     n={de="Aura des Schattenwiderstands",en="Shadow Resistance Aura"},
@@ -259,14 +252,6 @@ ns.Data.Abilities.PALADIN = {
     rk={38,48,58},
     sid=20166,
     sp="paladin-holy",
-  },
-  {
-    ft=true,
-    i="spell_nature_lightningshield",
-    l=40,
-    n={en="Blessing of Sanctuary"},
-    rk={40,50,60},
-    sp="paladin-protection",
   },
   {
     ft=true,
@@ -347,20 +332,6 @@ ns.Data.Abilities.PALADIN = {
     n={de="Großer Segen der Könige",en="Greater Blessing of Kings"},
     rk={60},
     sid=25898,
-    sp="paladin-protection",
-  },
-  {
-    i="spell_holy_greaterblessingofsalvation",
-    l=60,
-    n={en="Greater Blessing of Salvation"},
-    rk={60},
-    sp="paladin-protection",
-  },
-  {
-    i="spell_holy_greaterblessingofsanctuary",
-    l=60,
-    n={en="Greater Blessing of Sanctuary"},
-    rk={60},
     sp="paladin-protection",
   },
   {

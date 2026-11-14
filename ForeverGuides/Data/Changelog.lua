@@ -5,6 +5,20 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.12",
+      date = "2026-11-14",
+      highlights = {
+      },
+      changed = {
+        { de = "Instanzen: Die Quest-Liste zeigt nur den Anfang jeder Kette. Die Schritte stehen nummeriert im Detail und im Kettenfenster, Allianz und Horde getrennt. Der Funkelmat ist eine Zeile.", en = "Instances: The quest list shows only the start of each chain. Steps are numbered in the details and the chain window, Alliance and Horde apart. The Sparklematic is one row.", go = "instances" },
+        { de = "Instanzen: Klassenquests tragen \"Klassenquest:\" mit Klassensymbol und Klassenname in der Klassenfarbe, wiederholbare Quests das Wort \"wiederholbar\" mit Symbol.", en = "Instances: Class quests carry \"Class quest:\" with the class icon and the class name in its class color, repeatable quests the word \"repeatable\" with an icon.", go = "instances" },
+      },
+      fixed = {
+        { de = "Instanzen: Fraktion, Stufe, Vorquests und Klasse der Dungeon- und Raid-Quests in allen Instanzen geprüft und korrigiert, unter anderem 11 falsche Fraktionen und 46 fehlende Stufen.", en = "Instances: Faction, level, prequests and class of the dungeon and raid quests checked and corrected in all instances, among them 11 wrong factions and 46 missing levels.", go = "instances" },
+        { de = "Stufen-Übersicht: Fähigkeiten, die es im Spiel nicht mehr gibt, sind entfernt, darunter Tigerfuror beim Druiden. Fluch der Pein heißt jetzt Omen der Pein, Feuernova-Totem heißt Feuernova.", en = "Level overview: Abilities that no longer exist in the game are removed, among them Tiger's Fury for druids. Curse of Agony is now Bane of Agony, Fire Nova Totem is now Fire Nova." },
+      },
+    },
+    {
       version = "0.7.11",
       date = "2026-11-14",
       highlights = {
@@ -149,16 +163,6 @@ ns.Data.Changelog = {
       fixed = {
         { de = "Angeln: Ein zweiter schneller Druck oder Klick stört das Einholen und Looten nicht mehr und wirft nicht versehentlich neu aus.", en = "Fishing: a second quick press or click no longer disturbs reeling in and looting and does not cast again by mistake.", go = "settings:fishing.cast" },
         { de = "Angeln: Ein Doppelklick zählt nur bei kurzen Klicks auf der Spielwelt, langes Halten und Ziehen werden ignoriert.", en = "Fishing: a double click only counts for short clicks on the game world, long holds and drags are ignored.", go = "settings:fishing.cast" },
-      },
-    },
-    {
-      version = "0.7.2",
-      date = "2026-11-12",
-      highlights = {
-      },
-      fixed = {
-        { de = "Schlafsack: Die Leiste startet auch im Sack eines anderen Spielers sofort beim Hinlegen.", en = "Sleeping bag: the bar also starts at once in another player's bag.", go = "settings:sleepbag.main" },
-        { de = "Schlafsack: Legst du dich nach dem Aufstehen wieder in einen Sack, startet die Leiste sofort, Gasthäuser und Städte lösen sie nicht aus.", en = "Sleeping bag: lying down again in a bag starts the bar at once, inns and cities do not trigger it.", go = "settings:sleepbag.main" },
       },
     },
   },

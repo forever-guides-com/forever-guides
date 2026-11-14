@@ -18,6 +18,8 @@ ns.AddLocale("enUS", {
   ["questpanel.pre"] = "Requires",
   ["questpanel.next"] = "Then",
   ["questpanel.chain"] = "Chain",
+  ["questpanel.stepTip"] = "Shows this quest of the chain.",
+  ["questpanel.stepCurrent"] = "This quest is shown.",
   ["questpanel.goal"] = "Goal",
   ["questpanel.desc"] = "Description",
   ["questpanel.reward"] = "Rewards",
@@ -44,7 +46,9 @@ ns.AddLocale("deDE", {
   ["questpanel.finish"] = "Abgeben bei",
   ["questpanel.pre"] = "Voraussetzung",
   ["questpanel.next"] = "Danach",
-  ["questpanel.chain"] = "Reihe",
+  ["questpanel.chain"] = "Kette",
+  ["questpanel.stepTip"] = "Zeigt diese Quest der Kette.",
+  ["questpanel.stepCurrent"] = "Diese Quest wird angezeigt.",
   ["questpanel.goal"] = "Ziel",
   ["questpanel.desc"] = "Beschreibung",
   ["questpanel.reward"] = "Belohnungen",
@@ -309,6 +313,107 @@ local function makeLink(panel)
   return b
 end
 
+-- Plain text of a marked-up string, for the keyboard name of a row.
+local function plainText(text)
+  text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):gsub("%s+", " ")
+  return (text:gsub("^ ", ""))
+end
+
+-- The two lines of a step of the chain: "2. Name" and the level, the faction when it is one side only, the giver
+-- with its zone, "repeatable", the class and the quests it rules out.
+local function stepLines(step)
+  if step.missing then
+    return string.format(L["questchain.missing"], step.id), ""
+  end
+  local bits =
+    { step.level and string.format(L["questchain.stepLevel"], step.level) or L["questchain.stepLevelUnknown"] }
+  if step.faction ~= "B" then
+    bits[#bits + 1] = QW.FactionText(step.faction)
+  end
+  if step.giver then
+    local zone = step.zone and ns.T(step.zone)
+    bits[#bits + 1] = zone and string.format("%s (%s)", step.giver, zone) or step.giver
+  end
+  if step.repeatable then
+    bits[#bits + 1] = QW.RepeatText()
+  end
+  bits[#bits + 1] = QW.ClassText(step.class)
+  bits[#bits + 1] = QW.ExclText(step)
+  local title = string.format("%d. %s", step.number, name(step.quest) or "?")
+  if step.chosen then
+    title = title .. "  " .. Theme.hexText("accent2", L["questchain.tag.chosen"])
+  end
+  return title, table.concat(bits, " · ")
+end
+
+-- One row of the numbered chain: a button that shows the quest in the list (the current quest is marked and
+-- does nothing), like the reward rows it is a focus stop with a name for readers.
+local function makeStep(panel)
+  local b = CreateFrame("Button", nil, panel)
+  b.bg = b:CreateTexture(nil, "BACKGROUND")
+  b.bg:SetAllPoints()
+  b.hover = b:CreateTexture(nil, "HIGHLIGHT")
+  b.hover:SetAllPoints()
+  b.hover:SetColorTexture(1, 1, 1, 0.06)
+  b.mark = b:CreateTexture(nil, "OVERLAY")
+  b.mark:SetPoint("TOPLEFT")
+  b.mark:SetPoint("BOTTOMLEFT")
+  b.mark:SetWidth(3)
+  b.title = W.Text(b, { role = "ui", color = "text", wrap = true })
+  b.meta = W.Text(b, { role = "ui", color = "textSecondary", wrap = true })
+  ns.Bind(b, function()
+    b.mark:SetColorTexture(Theme.color("accent2"))
+    b.bg:SetColorTexture(Theme.color("accent2", b.current and 0.2 or 0))
+  end)
+  local function act()
+    if b.ref and not b.current and panel.ctx then
+      panel.ctx.go(b.ref)
+    end
+  end
+  b:SetScript("OnClick", ns.Wrap("questpanel-step", act))
+  local function tip()
+    ns.ShowTooltip(b, b.plainTitle or "", b.current and L["questpanel.stepCurrent"] or L["questpanel.stepTip"])
+  end
+  b:HookScript("OnEnter", tip)
+  b:HookScript("OnLeave", ns.HideTooltip)
+  b.fgOnFocus, b.fgOnBlur = tip, ns.HideTooltip
+  b.fgName = function()
+    return b.label
+  end
+  b.fgDescription = function()
+    return b.current and L["questpanel.stepCurrent"] or nil
+  end
+  ns.Focus.register(b, act)
+
+  function b:fgLayout(width)
+    local textW = math.max(40, width - 14)
+    self.title:ClearAllPoints()
+    self.title:SetPoint("TOPLEFT", self, "TOPLEFT", 8, -4)
+    self.title:SetWidth(textW)
+    local y = 4 + ceil(self.title) + 2
+    if self.meta:IsShown() then
+      self.meta:ClearAllPoints()
+      self.meta:SetPoint("TOPLEFT", self, "TOPLEFT", 8, -y)
+      self.meta:SetWidth(textW)
+      y = y + ceil(self.meta) + 2
+    end
+    return y + 2
+  end
+  return b
+end
+
+local function paintStep(b, step, ref)
+  local title, meta = stepLines(step)
+  b.ref, b.current = ref, step.chosen == true
+  b.plainTitle = plainText(title)
+  b.label = plainText(title .. (meta ~= "" and (", " .. meta) or ""))
+  b.title:SetText(title)
+  b.meta:SetText(meta)
+  b.meta:SetShown(meta ~= "")
+  b.mark:SetShown(b.current)
+  b.bg:SetColorTexture(Theme.color("accent2", b.current and 0.2 or 0))
+end
+
 -- One button of the "Also in" field: opens the quests of another wing that lists the quest.
 local function makeAlso(panel)
   local b
@@ -354,6 +459,7 @@ function P.Create(parent)
   local panel = CreateFrame("Frame", nil, parent)
   W.Fill(panel, "surface", 1)
   panel.pre, panel.nxt, panel.also, panel.rewards = {}, {}, {}, {}
+  panel.steps, panel.lanes, panel.chainItems = {}, {}, {}
   panel.nChoice, panel.nTiles = 0, 0
 
   panel.empty = W.Text(panel, { key = "questpanel.empty", role = "ui", color = "textSecondary", wrap = true })
@@ -363,6 +469,7 @@ function P.Create(parent)
   panel.title = W.Text(panel, { role = "h3", color = "text", wrap = true })
   panel.sub = W.Text(panel, { role = "ui", color = "textSecondary", wrap = true })
   panel.weak = W.Text(panel, { role = "ui", color = "warning", wrap = true })
+  panel.tags = W.Text(panel, { role = "ui", color = "text", wrap = true })
   panel.share = W.Action(panel, {
     key = "act.share",
     icon = "share",
@@ -437,7 +544,7 @@ function P.Create(parent)
 
   function panel:Stops()
     local out = { self.share, self.places.map, self.places.marker, self.chainButton }
-    for _, pool in ipairs({ self.pre, self.nxt, self.also, self.rewards }) do
+    for _, pool in ipairs({ self.pre, self.nxt, self.steps, self.also, self.rewards }) do
       for _, item in ipairs(pool) do
         out[#out + 1] = item
       end
@@ -489,6 +596,45 @@ function P.Create(parent)
     end
   end
 
+  -- Paints the numbered chain: one row per step, a heading before the first step of a branch. nil hides it all.
+  function panel:PaintChain(chain, ctx)
+    local items = {}
+    for _, step in ipairs(chain and chain.steps or {}) do
+      if step.laneStart and step.lane then
+        items[#items + 1] = { head = QW.LaneText(step.lane) }
+      end
+      items[#items + 1] = { step = step }
+    end
+    self.chainItems = {}
+    local nHead, nStep = 0, 0
+    for _, item in ipairs(items) do
+      if item.head then
+        nHead = nHead + 1
+        local fs = self.lanes[nHead]
+        if not fs then
+          fs = W.Text(panel, { role = "ui", color = "accent2", wrap = true })
+          self.lanes[nHead] = fs
+        end
+        fs:SetText(item.head)
+        fs:Show()
+        self.chainItems[#self.chainItems + 1] = fs
+      else
+        nStep = nStep + 1
+        local b = pooled(panel, self.steps, nStep, makeStep)
+        paintStep(b, item.step, ctx and ctx.resolve(item.step.id) or nil)
+        b:Show()
+        self.chainItems[#self.chainItems + 1] = b
+      end
+    end
+    for i = nHead + 1, #self.lanes do
+      self.lanes[i]:Hide()
+    end
+    for i = nStep + 1, #self.steps do
+      self.steps[i].ref = nil
+      self.steps[i]:Hide()
+    end
+  end
+
   -- entry: an entry of QC.Entries, nil shows the empty state.
   function panel:SetQuest(entry, ctx)
     self.entry, self.ctx = entry, ctx
@@ -497,6 +643,7 @@ function P.Create(parent)
       self.title,
       self.sub,
       self.weak,
+      self.tags,
       self.share,
       self.places,
       self.chainButton,
@@ -514,6 +661,7 @@ function P.Create(parent)
     if not entry then
       paintLinks(self.pre, {})
       paintLinks(self.nxt, {})
+      self:PaintChain(nil)
       for i = 1, #self.also do
         self.also[i].inst = nil
         self.also[i]:Hide()
@@ -530,6 +678,14 @@ function P.Create(parent)
     local weak = ns.InstanceGaps and ns.InstanceGaps.QuestWeak(q)
     self.weak:SetText(weak and L["instances.quest.weak"] or "")
     self.weak:SetShown(weak == true)
+
+    local tags = {}
+    if entry.repeatable then
+      tags[#tags + 1] = QW.RepeatText()
+    end
+    tags[#tags + 1] = QW.ClassText(entry.class)
+    self.tags:SetText(table.concat(tags, " · "))
+    self.tags:SetShown(#tags > 0)
 
     local start = startText(entry)
     local place = QW.Place(entry)
@@ -564,10 +720,12 @@ function P.Create(parent)
     end
     self.shown.also = #also > 0
 
-    local steps = ctx.chainLength or 1
+    local chain = ctx.chain
+    local steps = chain and #chain.steps or ctx.chainLength or 1
     self.shown.chain = steps > 1
+    self:PaintChain(self.shown.chain and chain or nil, ctx)
     if self.shown.chain then
-      W.SetText(self.chainButton.label, nil, string.format(L["questchain.chainLen"]:gsub("^%l", string.upper), steps))
+      W.SetText(self.chainButton.label, nil, (string.format(L["questchain.chainLen"], steps):gsub("^%l", string.upper)))
     end
 
     local desc, goal = ns.QuestText.Get(q.id)
@@ -655,6 +813,10 @@ function P.Create(parent)
     local y = PAD + math.max(ceil(self.title), BUTTON_H) + 4
     at(self.sub, PAD, y, inner)
     y = y + ceil(self.sub) + 2
+    if self.tags:IsShown() then
+      at(self.tags, PAD, y, inner)
+      y = y + ceil(self.tags) + 2
+    end
     if self.weak:IsShown() then
       at(self.weak, PAD, y, inner)
       y = y + ceil(self.weak) + 2
@@ -762,10 +924,23 @@ function P.Create(parent)
     self.chainButton:SetShown(shown.chain == true)
     if shown.chain then
       local h = head("chain")
+      local top = y
+      for _, item in ipairs(self.chainItems) do
+        at(item, vx, y, vw)
+        if item.fgLayout then
+          local ih = item:fgLayout(vw)
+          item:SetSize(vw, ih)
+          y = y + ih + 2
+        else
+          y = y + ceil(item) + 2
+        end
+      end
+      y = y + 2
       local w = math.min(vw, math.ceil(self.chainButton:Fit(vw)))
       self.chainButton:SetWidth(w)
       at(self.chainButton, vx, y)
-      y = y + math.max(h, BUTTON_H) + ROW_GAP
+      y = y + BUTTON_H + ROW_GAP
+      y = math.max(y, top + h + ROW_GAP)
     end
     local height = y - ROW_GAP + PAD
     self:SetHeight(height)

@@ -4,6 +4,18 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.12] - 2026-11-14
+
+### Changed
+
+- Instances: The quest list shows only the start of each chain. Steps are numbered in the details and the chain window, Alliance and Horde apart. The Sparklematic is one row.
+- Instances: Class quests carry "Class quest:" with the class icon and the class name in its class color, repeatable quests the word "repeatable" with an icon.
+
+### Fixed
+
+- Instances: Faction, level, prequests and class of the dungeon and raid quests checked and corrected in all instances, among them 11 wrong factions and 46 missing levels.
+- Level overview: Abilities that no longer exist in the game are removed, among them Tiger's Fury for druids. Curse of Agony is now Bane of Agony, Fire Nova Totem is now Fire Nova.
+
 ## [0.7.11] - 2026-11-14
 
 ### Changed
@@ -600,6 +612,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.12]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.11...v0.7.12
 [0.7.11]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.8...v0.7.9

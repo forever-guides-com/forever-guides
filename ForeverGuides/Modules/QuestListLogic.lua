@@ -79,16 +79,29 @@ function QL.Kind(entry)
   return entry.inst and entry.inst.t == "raid" and "raid" or "dungeon"
 end
 
--- Rows of the list: the direct quests of the entries (chain links are no rows) that the faction filter keeps
--- ("all", "A" or "H"; a quest of both factions stays), in the order of the entries.
+-- Rows of the list: the chain heads and single quests among the entries (a follow-up step is no row, it shows
+-- in its chain) that the faction filter keeps ("all", "A" or "H"; a quest of both factions stays), in the order
+-- of the entries. The heads of a group of parallel chains (`grp`) are one row, the head of the first variant.
 -- opts: player (level), grey (grey level of the client), pre = { [quest id] = number of prequests },
--- text(entry) -> objective text. Each row: { entry, level, bucket, faction ("A", "H" or nil for both), kind,
--- start ("in", "out" or nil), pre, objectives }.
+-- chain = { [quest id] = number of quests of its chain }, text(entry) -> objective text. Each row: { entry, level,
+-- bucket, faction ("A", "H" or nil for both), kind, start ("in", "out" or nil), pre, chain (nil without a chain),
+-- group (number of heads of its group, nil for a quest without one), class (token or nil), repeatable, objectives }.
 function QL.Rows(entries, filter, opts)
   opts = opts or {}
+  local first, size = {}, {}
+  for _, e in ipairs(entries or {}) do
+    local grp = e.direct and e.grp
+    if grp then
+      size[grp] = (size[grp] or 0) + 1
+      if not first[grp] or (e.var or 0) < (first[grp].var or 0) then
+        first[grp] = e
+      end
+    end
+  end
   local rows = {}
   for _, e in ipairs(entries or {}) do
-    if e.direct and (filter == "all" or filter == nil or e.faction == "B" or e.faction == filter) then
+    local one = not e.grp or first[e.grp] == e
+    if e.direct and one and (filter == "all" or filter == nil or e.faction == "B" or e.faction == filter) then
       rows[#rows + 1] = {
         entry = e,
         level = e.level,
@@ -97,6 +110,10 @@ function QL.Rows(entries, filter, opts)
         kind = QL.Kind(e),
         start = e.quest and (e.quest.st == "in" or e.quest.st == "out") and e.quest.st or nil,
         pre = opts.pre and opts.pre[e.id or 0] or 0,
+        chain = opts.chain and opts.chain[e.id or 0] or nil,
+        group = e.grp and size[e.grp] > 1 and size[e.grp] or nil,
+        class = e.class,
+        repeatable = e.repeatable,
         objectives = QL.Objectives(opts.text and opts.text(e)),
       }
     end

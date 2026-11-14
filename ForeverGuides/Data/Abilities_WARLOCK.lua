@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-04.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Learn list of WARLOCK.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -63,8 +63,9 @@ ns.Data.Abilities.WARLOCK = {
   {
     i="spell_shadow_curseofsargeras",
     l=8,
-    n={en="Curse of Agony"},
+    n={de="Omen der Pein",en="Bane of Agony"},
     rk={8,18,28,38,48,58},
+    sid=980,
     sp="warlock-affliction",
   },
   {
@@ -327,13 +328,6 @@ ns.Data.Abilities.WARLOCK = {
     sp="warlock-demonology",
   },
   {
-    i="spell_shadow_mindrot",
-    l=38,
-    n={en="Curse of Idiocy"},
-    rk={38},
-    sp="warlock-affliction",
-  },
-  {
     i="spell_shadow_detectinvisibility",
     l=38,
     n={de="Unsichtbarkeit entdecken",en="Detect Invisibility"},
@@ -432,14 +426,6 @@ ns.Data.Abilities.WARLOCK = {
     n={en="Create Soulstone (Greater)"},
     rk={50},
     sp="warlock-demonology",
-  },
-  {
-    ft=true,
-    i="spell_shadow_darkritual",
-    l=50,
-    n={en="Dark Pact"},
-    rk={50,60},
-    sp="warlock-affliction",
   },
   {
     i="spell_shadow_detectinvisibility",

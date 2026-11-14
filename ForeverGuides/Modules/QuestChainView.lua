@@ -23,6 +23,8 @@ ns.AddLocale("enUS", {
   ["questchain.selected"] = "Selected",
   ["questlist.pre.one"] = "1 prequest",
   ["questlist.pre.other"] = "%d prequests",
+  ["questlist.group.sparklematic"] = "%d machines",
+  ["questlist.group.other"] = "%d variants",
   ["questlist.kind.dungeon"] = "Dungeon",
   ["questlist.kind.raid"] = "Raid",
   ["questlist.start.in"] = "Start: inside",
@@ -34,13 +36,15 @@ ns.AddLocale("deDE", {
   ["questchain.group.count"] = "%s (%d)",
   ["questchain.pre.toggle"] = "Vorquests (%d)",
   ["questchain.pre.hint"] = "Quests, die nur zu einer anderen Quest dieser Liste führen.",
-  ["questchain.chainLen"] = "Reihe mit %d Schritten",
+  ["questchain.chainLen"] = "Kette mit %d Schritten",
   ["questchain.empty"] = "Keine Quest passt zu diesem Filter.",
   ["questchain.openTip"] = "Öffnet die Reihe der Vorquests mit Marker und Karte.",
   ["questchain.selectTip"] = "Zeigt die Details dieser Quest.",
   ["questchain.selected"] = "Ausgewählt",
   ["questlist.pre.one"] = "1 Vorquest",
   ["questlist.pre.other"] = "%d Vorquests",
+  ["questlist.group.sparklematic"] = "%d Maschinen",
+  ["questlist.group.other"] = "%d Varianten",
   ["questlist.kind.dungeon"] = "Dungeon",
   ["questlist.kind.raid"] = "Schlachtzug",
   ["questlist.start.in"] = "Start: drinnen",
@@ -93,6 +97,20 @@ function QV.LevelHex(level, bucket)
   return (Theme.readable(base, Theme.hex("surface3")))
 end
 
+-- The line under a row that opens the chain: the group ("3 machines"), the chain ("Chain of 4 steps") or the
+-- prequests outside the list ("2 prequests"). Nil when the row has none of them.
+function QV.HintText(row)
+  if row.group then
+    local key = "questlist.group." .. tostring(row.entry.grp)
+    return string.format(L[key] ~= key and L[key] or L["questlist.group.other"], row.group)
+  elseif row.chain and row.chain > 1 then
+    return (string.format(L["questchain.chainLen"], row.chain):gsub("^%l", string.upper))
+  elseif row.pre > 0 then
+    return row.pre == 1 and L["questlist.pre.one"] or string.format(L["questlist.pre.other"], row.pre)
+  end
+  return nil
+end
+
 -- Texts of one list row: { level (colored), title, meta (faction, kind and where it starts), label (plain, for the keyboard and
 -- readers) }.
 function QV.Describe(row)
@@ -107,6 +125,13 @@ function QV.Describe(row)
   if row.start then
     meta[#meta + 1] = L["questlist.start." .. row.start]
   end
+  if row.repeatable then
+    meta[#meta + 1] = QW.RepeatText()
+  end
+  local class, classPlain = QW.ClassText(row.class), QW.ClassPlain(row.class)
+  if class then
+    meta[#meta + 1] = class
+  end
   local plain = { title, row.level and string.format(L["questchain.level"], row.level) or nil }
   if row.faction then
     plain[#plain + 1] = L["kit.faction." .. row.faction]
@@ -115,7 +140,18 @@ function QV.Describe(row)
   if row.start then
     plain[#plain + 1] = L["questlist.start." .. row.start]
   end
+  if row.repeatable then
+    plain[#plain + 1] = L["questchain.repeatable"]
+  end
+  if classPlain then
+    plain[#plain + 1] = classPlain
+  end
+  local hint = QV.HintText(row)
+  if hint then
+    plain[#plain + 1] = hint
+  end
   return {
+    hint = hint,
     level = row.level and string.format("|cff%s%s|r", QV.LevelHex(row.level, row.bucket):sub(2), number) or number,
     title = title,
     meta = table.concat(meta, " · "),
@@ -249,7 +285,7 @@ end
 local function paintEntry(e, row, view)
   e.fgItem, e.fgMode = row, "quest"
   e.fgEntry = row.entry
-  e.fgSelected = view.selected == row.entry.quest or nil
+  e.fgSelected = view:Owns(row.entry) or nil
   local text = QV.Describe(row)
   e.label = text.label
   e.level:SetText(text.level)
@@ -258,9 +294,9 @@ local function paintEntry(e, row, view)
   local lines = row.objectives
   e.objectives:SetText(table.concat(lines, "\n"))
   e.objectives:SetShown(#lines > 0)
-  e.hint:SetShown(row.pre > 0)
-  if row.pre > 0 then
-    e.hint.text:SetText(row.pre == 1 and L["questlist.pre.one"] or string.format(L["questlist.pre.other"], row.pre))
+  e.hint:SetShown(text.hint ~= nil)
+  if text.hint then
+    e.hint.text:SetText(text.hint)
   end
   paintBackground(e)
 end
@@ -309,7 +345,7 @@ function QV.Create(parent)
   local function context()
     return {
       inst = f.inst,
-      chainLength = f.selectedEntry and f.lengths[f.selectedEntry.id or 0] or 1,
+      chain = f.selectedEntry and f:Chain(f.selectedEntry) or nil,
       resolve = function(id)
         return QC.Reference(f.inst, f.byId, id)
       end,
@@ -336,17 +372,26 @@ function QV.Create(parent)
 
   local function sync()
     f.used = 0
-    local pre = {}
-    for id, steps in pairs(f.lengths) do
-      pre[id] = steps - 1
+    -- A row with follow-up steps shows its chain (the prequests are part of it), any other the prequests.
+    local pre, chain = {}, {}
+    for _, entry in ipairs(f.all) do
+      if entry.direct then
+        local info = f:Chain(entry)
+        if info.after > 0 then
+          chain[entry.id or 0] = #info.steps
+        else
+          pre[entry.id or 0] = info.before
+        end
+      end
     end
-    local rows = QL.Rows(f.all, f.filter, { player = playerLevel(), pre = pre, text = objectiveText })
+    local rows = QL.Rows(f.all, f.filter, { player = playerLevel(), pre = pre, chain = chain, text = objectiveText })
     f.rows = rows
-    -- The chosen quest stays when it is still in the list, else the first one is chosen.
+    -- The chosen quest stays while its row is in the list (a follow-up step sits in the row of its head) and the
+    -- faction filter lets it through, else the first row is chosen.
     local seen
-    for _, row in ipairs(rows) do
-      if row.entry.quest == f.selected then
-        seen = row.entry
+    for _, entry in ipairs(f.all) do
+      if entry.quest == f.selected and f:Visible(entry, rows) then
+        seen = entry
       end
     end
     if not seen then
@@ -377,6 +422,42 @@ function QV.Create(parent)
     end
   end
 
+  -- The chain of an entry (QC.Chain), built once per instance.
+  function f:Chain(entry)
+    local info = self.chains[entry.quest]
+    if not info then
+      info = QC.Chain(self.inst, entry.quest, { byId = self.byId })
+      self.chains[entry.quest] = info
+    end
+    return info
+  end
+
+  -- True when the row of `entry` (its own, the one of its chain head, the one of its group) is in `rows` and the
+  -- faction filter keeps the quest itself.
+  function f:Visible(entry, rows)
+    if self.filter ~= "all" and entry.faction ~= "B" and entry.faction ~= self.filter then
+      return false
+    end
+    for _, row in ipairs(rows) do
+      if self:RowOwns(row.entry, entry) then
+        return true
+      end
+    end
+    return false
+  end
+
+  -- True when `rowEntry` is the row that stands for `entry`: the entry itself, the row of its chain or of its group.
+  function f:RowOwns(rowEntry, entry)
+    return rowEntry == entry
+      or (entry.owner ~= nil and entry.owner == rowEntry.id)
+      or (entry.grp ~= nil and entry.grp == rowEntry.grp)
+  end
+
+  -- Whether the row of `rowEntry` is marked as chosen.
+  function f:Owns(rowEntry)
+    return self.selectedEntry ~= nil and self:RowOwns(rowEntry, self.selectedEntry)
+  end
+
   -- A click on a row makes its quest the chosen one.
   function f:Activate(frame)
     self:Select(frame.fgEntry)
@@ -390,7 +471,7 @@ function QV.Create(parent)
     self.selected, self.selectedEntry = entry.quest, entry
     for _, e in ipairs(self.entries) do
       local frame = e.frame
-      frame.fgSelected = frame.fgEntry.quest == entry.quest or nil
+      frame.fgSelected = self:Owns(frame.fgEntry) or nil
       paintBackground(frame)
     end
     self.panel:SetQuest(entry, context())
@@ -403,7 +484,7 @@ function QV.Create(parent)
     local target
     if ref.kind == "select" then
       for _, entry in ipairs(self.all) do
-        if entry.quest == ref.quest and entry.direct then
+        if (entry.quest == ref.quest or (entry.id and entry.id == ref.quest.id)) and (entry.direct or entry.step) then
           target = entry
         end
       end
@@ -450,10 +531,7 @@ function QV.Create(parent)
     self.byId = inst and QC.Index(inst) or nil
     local quests = inst and R.Quests(inst, nil) or {}
     self.all = inst and QC.Entries(inst, quests) or {}
-    self.lengths = {}
-    for _, entry in ipairs(self.all) do
-      self.lengths[entry.id or 0] = #QC.Chain(inst, entry.quest, { byId = self.byId }).steps
-    end
+    self.chains = {}
     self.count = #self.all
     sync()
   end
@@ -497,6 +575,6 @@ function QV.Create(parent)
     return y
   end
 
-  f.all, f.lengths = {}, {}
+  f.all, f.chains = {}, {}
   return f
 end

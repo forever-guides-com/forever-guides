@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Learn list of MAGE.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -106,13 +106,6 @@ ns.Data.Abilities.MAGE = {
     n={de="Arkane Explosion",en="Arcane Explosion"},
     rk={14,22,30,38,46,54},
     sid=1449,
-    sp="mage-arcane",
-  },
-  {
-    i="spell_holy_dizzy",
-    l=16,
-    n={en="Detect Magic"},
-    rk={16},
     sp="mage-arcane",
   },
   {
