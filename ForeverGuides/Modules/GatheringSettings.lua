@@ -9,7 +9,7 @@ ns.GatheringSettings = S
 
 ns.AddLocale("enUS", {
   ["gather.set.heading"] = "Ores and herbs",
-  ["gather.set.hint"] = "Shows where ore veins and herbs grow, and where chests and fishing schools are. Every ore and herb of a zone shows by default. The choice of materials, chests and schools below counts for both maps and is the same in every zone.",
+  ["gather.set.hint"] = "Shows where ore veins and herbs grow, and where chests and fishing schools are. Everything starts off, switch on below or in the setup what you want to see. The choice of materials, chests and schools below counts for both maps and is the same in every zone.",
   ["gather.set.forever"] = "Show ores and herbs on the addon map",
   ["gather.set.foreverHint"] = "The page Ores and herbs narrows the items down per zone.",
   ["gather.set.foreverObjects"] = "Show chests and fishing schools on the addon map",
@@ -40,7 +40,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["gather.set.heading"] = "Erze und Kräuter",
-  ["gather.set.hint"] = "Zeigt, wo Erzadern und Kräuter wachsen und wo Truhen und Fischschwärme liegen. Standardmäßig erscheinen alle Erze und Kräuter eines Gebiets. Die Auswahl der Materialien, Truhen und Schwärme unten gilt für beide Karten und ist in jedem Gebiet gleich.",
+  ["gather.set.hint"] = "Zeigt, wo Erzadern und Kräuter wachsen und wo Truhen und Fischschwärme liegen. Zu Beginn ist alles aus, schalte unten oder im Setup ein, was du sehen willst. Die Auswahl der Materialien, Truhen und Schwärme unten gilt für beide Karten und ist in jedem Gebiet gleich.",
   ["gather.set.forever"] = "Erze und Kräuter auf der Addon-Karte zeigen",
   ["gather.set.foreverHint"] = "Die Seite Erze und Kräuter schränkt die Items je Gebiet ein.",
   ["gather.set.foreverObjects"] = "Truhen und Fischschwärme auf der Addon-Karte zeigen",

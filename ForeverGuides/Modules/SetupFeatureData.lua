@@ -13,8 +13,12 @@
 --             { kind = "menu" }                         no switch of its own: on while all pages are in the menu
 --             { kind = "none" }                         no question for the row, only its options
 --   pages     menu pages (router ids) that belong to this feature alone: off hides them, on shows them
---   options   at most two coarse options, shown while the feature is on: { key, labelKey, hintKey, kind }
---             with kind "toggle" (default) or "words" (a list of key words as text)
+--   options   at most two coarse options (more only for a row that splits its own switch, see FL.MAX_OPTIONS),
+--             shown while the feature is on: { key, labelKey, hintKey, kind, apply } with kind "toggle" (default)
+--             or "words" (a list of key words as text); apply like the row's, run after the option was written
+--   columns   the options stand in this many columns (default 1)
+--   optionsAlways  the options show while the switch is off too: they are the parts of the switch, one of
+--             them on turns the row on
 --   target    where the "Options" button leads: { feature, card } (ns.SettingsPage.Select) or { page }
 --   textKey   the one-sentence description, "setup.feature.<id>.text"
 --   nameKey   the row name, default "settings.feature.<id>" (a row that is no settings feature sets its own)
@@ -101,8 +105,21 @@ row("map", "world", {
   },
 })
 row("gathering", "world", {
-  switch = setting({ "settings.gather.worldmap", "settings.gather.minimap" }),
+  switch = setting({
+    "settings.gather.herbs",
+    "settings.gather.mining",
+    "settings.gather.treasure",
+    "settings.gather.schools",
+  }),
+  apply = { "GatherFilter.Notify" },
+  -- The four parts of the switch, so a player picks only what they gather.
+  columns = 2,
+  optionsAlways = true,
   options = {
+    { key = "settings.gather.herbs", labelKey = "gather.filter.herbs", apply = { "GatherFilter.Notify" } },
+    { key = "settings.gather.mining", labelKey = "gather.filter.mining", apply = { "GatherFilter.Notify" } },
+    { key = "settings.gather.treasure", labelKey = "gather.filter.treasure", apply = { "GatherFilter.Notify" } },
+    { key = "settings.gather.schools", labelKey = "gather.filter.school", apply = { "GatherFilter.Notify" } },
     { key = "settings.sparkles.enabled", labelKey = "sparkles.set.enabled", hintKey = "setup.ctl.sparklesHint" },
   },
   target = { feature = "gathering", card = "gathering.pins" },

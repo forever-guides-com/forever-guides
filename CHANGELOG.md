@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.1
+
+### Changed
+
+- Gathering: Ores, herbs, chests and fishing schools are off by default on all maps. Existing settings stay as they are.
+- Gathering: Turn them on in the setup, the settings under Gathering or the map filter, all share one setting. The setup offers each of the four kinds.
+- Addon map: When the gathering spots are off, the line under the switch tells where to turn them on.
+
 ## 0.8.0
 
 ### Added

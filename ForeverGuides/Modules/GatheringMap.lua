@@ -20,6 +20,7 @@ ns.AddLocale("enUS", {
   ["map.gather.spots"] = "Spots: %d (items: %d)",
   ["map.gather.noZone"] = "Open a zone to see ore and herb spots.",
   ["map.gather.none"] = "All items of this zone are switched off. Choose them on the page Ores and herbs.",
+  ["map.gather.off"] = "Ores and herbs are switched off. Switch them on in the settings under Gathering or in the setup.",
   ["map.gather.empty"] = "The data has no ore or herb spots for this zone.",
   ["map.gather.hide"] = "Hide spots",
   ["map.gather.hideTip"] = "Clears the choice of items for this zone.",
@@ -32,6 +33,7 @@ ns.AddLocale("enUS", {
   ["map.gatherObjects.spots"] = "Chests and schools: %d spots (kinds: %d)",
   ["map.gatherObjects.noZone"] = "Open a zone to see chests and fishing schools.",
   ["map.gatherObjects.none"] = "All kinds of this zone are switched off. Choose them in the settings.",
+  ["map.gatherObjects.off"] = "Chests and fishing schools are switched off. Switch them on in the settings under Gathering or in the setup.",
   ["map.gatherObjects.empty"] = "The data has no chests or fishing schools for this zone.",
 })
 
@@ -41,6 +43,7 @@ ns.AddLocale("deDE", {
   ["map.gather.spots"] = "Fundorte: %d (Items: %d)",
   ["map.gather.noZone"] = "Öffne ein Gebiet, um Fundorte von Erzen und Kräutern zu sehen.",
   ["map.gather.none"] = "Alle Items dieses Gebiets sind ausgeschaltet. Wähle sie auf der Seite Erze und Kräuter.",
+  ["map.gather.off"] = "Erze und Kräuter sind ausgeschaltet. Schalte sie in den Einstellungen unter Sammeln oder im Setup ein.",
   ["map.gather.empty"] = "Für dieses Gebiet kennen die Daten keine Fundorte von Erzen oder Kräutern.",
   ["map.gather.hide"] = "Fundorte ausblenden",
   ["map.gather.hideTip"] = "Leert die Auswahl der Items für dieses Gebiet.",
@@ -53,6 +56,7 @@ ns.AddLocale("deDE", {
   ["map.gatherObjects.spots"] = "Truhen und Schwärme: %d Fundorte (Arten: %d)",
   ["map.gatherObjects.noZone"] = "Öffne ein Gebiet, um Truhen und Fischschwärme zu sehen.",
   ["map.gatherObjects.none"] = "Alle Arten dieses Gebiets sind ausgeschaltet. Wähle sie in den Einstellungen.",
+  ["map.gatherObjects.off"] = "Truhen und Fischschwärme sind ausgeschaltet. Schalte sie in den Einstellungen unter Sammeln oder im Setup ein.",
   ["map.gatherObjects.empty"] = "Für dieses Gebiet kennen die Daten keine Truhen oder Fischschwärme.",
 })
 

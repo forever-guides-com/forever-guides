@@ -84,6 +84,11 @@ local function changed()
   ns.Emit("FG_GATHER_FILTER_CHANGED")
 end
 
+-- Redraws both maps after the keys were written elsewhere (the setup writes the store directly).
+function F.Notify()
+  changed()
+end
+
 -- Items of the data that belong to the profession (nil: all of them), as a list of ids.
 local function idsOf(data, prof)
   local ids = {}

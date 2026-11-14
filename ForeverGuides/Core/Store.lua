@@ -103,6 +103,8 @@ Store.defaults = {
     -- Forever map (foreverObjects), a switch per category (treasure, schools) and a list of the kinds switched
     -- off (hiddenKinds, { [kindId] = true }); the Blizzard world map shows them under its main switch (worldmap).
     -- placesOpen: the section with the fishing places of the zone in the tab Gather of the map panel is open.
+    -- The four categories (herbs, mining, treasure, schools) start off so a new map stays clean; the setup row
+    -- "gathering", the settings and the map filter all switch these same keys.
     gather = {
       forever = true,
       foreverObjects = true,
@@ -114,11 +116,11 @@ Store.defaults = {
       minimapNear = 60,
       minimapRingSize = 18,
       minimapRingWidth = 2,
-      herbs = true,
-      mining = true,
+      herbs = false,
+      mining = false,
       hidden = {},
-      treasure = true,
-      schools = true,
+      treasure = false,
+      schools = false,
       hiddenKinds = {},
       placesOpen = false,
     },

@@ -16,7 +16,7 @@
 --   FL.Problems(data, sf, env)         the rules of the registry as a list of problems (see tests)
 local _, ns = ...
 
-local FL = { MAX_ROWS = 5, MAX_OPTIONS = 2 }
+local FL = { MAX_ROWS = 5, MAX_OPTIONS = 2, MAX_PART_OPTIONS = 5 }
 ns.SetupFeatureLogic = FL
 
 local KINDS = { subaddon = true, setting = true, module = true, menu = true, none = true }
@@ -337,6 +337,9 @@ function FL.Options(id)
         hintKey = option.hintKey,
         tab = row.target.feature,
         owner = id,
+        apply = option.apply and function()
+          applyHooks(option)
+        end or nil,
       }
     end
     out[i] = entry
@@ -498,8 +501,9 @@ function FL.Problems(d, sf, env)
       if not features[id] and not row.nameKey then
         bad(id .. ": no feature of the settings and no nameKey")
       end
-      if #row.options > FL.MAX_OPTIONS then
-        bad(id .. ": more than " .. FL.MAX_OPTIONS .. " options")
+      local maxOptions = row.optionsAlways and FL.MAX_PART_OPTIONS or FL.MAX_OPTIONS
+      if #row.options > maxOptions then
+        bad(id .. ": more than " .. maxOptions .. " options")
       end
       local sw = row.switch or {}
       if not KINDS[sw.kind] then

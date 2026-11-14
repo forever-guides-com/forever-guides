@@ -447,6 +447,10 @@ function R.FeatureRow(view, id)
     nameKey = FL.NameKey(id),
     textKey = def.textKey,
     noteKey = def.noteKey,
+    columns = def.columns,
+    optionsShown = def.optionsAlways and function()
+      return true
+    end or nil,
     onRelayout = function()
       view.relayout = true
     end,

@@ -713,6 +713,12 @@ local function build(container)
         button = gatherHide
       elseif info.state == "data" then
         gatherText:SetText(ns.GatherDataAccess.Hint(info.status))
+      elseif
+        info.state == "none"
+        and not (ns.GatherFilter.ProfessionOn("mining") or ns.GatherFilter.ProfessionOn("herbalism"))
+      then
+        -- Both professions off (as shipped): the zone choice is not the reason, the switches are.
+        gatherText:SetText(L["map.gather.off"])
       else
         gatherText:SetText(L["map.gather." .. info.state])
         button = info.state ~= "empty" and gatherChoose or nil
@@ -730,6 +736,10 @@ local function build(container)
         objectsText:SetText(string.format(L["map.gatherObjects.spots"], info.points, info.items))
       elseif info.state == "data" then
         objectsText:SetText(ns.GatherDataAccess.Hint(info.status))
+      elseif
+        info.state == "none" and not (ns.GatherObjects.CategoryOn("treasure") or ns.GatherObjects.CategoryOn("school"))
+      then
+        objectsText:SetText(L["map.gatherObjects.off"])
       else
         objectsText:SetText(L["map.gatherObjects." .. info.state])
       end
