@@ -26,6 +26,40 @@ function RL.Active()
   return store ~= nil and store.get("settings.rares") == true
 end
 
+-- Pins on the maps: the scanner is on and the player did not choose "only the alert".
+function RL.ShowsMap()
+  return RL.Active() and ns.Store.get("settings.rareMapShow") ~= false
+end
+
+-- The three ways the settings and the setup offer: "map" (pins and alert), "alert" (only the alert) or "off".
+-- No key of its own: it is read from and written to the switches above, so every control shows the same.
+RL.MODES = { "map", "alert", "off" }
+
+function RL.Mode()
+  if not RL.Active() then
+    return "off"
+  end
+  return ns.Store.get("settings.rareMapShow") == false and "alert" or "map"
+end
+
+function RL.SetMode(mode)
+  local store = ns.Store
+  if mode == "off" then
+    store.set("settings.rares", false)
+    return true
+  elseif mode ~= "map" and mode ~= "alert" then
+    return false
+  end
+  store.set("settings.rareMapShow", mode == "map")
+  store.set("settings.rareAlert", true)
+  if mode == "alert" then
+    store.set("settings.rareCenterText", true)
+  end
+  -- The main switch last, so its listeners see the parts already set.
+  store.set("settings.rares", true)
+  return true
+end
+
 -- Number of spawn points besides the main point of each map.
 function RL.OtherCount(rare)
   local n = 0

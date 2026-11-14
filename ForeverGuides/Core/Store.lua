@@ -197,8 +197,10 @@ Store.defaults = {
     -- and the minimap, and the alert with its sound when one is found: the find window (RareFound.lua, position in
     -- frames.rareFound once moved), the big line in the screen center and the line in chat.
     -- rares is the main switch of all of it and starts off: the scanner runs only once the player turns it on
-    -- (settings or setup), the other switches choose the parts.
+    -- (settings or setup), the other switches choose the parts. rareMapShow off keeps the scanner and its alert
+    -- and takes the pins off both maps: the mode "only the alert" of RareLogic.Mode.
     rares = false,
+    rareMapShow = true,
     rareMapPins = true,
     rareMinimapPins = true,
     rareAlert = true,

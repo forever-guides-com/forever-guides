@@ -5,6 +5,20 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.8.2",
+      date = "2026-11-15",
+      highlights = {
+      },
+      added = {
+        { de = "Seltene Gegner: Drei Stufen direkt oben in den Einstellungen: auf den Karten mit Hinweis, nur Hinweis in der Bildschirmmitte oder aus.", en = "Rare enemies: Three modes right at the top of the settings: on the maps with alert, only the alert in the screen center or off.", go = "settings:map.rares" },
+        { de = "Setup: Die Zeile Seltene Gegner hat die Haken \"Auf den Karten\" und \"Hinweis bei Fund\". Ohne Karte bleibt nur der Hinweis.", en = "Setup: The rare enemies row has the options \"On the maps\" and \"Alert when found\". Without the map only the alert stays.", go = "settings:setup.wizard" },
+      },
+      changed = {
+        { de = "Seltene Gegner: Die einzelnen Schalter für Weltkarte, Minikarte und Hinweis stehen jetzt unter Weitere Einstellungen.", en = "Rare enemies: The single switches for world map, minimap and alert are now under More settings.", go = "settings:map.rares" },
+        { de = "Setup: Sammelpunkte funkeln steht wieder in einer eigenen Zeile, die Sätze unter Sammeln und Seltene Gegner zeigt der Tooltip.", en = "Setup: Gathering sparkles has a line of its own again, the tooltip shows the sentences of Gathering and Rare enemies.", go = "settings:setup.wizard" },
+      },
+    },
+    {
       version = "0.8.1",
       date = "2026-11-14",
       highlights = {
@@ -126,24 +140,6 @@ ns.Data.Changelog = {
         { de = "Instanzen: Gold, Erfahrung und Gegenstände der Belohnungen stimmen mit dem Spiel überein.", en = "Instances: Gold, experience and item rewards match the game.", go = "instances" },
         { de = "Instanzen: Die Quests in Düsterbruch und der Schwarzfelsspitze stehen beim richtigen Flügel.", en = "Instances: The quests in Dire Maul and Blackrock Spire are listed under the right wing.", go = "instances" },
         { de = "Instanzen-Seite: Zurück führt immer zur Übersicht, Zurücksetzen steht neben \"Alle Instanzen\", die Detailseite kommt ohne Einleitung aus und der Stufenfilter ist klarer.", en = "Instances page: Back always leads to the overview, reset sits beside \"All instances\", the detail page has no intro, and the level filter is clearer.", go = "instances" },
-      },
-    },
-    {
-      version = "0.7.5",
-      date = "2026-11-13",
-      highlights = {
-        { head = { de = "Weiterleiten im Teilen-Fenster", en = "Forwarding in the Share window" }, text = { de = "Eine Chatzeile weiterleiten öffnet das bekannte Teilen-Fenster und sendet erst nach \"Senden\".", en = "Forwarding a chat line opens the familiar Share window and sends only after \"Send\"." }, go = "settings:foreverchat.options" },
-      },
-      added = {
-        { de = "Forever Chat: Neue Option \"Chat bleibt bei Esc offen\", standardmäßig an: Esc verlässt das Eingabefeld und schließt offene Felder, das Fenster bleibt stehen.", en = "Forever Chat: new option \"Keep chat open on Esc\", on by default: Esc leaves the input box and closes open panels, and the window stays.", go = "settings:foreverchat.options" },
-      },
-      changed = {
-        { de = "Forever Chat: Weiterleiten öffnet das gemeinsame Teilen-Fenster mit dem Titel \"Weiterleiten\", die Nachricht geht erst nach dem Klick auf \"Senden\" hinaus.", en = "Forever Chat: forwarding opens the shared Share window titled \"Forward\", and the message is sent only after you click \"Send\".", go = "settings:foreverchat.options" },
-        { de = "Forever Chat: Beim Flüstern gibst du Vorname und Nachname ein, ein Realm ist nicht nötig.", en = "Forever Chat: for a whisper you enter first and last name, and no realm is needed.", go = "settings:foreverchat.options" },
-        { de = "Forever Chat: Beim Weiterleiten steht der ursprüngliche Absender immer als Kopfzeile vor dem Text, die Option dafür entfällt.", en = "Forever Chat: when forwarding, the original writer always stands in a header line before the text, and the option for it is gone.", go = "settings:foreverchat.options" },
-      },
-      fixed = {
-        { de = "Forever Chat: Die unterste Nachricht im Chatfenster ist jetzt immer ganz zu sehen, auch bei größerer Schrift und mit oder ohne Byte-Zähler.", en = "Forever Chat: the bottom message in the chat window is now always fully visible, also with a larger font and with or without the byte counter.", go = "settings:foreverchat.options" },
       },
     },
   },

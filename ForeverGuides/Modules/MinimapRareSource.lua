@@ -19,7 +19,7 @@ local HIT = 16
 local EXTRA = 4
 
 function MR.Enabled()
-  return RL.Active() and ns.Store.get("settings.rareMinimapPins") ~= false
+  return RL.ShowsMap() and ns.Store.get("settings.rareMinimapPins") ~= false
 end
 
 -- The grid of a zone is built once per map, the places do not change while the client runs.
@@ -167,7 +167,7 @@ Layer.RegisterSource("rares", source, MR.Enabled)
 
 -- The layer frame is only made outside of combat; PLAYER_REGEN_ENABLED applies what waited.
 ns.On("FG_SETTING_CHANGED", function(_, path)
-  if path == "settings.rareMinimapPins" or path == "settings.rares" then
+  if path == "settings.rareMinimapPins" or path == "settings.rares" or path == "settings.rareMapShow" then
     if not ns.InCombat() then
       Layer.Apply()
     end

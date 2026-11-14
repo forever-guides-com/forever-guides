@@ -272,7 +272,7 @@ ns.SettingsIndexData = {
   {
     id = "map.rares", feature = "map", title = "rare.set.heading",
     controls = {
-      { key = "rare.set.enabled", kind = "toggle", id = "setting-rares", tip = "rare.set.enabledTip" },
+      { key = "rare.set.mode", kind = "choice", id = "rare-mode", hint = "rare.set.modeHint" },
       { key = "rare.set.map", kind = "toggle", id = "setting-rareMapPins" },
       { key = "rare.set.minimap", kind = "toggle", id = "setting-rareMinimapPins" },
       { key = "rare.set.alert", kind = "toggle", id = "setting-rareAlert", tip = "rare.set.alertTip" },

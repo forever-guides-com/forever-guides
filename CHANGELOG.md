@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.2
+
+### Added
+
+- Rare enemies: Three modes right at the top of the settings: on the maps with alert, only the alert in the screen center or off.
+- Setup: The rare enemies row has the options "On the maps" and "Alert when found". Without the map only the alert stays.
+
+### Changed
+
+- Rare enemies: The single switches for world map, minimap and alert are now under More settings.
+- Setup: Gathering sparkles has a line of its own again, the tooltip shows the sentences of Gathering and Rare enemies.
+
 ## 0.8.1
 
 ### Changed

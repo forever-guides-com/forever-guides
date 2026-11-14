@@ -327,8 +327,13 @@ function FL.Options(id)
   local row = FL.Row(id)
   local out = {}
   for i, option in ipairs(row and row.options or {}) do
-    local entry =
-      { key = option.key, labelKey = option.labelKey, hintKey = option.hintKey, kind = option.kind or "toggle" }
+    local entry = {
+      key = option.key,
+      labelKey = option.labelKey,
+      hintKey = option.hintKey,
+      kind = option.kind or "toggle",
+      wide = option.wide,
+    }
     if entry.kind == "toggle" then
       entry.control = {
         type = "toggle",

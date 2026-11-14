@@ -4,6 +4,18 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.8.2] - 2026-11-14
+
+### Added
+
+- Rare enemies: Three modes right at the top of the settings: on the maps with alert, only the alert in the screen center or off.
+- Setup: The rare enemies row has the options "On the maps" and "Alert when found". Without the map only the alert stays.
+
+### Changed
+
+- Rare enemies: The single switches for world map, minimap and alert are now under More settings.
+- Setup: Gathering sparkles has a line of its own again, the tooltip shows the sentences of Gathering and Rare enemies.
+
 ## [0.8.1] - 2026-11-14
 
 ### Changed
@@ -629,6 +641,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.8.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.12...v0.8.0
 [0.7.12]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.11...v0.7.12

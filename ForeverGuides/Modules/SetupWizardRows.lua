@@ -174,17 +174,22 @@ end
 -- Generic row ---------------------------------------------------------------------------------------
 
 -- Lays the options of a row out below y in `columns` equal columns (one column: one line each, as wide as the
--- room). Returns the y below the last line.
+-- room). A wide option takes a line of its own. Returns the y below the last line.
 local function layoutOptions(row, columns, width, y)
   local options = row.options
   local first = 1
   while first <= #options do
     local indent = options[first].indent
+    local span = options[first].wide and 1 or columns
+    local last = first
+    while last < math.min(first + span - 1, #options) and not options[last + 1].wide do
+      last = last + 1
+    end
     local room = math.max(40, width - indent)
-    local gap = columns > 1 and R.GAP or 0
-    local colW = math.max(40, math.floor((room - (columns - 1) * gap) / columns))
+    local gap = span > 1 and R.GAP or 0
+    local colW = math.max(40, math.floor((room - (span - 1) * gap) / span))
     local lineH = 0
-    for i = first, math.min(first + columns - 1, #options) do
+    for i = first, last do
       local frame = options[i].frame
       frame:ClearAllPoints()
       frame:SetPoint("TOPLEFT", indent + (i - first) * (colW + gap), -(y + 2))
@@ -192,7 +197,7 @@ local function layoutOptions(row, columns, width, y)
       lineH = math.max(lineH, frame:fgGridLayout(colW))
     end
     y = y + 2 + lineH + 2
-    first = first + columns
+    first = last + 1
   end
   return y
 end
@@ -324,8 +329,8 @@ function R.Row(parent, spec)
     end
   end
 
-  function row:AddOption(frame, indent)
-    self.options[#self.options + 1] = { frame = frame, indent = indent or R.OPTION_INDENT }
+  function row:AddOption(frame, indent, wide)
+    self.options[#self.options + 1] = { frame = frame, indent = indent or R.OPTION_INDENT, wide = wide }
     frame:SetShown(self.optionsOn == true)
     return frame
   end
@@ -429,7 +434,7 @@ local function addOptions(row, def, view)
       frame = wordsLine(row, option, id)
     end
     if frame then
-      row:AddOption(frame)
+      row:AddOption(frame, nil, option.wide)
       view.widgets[#view.widgets + 1] = frame
       count = count + 1
     end
@@ -447,6 +452,7 @@ function R.FeatureRow(view, id)
     nameKey = FL.NameKey(id),
     textKey = def.textKey,
     noteKey = def.noteKey,
+    compact = def.compact,
     columns = def.columns,
     optionsShown = def.optionsAlways and function()
       return true

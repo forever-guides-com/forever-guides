@@ -35,6 +35,11 @@ ns.AddLocale("enUS", {
   ["rare.set.windowReset"] = "Reset the position of the find window",
   ["rare.set.center"] = "Big message in the screen center",
   ["rare.set.chat"] = "Message in chat",
+  ["rare.set.mode"] = "Show rare enemies",
+  ["rare.set.mode.map"] = "On the maps with alert",
+  ["rare.set.mode.alert"] = "Only the alert in the screen center",
+  ["rare.set.mode.off"] = "Off",
+  ["rare.set.modeHint"] = "On the maps: symbols on the world map and the minimap and an alert when one is near. Only the alert: no symbols, a message in the screen center when one is near.",
 })
 ns.AddLocale("deDE", {
   ["rare.alert"] = "Seltener Gegner gefunden: %s",
@@ -55,6 +60,11 @@ ns.AddLocale("deDE", {
   ["rare.set.windowReset"] = "Position des Fundfensters zurücksetzen",
   ["rare.set.center"] = "Große Meldung in der Bildschirmmitte",
   ["rare.set.chat"] = "Meldung im Chat",
+  ["rare.set.mode"] = "Seltene Gegner zeigen",
+  ["rare.set.mode.map"] = "Auf den Karten mit Hinweis",
+  ["rare.set.mode.alert"] = "Nur Hinweis in der Bildschirmmitte",
+  ["rare.set.mode.off"] = "Aus",
+  ["rare.set.modeHint"] = "Auf den Karten: Symbole auf Weltkarte und Minikarte und ein Hinweis, wenn einer in der Nähe ist. Nur Hinweis: keine Symbole, eine Meldung in der Bildschirmmitte, wenn einer in der Nähe ist.",
 })
 
 -- Sound kit names tried in order, the first one the client has plays.

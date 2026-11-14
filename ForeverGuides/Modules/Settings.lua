@@ -556,15 +556,29 @@ local function styleSection(view)
   ns.AddParagraph(view, "settings.reopenNoteWindowsHint", { role = "micro", color = "textMuted" })
 end
 
--- Rare enemies: the main switch (off by default) in sight, the parts below it.
+-- Rare enemies: the way they show (map, only the alert, off; off by default) in sight, the parts below it.
 local function raresSection(view)
   ns.AddHeading(view, "rare.set.heading")
-  toggle(view, "rares", "rare.set.enabled", nil, "rare.set.enabledTip")
+  local RL = ns.RareLogic
+  local options = {}
+  for _, mode in ipairs(RL.MODES) do
+    options[#options + 1] = { value = mode, key = "rare.set.mode." .. mode }
+  end
+  local mode = W.Dropdown(view.content, {
+    key = "rare.set.mode",
+    width = 280,
+    options = options,
+    get = RL.Mode,
+    set = RL.SetMode,
+  })
+  mode.fgId = "rare-mode"
+  view.stack:Add(mode, { height = 46, width = 280 })
+  ns.AddParagraph(view, "rare.set.modeHint", { role = "micro", color = "textMuted" })
+  -- Which maps and how the alert looks is set once: behind "More settings".
+  view = W.Accordion(view, { id = view.id or "map.rares" })
   toggle(view, "rareMapPins", "rare.set.map")
   toggle(view, "rareMinimapPins", "rare.set.minimap")
   toggle(view, "rareAlert", "rare.set.alert", nil, "rare.set.alertTip")
-  -- How the alert looks is set once: behind "More settings".
-  view = W.Accordion(view, { id = view.id or "map.rares" })
   toggle(view, "rareSound", "rare.set.sound")
   toggle(view, "rareWindow", "rare.set.window", nil, "rare.set.windowTip")
   button(view, "rare.set.windowReset", "act.reset", "reset", function()

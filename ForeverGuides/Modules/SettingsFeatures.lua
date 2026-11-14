@@ -267,6 +267,9 @@ SF.MORE = {
     "sparkles-measureChat",
   },
   ["map.rares"] = {
+    "setting-rareMapPins",
+    "setting-rareMinimapPins",
+    "setting-rareAlert",
     "setting-rareSound",
     "setting-rareWindow",
     "button-rare-set-windowReset",

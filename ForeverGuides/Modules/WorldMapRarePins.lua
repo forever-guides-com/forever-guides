@@ -91,7 +91,7 @@ local function draw()
   if not (map and ns.ProtectedAllowed(map)) then
     return
   end
-  local canvas = RL.Active() and WML.Enabled("rareMapPins") and map:IsShown() and WML.Canvas()
+  local canvas = RL.ShowsMap() and WML.Enabled("rareMapPins") and map:IsShown() and WML.Canvas()
   local id = canvas and WML.MapID()
   if not id then
     hidePins(1)
@@ -186,7 +186,7 @@ ns.On("ADDON_LOADED", function(_, name)
 end)
 
 ns.On("FG_SETTING_CHANGED", function(_, path)
-  if path == "settings.rareMapPins" or path == "settings.rares" then
+  if path == "settings.rareMapPins" or path == "settings.rares" or path == "settings.rareMapShow" then
     WRP.Refresh()
   end
 end)

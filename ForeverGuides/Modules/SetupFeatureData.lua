@@ -16,7 +16,8 @@
 --   options   at most two coarse options (more only for a row that splits its own switch, see FL.MAX_OPTIONS),
 --             shown while the feature is on: { key, labelKey, hintKey, kind, apply } with kind "toggle" (default)
 --             or "words" (a list of key words as text); apply like the row's, run after the option was written
---   columns   the options stand in this many columns (default 1)
+--   columns   the options stand in this many columns (default 1); an option with wide = true takes a line alone
+--   compact   no sentence under the name, it stays in the tooltip of the switch (the options say it)
 --   optionsAlways  the options show while the switch is off too: they are the parts of the switch, one of
 --             them on turns the row on
 --   target    where the "Options" button leads: { feature, card } (ns.SettingsPage.Select) or { page }
@@ -112,7 +113,8 @@ row("gathering", "world", {
     "settings.gather.schools",
   }),
   apply = { "GatherFilter.Notify" },
-  -- The four parts of the switch, so a player picks only what they gather.
+  -- The four parts of the switch, so a player picks only what they gather; their names replace the sentence.
+  compact = true,
   columns = 2,
   optionsAlways = true,
   options = {
@@ -120,13 +122,25 @@ row("gathering", "world", {
     { key = "settings.gather.mining", labelKey = "gather.filter.mining", apply = { "GatherFilter.Notify" } },
     { key = "settings.gather.treasure", labelKey = "gather.filter.treasure", apply = { "GatherFilter.Notify" } },
     { key = "settings.gather.schools", labelKey = "gather.filter.school", apply = { "GatherFilter.Notify" } },
-    { key = "settings.sparkles.enabled", labelKey = "sparkles.set.enabled", hintKey = "setup.ctl.sparklesHint" },
+    {
+      key = "settings.sparkles.enabled",
+      labelKey = "sparkles.set.enabled",
+      hintKey = "setup.ctl.sparklesHint",
+      wide = true,
+    },
   },
   target = { feature = "gathering", card = "gathering.pins" },
 })
 row("rares", "world", {
   nameKey = "setup.feature.rares",
   switch = setting({ "settings.rares" }),
+  -- On with the map off is the mode "only the alert" (RareLogic.Mode).
+  compact = true,
+  columns = 2,
+  options = {
+    { key = "settings.rareMapShow", labelKey = "setup.ctl.rareMap" },
+    { key = "settings.rareAlert", labelKey = "setup.ctl.rareAlert" },
+  },
   target = { feature = "map", card = "map.rares" },
 })
 row("flight", "world", {
