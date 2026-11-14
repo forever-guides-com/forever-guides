@@ -99,10 +99,19 @@ end
 
 -- The key while the helper has no binding in place (something blocks fishing, the option is off, the
 -- helper is off): it names the reason in chat and does nothing else.
+-- The same hint again within this many seconds stays out of the chat: a held or repeated key must not flood it.
+FL.KEY_REPEAT = 5
+local lastKeyText, lastKeyAt
+
 function FL.Key()
   ensure()
   if FL.Active() and type(handlers.KeyText) == "function" then
-    ns.Notify.chat(handlers.KeyText())
+    local text = handlers.KeyText()
+    local now = type(GetTime) == "function" and GetTime() or 0
+    if type(text) == "string" and text ~= "" and not (text == lastKeyText and lastKeyAt and now - lastKeyAt < FL.KEY_REPEAT) then
+      lastKeyText, lastKeyAt = text, now
+      ns.Notify.chat(text)
+    end
     return "status"
   end
   return FL.Status()

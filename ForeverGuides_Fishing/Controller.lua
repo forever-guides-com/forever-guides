@@ -2,7 +2,8 @@
 -- BindMachine, DoubleClick, Loans, Trustee, LootLogic) and carries it out. Nothing happens unless the player
 -- switched an option on. Everything that is protected or can change a setting happens outside of combat,
 -- in combat the wish waits and runs when the fight ends. A call the game blocks (ADDON_ACTION_BLOCKED)
--- switches the helper off and says so on the status line, it never fails silently.
+-- pauses the helper and says so on the status line, it never fails silently. It resumes by itself after
+-- the fight (or a short delay), a call that keeps getting blocked keeps it off until /reload.
 local ADDON_NAME, fish = ...
 if not fish.FG then
   return
@@ -28,6 +29,10 @@ C.MOUSE_KEY = "BUTTON2"
 C.INTERVAL = 0.25
 -- A mouse binding that was never released (the button up got lost) is dropped after this time.
 C.WATCHDOG = 2
+-- Seconds until the helper tries again after a call was blocked out of combat.
+C.RESUME_DELAY = 5
+-- The same call blocked this often in one session keeps the helper off.
+C.MAX_TRIPS = 3
 
 local db, trustee, detector, watch, recast, keyWatcher, lastStopAt, lastStartAt, lastLootAt, pressAt, pressPos, firstPos
 -- The options while the saved data is not there (the start did not run yet): a switch the player flips
@@ -37,6 +42,8 @@ local keyOwner, mouseOwner, button
 local keyMachine, mouseMachine
 local state = { channeling = false, allowed = false, reason = "spell", keys = {}, started = false }
 local blocked
+-- Per session: trips per call, the pending timer, which messages were said.
+local trips, resumeToken, saidPause, saidResume, saidOff = {}, 0, false, false, false
 local loansSignature, mouseArmed, buttonSpell, recovered
 -- True while the mouse binding rests on "cast" because a throw after the reel in is offered.
 local restBound, armedWatched
@@ -177,12 +184,13 @@ end
 
 -- A blocked call ----------------------------------------------------------------------------------------------------
 
--- Switches the helper off for good (until the player tries again) and tells them why.
+local autoResume
+
+-- Switches the helper off and tells the player why. It resumes by itself unless the same call keeps
+-- getting blocked.
 local function trip(func)
-  blocked = { func = func, time = game().Epoch() }
-  if db then
-    db.blocked = { func = blocked.func, time = blocked.time }
-  end
+  trips[func] = (trips[func] or 0) + 1
+  blocked = { func = func, time = game().Epoch(), final = trips[func] >= C.MAX_TRIPS }
   for _, machine in ipairs({ keyMachine, mouseMachine }) do
     if machine then
       machine:Disable("blocked")
@@ -207,9 +215,25 @@ local function trip(func)
     recast:Cancel()
   end
   C.SyncEvents()
-  local text = Status.Format(FG.L, { key = "fishing.status.blocked", func = func })
+  local final = blocked.final
+  local text = Status.Format(FG.L, { key = final and "fishing.status.blocked" or "fishing.status.paused", func = func })
   FG.Errors.add({ msg = text, kind = "warning", ctx = "fishing" })
-  FG.Notify(text, "warning")
+  if final and not saidOff then
+    saidOff = true
+    FG.Notify.chat(text)
+  elseif not final and not saidPause then
+    saidPause = true
+    FG.Notify.chat(text)
+  end
+  resumeToken = resumeToken + 1
+  if not final and not game().InCombat() then
+    local token = resumeToken
+    game().After(C.RESUME_DELAY, function()
+      if token == resumeToken then
+        autoResume()
+      end
+    end)
+  end
   announce()
 end
 
@@ -221,12 +245,14 @@ local function judge(result, err, func)
   end
 end
 
--- The player wants to try again after a blocked call.
-function C.Retry()
-  blocked = nil
-  if db then
-    db.blocked = nil
+-- The helper tries again after a blocked call. auto: the helper itself, not the player (the count of
+-- blocked calls stays).
+function C.Retry(auto)
+  if auto ~= true then
+    trips, saidOff = {}, false
   end
+  blocked = nil
+  resumeToken = resumeToken + 1
   if watch then
     watch:Reset()
   end
@@ -242,6 +268,18 @@ function C.Retry()
   C.SyncEvents()
   C.Refresh()
   announce()
+end
+
+-- The pause is over (fight ended or delay passed): tries again, says so once when it holds.
+function autoResume()
+  if not blocked or blocked.final or game().InCombat() then
+    return
+  end
+  C.Retry(true)
+  if not blocked and not saidResume then
+    saidResume = true
+    FG.Notify.chat(FG.L["fishing.status.resumed"])
+  end
 end
 
 -- Looking at the game -----------------------------------------------------------------------------------------------
@@ -798,6 +836,7 @@ function C.OnEvent(event, ...)
     end
   elseif blocked then
     if event == "PLAYER_REGEN_ENABLED" then
+      autoResume()
       announce()
     end
   elseif event == "UNIT_SPELLCAST_CHANNEL_START" then
@@ -940,11 +979,9 @@ function C.Start(saved)
     end,
   })
   state.started = true
-  if type(db.blocked) == "table" and type(db.blocked.func) == "string" then
-    blocked = { func = db.blocked.func, time = db.blocked.time }
-    keyMachine:Disable("blocked")
-    mouseMachine:Disable("blocked")
-  elseif not (keyOwner and mouseOwner and button) then
+  -- A block of an earlier session (older versions saved it) does not count.
+  db.blocked = nil
+  if not (keyOwner and mouseOwner and button) then
     trip("CreateFrame")
   end
   eventFrame = eventFrame or CreateFrame("Frame")
@@ -974,6 +1011,7 @@ function C.Stop()
   stopped = true
   db = nil
   recovered, blocked, loansSignature, lastSignature, mouseArmed = nil, nil, nil, nil, nil
+  trips, resumeToken, saidPause, saidResume, saidOff = {}, resumeToken + 1, false, false, false
   if eventFrame then
     setRegistered(ALWAYS, false)
     setRegistered(FOR_KEY, false)

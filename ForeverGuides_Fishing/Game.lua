@@ -641,7 +641,7 @@ function G.WatchKeys(frame, on)
     return false
   end
   if on then
-    if not pcall(frame.SetPropagateKeyboardInput, frame, true) then
+    if not FG.PropagateKeys(frame, true) then
       return false
     end
   end

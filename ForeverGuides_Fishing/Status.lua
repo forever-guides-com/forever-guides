@@ -8,7 +8,7 @@ end
 local S = {}
 fish.Status = S
 
--- snap: blocked ({ func } or nil), anyOn (an option is on), oneKey (the key option is on), keys (number
+-- snap: blocked ({ func, final } or nil, final: stays off for the session), anyOn (an option is on), oneKey (the key option is on), keys (number
 -- of keys bound), allowed (fishing is possible now), reason (code from Conditions when not allowed),
 -- searched (the methods the spell search could use), spell (the report of the spell search, for the
 -- diagnosis), diagnosis (true adds the diagnosis line), keyPress (a key press: one short hint when only
@@ -21,11 +21,15 @@ function S.Build(snap)
     return { { key = "fishing.status.keyOff" } }
   end
   if snap.blocked then
-    lines[#lines + 1] = { key = "fishing.status.blocked", func = snap.blocked.func }
+    local key = snap.blocked.final and "fishing.status.blocked" or "fishing.status.paused"
+    lines[#lines + 1] = { key = key, func = snap.blocked.func }
     return lines
   end
   if snap.allowed == true then
-    lines[#lines + 1] = { key = "fishing.status.yes" }
+    -- A key press only speaks up when fishing is not possible: "yes" on every press is noise.
+    if snap.keyPress ~= true then
+      lines[#lines + 1] = { key = "fishing.status.yes" }
+    end
   else
     local reason = tostring(snap.reason or "spell")
     local line = { key = "fishing.status.no", why = "fishing.why." .. reason }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.10
+
+### Changed
+
+- Fishing helper: The key only speaks up in chat when fishing is not possible right now, with the reason and without repeating itself.
+
+### Fixed
+
+- Fishing helper: A key press in combat while the catch journal is open no longer switches the fishing helper off.
+- Fishing helper: When the game blocks a call, the helper only pauses and resumes by itself after combat. Anyone stuck since the bug can fish again right away.
+
 ## 0.7.9
 
 ### Added

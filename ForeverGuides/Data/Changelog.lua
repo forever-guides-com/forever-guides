@@ -5,6 +5,19 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.10",
+      date = "2026-11-14",
+      highlights = {
+      },
+      changed = {
+        { de = "Angelhilfe: Die Taste meldet sich im Chat nur noch, wenn Angeln gerade nicht geht, mit dem Grund und ohne Wiederholung.", en = "Fishing helper: The key only speaks up in chat when fishing is not possible right now, with the reason and without repeating itself.", go = "settings:fishing.cast" },
+      },
+      fixed = {
+        { de = "Angelhilfe: Ein Tastendruck im Kampf bei offenem Fangjournal schaltet die Angelhilfe nicht mehr aus.", en = "Fishing helper: A key press in combat while the catch journal is open no longer switches the fishing helper off.", go = "settings:fishing.cast" },
+        { de = "Angelhilfe: Blockiert das Spiel einen Aufruf, pausiert die Hilfe nur und läuft nach dem Kampf von selbst weiter. Wer seit dem Fehler festhing, kann sofort wieder angeln.", en = "Fishing helper: When the game blocks a call, the helper only pauses and resumes by itself after combat. Anyone stuck since the bug can fish again right away.", go = "settings:fishing.cast" },
+      },
+    },
+    {
       version = "0.7.9",
       date = "2026-11-14",
       highlights = {
@@ -144,52 +157,6 @@ ns.Data.Changelog = {
       },
       fixed = {
         { de = "Tooltips: Tooltips liegen im Einrichtungsfenster und anderen Fenstern über dem Fensterrahmen.", en = "Tooltips: tooltips sit above the frame in the setup window and other windows." },
-      },
-    },
-    {
-      version = "0.7.0",
-      date = "2026-11-11",
-      highlights = {
-        { head = { de = "Chat-Name", en = "Chat name" }, text = { de = "Auf Wunsch steht dein Name vor deinen Nachrichten, mit Klammern, Profil und Klassenfarbe.", en = "Your name can stand in front of your messages, with brackets, a profile and class color." }, go = "settings:chatname.main" },
-        { head = { de = "Angeln mit Hilfe und Journal", en = "Fishing with help and a journal" }, text = { de = "Eine Taste wirft aus und holt ein, das Journal zeigt jeden Fang und jeden Angelplatz mit Chancen.", en = "One key casts and reels in, and the journal shows every catch and fishing place with its chances." }, go = "settings:fishing.cast" },
-        { head = { de = "Instanzen als Kartenraster", en = "Instances as a card grid" }, text = { de = "Jede Instanz hat ihr Ladebild, dazu Beute nach Boss, Quest-Tafel mit Text und Dungeonkarten.", en = "Every instance has its loading screen, plus loot by boss, quest panel with text and dungeon maps." }, go = "instances" },
-        { head = { de = "Einstellungen mit Suche", en = "Settings with search" }, text = { de = "43 Reiter in acht Gruppen, Suche nach einzelnen Einstellungen und ein neu gebauter Einrichtungsassistent.", en = "43 tabs in eight groups, a search for single settings and a rebuilt setup wizard." }, go = "settings" },
-      },
-      added = {
-        { de = "Forever Chat: Zeilen lassen sich kopieren, weiterleiten und beantworten, Links sind klickbar.", en = "Forever Chat: lines can be copied, forwarded and replied to, and links are clickable.", go = "settings:foreverchat" },
-        { de = "Chat-Name: Auf Wunsch steht dein Name vor deinen Nachrichten, mit Klammern, Profil und Klassenfarbe.", en = "Chat name: optionally put your own name in front of your messages, with brackets, profile and class color.", go = "settings:chatname.main" },
-        { de = "Angelhilfe: Eine Taste wirft aus und holt ein, auf Wunsch mit Autoplündern und lauterem Ton.", en = "Fishing helper: one key casts and reels in, optionally with auto loot and louder sound.", go = "settings:fishing.cast" },
-        { de = "Fangjournal: \"Meine Fänge\" zeigt jeden Fisch mit Fängen, Fundorten und Rezepten.", en = "Catch journal: \"My catches\" shows every fish with catches, locations and recipes.", go = "settings:fishing.journal" },
-        { de = "Angelplätze: Ein Fenster nennt Gebiete, Mindest-Skill und Fangchance pro Wurf.", en = "Fishing places: a window lists areas, minimum skill and catch chance per cast.", go = "settings:fishing" },
-        { de = "Instanzen: Das Raster zeigt Ladebilder, startet nach Stufe sortiert und hat eine gemeinsame Fraktionswahl.", en = "Instances: the grid shows loading screens, starts sorted by level and shares one faction choice.", go = "instances" },
-        { de = "Instanzen: Der Reiter Items zeigt Beute nach Boss mit Droprate, Quests zeigen Text und Startort.", en = "Instances: the Items tab lists loot by boss with drop rate, and quests show text and where they start.", go = "instances" },
-        { de = "Dungeonkarten: Zoom, Eingang und Legende, zwei weitere Instanzen haben jetzt eine Karte.", en = "Dungeon maps: zoom, entrance and a legend, and two more instances now have a map.", go = "instances" },
-        { de = "Sammelpunkte: Truhen, Muscheln, Fischschwärme und Wrackteile haben einen eigenen Schalter.", en = "Gathering spots: chests, clams, fish schools and wreckage have a switch of their own.", go = "settings:gathering.pins" },
-        { de = "Händler: Eine neue Seite findet Händler mit Suche, Filtern und Wegpunkt.", en = "Vendors: a new page finds vendors with search, filters and waypoint.", go = "vendors" },
-        { de = "Suche: Das Suchfeld im Fensterkopf springt zu Menüpunkten, Reitern und einzelnen Einstellungen.", en = "Search: the field in the window header jumps to menu pages, tabs and single settings.", go = "search" },
-        { de = "Einrichtung: Im Schritt \"Menü-Bereiche\" blendest du Bereiche und Seiten mit ihrem Symbol ein und aus.", en = "Setup: in the step \"Menu areas\" you show and hide areas and pages, each with its icon.", go = "settings:setup.wizard" },
-        { de = "Schlafsack: Eine Leiste zeigt \"Gut erholt\" nur beim Liegen, ein X blendet sie aus. Standard aus.", en = "Sleeping bag: a bar shows the Well Rested stacks only while you lie, and an X hides it. Off by default.", go = "settings:sleepbag.main" },
-        { de = "Berufstracker: Die Einkaufsliste hat einen Schließen-Knopf.", en = "Profession tracker: the shopping list has a close button.", go = "settings:professions.shopping" },
-      },
-      changed = {
-        { de = "Einstellungen: Aus elf Reitern werden 43 in acht Gruppen, lange Karten klappen den Rest zu.", en = "Settings: the eleven tabs become 43 in eight groups, and long cards fold away the rest.", go = "settings" },
-        { de = "Einrichtung: Der Assistent fragt nach Features statt nach Einzelschaltern.", en = "Setup: the wizard asks about features instead of single switches.", go = "settings:setup.wizard" },
-        { de = "Fenster: Esc schließt alle Fenster des Addons, das zuletzt geöffnete zuerst.", en = "Windows: Esc closes every add-on window, the newest first." },
-        { de = "Fensterstil: Neuinstallationen starten mit \"WoW Forever\", bestehende behalten ihre Wahl.", en = "Window style: fresh installs start with \"WoW Forever\", and existing installs keep their choice.", go = "settings:notes.main" },
-        { de = "Weltkarte: Ein Klick auf einen Zonenübergang zeigt das Gebiet im Kartenfenster.", en = "World map: a click on a zone transition shows the area in the map window.", go = "map" },
-        { de = "Raids: Barrow Deeps, Hyjal Summit und Onyxia's Lair sind Raids der Stufe 60 mit Datum 9. Dezember 2026.", en = "Raids: Barrow Deeps, Hyjal Summit and Onyxia's Lair are level 60 raids, dated December 9, 2026.", go = "instances" },
-        { de = "Daten: Spielbuild 1.60.1.70888, Rezepte und Zauber der Saison der Entdeckungen sind entfernt.", en = "Data: game build 1.60.1.70888, and Season of Discovery recipes and spells are removed." },
-        { de = "Erze und Kräuter: Etwa 1.900 Fundorte mehr, erstmals auch in Shen'dralas.", en = "Ores and herbs: about 1,900 more spots, for the first time also in Shen'dralas.", go = "gathering" },
-      },
-      fixed = {
-        { de = "Schlafsack: Die Leiste erscheint nur beim Liegen, nicht mehr im Stehen.", en = "Sleeping bag: the bar shows only while you lie, no longer while you stand.", go = "settings:sleepbag.main" },
-        { de = "Angelhilfe: Fische erscheinen mit Namen statt als Nummer.", en = "Fishing helper: fish show with their name instead of a number.", go = "settings:fishing.cast" },
-        { de = "Instanzen: Gegenstände zeigen ihren Namen statt der Nummer.", en = "Instances: items show their name instead of the number.", go = "instances" },
-        { de = "Tastatur: Enter und Leertaste wirken nur nach Tastaturbedienung eines Fensters.", en = "Keyboard: Enter and Space only act after you used the keyboard in a window." },
-        { de = "Einstellungen: Escape verwirft die Eingabe in einem Textfeld.", en = "Settings: Escape discards the input in a text field.", go = "settings" },
-        { de = "Fangjournal: Jeder Balken zeigt den echten Anteil und bleibt sichtbar.", en = "Catch journal: every bar shows its true share and stays visible.", go = "settings:fishing.journal" },
-        { de = "Weltkarte: Das Panel \"Forever Guides\" liegt über dem Kartenrahmen.", en = "World map: the \"Forever Guides\" panel sits above the map frame.", go = "map" },
-        { de = "Forever Chat: Gesperrte Nachrichten bleiben als Entwurf im Chatfeld.", en = "Forever Chat: blocked messages stay as a draft in the chat box.", go = "settings:foreverchat" },
       },
     },
   },

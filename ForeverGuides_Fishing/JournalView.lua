@@ -957,9 +957,8 @@ local function create()
     if not (self.search.edit.HasFocus and self.search.edit:HasFocus()) then
       handled = V.Key(key)
     end
-    if self.SetPropagateKeyboardInput then
-      self:SetPropagateKeyboardInput(not handled)
-    end
+    -- Blocked in combat: a blocked call would switch the fishing helper off (Blockade).
+    FG.PropagateKeys(self, not handled)
   end)
 
   local grip = CreateFrame("Button", nil, f)

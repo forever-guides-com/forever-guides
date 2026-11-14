@@ -4,6 +4,17 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.10] - 2026-11-14
+
+### Changed
+
+- Fishing helper: The key only speaks up in chat when fishing is not possible right now, with the reason and without repeating itself.
+
+### Fixed
+
+- Fishing helper: A key press in combat while the catch journal is open no longer switches the fishing helper off.
+- Fishing helper: When the game blocks a call, the helper only pauses and resumes by itself after combat. Anyone stuck since the bug can fish again right away.
+
 ## [0.7.9] - 2026-11-14
 
 ### Added
@@ -581,6 +592,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.10]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.6...v0.7.7
