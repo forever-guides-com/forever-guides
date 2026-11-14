@@ -101,9 +101,20 @@ end
 -- The display names seen with a class, for the name completion of the forward dialog.
 local seen = {}
 
+local version = 0
+
+-- Counts the changes of what is known, for the caches of the windows that depend on it.
+function Class.Version()
+  return version
+end
+
 function Class.Remember(name, class)
   if type(name) == "string" and CL.Token(class, known()) then
-    CL.Remember(cache, PN.Key(name), class)
+    local key = PN.Key(name)
+    if CL.Lookup(cache, key) ~= class then
+      version = version + 1
+    end
+    CL.Remember(cache, key, class)
     seen[PN.Key(name)] = name
   end
 end
@@ -141,6 +152,7 @@ function Class.Of(name, guid)
 end
 
 function Class.Clear()
+  version = version + 1
   seen = {}
   cache = CL.NewCache()
 end

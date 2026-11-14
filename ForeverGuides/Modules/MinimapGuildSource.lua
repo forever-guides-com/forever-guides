@@ -176,13 +176,28 @@ local function inGroup(name)
   return false
 end
 
+-- The minimap redraws often and GD.Get costs on every call: the roster is asked for once per second at most.
+-- GuildData hands out a new snapshot table only after a reread, so the index is rebuilt only then.
+local ROSTER_TTL = 1
+local indexedSnap, indexByKey, indexedAt, reading = nil, {}, nil, false
 local function rosterByKey()
-  local snap = GD.Get()
-  local out = {}
-  for _, m in ipairs(snap and snap.members or {}) do
-    out[m.key] = m
+  local clock = rawget(_G, "GetTime")
+  local now = type(clock) == "function" and clock() or nil
+  if now and indexedAt and now >= indexedAt and now - indexedAt < ROSTER_TTL then
+    return indexByKey
   end
-  return out
+  -- An update that the read itself emits must not reset the wait.
+  reading = true
+  local snap = GD.Get()
+  reading = false
+  indexedAt = now
+  if snap ~= indexedSnap then
+    indexedSnap, indexByKey = snap, {}
+    for _, m in ipairs(snap and snap.members or {}) do
+      indexByKey[m.key] = m
+    end
+  end
+  return indexByKey
 end
 
 local function source(view, add)
@@ -245,7 +260,12 @@ local function apply()
 end
 
 ns.On("FG_GUILDMAP_UPDATE", relayout)
-ns.On("FG_GUILD_UPDATE", relayout)
+ns.On("FG_GUILD_UPDATE", function()
+  if not reading then
+    indexedAt = nil
+  end
+  relayout()
+end)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and path:find("^settings%.guildMap") then
     apply()

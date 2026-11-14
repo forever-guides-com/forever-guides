@@ -93,12 +93,24 @@ end
 
 -- Guild roster by short name, rebuilt whenever the cached snapshot of the roster is a new table.
 local rosterOf, rosterMap
+-- The snapshot is read once per frame: the filter runs for every line and every chat window of the game.
+local snapTime, snapOk, snapValue
+
+local function snapshot()
+  local now = g("GetTime")
+  now = type(now) == "function" and now() or nil
+  if now == nil or now ~= snapTime then
+    local data = ns.GuildData
+    snapOk, snapValue = pcall(function()
+      return data and data.Get()
+    end)
+    snapTime = now
+  end
+  return snapOk, snapValue
+end
 
 local function guildClass(key)
-  local data = ns.GuildData
-  local ok, snap = pcall(function()
-    return data and data.Get()
-  end)
+  local ok, snap = snapshot()
   if not ok or type(snap) ~= "table" or type(snap.members) ~= "table" then
     return nil
   end

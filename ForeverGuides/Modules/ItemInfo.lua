@@ -520,3 +520,60 @@ function I.format(level)
   end
   return string.format("%d", math.floor(level + 0.5))
 end
+
+-- Display name of an item ------------------------------------------------------------------------------
+
+local nameCache, nameAsked, spellCache = {}, {}, {}
+
+-- The name of the item in the client language. The client answer wins, then the static field `static`
+-- ({ de, en } as the data files carry it), then `fallback`. An item the client has not cached yet is asked
+-- for once (RequestLoadItemDataByID); the answer arrives with GET_ITEM_INFO_RECEIVED, so pages repaint on
+-- that event. Never blocks, never errors.
+function I.name(id, static, fallback)
+  local hit = nameCache[id]
+  if hit then
+    return hit
+  end
+  local c = rawget(_G, "C_Item")
+  local byId = type(c) == "table" and type(c.GetItemNameByID) == "function" and c.GetItemNameByID or global("GetItemInfo")
+  if byId and type(id) == "number" then
+    local ok, name = pcall(byId, id)
+    if ok and type(name) == "string" and name ~= "" then
+      nameCache[id] = name
+      return name
+    end
+    if not nameAsked[id] then
+      nameAsked[id] = true
+      local request = method("C_Item", "RequestLoadItemDataByID")
+      if request then
+        pcall(request, id)
+      end
+    end
+  end
+  return (ns.T and ns.T(static)) or fallback
+end
+
+-- Forgets the cached names (tests).
+function I.resetNames()
+  nameCache, nameAsked, spellCache = {}, {}, {}
+end
+
+
+-- The name of a spell in the client language (C_Spell.GetSpellName, else GetSpellInfo), else `fallback`.
+-- Spell data is not loaded asynchronously for known spell ids, an unknown id gives the fallback.
+function I.spellName(id, fallback)
+  local hit = spellCache[id]
+  if hit then
+    return hit
+  end
+  local c = rawget(_G, "C_Spell")
+  local get = type(c) == "table" and type(c.GetSpellName) == "function" and c.GetSpellName or global("GetSpellInfo")
+  if get and type(id) == "number" then
+    local ok, name = pcall(get, id)
+    if ok and type(name) == "string" and name ~= "" then
+      spellCache[id] = name
+      return name
+    end
+  end
+  return fallback
+end

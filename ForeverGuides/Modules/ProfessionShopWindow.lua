@@ -1615,7 +1615,7 @@ ns.On("FG_PROFROUTE_CHANGED", function()
   end
 end)
 -- The stock and the skill change while the window is open.
-for _, event in ipairs({ "BAG_UPDATE_DELAYED", "SKILL_LINES_CHANGED" }) do
+for _, event in ipairs({ "BAG_UPDATE_DELAYED", "SKILL_LINES_CHANGED", "GET_ITEM_INFO_RECEIVED" }) do
   ns.On(event, function()
     if frame and frame:IsShown() then
       ns.Debounce("profshop-refresh", 0.5, function()

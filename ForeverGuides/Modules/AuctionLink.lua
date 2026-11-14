@@ -886,7 +886,7 @@ local function refreshOpen()
 end
 
 ns.On("FG_PROFROUTE_CHANGED", refreshOpen)
-for _, event in ipairs({ "BAG_UPDATE_DELAYED", "SKILL_LINES_CHANGED" }) do
+for _, event in ipairs({ "BAG_UPDATE_DELAYED", "SKILL_LINES_CHANGED", "GET_ITEM_INFO_RECEIVED" }) do
   ns.On(event, function()
     local rec = A.Parts()
     if rec and rec.panel:IsShown() and rec.tabId == "list" then

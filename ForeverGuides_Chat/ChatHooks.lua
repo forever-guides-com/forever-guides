@@ -87,12 +87,7 @@ end
 
 -- Shows the window on the conversation without moving the focus. False when the window did not open.
 function Hooks.OpenFor(key)
-  local frame = chat.Open()
-  if not frame then
-    return false
-  end
-  chat.SelectConversation(key)
-  return true
+  return chat.Open(key) ~= nil
 end
 
 -- The input told that conversations changed: remembers the whisper to answer and lets the automatic opening

@@ -479,3 +479,50 @@ function R.Reagents(mats, stock)
   end
   return out, crafts
 end
+
+-- Producers -----------------------------------------------------------------------------------------------
+
+-- Reverse index { [itemId] = { { slug, recipe, data }, ... } } over sources { { slug, data, list }, ... }.
+-- Removed recipes and recipes without a made item are left out.
+function R.IndexProducers(sources)
+  local index = {}
+  for _, src in ipairs(type(sources) == "table" and sources or {}) do
+    for _, r in ipairs(src.list) do
+      if type(r.i) == "number" and not r.rm then
+        local at = index[r.i]
+        if not at then
+          at = {}
+          index[r.i] = at
+        end
+        at[#at + 1] = { slug = src.slug, recipe = r, data = src.data }
+      end
+    end
+  end
+  return index
+end
+
+-- The producers of one item in click order: the profession `slug` first, then the lowest skill level,
+-- then the spell id. `skipSpell` leaves out the recipe being looked at. Nil when none is left.
+function R.PickProducers(entries, slug, skipSpell)
+  local out = {}
+  for _, e in ipairs(entries or {}) do
+    if e.recipe.s ~= skipSpell then
+      out[#out + 1] = e
+    end
+  end
+  if #out == 0 then
+    return nil
+  end
+  table.sort(out, function(a, b)
+    local sa, sb = a.slug == slug, b.slug == slug
+    if sa ~= sb then
+      return sa
+    end
+    local la, lb = R.Level(a.recipe), R.Level(b.recipe)
+    if la ~= lb then
+      return la < lb
+    end
+    return a.recipe.s < b.recipe.s
+  end)
+  return out
+end

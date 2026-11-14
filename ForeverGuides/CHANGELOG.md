@@ -4,6 +4,23 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.9] - 2026-11-14
+
+### Added
+
+- Professions: Craftable reagents carry an arrow. One click opens their recipe, Back takes you there again, and the tooltip lists their reagents.
+
+### Changed
+
+- Professions: Items and reagents use the names of your game, so they appear in German in the German game.
+- Professions: Clicking a reagent no longer puts it on the shopping list.
+- Forever Chat: The window opens much faster, also when a new message opens it by itself.
+
+### Fixed
+
+- Forever Chat: New messages no longer slow the game down while the chat is open.
+- Guild: The minimap, the map and the crafter directory read the guild list less often and cost less performance in large guilds.
+
 ## [0.7.8] - 2026-11-13
 
 ### Fixed
@@ -564,6 +581,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.9]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.6...v0.7.7
 [0.7.6]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.5...v0.7.6

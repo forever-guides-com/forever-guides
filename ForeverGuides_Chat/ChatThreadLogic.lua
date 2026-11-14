@@ -352,12 +352,20 @@ end
 -- dividerSeq (first unread line: the divider goes before it), unread (count shown on the divider),
 -- deliveryOf(line) (the delivery mark of a line that has none stored, a team keeps its own), resend(line) (true for
 -- a line that offers "Send again": item.actions; such a line always has its own head, the status line that
--- carries the buttons).
+-- carries the buttons), from (index of the first line to build, default 1: older lines cost nothing; the day
+-- marker is left out when that line continues the day of the one before it).
 function TL.Build(conv, opts)
   opts = opts or {}
   local dateOf = opts.date or rawget(_G, "date") or os.date
   local items, previous, day = {}, nil, nil
-  for i, line in ipairs(conv.lines) do
+  local lines = conv.lines
+  local from = math.max(1, math.floor(opts.from or 1))
+  if from > 1 and lines[from - 1] then
+    local t = lines[from - 1].time
+    day = isNumber(t) and dateOf("%Y-%m-%d", t) or "?"
+  end
+  for i = from, #lines do
+    local line = lines[i]
     local key = isNumber(line.time) and dateOf("%Y-%m-%d", line.time) or "?"
     if key ~= day then
       items[#items + 1] = { type = "day", key = key, time = line.time }
@@ -395,6 +403,49 @@ function TL.Build(conv, opts)
   return items
 end
 
+-- The item of a line that was just added at the end of the conversation, built the way TL.Build would, or nil when
+-- the new line needs more than one plain item (a day marker, the "new" divider) or there is nothing to continue.
+-- `items` are the items of the conversation without that line; opts as for TL.Build.
+function TL.AppendItem(conv, items, opts)
+  opts = opts or {}
+  local previous = items[#items]
+  local lines = conv.lines
+  local i = #lines
+  local line = lines[i]
+  if not (line and previous and previous.type == "line" and previous.index == i - 1) then
+    return nil
+  end
+  local dateOf = opts.date or rawget(_G, "date") or os.date
+  local key = isNumber(line.time) and dateOf("%Y-%m-%d", line.time) or "?"
+  local before = previous.line.time
+  if key ~= (isNumber(before) and dateOf("%Y-%m-%d", before) or "?") then
+    return nil
+  end
+  if opts.dividerSeq and line.seq == opts.dividerSeq then
+    return nil
+  end
+  local item = {
+    type = "line",
+    index = i,
+    line = line,
+    seq = line.seq,
+    own = line.dir == Logic.DIR_OUT,
+    delivery = opts.deliveryOf and opts.deliveryOf(line) or TL.Delivery(line),
+    voice = chat.ListLogic.Voice(conv, line),
+    actions = opts.resend ~= nil and opts.resend(line) == true,
+  }
+  item.first = not (
+    same(previous, item)
+    and previous.voice == item.voice
+    and not item.delivery
+    and not item.actions
+    and isNumber(line.time)
+    and isNumber(before)
+    and line.time - before <= TL.GROUP_SECONDS
+  )
+  return item
+end
+
 -- Width of the card of a line: most of the thread in the card mode, all of it in the compact mode.
 function TL.CardWidth(width, mode)
   if mode ~= "messenger" then
@@ -416,43 +467,53 @@ end
 -- Heights and tops of the items for a width. m: mode, scale(px) (text size scaling of fixed measures, default
 -- identity), measure(text, width, item) -> height of the wrapped text (a yell is set larger), text(item) -> the
 -- text the line shows. Fills item.top, item.h, item.bodyH and returns the height of everything.
-function TL.Layout(items, width, m)
+local function layoutItem(item, previous, y, m, textW)
   local spec = TL.SPEC
   local scale = m.scale or function(v)
     return v
   end
+  local compact = m.mode ~= "messenger"
+  local h
+  if item.type == "line" then
+    local body = math.max(scale(spec.minLine), m.measure(m.text(item), textW, item))
+    item.bodyH = body
+    if m.mode == "messenger" then
+      h = 2 * spec.padV + (item.first and scale(spec.head) or 0) + body
+    else
+      h = body
+    end
+  else
+    h = scale(compact and spec.compact.divider or spec.day)
+  end
+  local gap = 0
+  if previous then
+    if compact then
+      gap = (item.type == "line" and previous.type == "line") and spec.compact.gap or 2
+    elseif item.type == "line" and not item.first and previous.type == "line" then
+      gap = spec.groupGap
+    else
+      gap = spec.gap
+    end
+  end
+  y = y + gap
+  item.top, item.h = y, h
+  return y + h
+end
+
+function TL.Layout(items, width, m)
   local textW = TL.TextWidth(width, m.mode)
   local y, previous = 0, nil
-  local compact = m.mode ~= "messenger"
   for _, item in ipairs(items) do
-    local h
-    if item.type == "line" then
-      local body = math.max(scale(spec.minLine), m.measure(m.text(item), textW, item))
-      item.bodyH = body
-      if m.mode == "messenger" then
-        h = 2 * spec.padV + (item.first and scale(spec.head) or 0) + body
-      else
-        h = body
-      end
-    else
-      h = scale(compact and spec.compact.divider or spec.day)
-    end
-    local gap = 0
-    if previous then
-      if compact then
-        gap = (item.type == "line" and previous.type == "line") and spec.compact.gap or 2
-      elseif item.type == "line" and not item.first and previous.type == "line" then
-        gap = spec.groupGap
-      else
-        gap = spec.gap
-      end
-    end
-    y = y + gap
-    item.top, item.h = y, h
-    y = y + h
+    y = layoutItem(item, previous, y, m, textW)
     previous = item
   end
   return y
+end
+
+-- Places one item behind `items` (it is not in the list yet); contentH is what Layout returned for them. Returns the
+-- new height of everything.
+function TL.LayoutAppend(items, item, contentH, width, m)
+  return layoutItem(item, items[#items], contentH, m, TL.TextWidth(width, m.mode))
 end
 
 -- Indexes of the first and last item that touch the view from offset on, with `extra` pixels on both sides.

@@ -40,6 +40,21 @@ local function finite(v)
   return type(v) == "number" and v == v and v > -math.huge and v < math.huge
 end
 
+-- Timing points for the chat timing probe: chat.Prof is nil unless the probe is on.
+local function pstart(name)
+  local p = chat.Prof
+  if p then
+    p.start(name)
+  end
+end
+
+local function pstop(name)
+  local p = chat.Prof
+  if p then
+    p.stop(name)
+  end
+end
+
 local function frameDb()
   local frames = FG.db.frames
   if type(frames.chatWindow) ~= "table" then
@@ -80,9 +95,29 @@ local function classOf(member)
   return member and FG.GuildKit.KNOWN_CLASS[member.class] and member.class or nil
 end
 
+-- The class of a name, kept per name (false: none known). Dropped with the guild list and whenever a class was
+-- newly seen (ChatClass.lua), so a name seen before its class was known is looked up again.
+local identity, identityAt = {}, 0
+
+local function dropIdentity()
+  roster, identity = nil, {}
+end
+
 -- Class and guild data of a name or a chat for the other windows of the add-on (the mini windows).
 function Window.ClassOfName(name)
-  return classOf(memberOfName(name)) or (chat.Class and chat.Class.Cached(name)) or nil
+  if type(name) ~= "string" then
+    return nil
+  end
+  local seen = chat.Class and chat.Class.Version() or 0
+  if seen ~= identityAt then
+    identity, identityAt = {}, seen
+  end
+  local hit = identity[name]
+  if hit == nil then
+    hit = classOf(memberOfName(name)) or (chat.Class and chat.Class.Cached(name)) or false
+    identity[name] = hit
+  end
+  return hit or nil
 end
 
 function Window.ClassOfKey(key)
@@ -285,7 +320,7 @@ end
 
 -- Shows a conversation in the thread and marks it in the list. opts.seq scrolls to that line. opts.browse
 -- keeps a narrow window on the list (arrow keys). False for an unknown key.
-function Window.SelectConversation(key, opts)
+local function selectNow(key, opts)
   opts = opts or {}
   local conv = chat.convs and chat.convs.convs[key]
   if not conv then
@@ -313,9 +348,18 @@ function Window.SelectConversation(key, opts)
   frame.list:SetTab(tab, true)
   frame.list:SetSelected(key, opts.seq)
   frame.input:SetConversation(key, true)
-  Window.Layout(true)
-  frame.thread:Show(conv, { seq = opts.seq })
+  frame.thread:Batch(function()
+    Window.Layout(true)
+    frame.thread:Show(conv, { seq = opts.seq })
+  end)
   return true
+end
+
+function Window.SelectConversation(key, opts)
+  pstart("win.select")
+  local ok = selectNow(key, opts)
+  pstop("win.select")
+  return ok
 end
 
 -- Lets go of the picked chat when it is key (marking it unread: a chat that stays in view counts as read).
@@ -582,8 +626,15 @@ local function applyLook()
   WS.ApplyShadow(f.shell.titleText, WS.TextShadow(style), Theme.rgb("accent2"))
 end
 
-local function create()
+-- The window is built in steps so that the build after the login can spread over several frames. A step
+-- gets the build { f = the frame, n = steps done }. The frame counts as built (Window.Frame) after the last.
+local STEPS = {}
+local building
+
+STEPS[1] = function(b)
   local f = CreateFrame("Frame", "FGChatWindow", UIParent)
+  f:Hide()
+  b.f = f
   f:SetFrameStrata("DIALOG")
   f:SetToplevel(true)
   f:SetClampedToScreen(true)
@@ -642,7 +693,10 @@ local function create()
 
   f.content = CreateFrame("Frame", nil, f)
   fitHead(f)
+end
 
+STEPS[2] = function(b)
+  local f = b.f
   f.list = List.Create(f.content, {
     Pick = pick,
     Menu = function(key)
@@ -657,6 +711,10 @@ local function create()
       Window.ShowSettings(true)
     end,
   })
+end
+
+STEPS[3] = function(b)
+  local f = b.f
   f.pane = CreateFrame("Frame", nil, f.content)
   -- The input line lives in this host, under the thread.
   f.inputHost = CreateFrame("Frame", nil, f.pane)
@@ -676,6 +734,10 @@ local function create()
     EmptyKey = emptyKey,
   })
 
+end
+
+STEPS[4] = function(b)
+  local f = b.f
   f.input = chat.Input.Create(f.inputHost, {
     Conv = function()
       return state.key and chat.convs and chat.convs.convs[state.key] or nil
@@ -692,6 +754,10 @@ local function create()
     end,
     Draw = Window.Refresh,
   })
+end
+
+STEPS[5] = function(b)
+  local f = b.f
   chat.Menu.Create()
   chat.TeamPanel.Build(f.pane, {
     Layout = function()
@@ -710,6 +776,10 @@ local function create()
     end,
   })
 
+end
+
+STEPS[6] = function(b)
+  local f = b.f
   -- The grip stays inside the padding at the corner (its mark is the lower right triangle); the hit area reaches
   -- a little further out over the frame edge, so it is easy to take.
   local grip = CreateFrame("Frame", nil, f)
@@ -775,13 +845,23 @@ local function create()
   f:SetScript(
     "OnShow",
     FG.Wrap("chat-show", function()
+      pstart("win.show.look")
       applyEsc(f)
-      roster = nil
+      dropIdentity()
       applyLook()
+      pstop("win.show.look")
+      pstart("win.show.layout")
       Window.Layout(true)
+      pstop("win.show.layout")
+      pstart("win.show.input")
       f.input:Refresh()
+      pstop("win.show.input")
+      pstart("win.show.list")
       f.list:Refresh()
+      pstop("win.show.list")
+      pstart("win.show.thread")
       f.thread:Refresh()
+      pstop("win.show.thread")
     end)
   )
   f:SetScript(
@@ -803,7 +883,51 @@ local function create()
   if chat.AutoOpen then
     chat.AutoOpen.Watch(f)
   end
+end
+
+local STEP_PROF = {
+  "win.create.shell",
+  "win.create.list",
+  "win.create.thread",
+  "win.create.input",
+  "win.create.panels",
+  "win.create.finish",
+}
+
+-- Runs the next step. Returns the frame after the last one, nil before.
+local function buildStep()
+  building = building or { n = 0 }
+  local n = building.n + 1
+  pstart(STEP_PROF[n])
+  STEPS[n](building)
+  pstop(STEP_PROF[n])
+  building.n = n
+  if n < #STEPS then
+    return nil
+  end
+  local f = building.f
+  building = nil
   return f
+end
+
+-- Builds what is left of the window in one go (the first open, or a build the background has not finished).
+local function create()
+  pstart("win.create")
+  local f
+  repeat
+    f = buildStep()
+  until f
+  pstop("win.create")
+  return f
+end
+
+-- The finished frame becomes the window, on the tab of the last session.
+local function adopt(f)
+  frame = f
+  local tab = frameDb().tab
+  if tab then
+    f.list:SetTab(tab, true)
+  end
 end
 
 -- Public ----------------------------------------------------------------------------------------------------
@@ -836,8 +960,8 @@ function Window.Parts()
 end
 
 -- Shows the window, built on first use (not in combat). Returns the frame, or nil in combat before the first
--- build.
-function Window.Open()
+-- build. With the key of a known chat that chat is selected right away (the only selection of this open).
+function Window.Open(key)
   if not FG.db then
     return nil
   end
@@ -846,37 +970,174 @@ function Window.Open()
       FG.Notify(L["chat.win.combat"], "warning")
       return nil
     end
-    frame = create()
-    local tab = frameDb().tab
-    if tab then
-      frame.list:SetTab(tab, true)
-    end
+    adopt(create())
   end
+  pstart("win.place")
   place(frame)
+  pstop("win.place")
   state.active = true
-  if frame:IsShown() then
-    Window.Layout(true)
-    Window.Refresh()
-  else
-    frame:Show()
-  end
-  if state.pendingKey then
-    local key = state.pendingKey
-    state.pendingKey = nil
-    Window.SelectConversation(key)
-  elseif not state.key then
-    -- The tab of the last session stays. Its chat comes back when it belongs to that tab (the list marks it, a
-    -- narrow window stays on the list); without a saved tab the chat sets the tab. Opening never reads a chat
-    -- the player did not pick.
-    local db = frameDb()
-    local conv = type(db.last) == "string" and chat.convs.convs[db.last] or nil
-    if conv and (db.tab == nil or inTab(conv, frame.list.tab)) then
-      Window.SelectConversation(db.last, { browse = true })
+  -- One redraw of the thread for the whole open: OnShow, the layout and the selection share it.
+  frame.thread:Batch(function()
+    if frame:IsShown() then
+      Window.Layout(true)
+      Window.Refresh()
+    else
+      frame:Show()
     end
-  end
+    local target = type(key) == "string" and chat.convs and chat.convs.convs[key] and key or nil
+    if target then
+      state.pendingKey = nil
+      Window.SelectConversation(target)
+    elseif state.pendingKey then
+      local pending = state.pendingKey
+      state.pendingKey = nil
+      Window.SelectConversation(pending)
+    elseif not state.key then
+      -- The tab of the last session stays. Its chat comes back when it belongs to that tab (the list marks it, a
+      -- narrow window stays on the list); without a saved tab the chat sets the tab. Opening never reads a chat
+      -- the player did not pick.
+      local db = frameDb()
+      local conv = type(db.last) == "string" and chat.convs.convs[db.last] or nil
+      if conv and (db.tab == nil or inTab(conv, frame.list.tab)) then
+        Window.SelectConversation(db.last, { browse = true })
+      end
+    end
+  end)
   frame:Raise()
   return frame
 end
+
+-- Background build -----------------------------------------------------------------------------------------
+
+-- A while after the login the window is built hidden, one step per frame, so the first open (a message that opens
+-- it by itself) only shows a frame that exists. Never in combat (the build waits for its end), never while the
+-- messenger is switched off. An open that comes first builds the rest at once. Nothing is shown, focused, played
+-- or saved here.
+Window.PREBUILD_DELAY, Window.STEP_DELAY = 2.5, 0.03
+local prebuildStarted, prebuildQueued, prebuildWaits = false, false, false
+
+local function prebuildWanted()
+  return FG.db ~= nil and FG.SubAddons ~= nil and FG.SubAddons.State("chat") == "active"
+end
+
+local prebuildStep
+
+local function schedule(delay)
+  local timer = rawget(_G, "C_Timer")
+  if prebuildQueued or type(timer) ~= "table" or type(timer.After) ~= "function" then
+    return
+  end
+  prebuildQueued = true
+  timer.After(delay, function()
+    prebuildQueued = false
+    FG.Safe("chat-prebuild", prebuildStep)
+  end)
+end
+
+-- Body texts ahead of time: once the window is built, the newest lines of the chats most likely to open by
+-- themselves get their body text cached, a few lines per frame, never in combat. The layout then finds them.
+Window.WARM_MS, Window.WARM_LINES, Window.WARM_CONVS, Window.WARM_KEEP = 2, 8, 4, Thread.KEEP
+Window.WARM_AGAIN_DELAY = 1
+local warmPlan, warmWaits = nil, false
+
+-- The guild chat first, then the chats of a kind that opens by itself, the newest first.
+local function warmCandidates()
+  local list, OL = {}, chat.OpenLogic
+  local options = type(chat.db) == "table" and chat.db.options or nil
+  for _, conv in pairs(chat.convs and chat.convs.convs or {}) do
+    if conv.kind == "guild" or (OL and OL.Enabled(options, conv.kind)) then
+      list[#list + 1] = conv
+    end
+  end
+  table.sort(list, function(a, b)
+    local ga, gb = a.kind == "guild", b.kind == "guild"
+    if ga ~= gb then
+      return ga
+    end
+    if a.last ~= b.last then
+      return a.last > b.last
+    end
+    return a.key < b.key
+  end)
+  for i = #list, Window.WARM_CONVS + 1, -1 do
+    list[i] = nil
+  end
+  return list
+end
+
+local function warmStep()
+  if not warmPlan then
+    return
+  end
+  if FG.InCombat() then
+    warmWaits = true
+    return
+  end
+  pstart("thread.warm")
+  local clock = rawget(_G, "debugprofilestop")
+  local t0 = type(clock) == "function" and clock() or nil
+  local n = 0
+  while warmPlan[1] do
+    local plan = warmPlan[1]
+    local lines = plan.conv.lines
+    if plan.at == nil then
+      plan.at = math.max(1, #lines - Window.WARM_KEEP + 1)
+    end
+    if plan.at > #lines then
+      table.remove(warmPlan, 1)
+    else
+      Thread.WarmBody(plan.conv, lines[plan.at])
+      plan.at = plan.at + 1
+      n = n + 1
+      if (t0 and clock() - t0 >= Window.WARM_MS) or (not t0 and n >= Window.WARM_LINES) then
+        break
+      end
+    end
+  end
+  pstop("thread.warm")
+  if warmPlan[1] then
+    local timer = rawget(_G, "C_Timer")
+    if type(timer) == "table" and type(timer.After) == "function" then
+      timer.After(0, function()
+        FG.Safe("chat-warm", warmStep)
+      end)
+    end
+  else
+    warmPlan = nil
+  end
+end
+
+local function warmStart()
+  warmPlan = {}
+  for _, conv in ipairs(warmCandidates()) do
+    warmPlan[#warmPlan + 1] = { conv = conv }
+  end
+  warmStep()
+end
+
+function prebuildStep()
+  if frame or not prebuildWanted() then
+    return
+  end
+  if FG.InCombat() then
+    prebuildWaits = true
+    return
+  end
+  local f = buildStep()
+  if f then
+    adopt(f)
+    warmStart()
+  else
+    schedule(Window.STEP_DELAY)
+  end
+end
+
+FG.On("PLAYER_ENTERING_WORLD", function()
+  if not prebuildStarted then
+    prebuildStarted = true
+    schedule(Window.PREBUILD_DELAY)
+  end
+end)
 
 function Window.Close()
   if frame then
@@ -897,13 +1158,22 @@ chat.SelectConversation = Window.SelectConversation
 
 -- Events ----------------------------------------------------------------------------------------------------
 
+-- Chats that arrive after the prebuild (restored history, a first line) and new lines get their bodies warmed too.
+local function warmAgain()
+  if frame and not warmPlan and not Window.IsShown() then
+    warmStart()
+  end
+end
+
 FG.On("FG_CHAT_UPDATE", function(_, keys)
   if not emitting and Window.IsShown() then
     Window.Refresh(type(keys) == "table" and keys or nil)
+  elseif frame and not warmPlan then
+    FG.Debounce("chat-warm-again", Window.WARM_AGAIN_DELAY, warmAgain)
   end
 end)
 FG.On("FG_GUILD_UPDATE", function()
-  roster = nil
+  dropIdentity()
   if Window.IsShown() then
     Window.Refresh()
   end
@@ -952,6 +1222,14 @@ FG.On("FG_SUBADDON_CHANGED", function(_, id)
   end
 end)
 FG.On("PLAYER_REGEN_ENABLED", function()
+  if warmWaits then
+    warmWaits = false
+    FG.Safe("chat-warm", warmStep)
+  end
+  if prebuildWaits then
+    prebuildWaits = false
+    schedule(Window.STEP_DELAY)
+  end
   if state.pending then
     state.pending = false
     Window.Refresh()
@@ -971,6 +1249,9 @@ chat.hook.Register({
   IsShown = Window.IsShown,
   SelectConversation = Window.SelectConversation,
   Window = Window,
+  SetProf = function(prof)
+    chat.Prof = prof
+  end,
   Store = chat.Store,
   Db = function()
     return chat.db

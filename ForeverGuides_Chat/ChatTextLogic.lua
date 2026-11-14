@@ -88,6 +88,10 @@ function TX.ColorUrls(shown, hex)
   if type(shown) ~= "string" or shown == "" or type(hex) ~= "string" then
     return shown
   end
+  -- Every address has a dot or a scheme; most lines have neither.
+  if not (shown:find(".", 1, true) or shown:find("://", 1, true)) then
+    return shown
+  end
   return (
     shown:gsub("%S+", function(word)
       local from, to = addressIn(word)

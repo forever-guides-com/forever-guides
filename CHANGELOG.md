@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.9
+
+### Added
+
+- Professions: Craftable reagents carry an arrow. One click opens their recipe, Back takes you there again, and the tooltip lists their reagents.
+
+### Changed
+
+- Professions: Items and reagents use the names of your game, so they appear in German in the German game.
+- Professions: Clicking a reagent no longer puts it on the shopping list.
+- Forever Chat: The window opens much faster, also when a new message opens it by itself.
+
+### Fixed
+
+- Forever Chat: New messages no longer slow the game down while the chat is open.
+- Guild: The minimap, the map and the crafter directory read the guild list less often and cost less performance in large guilds.
+
 ## 0.7.8
 
 ### Fixed

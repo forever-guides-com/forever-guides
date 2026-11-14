@@ -299,7 +299,7 @@ local function paintStep(row, item)
     local info = type(data.items) == "table" and data.items[m[1]] or {}
     local chip = {
       icon = iconPath(info.icon),
-      name = ns.T({ de = info.de, en = info.en }) or ("item:" .. tostring(m[1])),
+      name = ns.ItemInfo.name(m[1], { de = info.de, en = info.en }, "item:" .. tostring(m[1])),
       meta = tostring((m[2] or 1) * (step.crafts or 1)),
       tip = string.format(L["profroute.perCraft"], m[2] or 1),
     }
@@ -619,6 +619,9 @@ local function build(container)
   ns.On("FG_UI_REFRESHED", whenVisible)
   ns.On("SKILL_LINES_CHANGED", function()
     ns.Debounce("profroute-skill", 0.5, whenVisible)
+  end)
+  ns.On("GET_ITEM_INFO_RECEIVED", function()
+    ns.Debounce("profroute-items", 0.5, whenVisible)
   end)
   P.view, P.options = view, options
   return view

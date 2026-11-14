@@ -267,7 +267,7 @@ function R.Needs(data, from, to, opts)
       end
       lines[#lines + 1] = {
         id = id,
-        name = ns.T({ de = info.de, en = info.en }) or ("item:" .. id),
+        name = ns.ItemInfo.name(id, { de = info.de, en = info.en }, "item:" .. id),
         de = info.de,
         en = info.en,
         icon = info.icon,

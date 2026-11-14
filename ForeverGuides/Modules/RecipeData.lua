@@ -65,6 +65,24 @@ function D.Get(slug)
   return data, cached.list, D.STATUS.ok
 end
 
+-- Which recipes make an item, over every profession with data: the reverse index is built on the first
+-- question and kept until Reset. Returns the entries { slug, recipe, data } in click order (see
+-- RecipeLogic.PickProducers), nil when no recipe makes the item.
+local producers
+function D.Producers(itemId, slug, skipSpell)
+  if not producers then
+    local sources = {}
+    for _, s in ipairs(ns.ProfessionRouteLogic.SLUGS) do
+      local data, list = D.Get(s)
+      if data then
+        sources[#sources + 1] = { slug = s, data = data, list = list }
+      end
+    end
+    producers = ns.RecipeLogic.IndexProducers(sources)
+  end
+  return ns.RecipeLogic.PickProducers(producers[itemId], slug, skipSpell)
+end
+
 -- The hint text for a status other than "ok".
 function D.Hint(status)
   return ns.L[status == D.STATUS.missing and "recipes.missing" or "recipes.noData"]
@@ -74,6 +92,7 @@ end
 function D.Reset()
   attempted, loaded = false, false
   cache = {}
+  producers = nil
 end
 
 -- The package banner switched the add-on on: ask again, the old "missing" answer is out of date.

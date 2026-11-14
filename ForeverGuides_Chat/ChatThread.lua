@@ -26,6 +26,9 @@ chat.Thread = Thread
 Thread.HEAD = 48
 Thread.PREBUILD = 24
 Thread.OVERSCAN = 40
+Thread.KEEP = 80 -- lines laid out at least
+Thread.BATCH = 80 -- lines added when the view nears the top
+Thread.MARGIN = 20 -- lines kept before a jump target
 local GAP, WHEEL_LINES = 6, 3
 local PALETTE = { "actionHi", "accent", "success", "info", "warning", "accent2" }
 local DELIVERY_TOKEN = {
@@ -48,6 +51,21 @@ end
 
 local function isNumber(v)
   return type(v) == "number" and v == v
+end
+
+-- Timing points for the chat timing probe: chat.Prof is nil unless the probe is on.
+local function pstart(name)
+  local p = chat.Prof
+  if p then
+    p.start(name)
+  end
+end
+
+local function pstop(name)
+  local p = chat.Prof
+  if p then
+    p.stop(name)
+  end
 end
 
 -- Colors as { r, g, b } so cards, voices and their contrast can be computed.
@@ -82,14 +100,43 @@ function Thread.CardSeen(kind, voice, own)
 end
 
 -- Color of the voice (say, yell, emote) on its card: the color of the game's chat type, readable on the card.
+-- Colors resolved once per kind, voice and owner. Dropped when the game's chat colors, the theme or a setting
+-- change (see the events at the end of the file).
+local voiceColors, voiceMarks, classRgbs = {}, {}, {}
+local bodies = setmetatable({}, { __mode = "k" })
+-- Logo markup per name while a layout pass runs (the lookup is costly), nil outside of one.
+local badges
+
+-- bodies is not dropped here: any settings write anywhere fires FG_SETTING_CHANGED, and a body only depends on
+-- its line, the quote head, the decor and the accent color, all of which are checked on a hit.
+local function dropColors()
+  voiceColors, voiceMarks, classRgbs = {}, {}, {}
+end
+Thread.DropColors = dropColors
+FG.On("UPDATE_CHAT_COLOR", dropColors)
+FG.On("FG_UI_REFRESHED", dropColors)
+FG.On("FG_SETTING_CHANGED", dropColors)
+
 function Thread.VoiceRgb(kind, voice, own)
-  return TL.VoiceColor(voice, rawget(_G, "ChatTypeInfo"), Thread.CardSeen(kind, voice, own))
+  local key = tostring(kind) .. "|" .. tostring(voice) .. "|" .. tostring(own == true)
+  local hit = voiceColors[key]
+  if not hit then
+    hit = { TL.VoiceColor(voice, rawget(_G, "ChatTypeInfo"), Thread.CardSeen(kind, voice, own)) }
+    voiceColors[key] = hit
+  end
+  return hit[1], hit[2], hit[3]
 end
 
 -- "» says" in the color of the voice: a symbol and a word, so the voice never rests on color alone.
 function Thread.VoiceMark(kind, voice, own)
-  local r, g, b = Thread.VoiceRgb(kind, voice, own)
-  return hexOf(r, g, b, LL.VOICE_SYMBOL[voice] .. " " .. L["chat.voice." .. voice])
+  local key = tostring(kind) .. "|" .. tostring(voice) .. "|" .. tostring(own == true)
+  local hit = voiceMarks[key]
+  if not hit then
+    local r, g, b = Thread.VoiceRgb(kind, voice, own)
+    hit = hexOf(r, g, b, LL.VOICE_SYMBOL[voice] .. " " .. L["chat.voice." .. voice])
+    voiceMarks[key] = hit
+  end
+  return hit
 end
 
 local function scaled(base)
@@ -131,8 +178,12 @@ local function look(view, item)
   end
   local class = Thread.ClassOf(view, item.line)
   if class then
-    local r, g, b = U.hex(K.ClassColorHex(class))
-    return r, g, b, short
+    local rgb = classRgbs[class]
+    if not rgb then
+      rgb = { U.hex(K.ClassColorHex(class)) }
+      classRgbs[class] = rgb
+    end
+    return rgb[1], rgb[2], rgb[3], short
   end
   local sum = 0
   for i = 1, #short do
@@ -170,18 +221,75 @@ local function quoteHead(view, line)
   return "|Hfgjump:" .. original.seq .. "|h" .. hexOf(r, g, b, text) .. "|h" .. "\n"
 end
 
-local function bodyText(view, item)
+-- The expensive part of a body (link coloring) per text and color, so a changed head, decor or a replaced line table
+-- does not redo it. Dropped as a whole at the cap.
+local colored, coloredN, COLORED_CAP = {}, 0, 600
+
+local function coloredText(text, hex)
+  if type(text) ~= "string" then
+    return TX.ColorUrls(text, hex)
+  end
+  local key = hex .. text
+  local out = colored[key]
+  if out then
+    return out
+  end
+  out = TX.ColorUrls(text, hex)
+  if coloredN >= COLORED_CAP then
+    colored, coloredN = {}, 0
+  end
+  colored[key], coloredN = out, coloredN + 1
+  return out
+end
+
+-- Always-on counters for /fg dev chatprof: lines warmed ahead, layout hits and misses of the body cache.
+local stats = { warmed = 0, hit = 0, miss = 0 }
+
+function Thread.BodyStats()
+  return stats.warmed, stats.hit, stats.miss
+end
+
+function Thread.ResetBodyStats()
+  stats.warmed, stats.hit, stats.miss = 0, 0, 0
+end
+
+local function bodyText(view, item, warming)
   if item.line.hidden then
     return L["chat.thread.hidden"]
   end
+  local line = item.line
+  local head = quoteHead(view, line)
+  local decor = chat.Peer and view.conv and chat.Peer.Decor(view.conv.key, line) or ""
+  -- The assembled text is kept per line while none of its inputs changed.
   local r, g, b = Theme.rgb("accent2")
-  local text = TX.ColorUrls(item.line.text, string.format("%02x%02x%02x", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5))
-  text = quoteHead(view, item.line) .. text
-  local decor = chat.Peer and view.conv and chat.Peer.Decor(view.conv.key, item.line) or ""
-  if decor == "" then
-    return text
+  local hex = string.format("%02x%02x%02x", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5)
+  local kept = bodies[line]
+  if kept and kept.text == line.text and kept.head == head and kept.decor == decor and kept.hex == hex then
+    if not warming then
+      stats.hit = stats.hit + 1
+    end
+    return kept.out
   end
-  return text .. "  " .. hexOf(r, g, b, "[" .. decor .. "]")
+  if not warming then
+    stats.miss = stats.miss + 1
+  end
+  local out = head .. coloredText(line.text, hex)
+  if decor ~= "" then
+    out = out .. "  " .. hexOf(r, g, b, "[" .. decor .. "]")
+  end
+  bodies[line] = { text = line.text, head = head, decor = decor, hex = hex, out = out }
+  return out
+end
+
+-- Fills the body cache of a line ahead of a layout; the key and inputs are those of the layout (bodyText is shared
+-- by both modes). Returns whether a body was computed.
+function Thread.WarmBody(conv, line)
+  if type(conv) ~= "table" or type(line) ~= "table" or line.hidden then
+    return false
+  end
+  bodyText({ conv = conv }, { line = line }, true)
+  stats.warmed = stats.warmed + 1
+  return true
 end
 
 -- The logo in front of a name, "" unless the logo setting and Presence say so (ChatPeer.Badge).
@@ -189,7 +297,16 @@ local function badgeOf(item)
   if not chat.Peer or item.line.hidden then
     return ""
   end
-  return chat.Peer.Badge(item.own and FG.PlayerName.Self() or item.line.sender)
+  local name = item.own and FG.PlayerName.Self() or item.line.sender
+  if not (badges and type(name) == "string") then
+    return chat.Peer.Badge(name)
+  end
+  local badge = badges[name]
+  if badge == nil then
+    badge = chat.Peer.Badge(name)
+    badges[name] = badge
+  end
+  return badge
 end
 
 -- The text of a delivery mark: a team line that waits says what it waits for.
@@ -823,6 +940,7 @@ function Thread.Create(parent, win, shape)
   local view = {
     win = win,
     pool = {},
+    holding = 0,
     items = {},
     offset = 0,
     contentH = 0,
@@ -1080,11 +1198,55 @@ function Thread.Create(parent, win, shape)
 
   -- Layout and drawing ---------------------------------------------------------------------------------
 
+  -- Wrapping a text is the expensive part of a layout. A height is kept per line and reused while the text, the
+  -- width and the fonts stay the same, so a new message measures one text, not the whole history.
+  local heights = setmetatable({}, { __mode = "k" })
+  local fontSig = ""
+
+  local function fontKey()
+    local a, sa, fa = view.meas:GetFont()
+    local b, sb, fb = view.measBig:GetFont()
+    return table.concat({ tostring(a), tostring(sa), tostring(fa), tostring(b), tostring(sb), tostring(fb) }, "|")
+  end
+
   local function measure(text, width, item)
-    local meas = item and item.voice == "yell" and view.mode == "messenger" and view.measBig or view.meas
+    local big = item and item.voice == "yell" and view.mode == "messenger"
+    local line = item and item.line
+    local kept = line and heights[line]
+    if kept and kept.text == text and kept.width == width and kept.big == big and kept.fonts == fontSig then
+      return kept.h
+    end
+    local meas = big and view.measBig or view.meas
     meas:SetWidth(width)
     meas:SetText(text)
-    return meas:GetStringHeight()
+    local h = meas:GetStringHeight()
+    if line then
+      heights[line] = { text = text, width = width, big = big, fonts = fontSig, h = h }
+    end
+    return h
+  end
+
+  -- Only the newest lines are laid out, so opening a long history costs the same as opening a short one. Older
+  -- lines come in batches (Thread.BATCH) when the view nears the top of what is laid out, or at once when a jump
+  -- needs one. view.extra: lines beyond the base count that were asked for.
+  local function baseCount()
+    local per = math.max(1, scaled(TL.SPEC.minLine))
+    return math.max(Thread.KEEP, math.ceil(3 * view.viewH / per))
+  end
+
+  -- Makes sure the line with this seq (and a few before it) is laid out; the caller rebuilds.
+  local function reveal(seq)
+    local lines = view.conv and view.conv.lines
+    if not (lines and seq) then
+      return
+    end
+    for i = #lines, 1, -1 do
+      if lines[i].seq == seq then
+        local need = #lines - i + 1 + Thread.MARGIN
+        view.extra = math.max(view.extra or 0, need - baseCount())
+        return
+      end
+    end
   end
 
   -- Items and heights for the width now. The line at the top of the view keeps its place.
@@ -1095,6 +1257,7 @@ function Thread.Create(parent, win, shape)
       local item = view.items[view.first]
       anchor, delta = item.seq, view.offset - item.top
     end
+    pstart("thread.build")
     local deliveryOf
     if conv.kind == "team" and chat.Teams then
       local tid = chat.TeamsUILogic.TeamId(conv.key)
@@ -1104,7 +1267,9 @@ function Thread.Create(parent, win, shape)
         return chat.TeamsUILogic.Delivery(set, line) or TL.Delivery(line)
       end
     end
-    view.items = TL.Build(conv, {
+    local cut = #conv.lines - baseCount() - (view.extra or 0)
+    view.buildOpts = {
+      from = cut > 0 and cut + 1 or 1,
       date = List.DateOf,
       dividerSeq = view.dividerSeq,
       unread = view.dividerCount,
@@ -1112,16 +1277,42 @@ function Thread.Create(parent, win, shape)
       resend = function(line)
         return chat.WayLogic.Resendable(conv.kind, line)
       end,
-    })
+    }
+    view.items = TL.Build(conv, view.buildOpts)
+    view.hidden = math.max(0, cut)
+    if cut > 0 then
+      for _, item in ipairs(view.items) do
+        if item.type == "line" then
+          item.first = true
+          break
+        end
+      end
+    end
+    pstop("thread.build")
     local mode = view.mode
-    view.contentH = TL.Layout(view.items, view.width, {
+    pstart("thread.fonts")
+    fontSig = fontKey()
+    pstop("thread.fonts")
+    view.layoutM = {
       mode = mode,
       scale = scaled,
       measure = measure,
       text = function(item)
-        return mode == "messenger" and bodyText(view, item) or compactText(view, item)
+        pstart("thread.text")
+        local text = mode == "messenger" and bodyText(view, item) or compactText(view, item)
+        pstop("thread.text")
+        return text
       end,
-    })
+    }
+    pstart("thread.layout")
+    badges = {}
+    local ok, height = pcall(TL.Layout, view.items, view.width, view.layoutM)
+    badges = nil
+    if not ok then
+      error(height, 0)
+    end
+    view.contentH = height
+    pstop("thread.layout")
     if anchor then
       local at = TL.IndexOfSeq(view.items, anchor)
       if at then
@@ -1129,6 +1320,73 @@ function Thread.Create(parent, win, shape)
       end
     end
     view.offset = TL.ClampOffset(view.offset, view.contentH, view.viewH)
+    view.laidOut = {
+      conv = conv,
+      n = #conv.lines,
+      last = conv.lines[#conv.lines],
+      mode = mode,
+      width = view.width,
+      fonts = fontSig,
+      divider = view.dividerSeq,
+      count = view.dividerCount,
+    }
+  end
+
+  -- Adds the one new line at the end of what Rebuild laid out. False (nothing changed) whenever the result would
+  -- not be the same as a Rebuild: another conversation, mode, width or font, a team (its delivery set), a divider
+  -- change, other than one new line (older ones may have dropped out of a full history), a day marker, or the laid-out window running far past its size.
+  local function appendLine(conv)
+    local built = view.laidOut
+    local lines = conv.lines
+    if
+      not (
+        built
+        and built.conv == conv
+        and conv.kind ~= "team"
+        and #lines >= 2
+        and built.n + 1 >= #lines
+        and lines[#lines - 1] == built.last
+        and built.mode == view.mode
+        and built.width == view.width
+        and built.fonts == fontKey()
+        and built.divider == view.dividerSeq
+        and built.count == view.dividerCount
+        and (#view.items > 0)
+      )
+    then
+      return false
+    end
+    local size = baseCount() + (view.extra or 0)
+    if #lines - size - view.hidden > Thread.BATCH or #view.items - size > Thread.BATCH then
+      return false
+    end
+    pstart("thread.append")
+    -- A full history drops its oldest lines for each new one: the items keep their place in the conversation.
+    local dropped = built.n + 1 - #lines
+    if dropped > 0 then
+      for _, kept in ipairs(view.items) do
+        if kept.index then
+          kept.index = kept.index - dropped
+        end
+      end
+    end
+    local opts = view.buildOpts
+    local item = TL.AppendItem(conv, view.items, opts)
+    if not item then
+      pstop("thread.append")
+      return false
+    end
+    badges = {}
+    local ok, height = pcall(TL.LayoutAppend, view.items, item, view.contentH, view.width, view.layoutM)
+    badges = nil
+    if not ok then
+      error(height, 0)
+    end
+    view.contentH = height
+    view.items[#view.items + 1] = item
+    built.n, built.last = #lines, lines[#lines]
+    pstop("thread.append")
+    return true
   end
 
   function view:MarkSeen()
@@ -1203,7 +1461,24 @@ function Thread.Create(parent, win, shape)
     return TL.AtEnd(view.offset, view.contentH, view.viewH)
   end
 
+  -- Lays out older lines. Home (all) takes the whole history; otherwise one batch, the line at the top stays put.
+  local function loadOlder(all)
+    view.first = TL.Visible(view.items, view.offset, view.viewH, 0)
+    view.extra = (view.extra or 0) + (all and view.hidden or Thread.BATCH)
+    view:Rebuild()
+  end
+
   function view:ScrollTo(offset)
+    if view.hidden and view.hidden > 0 then
+      if offset <= 0 then
+        loadOlder(true)
+      elseif offset < view.viewH then
+        -- The new lines push everything down; the wanted offset moves with them.
+        local before = view.offset
+        loadOlder(false)
+        offset = offset + view.offset - before
+      end
+    end
     local clamped = TL.ClampOffset(offset == math.huge and view.contentH or offset, view.contentH, view.viewH)
     if clamped ~= view.offset or offset == math.huge then
       view.offset = clamped
@@ -1214,6 +1489,12 @@ function Thread.Create(parent, win, shape)
   -- Scrolls to a line and marks it (the jump of a quote head). Returns whether the line is still there.
   function view:JumpTo(seq)
     local index = seq and TL.IndexOfSeq(view.items, seq)
+    if not index and seq and view.hidden and view.hidden > 0 then
+      reveal(seq)
+      view.first = TL.Visible(view.items, view.offset, view.viewH, 0)
+      view:Rebuild()
+      index = TL.IndexOfSeq(view.items, seq)
+    end
     if not index then
       return false
     end
@@ -1348,6 +1629,10 @@ function Thread.Create(parent, win, shape)
 
   -- Draws again after new lines, a resize or a font change. toEnd: jump to the end whatever the position.
   function view:Refresh(toEnd)
+    if view.holding > 0 then
+      view.dirty = true
+      return
+    end
     local conv = view.conv and chat.convs.convs[view.conv.key]
     if view.conv and not conv then
       view:Clear()
@@ -1367,7 +1652,9 @@ function Thread.Create(parent, win, shape)
       view.dividerCount = chat.Unread.Count(conv)
     end
     view:PaintHead()
-    view:Rebuild()
+    if not (wasAtEnd and appendLine(conv)) then
+      view:Rebuild()
+    end
     if toEnd or wasAtEnd then
       view.offset = TL.MaxOffset(view.contentH, view.viewH)
     end
@@ -1378,8 +1665,9 @@ function Thread.Create(parent, win, shape)
   -- divider) or the end.
   function view:Show(conv, opts)
     opts = opts or {}
+    view.dirty = false
     closePicker()
-    view.conv, view.items, view.first = conv, {}, nil
+    view.conv, view.items, view.first, view.laidOut = conv, {}, nil, nil
     view.offset, view.highlight = 0, opts.seq
     view.dividerSeq, view.dividerCount = nil, nil
     if not conv then
@@ -1393,6 +1681,8 @@ function Thread.Create(parent, win, shape)
     end
     view.mode = view.forceMode or TL.Mode(chat.db, conv.key)
     view:PaintHead()
+    view.extra, view.hidden = 0, 0
+    reveal(opts.seq or view.dividerSeq)
     view:Rebuild()
     local target = math.huge
     if opts.seq then
@@ -1406,6 +1696,21 @@ function Thread.Create(parent, win, shape)
     end
     view.offset = TL.ClampOffset(target == math.huge and view.contentH or target, view.contentH, view.viewH)
     view:Render()
+  end
+
+  -- Runs fn with Refresh deferred: the calls inside (a layout, OnShow, a selection) share one redraw at the end.
+  -- Show still draws at once and settles what was asked before it.
+  function view:Batch(fn)
+    view.holding = view.holding + 1
+    local ok, err = pcall(fn)
+    view.holding = view.holding - 1
+    if view.holding == 0 and view.dirty then
+      view.dirty = false
+      view:Refresh()
+    end
+    if not ok then
+      error(err, 0)
+    end
   end
 
   function view:Clear()

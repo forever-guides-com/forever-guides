@@ -69,6 +69,9 @@ ns.AddLocale("enUS", {
   ["recipes.changedNote"] = "Changed against Classic",
   ["recipes.removedNote"] = "Removed in Forever",
   ["recipes.linkHint"] = "Shift+click: link to chat",
+  ["recipes.openHint"] = "Click: open recipe",
+  ["recipes.madeFrom"] = "Recipe: %s (%s)",
+  ["recipes.alsoMade"] = "Also made by: %s",
   ["recipes.addToList"] = "Add to shopping list",
   ["recipes.addTip"] = "Raises the amount when the item is already on the list.",
   ["recipes.addHint"] = "Click an item to add it to the shopping list.",
@@ -123,6 +126,9 @@ ns.AddLocale("deDE", {
   ["recipes.changedNote"] = "Geändert gegenüber Classic",
   ["recipes.removedNote"] = "In Forever entfernt",
   ["recipes.linkHint"] = "Umschalt+Klick: Link in den Chat",
+  ["recipes.openHint"] = "Klicken: Rezept öffnen",
+  ["recipes.madeFrom"] = "Rezept: %s (%s)",
+  ["recipes.alsoMade"] = "Auch hergestellt von: %s",
   ["recipes.addToList"] = "Zur Einkaufsliste hinzufügen",
   ["recipes.addTip"] = "Erhöht die Menge, wenn das Item schon auf der Liste steht.",
   ["recipes.addHint"] = "Klicke ein Item an, um es zur Einkaufsliste hinzuzufügen.",
@@ -156,19 +162,9 @@ local function call(fn, ...)
   end
 end
 
-local requested = {}
-
--- Item name from the client; asks for the data once when it is not cached yet.
+-- Item name from the client, nil while it is not cached (ItemInfo.name asks for the data once).
 local function clientItemName(id)
-  local get = itemApi("GetItemNameByID") or rawget(_G, "GetItemInfo")
-  local name = call(get, id)
-  if type(name) == "string" and name ~= "" then
-    return name
-  end
-  if not requested[id] then
-    requested[id] = true
-    call(itemApi("RequestLoadItemDataByID"), id)
-  end
+  return ns.ItemInfo.name(id)
 end
 
 local function itemIcon(id)
@@ -259,6 +255,49 @@ end
 
 -- Item lines (patterns, reagents) -----------------------------------------------------------------
 
+-- Name of a reagent from the data table of its profession, else the client, else the id.
+local function itemLabel(items, id)
+  local info = type(items) == "table" and items[id] or {}
+  return ns.T({ de = info.de, en = info.en }) or clientItemName(id) or string.format(L["recipes.item"], id)
+end
+
+-- Tooltip of a reagent line: the item tooltip, and for a craftable reagent the reagents of the recipe
+-- that makes it (one level) plus the click hint.
+local function showItemLine(b)
+  local spec = { link = "item:" .. b.id, title = b.label }
+  local made = b.producers
+  if made then
+    local first = made[1]
+    local lines = { { separator = true } }
+    lines[#lines + 1] = {
+      text = string.format(L["recipes.madeFrom"], R.Name(first.recipe, lang()), Route.Name(first.slug)),
+      color = "accent2",
+    }
+    for _, m in ipairs(R.Reagents(first.recipe.mats)) do
+      lines[#lines + 1] = { left = itemLabel(first.data.items, m.id), right = m.need .. "x", color = "text" }
+    end
+    if #made > 1 then
+      local others = {}
+      for i = 2, #made do
+        others[#others + 1] = string.format("%s (%s)", R.Name(made[i].recipe, lang()), Route.Name(made[i].slug))
+      end
+      lines[#lines + 1] = { text = string.format(L["recipes.alsoMade"], table.concat(others, ", ")), color = "textSecondary" }
+    end
+    spec.lines, spec.hint = lines, L["recipes.openHint"]
+  end
+  W.Tooltip.Show(b, spec)
+end
+
+-- Opens the recipe that makes a reagent. The recipe on show goes into the history first, so Back
+-- returns to it.
+local function openRecipe(d, made)
+  local here = d.slug and d.recipe and ("professions/" .. d.slug .. "/" .. d.recipe.s)
+  if here and ns.Router.current ~= here then
+    ns.Router:navigate(here)
+  end
+  ns.Router:navigate("professions/" .. made.slug .. "/" .. made.recipe.s)
+end
+
 local function newItemLine(parent)
   local b = CreateFrame("Button", nil, parent)
   b.icon = b:CreateTexture(nil, "ARTWORK")
@@ -267,12 +306,19 @@ local function newItemLine(parent)
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   b.right = W.Text(b, { role = "micro", color = "textSecondary", justify = "RIGHT" })
   b.right:SetPoint("RIGHT", -4, 0)
+  -- Marks a reagent that a recipe makes: a click opens that recipe.
+  b.go = b:CreateTexture(nil, "ARTWORK")
+  b.go:SetSize(12, 12)
+  b.go:SetPoint("RIGHT", b.right, "LEFT", -4, 0)
+  b.go:SetTexture(ns.UI_ICONS["chevron-right"])
+  b.go:SetVertexColor(Theme.color("accent2"))
+  b.go:Hide()
   b.name = W.Text(b, { role = "ui" })
   b.name:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
-  b.name:SetPoint("RIGHT", b.right, "LEFT", -6, 0)
+  b.name:SetPoint("RIGHT", b.go, "LEFT", -2, 0)
   b:SetScript("OnEnter", function(self)
     if self.id then
-      W.Tooltip.Show(self, { link = "item:" .. self.id, title = self.label })
+      showItemLine(self)
     end
   end)
   b:SetScript("OnLeave", ns.HideTooltip)
@@ -285,6 +331,8 @@ local function newItemLine(parent)
     ns.Wrap("recipes-item-line", function(self)
       if shiftDown() and self.id then
         insertChatLink(self.link or string.format("|Hitem:%d|h[%s]|h", self.id, self.label or tostring(self.id)))
+      elseif self.producers then
+        openRecipe(parent, self.producers[1])
       elseif self.id then
         parent:Select(self.id)
       end
@@ -432,9 +480,8 @@ local function newDetail(parent)
     self.entry = entry
     if entry then
       entry.slug = self.slug
-      local label = clientItemName(entry.id)
-        or ns.T({ de = entry.de, en = entry.en })
-        or string.format(L["recipes.item"], entry.id)
+      local label =
+        ns.ItemInfo.name(entry.id, { de = entry.de, en = entry.en }, string.format(L["recipes.item"], entry.id))
       W.SetText(self.add.name, nil, ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(entry.id)))
     end
     self.add:SetShown(entry ~= nil and r ~= nil)
@@ -473,6 +520,8 @@ local function line(d, i)
     b = newItemLine(d)
     d.lines[i] = b
   end
+  b.producers = nil
+  b.go:Hide()
   return b
 end
 
@@ -503,7 +552,7 @@ local function paintDetail(d, r, ctx)
   if d.targetFor ~= r.s then
     d.targetFor, d.target = r.s, r.i
   end
-  local name = R.Name(r, lang())
+  local name = ns.ItemInfo.spellName(r.s, R.Name(r, lang()))
   d.icon:SetTexture(recipeIcon(r))
   d.name:SetText(name)
   d.bands:SetText(bandsText(r.sk))
@@ -557,8 +606,10 @@ local function paintDetail(d, r, ctx)
     used = used + 1
     local b = line(d, used)
     local info = items[m.id] or {}
-    local label = ns.T({ de = info.de, en = info.en }) or clientItemName(m.id) or string.format(L["recipes.item"], m.id)
+    local label = ns.ItemInfo.name(m.id, { de = info.de, en = info.en }, string.format(L["recipes.item"], m.id))
     b.id, b.label, b.link = m.id, label, nil
+    b.producers = Data.Producers(m.id, ctx.slug, r.s)
+    b.go:SetShown(b.producers ~= nil)
     b.entry = { id = m.id, de = info.de, en = info.en, icon = info.ico }
     b.icon:SetTexture(iconPath(info.ico) or itemIcon(m.id) or FALLBACK_ICON)
     b.name:SetText(ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(m.id)))

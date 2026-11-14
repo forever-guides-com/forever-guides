@@ -470,16 +470,7 @@ local converter = ns.PriceSourceAddon.Converter
 -- The name the list has to search for: the item name of the client, else the data name in the
 -- client language.
 local function clientName(line)
-  local item = rawget(_G, "C_Item")
-  local byId = type(item) == "table" and item.GetItemNameByID or rawget(_G, "GetItemInfo")
-  if type(byId) == "function" then
-    local ok, name = pcall(byId, line.id)
-    if ok and type(name) == "string" and name ~= "" then
-      return name
-    end
-  end
-  local locale = type(GetLocale) == "function" and GetLocale() or "enUS"
-  return (locale == "deDE" and line.de or line.en) or line.name
+  return ns.ItemInfo.name(line.id, { de = line.de, en = line.en }, line.name)
 end
 S.ClientName = clientName
 

@@ -13,6 +13,8 @@ D.MAX_MEMBERS = 2000
 -- Seconds a request may stay unanswered by an event before the cache counts as the answer: a client that
 -- has nothing new to say may skip GUILD_ROSTER_UPDATE, and the age of the list must not stay behind.
 D.ANSWER_WAIT = 4
+-- An empty roster is read again at most this often, unless a roster event marks it dirty.
+D.RETRY = 1
 local UPDATE_DELAY = 0.5
 
 local state = { dirty = true, asked = -1e9, events = 0, requests = 0, reads = 0, silent = 0 }
@@ -108,8 +110,9 @@ local function read()
   snap.motd = motd and type(motd[1]) == "string" and motd[1] or ""
   snap.loaded = #snap.members > 0
   state.snap = snap
-  -- An empty roster means the server has not answered yet, read again next time.
+  -- An empty roster means the server has not answered yet, read again soon.
   state.dirty = not snap.loaded
+  state.retryAt = state.dirty and clock() + D.RETRY or nil
 end
 
 -- The cached roster. Read from the game when the events marked it dirty, never in combat.
@@ -118,9 +121,9 @@ function D.Get()
     return source.snapshot()
   end
   if state.pending and clock() - state.pending >= D.ANSWER_WAIT then
-    state.pending, state.silent, state.dirty = nil, state.silent + 1, true
+    state.pending, state.silent, state.dirty, state.retryAt = nil, state.silent + 1, true, nil
   end
-  if state.dirty and not inCombat() then
+  if state.dirty and not inCombat() and not (state.retryAt and clock() < state.retryAt) then
     read()
   end
   return state.snap
@@ -192,7 +195,7 @@ function D.Rights()
 end
 
 local function onUpdate()
-  state.dirty, state.pending = true, nil
+  state.dirty, state.pending, state.retryAt = true, nil, nil
   state.events, state.lastEvent = state.events + 1, clock()
   ns.Debounce("guild-update", UPDATE_DELAY, function()
     ns.Emit("FG_GUILD_UPDATE")
@@ -227,5 +230,5 @@ function D.Reset()
   source = nil
   state.dirty, state.asked, state.snap = true, -1e9, empty()
   state.events, state.requests, state.reads, state.silent = 0, 0, 0, 0
-  state.pending, state.lastEvent, state.askOk = nil, nil, nil
+  state.pending, state.lastEvent, state.askOk, state.retryAt = nil, nil, nil, nil
 end

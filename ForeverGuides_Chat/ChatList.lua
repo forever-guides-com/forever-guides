@@ -26,10 +26,26 @@ List.TAB_ORDER = Conv.TAB_ORDER
 local PAD, GAP, HEX = 8, 6, 16
 local TAB_GAP, TAB_PAD, TAB_H = 4, 8, 28
 
--- Clock text of the game (the global date), os.date outside the game.
+local dates, dateCount = {}, 0
+
+-- Clock text of the game (the global date), os.date outside the game. The answer is kept per format and minute (per
+-- second when the format shows seconds).
 function List.DateOf(format, time)
   local fn = rawget(_G, "date") or (os and os.date)
-  return fn(format, time)
+  if type(format) ~= "string" or type(time) ~= "number" or time ~= time then
+    return fn(format, time)
+  end
+  local at = format:find("%%[SscTX]") and time or time - time % 60
+  local key = format .. "|" .. at
+  local hit = dates[key]
+  if hit == nil then
+    if dateCount >= 512 then
+      dates, dateCount = {}, 0
+    end
+    hit = fn(format, time)
+    dates[key], dateCount = hit, dateCount + 1
+  end
+  return hit
 end
 
 -- The placeholder of an edit box (W.EditBox) is anchored on the left only and would run past the box and into
