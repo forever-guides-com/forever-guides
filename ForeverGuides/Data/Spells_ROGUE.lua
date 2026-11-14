@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-09.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Spell catalog of ROGUE: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -213,14 +213,14 @@ ns.Data.Spells.ROGUE = {
     i="ability_rogue_rupture",
     id=1329256,
     k="talent",
-    n={en="Blood Splatter"},
+    n={de="Blutspritzer",en="Blood Splatter"},
   },
   {
     fid=135342,
     i="inv_sword_32",
     id=1329286,
     k="talent",
-    n={en="Boot Knife"},
+    n={de="Stiefelmesser",en="Boot Knife"},
   },
   {
     c={"HUNTER","ROGUE","WARRIOR"},
@@ -768,7 +768,7 @@ ns.Data.Spells.ROGUE = {
     i="ability_rogue_restlessblades",
     id=1329284,
     k="talent",
-    n={en="Flash of Steel"},
+    n={de="Blitzender Stahl",en="Flash of Steel"},
   },
   {
     fid=135345,

@@ -5,6 +5,17 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.7.11",
+      date = "2026-11-14",
+      highlights = {
+      },
+      changed = {
+        { de = "Daten: Spielbuild 1.60.1.70938 mit allen Hotfixes.", en = "Data: Game build 1.60.1.70938 with all hotfixes." },
+        { de = "Talente: Sieben neue Talente von Druide, Paladin, Priester und Schurke heißen im deutschen Spiel jetzt auf Deutsch.", en = "Talents: Seven new talents of druid, paladin, priest and rogue now have their German names in the German game.", go = "talents" },
+        { de = "Berufe: Die Skillstufen von 25 Rezepten und die Reagenzmengen von 5 Schneiderei-Rezepten entsprechen dem aktuellen Spielstand.", en = "Professions: The skill levels of 25 recipes and the reagent counts of 5 tailoring recipes match the current game.", go = "professions" },
+      },
+    },
+    {
       version = "0.7.10",
       date = "2026-11-14",
       highlights = {
@@ -148,15 +159,6 @@ ns.Data.Changelog = {
       fixed = {
         { de = "Schlafsack: Die Leiste startet auch im Sack eines anderen Spielers sofort beim Hinlegen.", en = "Sleeping bag: the bar also starts at once in another player's bag.", go = "settings:sleepbag.main" },
         { de = "Schlafsack: Legst du dich nach dem Aufstehen wieder in einen Sack, startet die Leiste sofort, Gasthäuser und Städte lösen sie nicht aus.", en = "Sleeping bag: lying down again in a bag starts the bar at once, inns and cities do not trigger it.", go = "settings:sleepbag.main" },
-      },
-    },
-    {
-      version = "0.7.1",
-      date = "2026-11-12",
-      highlights = {
-      },
-      fixed = {
-        { de = "Tooltips: Tooltips liegen im Einrichtungsfenster und anderen Fenstern über dem Fensterrahmen.", en = "Tooltips: tooltips sit above the frame in the setup window and other windows." },
       },
     },
   },

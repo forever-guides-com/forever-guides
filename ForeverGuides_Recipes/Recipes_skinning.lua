@@ -18,8 +18,8 @@ ForeverGuides.RecipeData["skinning"] = {
     [5784]={de="Schleimige Murlocschuppe",en="Slimy Murloc Scale",ico="inv_misc_monsterscales_02"},
   },
   list={
-    {g=2718,i=279979,mats={{2318,3},{4470,2}},n={"Lagerstuhl","Camp Chair"},s=1229517,sk={0,20,23,25},src="t"},
-    {bd={{n="Lady Anacondra",npc=3671,zone={de="Die Höhlen des Wehklagens",en="Wailing Caverns"}}},g=2718,i=279969,mats={{2319,3},{5784,2},{2321,1}},n={"Leitfaden","Field Guide"},pat={273098},s=1262985,sk={140,140,143,145},src="i"},
+    {g=2718,i=279979,mats={{2318,3},{4470,2}},n={"Lagerstuhl","Camp Chair"},s=1229517,sk={0,20,20,20},src="t"},
+    {bd={{n="Lady Anacondra",npc=3671,zone={de="Die Höhlen des Wehklagens",en="Wailing Caverns"}}},g=2718,i=279969,mats={{2319,3},{5784,2},{2321,1}},n={"Leitfaden","Field Guide"},pat={273098},s=1262985,sk={140,140,140,140},src="i"},
     {g=2718,i=279938,mats={{4470,2},{4234,4},{3575,1}},n={"Werkbank des Fallenstellers","Trapper's Workbench"},pat={273109},s=1262982,sk={300,300,300,300},src="i"},
   },
   v=1,

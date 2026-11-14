@@ -1,11 +1,11 @@
--- Generated data, do not edit. Data as of 2026-11-10.
+-- Generated data, do not edit. Data as of 2026-11-13.
 local _, fish = ...
 if not fish.FG then
   return
 end
 fish.UsesData = {
   v = 1,
-  build = "1.60.1.70888",
+  build = "1.60.1.70938",
   -- Every item the client classes as fish food.
   fish = {
     787, 1326, 2608, 2674, 2675, 2682, 2683, 3663, 4592, 4593,

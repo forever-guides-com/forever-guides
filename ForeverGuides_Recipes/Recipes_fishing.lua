@@ -19,7 +19,7 @@ ForeverGuides.RecipeData["fishing"] = {
   },
   list={
     {g=2715,i=279967,mats={{6291,1},{3371,1}},n={"Fischglas","Fish Bowl"},s=1229745,sk={0,20,20,20},src="t"},
-    {bd={{n="Gelihast",npc=6243,zone={de="Blackfathom-Tiefe",en="Blackfathom Deeps"}}},g=2715,i=279965,mats={{4470,2},{8925,1},{8365,2}},n={"Angelständer","Fishing Rack"},pat={273141},s=1262990,sk={140,140,143,145},src="i"},
+    {bd={{n="Gelihast",npc=6243,zone={de="Blackfathom-Tiefe",en="Blackfathom Deeps"}}},g=2715,i=279965,mats={{4470,2},{8925,1},{8365,2}},n={"Angelständer","Fishing Rack"},pat={273141},s=1262990,sk={140,140,140,140},src="i"},
     {g=2715,i=279966,mats={{4470,5},{14048,2},{273295,1}},n={"Angelhütte","Fishing Hut"},pat={273119},s=1262998,sk={300,300,300,300},src="i"},
   },
   v=1,

@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-04.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Talent trees of the nine classes: position, ranks, prerequisites, C_Traits ids and texts per language.
 -- nv1 = true marks a node that the old digit code (v1) does not know, see Modules/TalentLogic.lua.
 -- v1 = the frozen digit order of old talent codes per tree: one entry per digit with node, spell id and name.
@@ -471,7 +471,7 @@ ns.Data.TalentTrees = {
             n = { de = "Zweihandwaffen-Spezialisierung", en = "Two-Handed Weapon Specialization" },
             d = { de = { "Erhöht den Schaden, den Ihr mit Zweihand-Nahkampfwaffen zufügt, um 2%.","Erhöht den Schaden, den Ihr mit Zweihand-Nahkampfwaffen zufügt, um 4%.","Erhöht den Schaden, den Ihr mit Zweihand-Nahkampfwaffen zufügt, um 6%." }, en = { "Increases the damage you deal with two-handed melee weapons by 2%.","Increases the damage you deal with two-handed melee weapons by 4%.","Increases the damage you deal with two-handed melee weapons by 6%." } } },
           { id = 476, r = 4, c = 0, mr = 2, rp = 20, sid = 1328370, node = 113629, entry = 141291, i = "spell_holy_turnundead", st = "new", nv1 = true,
-            n = { de = "Turn Evil", en = "Turn Evil" },
+            n = { de = "Böses vertreiben", en = "Turn Evil" },
             d = { de = { "Turn Evil","Turn Evil" }, en = { "Turn Evil","Turn Evil" } } },
           { id = 292, r = 4, c = 1, mr = 1, rp = 20, sid = 20066, node = 105694, entry = 130423, i = "spell_holy_prayerofhealing", st = "moved",
             n = { de = "Buße", en = "Repentance" },
@@ -770,7 +770,7 @@ ns.Data.TalentTrees = {
             n = { de = "Lebenskraft", en = "Vigor" },
             d = { de = { "Erhöht Eure maximale Energie um 5.","Erhöht Eure maximale Energie um 10." }, en = { "Increases your maximum Energy by 5.","Increases your maximum Energy by 10." } } },
           { id = 429, r = 2, c = 1, mr = 1, rp = 10, sid = 1329256, node = 105718, entry = 130447, i = "ability_rogue_rupture", st = "changed",
-            n = { de = "Blood Splatter", en = "Blood Splatter" },
+            n = { de = "Blutspritzer", en = "Blood Splatter" },
             d = { de = { "Blood Splatter" }, en = { "Blood Splatter" } } },
           { id = 427, r = 2, c = 2, mr = 2, rp = 10, sid = 14128, node = 105716, entry = 130445, i = "ability_criticalstrike", st = "changed",
             n = { de = "Tödlichkeit", en = "Lethality" },
@@ -880,7 +880,7 @@ ns.Data.TalentTrees = {
             n = { de = "Niedermetzeln", en = "Hack and Slash" },
             d = { de = { "Gewährt Euren Nahkampfangriffen einen von der Waffe abhängigen Vorteil.<br /><br />    <span style=\"color: #FFFFFF\">Axt/Schwert:</span> Eure erfolgreichen<br />    Nahkampfangriffe haben eine Chance von 1%,<br />    einen zusätzlichen Angriff auf das <br />    Ziel auszulösen.<br /><br />    <span style=\"color: #FFFFFF\">Dolch/Faust:</span> Erhöht Eure<br />    kritische Trefferchance um 1%.<br /><br />    <span style=\"color: #FFFFFF\">Streitkolben:</span> Eure Angriffe ignorieren 3%<br />    der Rüstung Eures Ziels.","Gewährt Euren Nahkampfangriffen einen von der Waffe abhängigen Vorteil.<br /><br />    <span style=\"color: #FFFFFF\">Axt/Schwert:</span> Eure erfolgreichen<br />    Nahkampfangriffe haben eine Chance von 2%,<br />    einen zusätzlichen Angriff auf das <br />    Ziel auszulösen.<br /><br />    <span style=\"color: #FFFFFF\">Dolch/Faust:</span> Erhöht Eure<br />    kritische Trefferchance um 2%.<br /><br />    <span style=\"color: #FFFFFF\">Streitkolben:</span> Eure Angriffe ignorieren 6%<br />    der Rüstung Eures Ziels.","Gewährt Euren Nahkampfangriffen einen von der Waffe abhängigen Vorteil.<br /><br />    <span style=\"color: #FFFFFF\">Axt/Schwert:</span> Eure erfolgreichen<br />    Nahkampfangriffe haben eine Chance von 3%,<br />    einen zusätzlichen Angriff auf das <br />    Ziel auszulösen.<br /><br />    <span style=\"color: #FFFFFF\">Dolch/Faust:</span> Erhöht Eure<br />    kritische Trefferchance um 3%.<br /><br />    <span style=\"color: #FFFFFF\">Streitkolben:</span> Eure Angriffe ignorieren 9%<br />    der Rüstung Eures Ziels.","Gewährt Euren Nahkampfangriffen einen von der Waffe abhängigen Vorteil.<br /><br />    <span style=\"color: #FFFFFF\">Axt/Schwert:</span> Eure erfolgreichen<br />    Nahkampfangriffe haben eine Chance von 4%,<br />    einen zusätzlichen Angriff auf das <br />    Ziel auszulösen.<br /><br />    <span style=\"color: #FFFFFF\">Dolch/Faust:</span> Erhöht Eure<br />    kritische Trefferchance um 4%.<br /><br />    <span style=\"color: #FFFFFF\">Streitkolben:</span> Eure Angriffe ignorieren 12%<br />    der Rüstung Eures Ziels.","Gewährt Euren Nahkampfangriffen einen von der Waffe abhängigen Vorteil.<br /><br />    <span style=\"color: #FFFFFF\">Axt/Schwert:</span> Eure erfolgreichen<br />    Nahkampfangriffe haben eine Chance von 5%,<br />    einen zusätzlichen Angriff auf das <br />    Ziel auszulösen.<br /><br />    <span style=\"color: #FFFFFF\">Dolch/Faust:</span> Erhöht Eure<br />    kritische Trefferchance um 5%.<br /><br />    <span style=\"color: #FFFFFF\">Streitkolben:</span> Eure Angriffe ignorieren 15%<br />    der Rüstung Eures Ziels." }, en = { "Gives your melee weapon attacks a benefit depending on the weapon.<br /><br />    <span style=\"color: #FFFFFF\">Axe/Sword:</span> Your successful<br />    melee attacks have a 1% chance<br />    to trigger an extra attack on the <br />    target.<br /><br />    <span style=\"color: #FFFFFF\">Dagger/Fist:</span> Increases your<br />    critical strike chance by 1%.<br /><br />    <span style=\"color: #FFFFFF\">Mace:</span> Your attacks ignore 3% of<br />    your target's armor.","Gives your melee weapon attacks a benefit depending on the weapon.<br /><br />    <span style=\"color: #FFFFFF\">Axe/Sword:</span> Your successful<br />    melee attacks have a 2% chance<br />    to trigger an extra attack on the <br />    target.<br /><br />    <span style=\"color: #FFFFFF\">Dagger/Fist:</span> Increases your<br />    critical strike chance by 2%.<br /><br />    <span style=\"color: #FFFFFF\">Mace:</span> Your attacks ignore 6% of<br />    your target's armor.","Gives your melee weapon attacks a benefit depending on the weapon.<br /><br />    <span style=\"color: #FFFFFF\">Axe/Sword:</span> Your successful<br />    melee attacks have a 3% chance<br />    to trigger an extra attack on the <br />    target.<br /><br />    <span style=\"color: #FFFFFF\">Dagger/Fist:</span> Increases your<br />    critical strike chance by 3%.<br /><br />    <span style=\"color: #FFFFFF\">Mace:</span> Your attacks ignore 9% of<br />    your target's armor.","Gives your melee weapon attacks a benefit depending on the weapon.<br /><br />    <span style=\"color: #FFFFFF\">Axe/Sword:</span> Your successful<br />    melee attacks have a 4% chance<br />    to trigger an extra attack on the <br />    target.<br /><br />    <span style=\"color: #FFFFFF\">Dagger/Fist:</span> Increases your<br />    critical strike chance by 4%.<br /><br />    <span style=\"color: #FFFFFF\">Mace:</span> Your attacks ignore 12% of<br />    your target's armor.","Gives your melee weapon attacks a benefit depending on the weapon.<br /><br />    <span style=\"color: #FFFFFF\">Axe/Sword:</span> Your successful<br />    melee attacks have a 5% chance<br />    to trigger an extra attack on the <br />    target.<br /><br />    <span style=\"color: #FFFFFF\">Dagger/Fist:</span> Increases your<br />    critical strike chance by 5%.<br /><br />    <span style=\"color: #FFFFFF\">Mace:</span> Your attacks ignore 15% of<br />    your target's armor." } } },
           { id = 447, r = 5, c = 2, mr = 5, rp = 25, sid = 1329284, node = 105740, entry = 130469, i = "ability_rogue_restlessblades", st = "changed",
-            n = { de = "Flash of Steel", en = "Flash of Steel" },
+            n = { de = "Blitzender Stahl", en = "Flash of Steel" },
             d = { de = { "Flash of Steel","Flash of Steel","Flash of Steel","Flash of Steel","Flash of Steel" }, en = { "Flash of Steel","Flash of Steel","Flash of Steel","Flash of Steel","Flash of Steel" } } },
           { id = 435, r = 6, c = 1, mr = 1, rp = 30, sid = 13750, node = 105724, entry = 130453, i = "spell_shadow_shadowworddominate", st = "unchanged",
             n = { de = "Adrenalinrausch", en = "Adrenaline Rush" },
@@ -964,7 +964,7 @@ ns.Data.TalentTrees = {
             rq = { {id=458,q=3} },
             d = { de = { "Ein sofortiger Stoß, der 100% Waffenschaden (oder bei Ausrüstung mit einem Dolch 145% Waffenschaden) verursacht und dafür sorgt, dass das Ziel durch den Schurken 15% mehr 'Blutung'-Schaden erleidet. Hält 15 Sek. lang an. Gewährt 1 <!--singular:Combopunkt:Combopunkte-->Combopunkt<!--singular-->." }, en = { "An instant strike that deals 100% weapon damage (145% if a Dagger is equipped) and causes the target to take 15% increased Rupture damage from the Rogue. Lasts 15 sec. Awards 1 Combo <!--singular:Point:Points-->Point<!--singular-->." } } },
           { id = 456, r = 5, c = 2, mr = 5, rp = 25, sid = 1329286, node = 105750, entry = 130479, i = "inv_sword_32", st = "new",
-            n = { de = "Boot Knife", en = "Boot Knife" },
+            n = { de = "Stiefelmesser", en = "Boot Knife" },
             d = { de = { "Boot Knife","Boot Knife","Boot Knife","Boot Knife","Boot Knife" }, en = { "Boot Knife","Boot Knife","Boot Knife","Boot Knife","Boot Knife" } } },
           { id = 468, r = 6, c = 1, mr = 1, rp = 30, sid = 1316709, node = 110866, entry = 137864, i = "ability_creature_cursed_02", st = "new",
             n = { de = "Todesmal", en = "Death Mark" },
@@ -1115,7 +1115,7 @@ ns.Data.TalentTrees = {
             rq = { {id=359,q=5} },
             d = { de = { "Erhöht Euren verursachten Heiligschaden um 2% und verleiht jedes Mal, wenn Euer Zauber 'Heiliges Feuer' regelmäßig Schaden verursacht, eine Chance von 5%, dass Euer nächster Einsatz von 'Heilige Nova' kein Mana kostet.","Erhöht Euren verursachten Heiligschaden um 5% und verleiht jedes Mal, wenn Euer Zauber 'Heiliges Feuer' regelmäßig Schaden verursacht, eine Chance von 10%, dass Euer nächster Einsatz von 'Heilige Nova' kein Mana kostet." }, en = { "Increases your Holy damage done by 2%, and gives a 5% chance each time your Holy Fire spell deals periodic damage for your next Holy Nova to cost no Mana.","Increases your Holy damage done by 5%, and gives a 10% chance each time your Holy Fire spell deals periodic damage for your next Holy Nova to cost no Mana." } } },
           { id = 352, r = 3, c = 3, mr = 1, rp = 15, sid = 1328569, node = 105856, entry = 130585, i = "spell_holy_blindingheal", st = "new",
-            n = { de = "Holy Binding", en = "Holy Binding" },
+            n = { de = "Heilige Bindung", en = "Holy Binding" },
             d = { de = { "Holy Binding" }, en = { "Holy Binding" } } },
           { id = 351, r = 4, c = 0, mr = 2, rp = 20, sid = 1317006, node = 105855, entry = 130584, i = "inv_scroll_07", st = "new",
             n = { de = "Litanei des Lichts", en = "Litany of Light" },
@@ -2076,7 +2076,7 @@ ns.Data.TalentTrees = {
             rq = { {id=40,q=2} },
             d = { de = { "Aufschlitzen" }, en = { "Lacerate" } } },
           { id = 43, r = 3, c = 2, mr = 1, rp = 15, sid = 1328613, node = 104951, entry = 129611, i = "spell_druid_savagery", st = "new",
-            n = { de = "Predatory Discipline", en = "Predatory Discipline" },
+            n = { de = "Disziplin des Raubtiers", en = "Predatory Discipline" },
             d = { de = { "Predatory Discipline" }, en = { "Predatory Discipline" } } },
           { id = 39, r = 3, c = 3, mr = 2, rp = 15, sid = 16958, node = 104947, entry = 129607, i = "ability_ghoulfrenzy", st = "changed",
             n = { de = "Blutraserei", en = "Blood Frenzy" },
@@ -2149,7 +2149,7 @@ ns.Data.TalentTrees = {
             n = { de = "Geschenk der Natur", en = "Gift of Nature" },
             d = { de = { "Erhöht den Effekt all Eurer Heilzauber um 2%.","Erhöht den Effekt all Eurer Heilzauber um 4%.","Erhöht den Effekt all Eurer Heilzauber um 6%.","Erhöht den Effekt all Eurer Heilzauber um 8%.","Erhöht den Effekt all Eurer Heilzauber um 10%." }, en = { "Increases the effect of all your healing spells by 2%.","Increases the effect of all your healing spells by 4%.","Increases the effect of all your healing spells by 6%.","Increases the effect of all your healing spells by 8%.","Increases the effect of all your healing spells by 10%." } } },
           { id = 10, r = 2, c = 3, mr = 1, rp = 10, sid = 1328621, node = 104918, entry = 129578, i = "inv_misc_herb_felblossom", st = "new",
-            n = { de = "Bloom", en = "Bloom" },
+            n = { de = "Blüte", en = "Bloom" },
             d = { de = { "Bloom" }, en = { "Bloom" } } },
           { id = 7, r = 3, c = 1, mr = 5, rp = 15, sid = 24968, node = 104915, entry = 129575, i = "spell_holy_elunesgrace", st = "unchanged",
             n = { de = "Gelassener Geist", en = "Tranquil Spirit" },

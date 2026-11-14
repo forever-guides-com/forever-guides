@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-09.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Spell catalog of PALADIN: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -2188,7 +2188,7 @@ ns.Data.Spells.PALADIN = {
     i="spell_holy_turnundead",
     id=1328370,
     k="talent",
-    n={en="Turn Evil"},
+    n={de="Böses vertreiben",en="Turn Evil"},
   },
   {
     fid=135983,

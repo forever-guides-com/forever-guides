@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.11
+
+### Changed
+
+- Data: Game build 1.60.1.70938 with all hotfixes.
+- Talents: Seven new talents of druid, paladin, priest and rogue now have their German names in the German game.
+- Professions: The skill levels of 25 recipes and the reagent counts of 5 tailoring recipes match the current game.
+
 ## 0.7.10
 
 ### Changed

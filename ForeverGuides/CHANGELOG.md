@@ -4,6 +4,14 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.7.11] - 2026-11-14
+
+### Changed
+
+- Data: Game build 1.60.1.70938 with all hotfixes.
+- Talents: Seven new talents of druid, paladin, priest and rogue now have their German names in the German game.
+- Professions: The skill levels of 25 recipes and the reagent counts of 5 tailoring recipes match the current game.
+
 ## [0.7.10] - 2026-11-14
 
 ### Changed
@@ -592,6 +600,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.7.11]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.10...v0.7.11
 [0.7.10]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.9...v0.7.10
 [0.7.9]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.7...v0.7.8

@@ -57,7 +57,7 @@ ForeverGuides.RecipeData["first-aid"] = {
   },
   list={
     {g=2530,i=1251,mats={{2589,1}},n={"Leinenverband","Linen Bandage"},rank="apprentice",s=3275,sk={1,30,45,60},src="t"},
-    {g=2535,i=279968,mats={{1251,3},{159,1}},n={"Verbandtasche","First Aid Kit"},s=1230117,sk={0,20,23,25},src="t"},
+    {g=2535,i=279968,mats={{1251,3},{159,1}},n={"Verbandtasche","First Aid Kit"},s=1230117,sk={0,20,20,20},src="t"},
     {g=2530,i=2581,mats={{2589,2}},n={"Schwerer Leinenverband","Heavy Linen Bandage"},rank="apprentice",s=3276,sk={0,50,75,100},src="t"},
     {g=2531,i=118,mats={{3371,1},{2678,1},{2447,1}},n={"Schwacher Heiltrank","Minor Healing Potion"},s=1244431,sk={0,55,75,95},src="t"},
     {ch=true,g=2533,i=6452,mats={{1475,1}},n={"Gegengift","Anti-Venom"},s=7934,sk={0,80,115,150},src="t"},
@@ -69,7 +69,7 @@ ForeverGuides.RecipeData["first-aid"] = {
     {ch=true,g=2533,i=6453,mats={{1288,1}},n={"Starkes Gegengift","Strong Anti-Venom"},pat={6454},s=7935,sk={130,130,165,200},src="i"},
     {g=2531,i=929,mats={{3372,1},{2692,1},{2453,1}},n={"Heiltrank","Healing Potion"},rank="journeyman",s=1244433,sk={0,135,155,175},src="t"},
     {g=2533,i=255717,mats={{1468,1},{3713,1},{2686,1}},n={"Schlaue Schlammpackung","Clever Poultice"},pat={255724},s=1259343,sk={140,160,190,220},src="i"},
-    {bd={{n="Commander Springvale",npc=4278,zone={de="Burg Shadowfang",en="Shadowfang Keep"}}},g=2535,i=279940,mats={{6452,1},{8544,2},{4470,2}},n={"Studierzimmer für Gifte","Toxin Study"},pat={273105},s=1262996,sk={140,140,143,145},src="i"},
+    {bd={{n="Commander Springvale",npc=4278,zone={de="Burg Shadowfang",en="Shadowfang Keep"}}},g=2535,i=279940,mats={{6452,1},{8544,2},{4470,2}},n={"Studierzimmer für Gifte","Toxin Study"},pat={273105},s=1262996,sk={140,140,140,140},src="i"},
     {g=2530,i=6450,mats={{4306,1}},n={"Seidenverband","Silk Bandage"},rank="expert",s=7928,sk={0,150,180,210},src="t"},
     {g=2531,i=1710,mats={{3372,1},{2692,3},{3357,1}},n={"Großer Heiltrank","Greater Healing Potion"},pat={255723},s=1244434,sk={155,175,195,215},src="i"},
     {g=2530,i=6451,mats={{4306,2}},n={"Schwerer Seidenverband","Heavy Silk Bandage"},pat={16112},s=7929,sk={180,180,210,240},src="i"},

@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-09.
+-- Generated data, do not edit. Data as of 2026-11-13.
 -- Spell catalog of PRIEST: one entry per rank.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -987,7 +987,7 @@ ns.Data.Spells.PRIEST = {
     i="spell_holy_blindingheal",
     id=1328569,
     k="talent",
-    n={en="Holy Binding"},
+    n={de="Heilige Bindung",en="Holy Binding"},
   },
   {
     fid=135972,
