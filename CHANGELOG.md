@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.8.3
+
+### Changed
+
+- Instances: The Bosses tab lists the bosses on the left and shows the chosen boss with portrait, level and abilities on the right.
+- Instances: Rare enemies are listed below the regular bosses. Those sharing a spot are one "One of" entry.
+
+### Fixed
+
+- Instances: The dungeon map shows the bosses of every wing in Scarlet Monastery, Dire Maul and Blackrock Spire, each with its wing.
+- Instances: Defeated states and lockouts now match per wing, before Fairbanks showed the state of Herod.
+
 ## 0.8.2
 
 ### Added

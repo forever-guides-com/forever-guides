@@ -220,9 +220,21 @@ local function paintStatus()
   end
 end
 
+-- The wings of a dungeon cannot be told apart from inside, so a dungeon with wings shows the client's name of the
+-- whole dungeon instead of the name of its first wing.
+local function titleText(inst)
+  if #ns.PinLogic.Wings(inst) > 1 and type(GetInstanceInfo) == "function" then
+    local ok, name = pcall(GetInstanceInfo)
+    if ok and type(name) == "string" and name ~= "" then
+      return name
+    end
+  end
+  return ns.T(inst.n)
+end
+
 local function paintTitle()
   if S.title and S.inst then
-    W.SetText(S.title, nil, ns.T(S.inst.n))
+    W.SetText(S.title, nil, titleText(S.inst))
   end
 end
 

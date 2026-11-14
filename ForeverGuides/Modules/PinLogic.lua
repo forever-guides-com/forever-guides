@@ -65,6 +65,30 @@ function P.BossList(instKey)
   return out, found
 end
 
+-- The Data.Instances entries that share the id of this entry (the wings of one dungeon, in data order; just the
+-- entry itself for a dungeon without wings) and the number of bosses that come before this entry in BossList(id).
+-- A boss at position i of inst.bo is BossList(inst.id)[offset + i].
+function P.Wings(inst)
+  if type(inst) ~= "table" or type(inst.id) ~= "number" then
+    return { inst }, 0
+  end
+  local wings, offset, seen = {}, 0, false
+  for _, other in ipairs(data().Instances or {}) do
+    if other.id == inst.id then
+      wings[#wings + 1] = other
+      if other == inst then
+        seen = true
+      elseif not seen then
+        offset = offset + #(other.bo or {})
+      end
+    end
+  end
+  if not seen then
+    return { inst }, 0
+  end
+  return wings, offset
+end
+
 -- Fills id, idx, eid and npc from the boss list where the pin lacks them.
 local function enrich(c)
   local list, inst = P.BossList(c.id or c.inst)

@@ -4,6 +4,18 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.8.3] - 2026-11-14
+
+### Changed
+
+- Instances: The Bosses tab lists the bosses on the left and shows the chosen boss with portrait, level and abilities on the right.
+- Instances: Rare enemies are listed below the regular bosses. Those sharing a spot are one "One of" entry.
+
+### Fixed
+
+- Instances: The dungeon map shows the bosses of every wing in Scarlet Monastery, Dire Maul and Blackrock Spire, each with its wing.
+- Instances: Defeated states and lockouts now match per wing, before Fairbanks showed the state of Herod.
+
 ## [0.8.2] - 2026-11-14
 
 ### Added
@@ -641,6 +653,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.8.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.7.12...v0.8.0

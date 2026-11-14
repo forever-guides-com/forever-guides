@@ -147,6 +147,31 @@ function BP.Summary(instanceId)
   return state and Logic.Summary(state) or nil
 end
 
+-- Status of the boss at position i of inst.bo. Wings share one progress state (one instance id), so the
+-- position is moved by the bosses of the wings before this one.
+function BP.WingStatus(inst, i)
+  if type(inst) ~= "table" or type(inst.id) ~= "number" then
+    return nil
+  end
+  local _, offset = ns.PinLogic.Wings(inst)
+  return BP.Status(inst.id, offset + i)
+end
+
+-- Summary of the bosses of this Data.Instances entry only: a wing counts its own bosses, not the whole dungeon.
+function BP.WingSummary(inst)
+  local state = type(inst) == "table" and get(inst.id)
+  local count = type(inst) == "table" and #(inst.bo or {}) or 0
+  if not state or count == 0 then
+    return nil
+  end
+  local _, offset = ns.PinLogic.Wings(inst)
+  local slice = { status = state.status, bosses = {} }
+  for i = 1, count do
+    slice.bosses[#slice.bosses + 1] = state.bosses[offset + i]
+  end
+  return Logic.Summary(slice)
+end
+
 -- "n of m bosses defeated" (kind "summary") or "... saved as defeated" (kind "saved") for a Summary result.
 function BP.SummaryText(summary, kind)
   local key = "bossprogress." .. (kind or "summary") .. "." .. (summary.total == 1 and "one" or "other")
@@ -180,8 +205,21 @@ local function lockMaps()
     if inst and type(inst.id) == "number" and not maps[inst.id] then
       local view = RLL.Combine(locks, inst, t)
       local map = {}
-      for i, b in ipairs(view.bosses) do
-        map[i] = b.state
+      -- Find gives the first wing of a shared id; the bosses of every wing are matched so a lockout of the
+      -- Cathedral confirms Cathedral bosses at their place in the shared progress state.
+      local offset = 0
+      for _, wing in ipairs((ns.PinLogic.Wings(inst))) do
+        for _, other in ipairs(locks) do
+          if RLL.Active(other, t) and RLL.Find(other) == inst then
+            for i, s in ipairs((RLL.BossStates(other, wing))) do
+              local at = offset + i
+              if s.state == true or (s.state == false and map[at] == nil) then
+                map[at] = s.state
+              end
+            end
+          end
+        end
+        offset = offset + #(wing.bo or {})
       end
       maps[inst.id] = { map = map, expires = view.expires }
     end

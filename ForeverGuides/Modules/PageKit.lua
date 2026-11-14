@@ -1305,6 +1305,15 @@ function K.ChipRow(parent, colors)
     shown = #list
   end
 
+  -- Every chip made so far (hidden ones too), for an owner that keeps them in its keyboard order.
+  function row:Frames()
+    local out = {}
+    for i, chip in ipairs(pool) do
+      out[i] = chip
+    end
+    return out
+  end
+
   function row:Layout(width)
     local chipH = scaledHeight(CHIP_ICON + 4)
     local x, y = 0, 0

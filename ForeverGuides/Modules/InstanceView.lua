@@ -17,6 +17,9 @@ ns.AddLocale("enUS", {
   ["instances.abilities"] = "Abilities",
   ["instances.abilities.none"] = "Abilities: not recorded yet",
   ["instances.abilities.summary"] = "Abilities are recorded for %d of %d bosses.",
+  ["instances.bosses.level"] = "Level %d",
+  ["instances.bosses.position"] = "Boss %d of %d",
+  ["instances.bosses.rare"] = "rare",
   ["instances.spell.unknown"] = "Spell %d",
   ["instances.spell.unknownMeta"] = "not known to this client",
   ["instances.items.loot"] = "No loot tables in the data yet.\nItems you find yourself are recorded by the loot capture.",
@@ -56,6 +59,9 @@ ns.AddLocale("deDE", {
   ["instances.abilities"] = "Fähigkeiten",
   ["instances.abilities.none"] = "Fähigkeiten: noch nicht erfasst",
   ["instances.abilities.summary"] = "Bei %d von %d Bossen sind Fähigkeiten erfasst.",
+  ["instances.bosses.level"] = "Stufe %d",
+  ["instances.bosses.position"] = "Boss %d von %d",
+  ["instances.bosses.rare"] = "selten",
   ["instances.spell.unknown"] = "Zauber %d",
   ["instances.spell.unknownMeta"] = "dem Client unbekannt",
   ["instances.items.loot"] = "Noch keine Beutetabellen in den Daten.\nWas du selbst findest, erfasst die Beute-Erfassung.",
@@ -229,7 +235,7 @@ function IV.HeadText(inst, faction)
       .. (faction and (" (" .. L["kit.faction." .. faction] .. ")") or ""),
   }
   lines[#lines + 1] = table.concat(bits, " · ")
-  local progress = ns.BossProgress and type(inst.id) == "number" and ns.BossProgress.Summary(inst.id) or nil
+  local progress = ns.BossProgress and type(inst.id) == "number" and ns.BossProgress.WingSummary(inst) or nil
   if progress then
     lines[#lines + 1] = ns.BossProgress.SummaryText(progress)
   end
@@ -614,14 +620,19 @@ local function newLine(row)
   end)
 end
 
--- Boss rows: portrait, name with tags and the ability chips.
-local function makeBossRow(parent)
+-- Boss rows: portrait, name with tags and the ability chips. opts.heading: the detail of the bosses tab
+-- (Modules/InstanceBossPanel.lua), the plain name as a heading and the number, level, tags and state on a line below.
+local function makeBossRow(parent, opts)
+  local heading = opts and opts.heading or false
   local row = CreateFrame("Frame", nil, parent)
+  row.heading = heading
   row.portrait = CreateFrame("Frame", nil, row)
   row.portrait:SetSize(IV.PORTRAIT, IV.PORTRAIT)
   row.pic = row.portrait:CreateTexture(nil, "ARTWORK")
   row.pic:SetAllPoints()
-  row.name = W.Text(row, { role = "text", color = "text", wrap = true })
+  row.name = W.Text(row, { role = heading and "h3" or "text", color = "text", wrap = true })
+  row.meta = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
+  row.meta:SetShown(heading)
   row.abLabel = W.Text(row, { key = "instances.abilities", role = "micro", color = "textMuted" })
   row.chips = K.ChipRow(row)
   -- Shown instead of the abilities when the data has none for this boss, so a gap reads as "not recorded".
@@ -644,6 +655,12 @@ local function makeBossRow(parent)
     -- An explicit height gives the click area over the name its size.
     self.name:SetHeight(math.max(1, math.ceil(self.name:GetStringHeight())))
     local y = PAD + math.ceil(self.name:GetStringHeight()) + 4
+    if self.meta:IsShown() then
+      self.meta:ClearAllPoints()
+      self.meta:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
+      self.meta:SetWidth(textW)
+      y = y + math.ceil(self.meta:GetStringHeight()) + 6
+    end
     if self.abMissing then
       self.abNone:ClearAllPoints()
       self.abNone:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
@@ -693,23 +710,50 @@ local function abilityChips(list)
   return chips, names
 end
 
--- item = { inst, boss, index }
+-- Word for the kill state of a boss in this run ("defeated", "probably defeated"), nil while it is open. index is
+-- the place in inst.bo; wings share one progress state, WingStatus moves it to the place in the whole dungeon.
+function IV.ProgressText(inst, index)
+  local progress = ns.BossProgress and ns.BossProgress.WingStatus(inst, index)
+  if progress then
+    return L[progress == "confirmed" and "bossprogress.defeated" or "bossprogress.likely"]
+  end
+end
+
+-- Level of a boss as text ("Level 28"), nil when the data has none.
+function IV.BossLevel(boss)
+  return type(boss.lvl) == "number" and string.format(L["instances.bosses.level"], boss.lvl) or nil
+end
+
+-- item = { inst, boss, index }; heading rows also take position and total (place among the regular bosses) or
+-- rare = true.
 local function paintBossRow(row, item)
   local boss = item.boss
-  local text = string.format("%d. %s", item.index, IV.Dual(boss.n) or "?")
-  if boss.opt then
-    text = text .. "  " .. Theme.hexText("textMuted", L["instances.bosses.optional"])
+  local progress = IV.ProgressText(item.inst, item.index)
+  if row.heading then
+    row.name:SetText(IV.Dual(boss.n) or "?")
+    local bits = {
+      item.rare and L["instances.bosses.rare"]
+        or string.format(L["instances.bosses.position"], item.position or item.index, item.total or item.index),
+    }
+    bits[#bits + 1] = IV.BossLevel(boss)
+    -- A rare is optional by nature, the word rare says it already.
+    bits[#bits + 1] = boss.opt and not item.rare and L["instances.bosses.optional"] or nil
+    bits[#bits + 1] = boss.hc and L["instances.bosses.heroic"] or nil
+    bits[#bits + 1] = progress
+    row.meta:SetText(table.concat(bits, " · "))
+  else
+    local text = string.format("%d. %s", item.index, IV.Dual(boss.n) or "?")
+    if boss.opt then
+      text = text .. "  " .. Theme.hexText("textMuted", L["instances.bosses.optional"])
+    end
+    if boss.hc then
+      text = text .. "  " .. Theme.hexText("warning", L["instances.bosses.heroic"])
+    end
+    if progress then
+      text = text .. "  " .. Theme.hexText("textMuted", progress)
+    end
+    row.name:SetText(text)
   end
-  if boss.hc then
-    text = text .. "  " .. Theme.hexText("warning", L["instances.bosses.heroic"])
-  end
-  local progress = ns.BossProgress and ns.BossProgress.Status(item.inst.id, item.index)
-  if progress then
-    text = text
-      .. "  "
-      .. Theme.hexText("textMuted", L[progress == "confirmed" and "bossprogress.defeated" or "bossprogress.likely"])
-  end
-  row.name:SetText(text)
   row.modelPic:SetBoss(item.inst, boss)
   row.modelName:SetBoss(item.inst, boss)
   local image = IV.PaintBossImage(row.portrait, row.pic, item.inst, boss)
@@ -725,6 +769,8 @@ local function paintBossRow(row, item)
   row.names:SetShown(#names > 0)
   row.names:SetText(table.concat(names, ", "))
 end
+
+IV.BossRow, IV.PaintBossRow = makeBossRow, paintBossRow
 
 -- Quest rows: head line, details and the map buttons of the start position.
 local function makeQuestRow(parent)

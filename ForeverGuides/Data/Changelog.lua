@@ -5,8 +5,22 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
-      version = "0.8.2",
+      version = "0.8.3",
       date = "2026-11-15",
+      highlights = {
+      },
+      changed = {
+        { de = "Instanzen: Der Reiter Bosse zeigt links die Liste und rechts den gewählten Boss mit Porträt, Stufe und Fähigkeiten.", en = "Instances: The Bosses tab lists the bosses on the left and shows the chosen boss with portrait, level and abilities on the right.", go = "instances" },
+        { de = "Instanzen: Seltene Gegner stehen unter den festen Bossen. Teilen sie sich einen Platz, sind sie ein Eintrag \"Einer von\".", en = "Instances: Rare enemies are listed below the regular bosses. Those sharing a spot are one \"One of\" entry.", go = "instances" },
+      },
+      fixed = {
+        { de = "Instanzen: Die Dungeonkarte zeigt im Kloster, in Düsterbruch und in der Schwarzfelsspitze die Bosse aller Flügel, jeder mit seinem Flügel.", en = "Instances: The dungeon map shows the bosses of every wing in Scarlet Monastery, Dire Maul and Blackrock Spire, each with its wing.", go = "instances" },
+        { de = "Instanzen: Besiegt und Sperren stimmen jetzt je Flügel, vorher zeigte etwa Schönufer den Stand von Herod.", en = "Instances: Defeated states and lockouts now match per wing, before Fairbanks showed the state of Herod.", go = "instances" },
+      },
+    },
+    {
+      version = "0.8.2",
+      date = "2026-11-14",
       highlights = {
       },
       added = {
@@ -118,28 +132,6 @@ ns.Data.Changelog = {
       added = {
         { de = "Instanzen: Jede Quest nennt in der Liste \"Start: drinnen\" oder \"Start: draußen\", wenn der Annahmeort bekannt ist.", en = "Instances: Each quest says \"Start: inside\" or \"Start: outside\" in the list when the place to accept it is known.", go = "instances" },
         { de = "Instanzen: Die Details einer Quest zeigen unter \"Annahme\", ob sie in der Instanz beginnt (mit Geber oder Gegenstand) oder außerhalb (mit Geber und Zone).", en = "Instances: The details of a quest show under \"Accepted\" whether it starts inside the instance (with giver or item) or outside (with giver and zone).", go = "instances" },
-      },
-    },
-    {
-      version = "0.7.6",
-      date = "2026-11-13",
-      highlights = {
-        { head = { de = "Quests wie im Questlog", en = "Quests like the quest log" }, text = { de = "Links die Instanz-Quests, rechts Ziel, Beschreibung und Belohnungen mit Gegenständen, EP und Gold.", en = "Instance quests on the left, objective, description and rewards with items, XP and gold on the right." }, go = "instances" },
-        { head = { de = "Scharlachrotes Kloster in Flügeln", en = "Scarlet Monastery by wing" }, text = { de = "Friedhof, Bibliothek, Waffenkammer und Kathedrale haben eigene Karten mit Bossen und Quests.", en = "Graveyard, Library, Armory and Cathedral each have their own card with bosses and quests." }, go = "instances" },
-        { head = { de = "Questtexte auf Deutsch", en = "Quest texts in German" }, text = { de = "Titel, Ziele und viele Beschreibungen der Instanz-Quests erscheinen im deutschen Spiel auf Deutsch.", en = "Titles, objectives and many descriptions of instance quests appear in German in the German game." }, go = "instances" },
-      },
-      added = {
-        { de = "Instanzen: Die Quests einer Instanz erscheinen wie im Questlog, links die Liste, rechts die Details mit Belohnungen als Kacheln samt Tooltip.", en = "Instances: The quests of an instance look like the quest log, with the list on the left and details on the right, rewards shown as tiles with tooltips.", go = "instances" },
-        { de = "Instanzen: Das Scharlachrote Kloster ist in Friedhof, Bibliothek, Waffenkammer und Kathedrale geteilt, jeder Flügel mit eigenen Bossen und Quests.", en = "Instances: Scarlet Monastery is split into Graveyard, Library, Armory and Cathedral, each wing with its own bosses and quests.", go = "instances" },
-        { de = "Instanzen: 13 weitere Dungeon-Quests, unter anderem in Gnomeregan, Uldaman, den Blackrocktiefen, Düsterbruch und Scholomance.", en = "Instances: 13 more dungeon quests, among them in Gnomeregan, Uldaman, Blackrock Depths, Dire Maul and Scholomance.", go = "instances" },
-        { de = "Instanzen: Eine Quest, die mehrere Flügel braucht, nennt die anderen Flügel, ein Klick wechselt dorthin.", en = "Instances: A quest that needs several wings names the other wings, and one click switches there.", go = "instances" },
-        { de = "Quests: Titel, Ziele und viele Beschreibungen erscheinen im deutschen Spiel auf Deutsch.", en = "Quests: Titles, objectives and many descriptions appear in German in the German game.", go = "instances" },
-      },
-      changed = {
-        { de = "Instanzen: Die Quest-Liste zeigt nur echte Dungeon- und Schlachtzug-Quests, Vorquests stehen im Fenster der Questreihe.", en = "Instances: The quest list shows only real dungeon and raid quests, and prequests are in the quest chain window.", go = "instances" },
-        { de = "Instanzen: Gold, Erfahrung und Gegenstände der Belohnungen stimmen mit dem Spiel überein.", en = "Instances: Gold, experience and item rewards match the game.", go = "instances" },
-        { de = "Instanzen: Die Quests in Düsterbruch und der Schwarzfelsspitze stehen beim richtigen Flügel.", en = "Instances: The quests in Dire Maul and Blackrock Spire are listed under the right wing.", go = "instances" },
-        { de = "Instanzen-Seite: Zurück führt immer zur Übersicht, Zurücksetzen steht neben \"Alle Instanzen\", die Detailseite kommt ohne Einleitung aus und der Stufenfilter ist klarer.", en = "Instances page: Back always leads to the overview, reset sits beside \"All instances\", the detail page has no intro, and the level filter is clearer.", go = "instances" },
       },
     },
   },

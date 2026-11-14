@@ -59,7 +59,10 @@ local function titleOf(group)
   return text, plain
 end
 
-local function paintBackground(e)
+-- Shared parts of the list and detail views (also Modules/InstanceBossPanel.lua) ----------------------
+
+-- The chosen entry: tinted background and the bar at its left edge, so the choice never rests on color alone.
+function BV.PaintSelected(e)
   if e.fgSelected then
     local r, g, b = Theme.color("accent2")
     e.bg:SetColorTexture(r, g, b, 0.2)
@@ -68,10 +71,13 @@ local function paintBackground(e)
   end
   e.mark:SetShown(e.fgSelected == true)
 end
+local paintBackground = BV.PaintSelected
 
--- List entries: boss picture, name and the number of items.
-local function makeEntry(view, register)
-  local e = CreateFrame("Button", nil, view)
+-- A list entry: picture, title and a second line (e.sub, hidden when empty). hooks.select(e) chooses the entry,
+-- hooks.tip(e) returns its tooltip text, hooks.activate(e) runs on Enter. register(frame, activate) hands the
+-- entry to the keyboard order of the owner. The owner sets e.label (the spoken name) and e.fgSelected.
+function BV.NewEntry(parent, register, hooks)
+  local e = CreateFrame("Button", nil, parent)
   e.bg = e:CreateTexture(nil, "BACKGROUND")
   e.bg:SetAllPoints()
   local hover = e:CreateTexture(nil, "HIGHLIGHT")
@@ -95,25 +101,21 @@ local function makeEntry(view, register)
   e.pic = e.portrait:CreateTexture(nil, "ARTWORK")
   e.pic:SetAllPoints()
   e.title = W.Text(e, { role = "ui", color = "text", wrap = true })
-  e.count = W.Text(e, { role = "micro", color = "textSecondary", wrap = true })
+  e.sub = W.Text(e, { role = "micro", color = "textSecondary", wrap = true })
 
   e:SetScript(
     "OnClick",
     ns.Wrap("instance-boss-entry", function(self)
-      view:Select(self.group)
+      hooks.select(self)
     end)
   )
   local function tip()
-    ns.ShowTooltip(
-      e,
-      e.label or "",
-      e.group and e.group.boss and L["instances.items.selectTip"] or L["instances.items.selectTipGroup"]
-    )
+    ns.ShowTooltip(e, e.label or "", hooks.tip(e))
   end
   e:HookScript("OnEnter", tip)
   e:HookScript("OnLeave", ns.HideTooltip)
   e.fgOnFocus = function()
-    view:Select(e.group)
+    hooks.select(e)
     tip()
   end
   e.fgOnBlur = ns.HideTooltip
@@ -124,8 +126,8 @@ local function makeEntry(view, register)
     return e.fgSelected and L["instances.items.selected"] or nil
   end
   register(e, function(self)
-    view:Select(self.group)
-    view:FocusDetail()
+    hooks.select(self)
+    hooks.activate(self)
   end)
 
   function e:fgLayout(width)
@@ -137,14 +139,97 @@ local function makeEntry(view, register)
     self.title:ClearAllPoints()
     self.title:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -PAD)
     self.title:SetWidth(textW)
-    local y = PAD + ceil(self.title) + 2
-    self.count:ClearAllPoints()
-    self.count:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
-    self.count:SetWidth(textW)
-    y = y + ceil(self.count)
+    local y = PAD + ceil(self.title)
+    if self.sub:IsShown() then
+      self.sub:ClearAllPoints()
+      self.sub:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(y + 2))
+      self.sub:SetWidth(textW)
+      y = y + 2 + ceil(self.sub)
+    end
     return math.max(y + PAD, withPortrait and PORTRAIT + 2 * PAD or 0)
   end
   return e
+end
+
+-- Frame pools in display order: Take hands out the next frame, HideRest hides the unused ones.
+function BV.Pool()
+  return { list = {}, used = 0 }
+end
+
+function BV.Take(pool, make)
+  pool.used = pool.used + 1
+  local frame = pool.list[pool.used]
+  if not frame then
+    frame = make()
+    pool.list[pool.used] = frame
+  end
+  frame:Show()
+  return frame
+end
+
+function BV.HideRest(pool)
+  for i = pool.used + 1, #pool.list do
+    local frame = pool.list[i]
+    frame:Hide()
+    if frame.portrait then
+      -- A hidden entry gives its 3D portrait back to the pool.
+      ns.BossPortrait.Unbind(frame.portrait)
+    end
+  end
+end
+
+-- The list on the left and the detail on the right, from PANEL_MIN px on; below that the detail sits under the
+-- list. heads (optional): { [i] = font string } puts a small heading above entry i. Sets the height of `view` and
+-- returns it.
+function BV.SplitLayout(view, entries, detail, width, heads)
+  local wide = width >= PANEL_MIN
+  local listW = wide and math.min(LIST_MAX, math.max(LIST_MIN, math.floor(width * 0.38))) or width
+  local y = 0
+  for i = 1, entries.used do
+    local e = entries.list[i]
+    local head = heads and heads[i]
+    if head then
+      head:ClearAllPoints()
+      head:SetPoint("TOPLEFT", view, "TOPLEFT", PAD, -(y + GAP))
+      head:SetWidth(math.max(40, listW - 2 * PAD))
+      y = y + GAP + ceil(head) + 4
+    end
+    e:ClearAllPoints()
+    e:SetPoint("TOPLEFT", view, "TOPLEFT", 0, -y)
+    e:SetWidth(listW)
+    local h = e:fgLayout(listW)
+    e:SetHeight(h)
+    y = y + h
+  end
+  if detail:IsShown() then
+    local detailW = wide and (width - listW - GAP) or width
+    local x, top = wide and (listW + GAP) or 0, wide and 0 or (y + GAP)
+    detail:ClearAllPoints()
+    detail:SetPoint("TOPLEFT", view, "TOPLEFT", x, -top)
+    detail:SetWidth(detailW)
+    local h = detail:fgLayout(detailW)
+    detail:SetHeight(h)
+    y = wide and math.max(y, top + h) or (top + h)
+  end
+  view:SetHeight(math.max(1, y))
+  return y
+end
+
+-- Loot view -------------------------------------------------------------------------------------------
+
+-- List entries: boss picture, name and the number of items.
+local function makeEntry(view, register)
+  return BV.NewEntry(view, register, {
+    select = function(e)
+      view:Select(e.group)
+    end,
+    tip = function(e)
+      return e.group and e.group.boss and L["instances.items.selectTip"] or L["instances.items.selectTipGroup"]
+    end,
+    activate = function()
+      view:FocusDetail()
+    end,
+  })
 end
 
 local function paintEntry(e, group, view)
@@ -154,7 +239,7 @@ local function paintEntry(e, group, view)
   local count = countText(group)
   e.label = plain .. ", " .. count
   e.title:SetText(text)
-  e.count:SetText(count)
+  e.sub:SetText(count)
   if group.boss then
     IV.PaintBossImage(e.portrait, e.pic, view.inst, group.boss)
   else
@@ -224,31 +309,11 @@ end
 -- changed.
 function BV.Create(parent, register)
   local f = CreateFrame("Frame", nil, parent)
-  f.entries = { list = {}, used = 0 }
-  f.rows = { list = {}, used = 0 }
+  f.entries = BV.Pool()
+  f.rows = BV.Pool()
   f.detail = makeDetail(f)
 
-  local function take(pool, make)
-    pool.used = pool.used + 1
-    local frame = pool.list[pool.used]
-    if not frame then
-      frame = make()
-      pool.list[pool.used] = frame
-    end
-    frame:Show()
-    return frame
-  end
-
-  local function hideRest(pool)
-    for i = pool.used + 1, #pool.list do
-      local frame = pool.list[i]
-      frame:Hide()
-      if frame.portrait then
-        -- A hidden entry gives its 3D portrait back to the pool.
-        ns.BossPortrait.Unbind(frame.portrait)
-      end
-    end
-  end
+  local take, hideRest = BV.Take, BV.HideRest
 
   local function paintDetail()
     local group = f.model and ns.InstanceItemsLogic.Find(f.model, f.selected)
@@ -337,30 +402,7 @@ function BV.Create(parent, register)
   end
 
   function f:fgGridLayout(width)
-    local wide = width >= PANEL_MIN
-    local listW = wide and math.min(LIST_MAX, math.max(LIST_MIN, math.floor(width * 0.38))) or width
-    local y = 0
-    for i = 1, self.entries.used do
-      local e = self.entries.list[i]
-      e:ClearAllPoints()
-      e:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-      e:SetWidth(listW)
-      local h = e:fgLayout(listW)
-      e:SetHeight(h)
-      y = y + h
-    end
-    if self.detail:IsShown() then
-      local detailW = wide and (width - listW - GAP) or width
-      local x, top = wide and (listW + GAP) or 0, wide and 0 or (y + GAP)
-      self.detail:ClearAllPoints()
-      self.detail:SetPoint("TOPLEFT", self, "TOPLEFT", x, -top)
-      self.detail:SetWidth(detailW)
-      local h = self.detail:fgLayout(detailW)
-      self.detail:SetHeight(h)
-      y = wide and math.max(y, top + h) or (top + h)
-    end
-    self:SetHeight(math.max(1, y))
-    return y
+    return BV.SplitLayout(self, self.entries, self.detail, width)
   end
 
   return f

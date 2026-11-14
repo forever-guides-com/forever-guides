@@ -96,6 +96,30 @@ local function makeRow(parent, owner)
   return row
 end
 
+-- Short name of a wing for its rows: the part after " - " ("Graveyard" of "Scarlet Monastery - Graveyard"),
+-- else the whole name ("Upper Blackrock Spire").
+function DBT.WingLabel(inst)
+  local name = ns.T(inst.n) or ""
+  return name:match("^.- %- (.+)$") or name
+end
+
+-- Rows of the tab: { inst, boss, n = position in inst.bo, idx = position in the progress state }. The client
+-- reports the same instance ID in every wing of a dungeon and nothing that tells the wings apart, so a dungeon
+-- with wings lists the bosses of all of them, each row labelled with its wing.
+function DBT.Entries(inst)
+  local out = {}
+  if not inst then
+    return out, false
+  end
+  local wings = ns.PinLogic.Wings(inst)
+  for _, wing in ipairs(wings) do
+    for n, boss in ipairs(wing.bo or {}) do
+      out[#out + 1] = { inst = wing, boss = boss, n = n, idx = #out + 1 }
+    end
+  end
+  return out, #wings > 1
+end
+
 -- Widget ----------------------------------------------------------------------------------------------
 
 function DBT.Create(parent)
@@ -131,8 +155,8 @@ function DBT.Create(parent)
     local inst = state.inst
     local sum = summary()
     state.available = sum ~= nil
-    local bosses = inst and inst.bo or {}
-    if #bosses == 0 then
+    local entries, labelled = DBT.Entries(inst)
+    if #entries == 0 then
       W.SetText(self.head, "instances.bosses.none")
     elseif sum then
       W.SetText(self.head, nil, BP.SummaryText(sum))
@@ -141,23 +165,27 @@ function DBT.Create(parent)
     end
     state.hasPortrait = false
     local fids, kinds, displays, creatures = {}, {}, {}, {}
-    for i, boss in ipairs(bosses) do
-      fids[i], kinds[i] = IV.Portrait(inst, boss)
-      displays[i] = kinds[i] ~= "own" and ns.BossModelWindow.DisplayId(inst, boss) or nil
-      creatures[i] = kinds[i] ~= "own" and ns.BossModelWindow.CreatureId(inst, boss) or nil
+    for i, e in ipairs(entries) do
+      fids[i], kinds[i] = IV.Portrait(e.inst, e.boss)
+      displays[i] = kinds[i] ~= "own" and ns.BossModelWindow.DisplayId(e.inst, e.boss) or nil
+      creatures[i] = kinds[i] ~= "own" and ns.BossModelWindow.CreatureId(e.inst, e.boss) or nil
       state.hasPortrait = state.hasPortrait or kinds[i] == "own" or displays[i] ~= nil or creatures[i] ~= nil
     end
     -- Without any own symbol or 3D portrait the column stays away, with one every other boss shows the placeholder.
     if not state.hasPortrait then
       fids = {}
     end
-    for i, boss in ipairs(bosses) do
+    for i, e in ipairs(entries) do
+      local boss = e.boss
       local row = state.rows[i]
       if not row then
         row = makeRow(self.area.content, self)
         state.rows[i] = row
       end
-      local text = string.format("%d. %s", i, ns.T(boss.n) or "?")
+      local text = string.format("%d. %s", e.n, ns.T(boss.n) or "?")
+      if labelled then
+        text = text .. "  " .. ns.Theme.hexText("textMuted", DBT.WingLabel(e.inst))
+      end
       if boss.opt then
         text = text .. "  " .. ns.Theme.hexText("textMuted", L["instances.bosses.optional"])
       end
@@ -170,12 +198,12 @@ function DBT.Create(parent)
         ns.BossPortrait.Unbind(row.portraitHost)
         row.portrait:SetAlpha(1)
       end
-      row.modelName:SetBoss(inst, boss)
-      row.modelPic:SetBoss(inst, boss)
+      row.modelName:SetBoss(e.inst, boss)
+      row.modelPic:SetBoss(e.inst, boss)
       if not row.hasPicture then
         row.modelPic:Hide()
       end
-      row.status = state.available and (BP.Status(inst.id, i) or "open") or nil
+      row.status = state.available and (BP.Status(inst.id, e.idx) or "open") or nil
       if row.status then
         local look = LOOK[row.status]
         row.mark:Draw(look.glyph)
@@ -185,11 +213,11 @@ function DBT.Create(parent)
       end
       row:Show()
     end
-    for i = #bosses + 1, #state.rows do
+    for i = #entries + 1, #state.rows do
       ns.BossPortrait.Unbind(state.rows[i].portraitHost)
       state.rows[i]:Hide()
     end
-    state.count = #bosses
+    state.count = #entries
   end
 
   -- Takes the shown instance (a Data.Instances entry, nil for none).

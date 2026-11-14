@@ -1,7 +1,7 @@
 -- Dungeons & raids in two levels: without a slug the card grid with its filter bar (Modules/InstanceCards.lua),
 -- with a slug the instance: back button, header band with the loading screen and the tabs (every section in a
 -- column below a page width of 760). Data: ns.Data.Instances. The header and the row lists are in
--- Modules/InstanceView.lua, the items in Modules/InstanceItemsView.lua.
+-- Modules/InstanceView.lua, the bosses in Modules/InstanceBossPanel.lua, the items in Modules/InstanceItemsView.lua.
 local _, ns = ...
 local W, L, Theme, R, K, IV = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.PageKit, ns.InstanceView
 local DA = ns.InstanceDataAccess
@@ -414,7 +414,10 @@ local function build(container)
 
   local bosses = newSection("bosses")
   local bossNote = note(bosses)
-  local bossList = part(bosses, IV.BossList(view.content), { gap = 14 })
+  local bossList = part(bosses, ns.InstanceBossPanel.Create(view.content), { gap = 14 })
+  bossList.onChange = function()
+    relayout()
+  end
 
   local quests = newSection("quests")
   local questNote = note(quests)
