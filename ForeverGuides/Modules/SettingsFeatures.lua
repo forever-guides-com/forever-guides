@@ -1,4 +1,4 @@
--- Registry of the settings: 8 groups, 44 features (the tabs of the settings page) and the cards of each
+-- Registry of the settings: 8 groups, 45 features (the tabs of the settings page) and the cards of each
 -- feature. Plain data, the rules are in Modules/SettingsFeatureLogic.lua, the texts in
 -- Modules/SettingsFeatureLocale.lua. The ids are stable keys of the code, never shown to the player.
 --
@@ -67,6 +67,7 @@ SF.FEATURES = {
   feature("xpbar", "display", { { "xpbar.main", "xpbar.set.heading" } }),
   feature("durability", "display", { { "durability.main", "dur.set.heading" } }),
   feature("sleepbag", "display", { { "sleepbag.main", "sleepbag.set.heading" } }),
+  feature("talentframe", "display", { { "talentframe.main", "talentframe.set.heading" } }),
   feature("farmhud", "display", { { "farmhud.main", "farmhud.set.heading" } }),
   feature("hudwindows", "display", { { "hudwindows.main", "settings.feature.hudwindows" } }),
 

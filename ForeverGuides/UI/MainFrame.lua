@@ -1156,10 +1156,49 @@ local function raiseOnPanelShow(panel)
   pcall(panel.Raise, panel)
 end
 
+-- Raise lifts only the window's own level on the client, and a raise over a Blizzard view changes the level
+-- again. Children keep their old absolute levels, so deep content (cards, jump highlight) can end up above a
+-- window that was raised later. The tree is shifted by the distance the root moved since the last fit; the
+-- edge overlay (fixed offset) tells whether the client already moved the children.
+function Main.FitLevels()
+  if not frame then
+    return false
+  end
+  local root = frame:GetFrameLevel()
+  local seen = frame.fgFitLevel
+  frame.fgFitLevel = root
+  local shell = ns.WindowShell.Of(frame)
+  if not seen or seen == root or (shell and shell.edge:GetFrameLevel() - root == ns.WindowShell.EDGE_LEVEL) then
+    return false
+  end
+  local list, head = { frame }, 1
+  while list[head] do
+    for _, child in ipairs({ list[head]:GetChildren() }) do
+      list[#list + 1] = child
+    end
+    head = head + 1
+  end
+  local levels = {}
+  for i = 2, #list do
+    levels[i] = list[i]:GetFrameLevel()
+  end
+  for i = 2, #list do
+    list[i]:SetFrameLevel(math.max(0, levels[i] + root - seen))
+  end
+  return true
+end
+
 local function create()
   frame = CreateFrame("Frame", "ForeverGuidesMainFrame", UIParent)
   frame:SetFrameStrata("MEDIUM")
   frame:SetToplevel(true)
+  frame.fgFitLevel = frame:GetFrameLevel()
+  if type(hooksecurefunc) == "function" then
+    for _, method in ipairs({ "Raise", "SetFrameStrata" }) do
+      hooksecurefunc(frame, method, Main.FitLevels)
+    end
+  end
+  frame:HookScript("OnShow", Main.FitLevels)
   if type(ShowUIPanel) == "function" and type(hooksecurefunc) == "function" then
     hooksecurefunc("ShowUIPanel", raiseOnPanelShow)
   end

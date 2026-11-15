@@ -7,6 +7,7 @@
 -- Built into the Talents page by Modules/Talents.lua through TE.Build(view).
 local _, ns = ...
 local W, L, Theme, K, R, TL, U = ns.W, ns.L, ns.Theme, ns.PageKit, ns.RefLogic, ns.TalentLogic, ns.U
+local TO = ns.TalentOrder
 
 local TE = {}
 ns.TalentEditor = TE
@@ -172,17 +173,23 @@ function TE.ClassOfLink(text)
 end
 
 -- The code in the website's current format (v2, stable when talents move). A code that cannot be
--- read stays as it is.
-function TE.WebCode(class, code)
+-- read stays as it is. `order` (optional, a skill order) adds its segment to the code.
+function TE.WebCode(class, code, order)
   local ranks = TL.Parse(class, code)
-  return ranks and TL.EncodeV2(TL.Specs(class), ranks) or code
+  local web = ranks and TL.EncodeV2(TL.Specs(class), ranks) or code
+  if ranks and order then
+    web = TO.CodeWithOrder(class, web, order)
+  end
+  return web
 end
 
--- The website's build link for a code, in the active language.
-function TE.WebLink(class, code)
+-- The website's build link for a code, in the active language. A skill order travels as &o=<segment>.
+function TE.WebLink(class, code, order)
+  local segment = order and TO.SegmentFor(class, code, order)
   code = TE.WebCode(class, code)
   local lang = ns.GetActiveLocale() == "deDE" and "de" or "en"
   return string.format("%s/%s/classic/talents/%s?b=%s", ns.Website, lang, class:lower(), code)
+    .. (segment and ("&o=" .. segment) or "")
 end
 
 -- Public interface --------------------------------------------------------------
@@ -229,8 +236,9 @@ function TE.ApplyBuild(class, code)
   return true
 end
 
--- { class, level, total, points = { a, b, c }, code, link } for the editor's
--- build, or nil while the page was never built.
+-- { class, level, total, points = { a, b, c }, code, order, link, buildId } for the editor's
+-- build (code without the order segment, link with it), or nil while the page was never built.
+-- buildId is the own build the editor was opened from with the active build, else nil.
 function TE.Current()
   return active and active.snapshot() or nil
 end
@@ -258,14 +266,25 @@ end
 -- Loads a build code into the editor (it opens the Talents page first). The
 -- build is checked like an import: damaged or rule-breaking input changes
 -- nothing and returns false plus the number of problems. A build already in the
--- editor is only replaced after a confirmation. `level` is optional.
-function TE.Load(class, code, level)
+-- editor is only replaced after a confirmation. `level` is optional. `order` (optional) is the skill
+-- order, without one the segment of the code counts, else the fallback order. `buildId` (optional)
+-- names the own build the editor writes back to when it is saved.
+function TE.Load(class, code, level, order, buildId)
   local ranks, total, replaced, lost = TL.Parse(class, code)
   if not ranks then
     return false, total
   end
   TE.NotifyDropped(replaced, lost)
-  handOver({ class = class, ranks = ranks, level = tonumber(level) and TL.ClampLevel(level) or nil })
+  if order == nil then
+    order = TO.FromCode(class, code)
+  end
+  handOver({
+    class = class,
+    ranks = ranks,
+    order = order,
+    buildId = buildId,
+    level = tonumber(level) and TL.ClampLevel(level) or nil,
+  })
   return true, 0
 end
 
@@ -320,6 +339,13 @@ end
 -- The newest page's "load from game" refresh; combat changes re-evaluate it.
 -- The event handler gets the new state itself, the lockdown flag may lag behind.
 local refreshGame
+-- The newest page's active build line, kept current when the active build changes.
+local refreshActiveLine
+ns.On("FG_TALENT_ACTIVE_CHANGED", function()
+  if refreshActiveLine then
+    refreshActiveLine()
+  end
+end)
 ns.On("PLAYER_REGEN_DISABLED", function()
   if refreshGame then
     refreshGame(true)
@@ -349,7 +375,11 @@ function TE.Build(view)
     class = TL.Specs(playerClass) and playerClass or firstClassWithData(),
     level = TL.ClampLevel(UnitLevel and UnitLevel("player")),
     ranks = {},
+    -- One step per point: { sid, rank }, see TalentOrder. buildId: the own build to save back to.
+    order = {},
   }
+  -- Step numbers per spell id for the nodes and their tooltips, rebuilt by paint.
+  local stepsOf = {}
 
   local function specs()
     return TL.Specs(state.class)
@@ -365,12 +395,17 @@ function TE.Build(view)
     return { Layout = function() end }
   end
 
-  local paint, syncTrees, toolbar, gameReasonKey
+  local paint, syncTrees, toolbar, gameReasonKey, panel, refreshActive
 
-  -- Replaces the editor's build with rule-checked `ranks`. The level only ever
-  -- goes up, the build has to fit the budget.
-  local function adopt(list, ranks)
+  -- Replaces the editor's build with rule-checked `ranks` and their skill order (nil: the fallback
+  -- order). The level only ever goes up, the build has to fit the budget.
+  local function adopt(list, ranks, order)
     state.ranks = ranks
+    state.order = (TO.Repair(list, ranks, order))
+    state.buildId = nil
+    if panel then
+      panel:Say(nil, true)
+    end
     local total = TL.Total(list, ranks)
     state.level = math.max(state.level, TL.LevelForPoints(total))
     return total
@@ -388,7 +423,8 @@ function TE.Build(view)
     if switched then
       switchClass(job.class)
     end
-    local total = adopt(list, job.ranks)
+    local total = adopt(list, job.ranks, job.order)
+    state.buildId = job.buildId
     if job.level then
       state.level = math.max(job.level, TL.LevelForPoints(total))
     end
@@ -425,7 +461,9 @@ function TE.Build(view)
       total = TL.Total(list, state.ranks),
       points = points,
       code = code,
-      link = TE.WebLink(state.class, code),
+      order = state.order,
+      link = TE.WebLink(state.class, code, state.order),
+      buildId = state.buildId,
     }
   end
 
@@ -452,7 +490,7 @@ function TE.Build(view)
     if switched then
       switchClass(class)
     end
-    local total = adopt(list, ranks)
+    local total = adopt(list, ranks, TO.FromCode(class, text))
     paint()
     ns.Notify(
       switched and string.format(L["talents.editor.importedClass"], total, R.className(class))
@@ -473,7 +511,7 @@ function TE.Build(view)
     ns.TalentDialogs.Export({
       info = string.format(L["talents.editor.exportInfo"], R.className(state.class), state.level, total),
       link = build.link,
-      code = TE.WebCode(build.class, build.code),
+      code = TE.WebCode(build.class, build.code, build.order),
       share = function()
         ns.Share.OpenTalent(snapshot())
       end,
@@ -532,6 +570,7 @@ function TE.Build(view)
     end
     ns.Dialogs.Confirm("talents.editor.resetTitle", "talents.editor.resetConfirm", function()
       TL.Reset(state.ranks)
+      state.order = {}
       paint()
     end)
   end
@@ -638,6 +677,136 @@ function TE.Build(view)
   refreshGameButton()
   refreshGame = refreshGameButton
 
+  -- Active build -------------------------------------------------------------------
+  -- The build this character uses for its talent group (TalentActive): a line that names it and two
+  -- buttons, one that opens it here and one that writes the editor's state back to it.
+  local CHECK = "|TInterface\\Buttons\\UI-CheckBox-Check:14|t "
+  local activeLine = ns.AddParagraph(view, nil, { color = "text", role = "ui", text = "", gap = 8 })
+
+  local function saveActive()
+    local id = state.buildId
+    if not (id and ns.TalentBuilds.Get(id)) then
+      return ns.Notify(L["talents.active.saveNone"], "warning")
+    end
+    if TL.Total(specs(), state.ranks) == 0 then
+      return ns.Notify(L["talents.editor.noPoints"], "warning")
+    end
+    ns.TalentBuilds.AskOverwrite(id, snapshot(), function(entry)
+      ns.Notify(string.format(L["talents.active.saved"], entry.name), "success")
+      refreshActive()
+    end)
+  end
+
+  -- Locale key of the reason "use as new build" cannot work, nil when it can.
+  local function newBuildBlock()
+    if TL.Total(specs(), state.ranks) == 0 then
+      return "talents.editor.noPoints"
+    end
+    local _, why = ns.TalentActive.CanUse({ valid = true, class = state.class })
+    if why then
+      return why
+    end
+    if ns.TalentBuilds.Count() >= ns.TalentBuilds.MAX_ITEMS then
+      return "talents.builds.err.full"
+    end
+  end
+
+  local function useAsNew()
+    local why = newBuildBlock()
+    if why then
+      return ns.Notify(L[why], "warning")
+    end
+    local snap = snapshot()
+    local ranks = TL.Parse(snap.class, snap.code)
+    local made, entry = ns.TalentBuilds.Create(
+      snap.class,
+      ns.TalentBuilds.UniqueName(snap.class, ns.TalentBuilds.DefaultName(snap.class, ranks)),
+      snap.code,
+      snap.level,
+      snap.order
+    )
+    if not made then
+      return ns.Notify(L["talents.builds.err." .. entry], "warning")
+    end
+    state.buildId = entry.id
+    ns.TalentActive.UseWithToast(entry)
+    refreshActive()
+  end
+
+  local activeRow = ns.FlowLayout.ButtonRow(content, {
+    {
+      id = "openActive",
+      label = "talents.active.open",
+      icon = "pin",
+      tooltip = "talents.active.open",
+      tooltipText = "talents.active.openTip",
+      -- Loads the build into this editor, no window opens.
+      opens = false,
+      onClick = function()
+        ns.TalentActive.Open()
+      end,
+    },
+    {
+      id = "saveActive",
+      label = "talents.active.save",
+      icon = "save",
+      tooltip = "talents.active.save",
+      tooltipText = "talents.active.saveTip",
+      onClick = saveActive,
+    },
+    {
+      id = "newActive",
+      label = "talents.active.new",
+      icon = "plus",
+      tooltip = "talents.active.new",
+      tooltipText = "talents.active.newTip",
+      onClick = useAsNew,
+    },
+  }, { height = K.scaledHeight(28) })
+  stack:Add(activeRow, { gap = 12 })
+
+  -- A disabled button keeps its tooltip, so the reason can be read.
+  local function reasonTip(id, titleKey, okKey, noKey, isOk)
+    local button = activeRow:GetButton(id)
+    button:HookScript("OnEnter", function(self)
+      ns.ShowTooltip(self, L[titleKey], L[isOk() and okKey or noKey])
+    end)
+    button:HookScript("OnLeave", ns.HideTooltip)
+  end
+  local function hasActive()
+    return ns.TalentActive.Get(nil) ~= nil
+  end
+  local function canSaveActive()
+    return state.buildId ~= nil and ns.TalentBuilds.Get(state.buildId) ~= nil
+  end
+  reasonTip("openActive", "talents.active.open", "talents.active.openTip", "talents.active.openNone", hasActive)
+  reasonTip("saveActive", "talents.active.save", "talents.active.saveTip", "talents.active.saveNone", canSaveActive)
+
+  activeRow:GetButton("newActive"):HookScript("OnEnter", function(self)
+    ns.ShowTooltip(self, L["talents.active.new"], L[newBuildBlock() or "talents.active.newTip"])
+  end)
+  activeRow:GetButton("newActive"):HookScript("OnLeave", ns.HideTooltip)
+
+  function refreshActive()
+    local TA = ns.TalentActive
+    local group = TA.Group()
+    local entry = TA.Get(nil, group)
+    local groupText = TA.GroupName(group)
+    W.SetText(
+      activeLine,
+      nil,
+      entry and (CHECK .. string.format(L["talents.active.line"], groupText, entry.name))
+        or string.format(L["talents.active.lineNone"], groupText)
+    )
+    activeRow:SetItemEnabled("openActive", entry ~= nil)
+    activeRow:SetItemEnabled("saveActive", canSaveActive())
+    activeRow:SetItemEnabled("newActive", newBuildBlock() == nil)
+  end
+  refreshActiveLine = function()
+    refreshActive()
+    view:Layout()
+  end
+
   -- Class and level ------------------------------------------------------------
   local classButtons
   classButtons = K.ClassButtons(content, {
@@ -650,6 +819,7 @@ function TE.Build(view)
       end
       state.class = class
       TL.Reset(state.ranks)
+      state.order, state.buildId = {}, nil
       syncTrees()
       paint()
     end,
@@ -688,7 +858,9 @@ function TE.Build(view)
   local summary = ns.AddParagraph(view, nil, { color = "text", role = "ui", text = "" })
 
   -- Trees -------------------------------------------------------------------------
-  local trees = CreateFrame("Frame", nil, content)
+  -- The trees and, right of them (below on a narrow page), the skill order panel.
+  local board = CreateFrame("Frame", nil, content)
+  local trees = CreateFrame("Frame", nil, board)
   local treeList, treeCount = {}, 0
 
   local function nodeTooltip(node)
@@ -711,6 +883,11 @@ function TE.Build(view)
     end
     if rank < talent.mr then
       addRank(rank > 0 and "talents.editor.nextRank" or "talents.editor.currentRank", rank + 1)
+    end
+    local steps = stepsOf[talent.sid]
+    if steps then
+      lines[#lines + 1] = ""
+      lines[#lines + 1] = Theme.hexText("accent2", string.format(L["talents.order.steps"], table.concat(steps, ", ")))
     end
     local reqs = {}
     if talent.rp > 0 then
@@ -755,20 +932,79 @@ function TE.Build(view)
     end
   end
 
-  local function change(node, delta)
-    local ok
-    if delta > 0 then
-      ok = TL.Add(specs(), node.spec, node.talent, state.ranks, cap())
-    else
-      ok = TL.Remove(node.spec, node.talent, state.ranks)
+  -- Shows a refused change or move: in the panel next to the list and as a toast, so it is found while
+  -- the panel is collapsed too.
+  local function refuse(reason)
+    local text = TO.ReasonText(reason) or tostring(reason)
+    panel:Say(text)
+    ns.Notify(string.format(L["talents.order.blocked"], text), "warning")
+  end
+
+  -- The talent ring that marks the steps of the hovered row, nil when none.
+  local ringed
+  local function setRing(sid)
+    if ringed then
+      ringed.pick.show(false)
+      ringed = nil
     end
-    if ok then
+    local talent = sid and TO.TalentOf(specs(), { sid = sid })
+    if not talent then
+      return
+    end
+    for _, tree in ipairs(treeList) do
+      for _, node in ipairs(tree.nodes) do
+        if node.talent == talent then
+          node.pick.show(true)
+          ringed = node
+          return
+        end
+      end
+    end
+  end
+
+  local function change(node, delta)
+    local list, talent = specs(), node.talent
+    local ok, order
+    if delta > 0 then
+      ok, order = TO.AddPoint(list, state.order, talent, state.level)
+    else
+      ok, order = TO.RemovePoint(list, state.order, talent)
+    end
+    if not ok then
+      -- A click on a talent without points (or at its limit) stays silent, the tooltip says why.
+      if delta < 0 and order ~= "none" then
+        refuse(order)
+      end
+      return
+    end
+    local changed
+    if delta > 0 then
+      changed = TL.Add(list, node.spec, talent, state.ranks, cap())
+    else
+      changed = TL.Remove(node.spec, talent, state.ranks)
+    end
+    if changed then
+      state.order = order
+      panel:Say(nil, true)
       paint()
       if node.hover then
         highlightPrerequisites(node, true)
         nodeTooltip(node)
       end
     end
+  end
+
+  -- Moves step `from` to place `to` (panel rows). A refused move changes nothing and says why.
+  local function moveStep(from, to)
+    local ok, order = TO.MoveTo(specs(), state.order, from, to, state.level)
+    if not ok then
+      refuse(order)
+      return false
+    end
+    state.order = order
+    panel:Say(nil, true)
+    paint()
+    return true
   end
 
   local function newNode(tree)
@@ -782,6 +1018,18 @@ function TE.Build(view)
     b.initial = W.Text(b, { role = "h3", justify = "CENTER", color = "textSecondary" })
     b.initial:SetPoint("CENTER")
     b.ring = W.Border(b, "white", 0.2, 2)
+    -- Ring outside the node for the talent of a hovered step (thicker than the state ring).
+    local pick = CreateFrame("Frame", nil, b)
+    pick:SetPoint("TOPLEFT", -3, 3)
+    pick:SetPoint("BOTTOMRIGHT", 3, -3)
+    b.pick = W.Border(pick, "accent", 1, 3)
+    b.pick.show(false)
+    b.numBg = b:CreateTexture(nil, "ARTWORK", nil, 1)
+    b.numBg:SetColorTexture(0, 0, 0, 0.75)
+    b.num = W.Text(b, { role = "micro", justify = "LEFT" })
+    b.num:SetPoint("TOPLEFT", 3, -3)
+    b.numBg:SetPoint("TOPLEFT", b.num, "TOPLEFT", -2, 1)
+    b.numBg:SetPoint("BOTTOMRIGHT", b.num, "BOTTOMRIGHT", 2, -1)
     b.rankBg = b:CreateTexture(nil, "ARTWORK", nil, 1)
     b.rankBg:SetColorTexture(0, 0, 0, 0.75)
     b.rank = W.Text(b, { role = "micro", justify = "RIGHT" })
@@ -804,6 +1052,13 @@ function TE.Build(view)
       b.ring.set(style.ring, style.alpha)
       b.rank:SetText(rank .. "/" .. talent.mr)
       W.SetColor(b.rank, style.text)
+      local steps = stepsOf[talent.sid]
+      local numbered = steps ~= nil and ns.TalentOrderPanel.NumbersOn()
+      b.num:SetShown(numbered)
+      b.numBg:SetShown(numbered)
+      if numbered then
+        b.num:SetText(tostring(steps[1]))
+      end
     end
 
     b:SetScript(
@@ -816,11 +1071,13 @@ function TE.Build(view)
       b.hover = true
       highlightPrerequisites(b, true)
       nodeTooltip(b)
+      panel:Highlight(b.talent.sid)
     end)
     b:SetScript("OnLeave", function()
       b.hover = false
       highlightPrerequisites(b, false)
       ns.HideTooltip()
+      panel:Highlight(nil)
     end)
     ns.Focus.register(b, function()
       change(b, IsShiftKeyDown and IsShiftKeyDown() and -1 or 1)
@@ -891,6 +1148,7 @@ function TE.Build(view)
   end
 
   function syncTrees()
+    setRing(nil)
     local list = specs()
     for i, spec in ipairs(list) do
       treeList[i] = treeList[i] or newTree()
@@ -986,13 +1244,43 @@ function TE.Build(view)
     trees:SetHeight(total)
     return total
   end
-  stack:Add(trees, { gap = 14 })
+
+  -- The panel sits beside the trees when each tree keeps four nodes and the panel its width, else under them.
+  local PANEL_GAP = 12
+  function board:fgGridLayout(width)
+    local P = ns.TalentOrderPanel
+    local wide = treeCount > 0 and width >= treeCount * MIN_TREE_W + (treeCount - 1) * TREE_GAP + PANEL_GAP + P.WIDTH
+    local treesW = wide and (width - P.WIDTH - PANEL_GAP) or width
+    trees:ClearAllPoints()
+    trees:SetPoint("TOPLEFT", board, "TOPLEFT", 0, 0)
+    trees:SetWidth(treesW)
+    local treesH = trees:fgGridLayout(treesW)
+    panel:ClearAllPoints()
+    local total
+    if wide then
+      panel:SetPoint("TOPRIGHT", board, "TOPRIGHT", 0, 0)
+      total = math.max(treesH, panel:Measure(P.WIDTH, treesH))
+    else
+      panel:SetPoint("TOPLEFT", trees, "BOTTOMLEFT", 0, -PANEL_GAP)
+      total = treesH + PANEL_GAP + panel:Measure(width)
+    end
+    board:SetHeight(total)
+    return total
+  end
+  stack:Add(board, { gap = 14 })
 
   -- Repaint ---------------------------------------------------------------------
   -- Repaints nodes and counters; lays the page out again unless
   -- called while the page is still being built (the width is unknown then).
   function paint(building)
     local list = specs()
+    stepsOf = {}
+    for i, step in ipairs(state.order) do
+      local steps = stepsOf[step.sid] or {}
+      steps[#steps + 1] = i
+      stepsOf[step.sid] = steps
+    end
+    panel:SetOrder(state.order)
     local total = TL.Total(list, state.ranks)
     local limit = cap()
     for i, spec in ipairs(list) do
@@ -1021,6 +1309,7 @@ function TE.Build(view)
         .. string.format(L["talents.editor.distribution"], TL.Summary(list, state.ranks))
     )
     toolbar:SetItemEnabled("share", total > 0)
+    refreshActive()
     levelSlider.Refresh()
     classButtons.Refresh()
     if not building then
@@ -1029,6 +1318,17 @@ function TE.Build(view)
   end
 
   syncTrees()
+  panel = ns.TalentOrderPanel.Create(board, {
+    specs = specs,
+    onMove = moveStep,
+    onHover = setRing,
+    onLayout = function()
+      view:Layout()
+    end,
+    onNumbers = function()
+      paint()
+    end,
+  })
   paint(true)
   active = { snapshot = snapshot, load = loadJob, export = openExport }
   if pending then
@@ -1039,6 +1339,7 @@ function TE.Build(view)
   return {
     Layout = function()
       refreshGameButton()
+      refreshActive()
       view:Layout()
     end,
   }

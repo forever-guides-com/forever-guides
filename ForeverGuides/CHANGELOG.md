@@ -4,6 +4,27 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.9.0] - 2026-11-15
+
+### Added
+
+- Talent editor: The skill order box shows every point as a step with rank and level. Arrows, drag and drop and Shift+Up/Down change the order.
+- Talent editor: Optional step numbers on the talents, the tooltip of a talent lists all of its steps.
+- Talent editor: "Use as new build" saves the distribution as a new build and makes it active.
+- Builds: The Use button makes a build active, per character and talent group. "Open active build" and "Save to active build" on the talents page.
+- Talent window: A bar on the right edge opens into a panel of window height with progress, learned steps and the next step.
+- Talent window: Numbers on the talents show the next open rank, "10+" while more ranks follow. A checkbox in the panel turns them on and off.
+- Talent window: A button hides learned steps, on opening the list jumps to the next step.
+
+### Changed
+
+- Builds: Only rated website builds are shipped, most liked first, each with its skill order.
+- Sharing: Links, codes and chat links carry the skill order, older codes without an order stay valid.
+
+### Fixed
+
+- Windows: Contents of the add-on window no longer sit above other windows when the window comes to the front.
+
 ## [0.8.4] - 2026-11-15
 
 ### Added
@@ -673,6 +694,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.9.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.1...v0.8.2

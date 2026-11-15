@@ -335,6 +335,7 @@ local function checksum(body)
   end
   return base36(acc, 2)
 end
+TL.Checksum = checksum
 
 -- true when the code is written in the v2 format (the website's current one).
 function TL.IsV2(text)
@@ -441,6 +442,43 @@ local function split(text)
   end
 end
 
+-- The code without whitespace and without the address around it (?b=<code>).
+function TL.Bare(text)
+  text = tostring(text or ""):gsub("%s+", "")
+  local build = text:match("[%?&]b=([^&#]*)")
+  if not build then
+    return text
+  end
+  -- A website link carries the skill order as its own parameter (&o=); it reads like a "-o" suffix.
+  local order = text:match("[%?&]o=([^&#]*)")
+  if order and order ~= "" and not build:find("-o", 1, true) then
+    build = build .. "-" .. order
+  end
+  return build
+end
+
+-- Splits the optional skill order segment ("-o..." after the build, see TalentOrder.lua) off a bare
+-- code. Returns the build part and the segment (nil without one). A segment after the last tree that
+-- starts with a digit stays in the build part and counts as a problem, as before.
+function TL.SplitOrder(text, specCount)
+  if TL.IsV2(text) then
+    local cut = text:find("-", 1, true)
+    if cut then
+      return text:sub(1, cut - 1), text:sub(cut + 1)
+    end
+    return text, nil
+  end
+  local segments = split(text)
+  if #segments > specCount and not segments[specCount + 1]:match("^%d") then
+    local build = {}
+    for i = 1, specCount do
+      build[i] = segments[i]
+    end
+    return table.concat(build, "-"), table.concat(segments, "-", specCount + 1)
+  end
+  return text, nil
+end
+
 -- Accepts the bare code (v1: one digit per entry of the frozen layout, so codes written for older
 -- talent data still read right; v2: "v2." and spell ids, see above) or a pasted
 -- web address with ?b=<code>. Never errors:
@@ -450,10 +488,10 @@ end
 -- TL.Normalize. The third result lists the v1 points dropped because the digit's spell is no
 -- talent of the tree any more: { node, sid, name = { de, en }, rank } of the OLD talent. They are no
 -- problems. v2 codes name the talent by spell id and never drop this way.
+-- A skill order segment at the end (TL.SplitOrder) is cut off first and not read here.
 function TL.Decode(text, specs)
   local ranks, problems, dropped = {}, 0, {}
-  text = tostring(text or ""):gsub("%s+", "")
-  text = text:match("[%?&]b=([^&#]*)") or text
+  text = TL.SplitOrder(TL.Bare(text), #specs)
   if text == "" then
     return ranks, 0, dropped
   end

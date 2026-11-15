@@ -1,12 +1,14 @@
 -- Talent links: a talent build goes into the chat as one short link
 -- ("[Talents - Warrior 31/7/13]") like a note or a drawing (see NoteLink.lua,
 -- which carries the protocol). The content is tiny, so it always travels inside
--- the link: <class letter><level, 2 digits><build code with "(" for "-" and "v2(" for "v2.">.
+-- the link: <class letter><level, 2 digits><build code with "(" for "-" and "v2(" for "v2.">. The code
+-- may end in the skill order segment ("(o..."), see TalentOrder.
 -- The title is the link text. The receiver reads it with the strict
 -- TalentLogic.Parse and sees it in a read-only window; nothing reaches the
 -- editor without a click on "load in editor".
 local _, ns = ...
-local W, L, Theme, R, TL, NL, TE = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.TalentLogic, ns.NoteLink, ns.TalentEditor
+local W, L, Theme, R, TL, TO, NL, TE =
+  ns.W, ns.L, ns.Theme, ns.RefLogic, ns.TalentLogic, ns.TalentOrder, ns.NoteLink, ns.TalentEditor
 
 local TLK = { TOKEN = "FGT", LINK = "FGTalent" }
 ns.TalentLink = TLK
@@ -28,10 +30,10 @@ for class, letter in pairs(CLASS_CODE) do
   CLASS_BY_CODE[letter] = class
 end
 
--- A v1 build is about 100 characters, a v2 build with many talents up to about 320, anything far
--- above that is not one.
+-- A v1 build is about 100 characters, a v2 build with many talents up to about 320 (with the skill
+-- order about 60 more), anything far above that is not one.
 local MAX_CODE = 340
-local VIEW_W, VIEW_H = 460, 240
+local VIEW_W, VIEW_H = 460, 282
 
 ns.AddLocale("enUS", {
   ["talentlink.label"] = "Talents",
@@ -76,21 +78,17 @@ end
 
 -- The build code as it travels: only letters, digits and "(" are allowed in the link.
 local function toWire(code)
-  if TL.IsV2(code) then
-    return (code:gsub("^v2%.", "v2("))
-  end
-  return (code:gsub("%-", "("))
+  return (code:gsub("^v2%.", "v2("):gsub("%-", "("))
 end
 
 local function fromWire(body)
-  if body:sub(1, 3) == "v2(" then
-    return "v2." .. body:sub(4)
-  end
-  return (body:gsub("%(", "-"))
+  return (body:gsub("^v2%(", "v2."):gsub("%(", "-"))
 end
 
--- Returns { class, level (or nil), code, total, points, dropped, lost } for received content (dropped
--- and lost: points a hotfix took out of an old code, see TL.Parse), or nil, reason. `hash` (optional) is checked before anything is read.
+-- Returns { class, level (or nil), code, total, points, dropped, lost, order, orderState } for received
+-- content (dropped and lost: points a hotfix took out of an old code, see TL.Parse; order: the skill
+-- order of the link or nil for the fallback order, orderState "none", "ignored" or "ok", see
+-- TO.FromCode), or nil, reason. `hash` (optional) is checked before anything is read.
 function TLK.Decode(code, hash)
   if type(code) ~= "string" or #code > MAX_CODE then
     return nil, "too-large"
@@ -104,10 +102,12 @@ function TLK.Decode(code, hash)
   if not class or (level ~= 0 and (level < TL.MIN_LEVEL or level > TL.MAX_LEVEL)) then
     return nil, "decode"
   end
-  local ranks, total, replaced, lost = TL.Parse(class, fromWire(body))
+  local wired = fromWire(body)
+  local ranks, total, replaced, lost = TL.Parse(class, wired)
   if not ranks or total == 0 then
     return nil, "decode"
   end
+  local order, report = TO.FromCode(class, wired)
   local list = TL.Specs(class)
   local points = {}
   for i, spec in ipairs(list) do
@@ -121,11 +121,17 @@ function TLK.Decode(code, hash)
     points = points,
     dropped = replaced,
     lost = lost,
+    order = order,
+    orderState = report.state,
   }
 end
 
--- Builds the one chat message for a build ({ class, level, code }, what
--- TalentEditor.Current returns). Returns { msg } or nil, "unreadable" | "tooLarge".
+-- Builds the one chat message for a build ({ class, level, code, order }, what
+-- TalentEditor.Current returns; order is optional, a segment on the code counts too). Returns
+-- { msg, entry, orderOmitted } or nil, "unreadable" | "tooLarge". The skill order travels when the
+-- content stays within MAX_CODE and the message stays inline (240 characters, no request to the
+-- sender) wherever it did without the order; otherwise orderOmitted is true and the link carries the
+-- build only.
 function TLK.Build(build, mode)
   local letter = build and CLASS_CODE[build.class]
   local ranks, total = TL.Parse(build and build.class, build and build.code)
@@ -134,9 +140,27 @@ function TLK.Build(build, mode)
   end
   local list = TL.Specs(build.class)
   local level = tonumber(build.level) and math.max(TL.ClampLevel(build.level), TL.LevelForPoints(total)) or 0
-  local content = letter .. string.format("%02d", level) .. toWire(TL.Encode(list, ranks))
+  local head = letter .. string.format("%02d", level)
+  local content = head .. toWire(TL.Encode(list, ranks))
   local title = build.title or (R.className(build.class) .. " " .. TL.Summary(list, ranks))
-  return NL.BuildFor("T", content, NL.Hash(content), title, mode)
+  local plain, why = NL.BuildFor("T", content, NL.Hash(content), title, mode)
+  local order = build.order
+  if order == nil then
+    order = TO.FromCode(build.class, build.code)
+  end
+  local segment = TO.SegmentFor(build.class, build.code, order)
+  if not segment then
+    return plain, why
+  end
+  local full = head .. toWire(TO.Join(TL.Encode(list, ranks), segment))
+  local built = #full <= MAX_CODE and NL.BuildFor("T", full, NL.Hash(full), title, mode)
+  if built and (plain == nil or plain.entry or not built.entry) then
+    return built
+  end
+  if plain then
+    plain.orderOmitted = true
+  end
+  return plain, why
 end
 
 -- Viewer -------------------------------------------------------------------------------
@@ -151,7 +175,8 @@ local function copyText(kind)
   local isCode = kind == "code"
   ns.Dialogs.Copy(
     "talents.editor.exportTitle",
-    isCode and data.code or TE.WebLink(data.class, data.code),
+    isCode and ns.TalentOrder.CodeWithOrder(data.class, data.code, data.order)
+      or TE.WebLink(data.class, data.code, data.order),
     isCode and "talents.editor.exportCode" or "talents.editor.exportLink"
   )
 end
@@ -161,10 +186,27 @@ local function loadInEditor()
   if not data then
     return
   end
-  if TE.Load(data.class, data.code, data.level) then
+  if TE.Load(data.class, data.code, data.level, data.order) then
     view:Hide()
   else
     ns.Notify(L["talents.editor.importDamaged"], "warning")
+  end
+end
+
+local function useBuild()
+  local data = view and view.data
+  if not data then
+    return
+  end
+  local ok = ns.TalentActive.UseWithToast({
+    class = data.class,
+    code = data.code,
+    level = data.level,
+    order = data.order,
+    name = data.title ~= "" and data.title or L["talentlink.untitled"],
+  })
+  if ok then
+    view:Hide()
   end
 end
 
@@ -208,6 +250,21 @@ local function makeView()
     end,
   })
   d.close:SetPoint("RIGHT", d.load, "LEFT", -8, 0)
+  d.use = W.Action(d, {
+    label = "talents.active.use",
+    icon = "pin",
+    tooltip = "talents.active.use",
+    width = 190,
+    onClick = useBuild,
+  })
+  d.use:SetPoint("BOTTOMRIGHT", -16, 82)
+  -- Also read while the button is disabled: the reason is the tooltip.
+  d.use:HookScript("OnEnter", function(self)
+    local data = d.data
+    local ok, why = ns.TalentActive.CanUse({ valid = data ~= nil, class = data and data.class })
+    local group = ns.TalentActive.GroupName(ns.TalentActive.Group())
+    ns.ShowTooltip(self, L["talents.active.use"], ok and string.format(L["talents.active.useTip"], group) or L[why])
+  end)
   d.copyLink = W.Action(d, {
     label = "act.link",
     icon = "copy",
@@ -242,6 +299,7 @@ function TLK.Show(sender, result, title)
     code = result.code,
     level = result.level,
     points = result.points,
+    order = result.order,
   }
   W.SetText(d.title, nil, title ~= "" and title or L["talentlink.untitled"])
   W.SetText(d.author, nil, fmt("talentlink.from", sender))
@@ -251,6 +309,7 @@ function TLK.Show(sender, result, title)
   if result.level then
     W.SetText(d.level, nil, fmt("talents.editor.levelFormat", result.level, TL.PointsForLevel(result.level)))
   end
+  d.use:SetEnabled(TE.CanApply(result.class))
   d.note:SetShown(not TE.CanApply(result.class))
   W.SetText(d.note, "talentlink.otherClass")
   d:Show()

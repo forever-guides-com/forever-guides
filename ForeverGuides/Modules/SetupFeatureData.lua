@@ -248,6 +248,7 @@ D.SKIP = {
   mouse = "modifier keys are personal",
   farmhud = "session only, no stored switch, opened by key",
   sleepbag = "rare situational display, off by default, stays in the settings",
+  talentframe = "only matters with an active skill order, stays in the settings",
   professions = "covered by the menu step (page Professions)",
   instances = "covered by the menu step (page Instances)",
   bosses = "covered by the menu step (page Instances)",

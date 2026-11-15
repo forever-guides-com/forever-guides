@@ -5,6 +5,31 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.9.0",
+      highlights = {
+        { head = { de = "Skillreihenfolge planen", en = "Plan your skill order" }, text = { de = "Lege im Talent-Editor fest, in welcher Reihenfolge du jeden Punkt vergibst, per Pfeil oder Ziehen.", en = "Set in the talent editor in which order you spend every point, with arrows or drag and drop." } },
+        { head = { de = "Reihenfolge am Talentfenster", en = "Order at the talent window" }, text = { de = "Eine Leiste am Talentfenster zeigt den nächsten Schritt, die Zahlen stehen direkt an den Talenten.", en = "A panel at the talent window shows your next step, the numbers sit right on the talents." } },
+        { head = { de = "Aktive Skillung", en = "Active build" }, text = { de = "Wähle eine Skillung als aktiv, Talentfenster und Editor richten sich dann nach ihr.", en = "Pick one build as active, the talent window and the editor then follow it." } },
+        { head = { de = "Bewertete Skillungen", en = "Rated builds" }, text = { de = "Mitgeliefert werden die Skillungen der Website mit den meisten Likes, samt ihrer Reihenfolge.", en = "The add-on ships the website builds with the most likes, including their skill order." } },
+      },
+      added = {
+        { de = "Talent-Editor: Der Kasten Skillreihenfolge zeigt jeden Punkt als Schritt mit Rang und Stufe. Pfeile, Ziehen und Umschalt+Hoch/Runter ändern die Reihenfolge.", en = "Talent editor: The skill order box shows every point as a step with rank and level. Arrows, drag and drop and Shift+Up/Down change the order.", go = "talents" },
+        { de = "Talent-Editor: Schrittnummern an den Talenten auf Wunsch, der Tooltip eines Talents nennt alle seine Schritte.", en = "Talent editor: Optional step numbers on the talents, the tooltip of a talent lists all of its steps.", go = "talents" },
+        { de = "Talent-Editor: \"Als neue Skillung nutzen\" speichert die Verteilung als neue Skillung und macht sie aktiv.", en = "Talent editor: \"Use as new build\" saves the distribution as a new build and makes it active.", go = "talents" },
+        { de = "Skillungen: Der Knopf Nutzen macht eine Skillung aktiv, je Charakter und Talentgruppe. \"Aktive Skillung öffnen\" und \"In aktive Skillung speichern\" auf der Talente-Seite.", en = "Builds: The Use button makes a build active, per character and talent group. \"Open active build\" and \"Save to active build\" on the talents page.", go = "talents" },
+        { de = "Talentfenster: Eine Leiste am rechten Rand klappt zu einem Bereich in Fensterhöhe auf, mit Fortschritt, gelernten Schritten und dem nächsten Schritt.", en = "Talent window: A bar on the right edge opens into a panel of window height with progress, learned steps and the next step.", go = "settings:talentframe.main" },
+        { de = "Talentfenster: Zahlen an den Talenten zeigen den nächsten offenen Rang, \"10+\" solange weitere Ränge folgen. Ein Haken im Bereich schaltet sie an und aus.", en = "Talent window: Numbers on the talents show the next open rank, \"10+\" while more ranks follow. A checkbox in the panel turns them on and off.", go = "settings:talentframe.main" },
+        { de = "Talentfenster: Ein Knopf blendet gelernte Schritte aus, beim Öffnen springt die Liste zum nächsten Schritt.", en = "Talent window: A button hides learned steps, on opening the list jumps to the next step.", go = "settings:talentframe.main" },
+      },
+      changed = {
+        { de = "Skillungen: Mitgeliefert werden nur noch bewertete Skillungen der Website, die meisten Likes zuerst, jede mit ihrer Skillreihenfolge.", en = "Builds: Only rated website builds are shipped, most liked first, each with its skill order.", go = "talents" },
+        { de = "Teilen: Links, Codes und Chat-Links tragen die Skillreihenfolge mit, ältere Codes ohne Reihenfolge bleiben gültig.", en = "Sharing: Links, codes and chat links carry the skill order, older codes without an order stay valid.", go = "talents" },
+      },
+      fixed = {
+        { de = "Fenster: Inhalte des Addon-Fensters liegen nicht mehr über anderen Fenstern, wenn das Fenster nach vorn kommt.", en = "Windows: Contents of the add-on window no longer sit above other windows when the window comes to the front." },
+      },
+    },
+    {
       version = "0.8.4",
       date = "2026-11-15",
       highlights = {
@@ -132,16 +157,6 @@ ns.Data.Changelog = {
       fixed = {
         { de = "Forever Chat: Neue Nachrichten bei offenem Chat bremsen das Spiel nicht mehr aus.", en = "Forever Chat: New messages no longer slow the game down while the chat is open.", go = "settings:foreverchat.options" },
         { de = "Gilde: Minimap, Karte und Berufsverzeichnis lesen die Gildenliste seltener neu und kosten in großen Gilden weniger Leistung.", en = "Guild: The minimap, the map and the crafter directory read the guild list less often and cost less performance in large guilds." },
-      },
-    },
-    {
-      version = "0.7.8",
-      date = "2026-11-13",
-      highlights = {
-      },
-      fixed = {
-        { de = "Forever Chat: Tippen im Eingabefeld bremst das Spiel nicht mehr aus.", en = "Forever Chat: typing in the input box no longer slows the game down.", go = "settings:foreverchat.options" },
-        { de = "Forever Chat: Beginnst du zu tippen, bleibt die letzte Nachricht sichtbar und wird nicht mehr überdeckt.", en = "Forever Chat: when you start typing, the last message stays visible and is no longer covered.", go = "settings:foreverchat.options" },
       },
     },
   },

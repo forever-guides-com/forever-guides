@@ -5,7 +5,7 @@
 -- Own builds are never deleted by the add-on: a build whose code no longer fits the talent
 -- data stays in the list marked as invalid until the player replaces or deletes it.
 local _, ns = ...
-local L, U, TL, R = ns.L, ns.U, ns.TalentLogic, ns.RefLogic
+local L, U, TL, TO, R = ns.L, ns.U, ns.TalentLogic, ns.TalentOrder, ns.RefLogic
 
 local TB = {
   NAME_MAX = 40,
@@ -27,6 +27,7 @@ ns.AddLocale("enUS", {
   ["talents.builds.err.nodb"] = "Saved builds are not available right now.",
   ["talents.builds.invalidLoad"] = "This build does not fit the current talent data, nothing was loaded.",
   ["talents.builds.stale"] = "%d of your own builds no longer fit the talent data. They stay saved and are marked in the list.",
+  ["talents.builds.orderFixed"] = "The skill order of %d of your own builds was adjusted to the new talent data.",
 })
 
 ns.AddLocale("deDE", {
@@ -42,6 +43,7 @@ ns.AddLocale("deDE", {
   ["talents.builds.err.nodb"] = "Gespeicherte Skillungen sind gerade nicht verfügbar.",
   ["talents.builds.invalidLoad"] = "Diese Skillung passt nicht zu den aktuellen Talentdaten, nichts wurde geladen.",
   ["talents.builds.stale"] = "%d deiner eigenen Skillungen passen nicht mehr zu den Talentdaten. Sie bleiben gespeichert und sind in der Liste markiert.",
+  ["talents.builds.orderFixed"] = "Die Skillreihenfolge von %d deiner eigenen Skillungen wurde an die neuen Talentdaten angepasst.",
 })
 
 -- Names ------------------------------------------------------------------------------------
@@ -92,6 +94,30 @@ local function levelFor(level, total)
   return tonumber(level) and math.max(TL.ClampLevel(level), least) or least
 end
 
+-- A stored skill order (TalentOrder): a list of up to 51 steps { sid, rank } of whole numbers, or
+-- nil. Whether it fits the build is checked when it is read (TB.OrderOf).
+local function cleanOrder(order)
+  if type(order) ~= "table" or #order > TL.MAX_POINTS then
+    return nil
+  end
+  local out = {}
+  for i, step in ipairs(order) do
+    local sid = type(step) == "table" and step.sid
+    local rank = type(step) == "table" and step.rank
+    if
+      type(sid) ~= "number"
+      or sid ~= math.floor(sid)
+      or sid < 0
+      or type(rank) ~= "number"
+      or rank ~= math.floor(rank)
+    then
+      return nil
+    end
+    out[i] = { sid = sid, rank = rank }
+  end
+  return #out > 0 and out or nil
+end
+
 local checked
 
 -- Repairs the saved structure once per table. Only entries that are no table at all are dropped;
@@ -109,6 +135,7 @@ local function validate(root)
       top = math.max(top, id)
       raw.class = type(raw.class) == "string" and raw.class or ""
       raw.code = type(raw.code) == "string" and raw.code or ""
+      raw.order = cleanOrder(raw.order)
       raw.name = TB.cleanName(raw.name) or TB.cleanName(R.className(raw.class)) or "?"
       raw.spec = U.clamp(math.floor(num(raw.spec, 1)), 1, TB.SPECS)
       raw.level = TL.ClampLevel(raw.level)
@@ -148,6 +175,7 @@ local function ownEntry(id, item)
     spec = item.spec,
     name = item.name,
     code = item.code,
+    skillOrder = item.order,
     level = item.level,
     total = ranks and total or 0,
     points = ranks and TL.Summary(list, ranks) or "",
@@ -169,6 +197,12 @@ local function count(root)
     n = n + 1
   end
   return n
+end
+
+-- Number of own builds.
+function TB.Count()
+  local root = TB.root()
+  return root and count(root) or 0
 end
 
 -- A name that no own build of the class has yet: "Name", "Name (2)", "Name (3)" ...
@@ -196,9 +230,11 @@ function TB.DefaultName(class, ranks)
 end
 
 -- Strict check shared by every way into the store. Returns the rule-checked ranks, the normalized
--- code, the dominant tree and the total, then the points a hotfix took out of a v1 code (see
--- TL.Parse); or nil plus "code" (unreadable, breaks the rules or other class) or "empty".
-local function checkCode(class, code)
+-- code (without a skill order segment), the dominant tree and the total, then the points a hotfix
+-- took out of a v1 code (see TL.Parse) and the skill order to keep (nil: the fallback order); or nil
+-- plus "code" (unreadable, breaks the rules or other class) or "empty". `order` (optional) is the
+-- order to keep, else the segment of the code counts.
+local function checkCode(class, code, order)
   local ranks, total, replaced, lost = TL.Parse(class, code)
   if not ranks then
     return nil, "code"
@@ -207,13 +243,20 @@ local function checkCode(class, code)
     return nil, "empty"
   end
   local list = TL.Specs(class)
-  return ranks, TL.Encode(list, ranks), dominantSpec(list, ranks), total, replaced, lost
+  local kept
+  if cleanOrder(order) then
+    kept = TO.Repair(list, ranks, cleanOrder(order))
+  else
+    kept = TO.FromCode(class, code)
+  end
+  return ranks, TL.Encode(list, ranks), dominantSpec(list, ranks), total, replaced, lost, kept
 end
 
--- Stores a new own build. level is optional (the lowest level that pays for the points).
--- Returns true, the new entry and the hotfix-dropped points of the code (TL.Parse results 3 and 4);
--- or false and "name", "code", "empty", "full" or "nodb".
-function TB.Create(class, name, code, level)
+-- Stores a new own build. level is optional (the lowest level that pays for the points). order
+-- (optional) is its skill order, see TalentOrder; without one the code's own segment is used, else
+-- the build has the fallback order. Returns true, the new entry and the hotfix-dropped points of the
+-- code (TL.Parse results 3 and 4); or false and "name", "code", "empty", "full" or "nodb".
+function TB.Create(class, name, code, level, order)
   local root = TB.root()
   if not root then
     return false, "nodb"
@@ -222,7 +265,7 @@ function TB.Create(class, name, code, level)
   if not name then
     return false, "name"
   end
-  local ranks, clean, spec, total, replaced, lost = checkCode(class, code)
+  local ranks, clean, spec, total, replaced, lost, kept = checkCode(class, code, order)
   if not ranks then
     return false, clean
   end
@@ -237,6 +280,7 @@ function TB.Create(class, name, code, level)
     spec = spec,
     name = name,
     code = clean,
+    order = kept,
     level = levelFor(level, total),
     created = now,
     updated = now,
@@ -258,9 +302,10 @@ function TB.Rename(id, name)
   return true, TB.Get(id)
 end
 
--- Replaces the build of an own entry with a new code of the same class. Returns true, the entry;
--- or false and "missing", "class", "code" or "empty".
-function TB.Update(id, class, code, level)
+-- Replaces the build of an own entry with a new code of the same class. The skill order is replaced
+-- too (see TB.Create: none given means the fallback order). Returns true, the entry; or false and
+-- "missing", "class", "code" or "empty".
+function TB.Update(id, class, code, level, order)
   local root = TB.root()
   local item = root and root.items[id]
   if not item then
@@ -269,11 +314,11 @@ function TB.Update(id, class, code, level)
   if item.class ~= class then
     return false, "class"
   end
-  local ranks, clean, spec, total = checkCode(class, code)
+  local ranks, clean, spec, total, _, _, kept = checkCode(class, code, order)
   if not ranks then
     return false, clean
   end
-  item.code, item.spec = clean, spec
+  item.code, item.spec, item.order = clean, spec, kept
   item.level = levelFor(level, total)
   item.updated = U.now()
   return true, TB.Get(id)
@@ -283,6 +328,9 @@ function TB.Delete(id)
   local root = TB.root()
   if root and root.items[id] then
     root.items[id] = nil
+    if ns.TalentActive then
+      ns.TalentActive.Forget(id)
+    end
     return true
   end
   return false
@@ -290,7 +338,13 @@ end
 
 -- A copy of any entry (own or shipped) as a new own build. name is optional.
 function TB.Copy(entry, name)
-  return TB.Create(entry.class, TB.UniqueName(entry.class, name or entry.name), entry.code, entry.level)
+  return TB.Create(
+    entry.class,
+    TB.UniqueName(entry.class, name or entry.name),
+    entry.code,
+    entry.level,
+    entry.skillOrder
+  )
 end
 
 -- Recommended builds ---------------------------------------------------------------------------
@@ -344,6 +398,7 @@ local function webEntries(class, spec)
         spec = spec,
         name = webName(raw, list, spec, points),
         code = TL.Encode(list, ranks),
+        skillOrder = raw.o and TO.FromCode(class, raw.c, raw.o) or nil,
         level = levelFor(raw.l, total),
         total = total,
         points = points,
@@ -433,19 +488,39 @@ function TB.Revalidate(announce)
   if not root then
     return 0, false
   end
-  local invalid = 0
+  local invalid, current, reordered = 0, dataVersion(), 0
+  local changed = root.dv ~= current
   for id, item in pairs(root.items) do
     if not ownEntry(id, item).valid then
       invalid = invalid + 1
+    elseif changed and item.order then
+      local fixed, report = TO.Repair(TL.Specs(item.class), TL.Parse(item.class, item.code), item.order)
+      if report.changed then
+        item.order = fixed
+        reordered = reordered + 1
+      end
     end
   end
-  local current = dataVersion()
-  local changed = root.dv ~= current
   root.dv = current
-  if changed and invalid > 0 and announce then
-    ns.Notify(string.format(L["talents.builds.stale"], invalid), "warning")
+  if changed and announce then
+    if invalid > 0 then
+      ns.Notify(string.format(L["talents.builds.stale"], invalid), "warning")
+    end
+    if reordered > 0 then
+      ns.Notify(string.format(L["talents.builds.orderFixed"], reordered), "info")
+    end
   end
-  return invalid, changed
+  return invalid, changed, reordered
+end
+
+-- The skill order of an entry in line with its build and the report of TO.Repair (fallback = true
+-- for an entry without an order). nil for an entry whose code is not valid.
+function TB.OrderOf(entry)
+  local ranks = entry.valid and TL.Parse(entry.class, entry.code)
+  if not ranks then
+    return nil
+  end
+  return TO.Repair(TL.Specs(entry.class), ranks, entry.skillOrder)
 end
 
 ns.On("PLAYER_LOGIN", function()
@@ -460,7 +535,7 @@ function TB.Plan(entry)
     ns.Notify(L["talents.builds.invalidLoad"], "warning")
     return false
   end
-  return ns.TalentEditor.Load(entry.class, entry.code, entry.level)
+  return ns.TalentEditor.Load(entry.class, entry.code, entry.level, TB.OrderOf(entry))
 end
 
 -- Applies the entry to the character after the editor's confirmation (own class only).
@@ -472,17 +547,28 @@ function TB.Apply(entry)
   return ns.TalentEditor.ApplyBuild(entry.class, entry.code)
 end
 
--- Opens the export window (web link, code, share in chat).
+-- Opens the export window (web link, code, share in chat). Link and code carry the skill order.
+local function withSegment(text, segment)
+  return segment and (text .. "-" .. segment) or text
+end
+
 function TB.Export(entry)
   local TE = ns.TalentEditor
+  local segment = entry.valid and TO.SegmentFor(entry.class, entry.code, entry.skillOrder) or nil
   ns.TalentDialogs.Export({
     info = entry.valid
         and string.format(L["talents.editor.exportInfo"], R.className(entry.class), entry.level, entry.total)
       or L["talents.builds.invalid"],
-    link = TE.WebLink(entry.class, entry.code),
-    code = TE.WebCode(entry.class, entry.code),
+    link = TE.WebLink(entry.class, entry.code, segment and entry.skillOrder or nil),
+    code = withSegment(TE.WebCode(entry.class, entry.code), segment),
     share = entry.valid and function()
-      ns.Share.OpenTalent({ class = entry.class, level = entry.level, code = entry.code, title = entry.name })
+      ns.Share.OpenTalent({
+        class = entry.class,
+        level = entry.level,
+        code = entry.code,
+        order = entry.skillOrder,
+        title = entry.name,
+      })
     end or nil,
   })
 end
@@ -496,11 +582,11 @@ function TB.ImportText(text, class)
   if linked and linked ~= class then
     return false, "talents.builds.err.class"
   end
-  local ranks, clean, _, _, replaced, lost = checkCode(class, text)
+  local ranks, clean, _, _, replaced, lost, order = checkCode(class, text)
   if not ranks then
     return false, clean == "empty" and "talents.builds.err.empty" or "talents.builds.err.code"
   end
-  local ok, result = TB.Create(class, TB.UniqueName(class, TB.DefaultName(class, ranks)), clean)
+  local ok, result = TB.Create(class, TB.UniqueName(class, TB.DefaultName(class, ranks)), clean, nil, order)
   if not ok then
     return false, "talents.builds.err." .. result
   end
@@ -520,7 +606,7 @@ end
 -- done(entry) runs after the change.
 function TB.AskOverwrite(id, snapshot, done)
   ns.Dialogs.Confirm("talents.builds.confirm.overwriteTitle", "talents.builds.confirm.overwrite", function()
-    local ok, entry = TB.Update(id, snapshot.class, snapshot.code, snapshot.level)
+    local ok, entry = TB.Update(id, snapshot.class, snapshot.code, snapshot.level, snapshot.order)
     if ok and done then
       done(entry)
     end

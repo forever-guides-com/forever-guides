@@ -219,6 +219,11 @@ local TARGETS = {
     root = "PlayerSpellsFrame",
     view = SIDE_VIEW,
     links = { "talents" },
+    -- The skill order bar or panel sits at the right edge of the window and carries the tab at its own edge.
+    edge = function()
+      local order = ns.TalentFrameOrder
+      return order and order.EdgeFrame()
+    end,
   },
   { id = "talents", parent = "ClassTalentFrame", view = SIDE_VIEW, links = { "talents" } },
   { id = "talents", parent = "PlayerTalentFrame", view = SIDE_VIEW, links = { "talents" } },

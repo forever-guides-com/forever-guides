@@ -265,6 +265,9 @@ Store.defaults = {
     sleepBag = false,
     sleepBagMessage = true,
     sleepBagLocked = false,
+    -- Skill order at the game's talent window (Modules/TalentFrameOrder.lua): numbers on the talents, side panel.
+    talentFrameNumbers = false,
+    talentFramePanel = true,
     -- Experience bar (Modules/XpBarWindow.lua): window shown and pinned, chosen layout, saved layouts
     -- (seeded from the presets on first use), opacity, then the tracker options (Modules/XpTracker.lua).
     xpBar = {
@@ -839,6 +842,12 @@ Store.charDefaults = {
   -- character only; an empty table would count as an override that wins over the account layout.
   -- Chat history per chat window id (Modules/ChatHistoryLogic.lua), the window layouts are per character.
   chatWindows = { v = 1, windows = {} },
+  -- Active build per talent group (Modules/TalentActive.lua): [group] = id of an own build in talentBuilds.
+  talentActive = {},
+  -- Skill order panel of the talent editor (Modules/TalentOrderPanel.lua): open state and the step
+  -- numbers on the talents; frameOpen is the side panel at the game's talent window (Modules/TalentFrameOrder.lua).
+  -- The panels start collapsed, the numbers start off.
+  talentOrderUi = { open = false, numbers = false, frameOpen = false },
 }
 
 -- Migrations[n] upgrades a db from schema n-1 to n.

@@ -22,6 +22,8 @@ local ICON_PLAN = "Interface\\Icons\\INV_Scroll_03"
 local ICON_APPLY = "Interface\\Buttons\\UI-CheckBox-Check"
 local ICON_SHARE = "Interface\\Icons\\INV_Letter_15"
 local ICON_DIR = "Interface\\Icons\\"
+-- Check mark in front of the word "Active", so the state is a word and a sign, not a color.
+local ACTIVE_MARK = "|TInterface\\Buttons\\UI-CheckBox-Check:12|t "
 -- Badge of a row: shipped builds (standard and website) in the accent color, own builds in blue.
 -- The badge always carries a word, the color only backs it.
 local BADGE_COLOR = { shipped = "accent2", own = "info" }
@@ -131,6 +133,9 @@ local function subLine(entry, withTree)
     return L["talents.builds.invalid"]
   end
   local parts = { entry.points, string.format(L["talents.builds.level"], entry.level) }
+  if ns.TalentActive.IsActive(entry) then
+    table.insert(parts, 1, ACTIVE_MARK .. L["talents.active.badge"])
+  end
   if withTree then
     table.insert(parts, 1, treeName(entry.class, entry.spec))
   end
@@ -190,7 +195,7 @@ function BL.Build(view, close)
     local ranks = TL.Parse(snapshot.class, snapshot.code)
     local suggestion = TB.UniqueName(snapshot.class, TB.DefaultName(snapshot.class, ranks))
     ns.TalentDialogs.Name("talents.builds.nameTitleSave", suggestion, function(name)
-      local ok, result = TB.Create(snapshot.class, name, snapshot.code, snapshot.level)
+      local ok, result = TB.Create(snapshot.class, name, snapshot.code, snapshot.level, snapshot.order)
       if not ok then
         return false, "talents.builds.err." .. result
       end
@@ -375,6 +380,10 @@ function BL.Build(view, close)
     bind = function(entry)
       local canApply = entry.valid and TE.CanApply(entry.class)
       local kind = entry.own and "own" or "shipped"
+      local TA = ns.TalentActive
+      local isActive = TA.IsActive(entry)
+      local canUse, whyNot = TA.CanUse(entry)
+      local group = TA.GroupName(TA.Group())
       return {
         title = entry.name,
         sub = subLine(entry, state.spec == nil),
@@ -413,6 +422,27 @@ function BL.Build(view, close)
             opens = true,
             onClick = function()
               TB.Export(entry)
+            end,
+          },
+          {
+            icon = "pin",
+            boxed = true,
+            selected = isActive,
+            dim = not (isActive or canUse),
+            tooltip = L[isActive and "talents.active.stop" or "talents.active.use"],
+            tooltipText = (isActive or canUse)
+                and string.format(L[isActive and "talents.active.stopTip" or "talents.active.useTip"], group)
+              or L[whyNot],
+            onClick = function()
+              if isActive then
+                TA.Stop()
+                return refresh()
+              end
+              local ok, result, copied = TA.UseWithToast(entry)
+              if ok and copied then
+                return choose(result)
+              end
+              refresh()
             end,
           },
         },

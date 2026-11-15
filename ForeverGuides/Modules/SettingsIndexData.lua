@@ -218,6 +218,13 @@ ns.SettingsIndexData = {
     },
   },
   {
+    id = "talentframe.main", feature = "talentframe", title = "talentframe.set.heading", intro = "talentframe.set.hint",
+    controls = {
+      { key = "talentframe.set.numbers", kind = "toggle", id = "talentframe-numbers", tip = "talentframe.set.numbersTip" },
+      { key = "talentframe.set.panel", kind = "toggle", id = "talentframe-panel", tip = "talentframe.set.panelTip" },
+    },
+  },
+  {
     id = "farmhud.main", feature = "farmhud", title = "farmhud.set.heading", intro = "farmhud.set.hint",
     controls = {
       { key = "farmhud.set.enabled", kind = "toggle", id = "farmhud-set-enabled", hint = "farmhud.set.enabledHint", tip = "farmhud.set.enabledHint" },

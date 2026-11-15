@@ -21,7 +21,7 @@ ns.Data.Manifest = {
     ["Abilities_SHAMAN.lua"]={bytes=8449,hash="7b7aa096ffb89e25"},
     ["Abilities_WARLOCK.lua"]={bytes=9958,hash="e0c183473858ea53"},
     ["Abilities_WARRIOR.lua"]={bytes=5691,hash="4b037f6a845802dc"},
-    ["Builds.lua"]={bytes=4857,hash="c56ac0b6b6d3c9cd"},
+    ["Builds.lua"]={bytes=1892,hash="ebc36563938b5385"},
     ["FlightTimes.lua"]={bytes=5493,hash="9089ecc7168175c5"},
     ["Instances.lua"]={bytes=128468,hash="35af19b4495d596e"},
     ["Macros.lua"]={bytes=16003,hash="1c2af0f6199d6e68"},
