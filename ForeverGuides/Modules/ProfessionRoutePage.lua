@@ -1,6 +1,7 @@
 -- Page "Profession route" (/fg berufsroute): pick a profession, see the skill route step by step
 -- (skill range, recipe, crafts, reagents, where the recipe comes from), the current step marked, done
--- steps dimmed, the trainers per rank with a map link, and the button for the shopping list window.
+-- steps dimmed, the trainers per rank with a map link, and the buttons for the shopping list window and
+-- the small shopping list (ProfessionTracker.lua).
 -- The data comes from the data add-on (Modules/ProfessionData.lua), the logic is in
 -- ProfessionRouteLogic.lua, own skill and saved choices in ProfessionShop.lua.
 local _, ns = ...
@@ -24,6 +25,14 @@ ns.AddLocale("enUS", {
   ["profroute.fromPh"] = "Automatic",
   ["profroute.shop"] = "Shopping list",
   ["profroute.shopTip"] = "Opens the shopping list window.",
+  ["profroute.addRange"] = "Start to target to the list",
+  ["profroute.addRangeTip"] = "Start to target on the list, empty fields: whole route.",
+  ["profroute.addPicked"] = "Selected to the list (%d)",
+  ["profroute.addPickedTip"] = "Materials of the picked steps on the list.",
+  ["profroute.pick"] = "Pick steps",
+  ["profroute.pickOff"] = "Stop picking",
+  ["profroute.pickTip"] = "Shows a switch in front of every step.",
+  ["profroute.pickStep"] = "Step on the shopping list",
   ["profroute.progress"] = "%s: skill %d of %d, step %d of %d",
   ["profroute.finished"] = "%s: route finished (skill %d)",
   ["profroute.notOwned"] = "%s: not learned, route from the start",
@@ -35,6 +44,8 @@ ns.AddLocale("enUS", {
   ["profroute.area.after"] = "After the target skill",
   ["profroute.crafts"] = "%dx",
   ["profroute.perCraft"] = "%d per craft",
+  ["profroute.recipeIcon"] = "Recipe",
+  ["profroute.itemIcon"] = "Finished item",
   ["profroute.src.trainer"] = "Trainer (%s): %s",
   ["profroute.src.trainerNone"] = "Trainer (%s)",
   ["profroute.src.item"] = "Recipe item",
@@ -59,6 +70,14 @@ ns.AddLocale("deDE", {
   ["profroute.fromPh"] = "Automatisch",
   ["profroute.shop"] = "Einkaufsliste",
   ["profroute.shopTip"] = "Öffnet das Fenster der Einkaufsliste.",
+  ["profroute.addRange"] = "Start bis Ziel zur Einkaufsliste",
+  ["profroute.addRangeTip"] = "Start bis Ziel auf die Liste, leer: ganze Route.",
+  ["profroute.addPicked"] = "Ausgewählte zur Einkaufsliste (%d)",
+  ["profroute.addPickedTip"] = "Materialien der gewählten Schritte auf die Liste.",
+  ["profroute.pick"] = "Schritte auswählen",
+  ["profroute.pickOff"] = "Auswahl beenden",
+  ["profroute.pickTip"] = "Zeigt vor jedem Schritt einen Schalter.",
+  ["profroute.pickStep"] = "Schritt auf die Einkaufsliste",
   ["profroute.progress"] = "%s: Skill %d von %d, Schritt %d von %d",
   ["profroute.finished"] = "%s: Route fertig (Skill %d)",
   ["profroute.notOwned"] = "%s: nicht gelernt, Route ab Anfang",
@@ -70,6 +89,8 @@ ns.AddLocale("deDE", {
   ["profroute.area.after"] = "Nach dem Ziel-Skill",
   ["profroute.crafts"] = "%dx",
   ["profroute.perCraft"] = "%d pro Herstellung",
+  ["profroute.recipeIcon"] = "Rezept",
+  ["profroute.itemIcon"] = "Fertiges Item",
   ["profroute.src.trainer"] = "Lehrer (%s): %s",
   ["profroute.src.trainerNone"] = "Lehrer (%s)",
   ["profroute.src.item"] = "Rezept-Item",
@@ -119,6 +140,71 @@ local function trainersOf(data, rank)
   return {}
 end
 
+-- The item a recipe spell makes, from the recipe database: { id, icon } or nil (enchanting, add-on off).
+-- The reverse index is kept per data table, so a reloaded database builds a new one.
+local productIndex = setmetatable({}, { __mode = "k" })
+local function productOf(slug, spell)
+  if type(spell) ~= "number" or not ns.RecipeAccess then
+    return nil
+  end
+  local data, list = ns.RecipeAccess.Get(slug)
+  if not data then
+    return nil
+  end
+  local index = productIndex[data]
+  if not index then
+    index = {}
+    for _, r in ipairs(list or {}) do
+      if type(r.s) == "number" and type(r.i) == "number" then
+        index[r.s] = r.i
+      end
+    end
+    productIndex[data] = index
+  end
+  local id = index[spell]
+  if not id then
+    return nil
+  end
+  local info = type(data.items) == "table" and data.items[id] or {}
+  return { id = id, icon = info.ico }
+end
+
+-- Recipe icon and the icon of the finished item in front of the step title.
+local STEP_ICON = 26
+local STEP_ICON_GAP = 4
+
+-- The recipe icon is the recipe scroll for every step; the finished item has its own icon next to it.
+local RECIPE_TEXTURE = "Interface\\Icons\\INV_Scroll_03"
+
+-- Icon of the made item: the data icon, else the client's.
+local function productTexture(product)
+  if product.icon then
+    return iconPath(product.icon)
+  end
+  local shop = ns.ProfessionShop
+  return shop and shop.ItemIcon(product.id) or iconPath(nil)
+end
+
+-- A square icon button showing a game texture in its own colors (W.Action tints its icon with the theme).
+local function newIconButton(parent, nameKey, id)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(STEP_ICON, STEP_ICON)
+  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon:SetPoint("TOPLEFT", 1, -1)
+  b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  local hover = b:CreateTexture(nil, "HIGHLIGHT")
+  hover:SetAllPoints(b.icon)
+  hover:SetColorTexture(1, 1, 1, 0.15)
+  W.Border(b, "accentDim", 1)
+  b.fgNameKey, b.fgId = nameKey, id
+  function b.fgName()
+    return L[nameKey]
+  end
+  b:SetScript("OnLeave", ns.HideTooltip)
+  return b
+end
+
 -- Where the recipe of a step comes from.
 local function sourceText(data, step)
   if step.src == "item" then
@@ -140,8 +226,20 @@ end
 
 -- Step rows ---------------------------------------------------------------------------------------
 
-local LEFT_W = 64
+-- Room of the skill range ("225-300" in full, never cut): measured from the widest range at the font in use.
+local LEFT_MIN = 84
+local function rangeWidth(fs)
+  local text = fs:GetText()
+  fs:SetText("300-300")
+  local w = fs:GetStringWidth() or 0
+  fs:SetText(text)
+  return math.max(LEFT_MIN, math.ceil(w) + 12)
+end
 local SIDE = 12
+-- Room of the switch in front of a step while steps are picked.
+local PICK_W = 80
+-- Picking steps for the shopping list: on while the player picks, the picked steps by their table.
+local PICK = { on = false, steps = {} }
 local CRAFTERS_SIDE = 22
 local HEAD_H = 26
 local HEAD_GAP = 8
@@ -198,32 +296,109 @@ local function newStepRow(parent)
   row.chips = K.ChipRow(row)
   row.src = W.Text(row, { role = "micro", color = "textMuted", wrap = true })
   row.head = newAreaHead(row)
+  row.pick = W.Toggle(row, {
+    key = "profroute.pickStep",
+    compact = true,
+    tooltip = "profroute.pickStep",
+    get = function()
+      return row.step ~= nil and PICK.steps[row.step] == true
+    end,
+    set = function(on)
+      if row.step then
+        PICK.steps[row.step] = on or nil
+        ns.Emit("FG_PROFROUTE_PICKED")
+      end
+    end,
+  })
+  row.pick:SetWidth(72)
+  row.pick.fgId = "profroute-pick"
+  row.pick:Hide()
   -- Who in the guild can make the recipe of the step.
   row.crafters = ns.CraftersView.Action(row, { size = CRAFTERS_SIDE, id = "profroute-crafters" })
-  row:SetScript("OnEnter", function(self)
-    if self.spell then
-      W.Tooltip.Show(self, { spell = self.spell, title = self.recipe })
+  -- The hint says what a click does: open the recipe in the profession window, or what is missing for it.
+  local function craftHint()
+    local craft = ns.ProfessionCraft
+    local status = craft.Status(S.Slug(), row.spell)
+    return status == "ok" and L["craft.open"] or craft.StatusText(S.Slug(), status)
+  end
+  local function recipeTip(self)
+    if row.spell then
+      W.Tooltip.Show(self, { spell = row.spell, title = row.recipe, hint = craftHint() })
+    end
+  end
+  local function openCraft()
+    if row.spell then
+      ns.ProfessionCraft.Open(S.Slug(), row.spell)
+    end
+  end
+  row:SetScript("OnEnter", recipeTip)
+  row:SetScript("OnClick", openCraft)
+  -- The recipe icon repeats the tooltip of the row; the item icon shows the finished item alone.
+  row.recipeIcon = newIconButton(row, "profroute.recipeIcon", "profroute-recipe-icon")
+  row.recipeIcon.icon:SetTexture(RECIPE_TEXTURE)
+  row.recipeIcon:SetScript("OnEnter", recipeTip)
+  row.recipeIcon:SetScript("OnClick", openCraft)
+  -- The hammer on the recipe icon: the game opens its window only from a secure click, so the hover lays
+  -- the shared secure button of ProfessionCraft over it; without one (no recipe, combat) a click says why.
+  row.badge = CreateFrame("Button", nil, row.recipeIcon)
+  row.badge:SetSize(14, 14)
+  row.badge:SetPoint("BOTTOMRIGHT", 2, -2)
+  row.badge:SetFrameLevel(row.recipeIcon:GetFrameLevel() + 2)
+  row.badge.icon = row.badge:CreateTexture(nil, "OVERLAY")
+  row.badge.icon:SetAllPoints()
+  row.badge.icon:SetTexture("Interface\\Icons\\Trade_BlackSmithing")
+  row.badge.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  W.Border(row.badge, "accent2", 1)
+  row.badge.fgNameKey, row.badge.fgId = "craft.badge", "profroute-craft-badge"
+  function row.badge.fgName()
+    return L["craft.badge"]
+  end
+  row.badge:SetScript("OnEnter", function(self)
+    if row.spell and not ns.ProfessionCraft.ArmBadge(self, S.Slug(), row.spell) then
+      ns.ShowTooltip(self, L["craft.badge"], craftHint())
     end
   end)
+  row.badge:SetScript("OnLeave", ns.HideTooltip)
+  row.badge:SetScript("OnClick", openCraft)
+  row.itemIcon = newIconButton(row, "profroute.itemIcon", "profroute-item-icon")
+  row.itemIcon:SetScript("OnEnter", function(self)
+    if row.product then
+      ns.ProfessionShop.ShowItemTooltip(self, row.product.id)
+    end
+  end)
+
   row:SetScript("OnLeave", ns.HideTooltip)
   function row:fgLayout(width)
     if self.isHead then
       return K.scaledHeight(HEAD_H) + HEAD_GAP
     end
-    local textW = math.max(40, width - LEFT_W - SIDE * 2)
+    local pickW = self.pick:IsShown() and PICK_W or 0
+    local LEFT_W = rangeWidth(self.range)
+    local textW = math.max(40, width - LEFT_W - SIDE * 2 - pickW)
+    self.pick:ClearAllPoints()
+    self.pick:SetPoint("TOPLEFT", SIDE, -5)
     self.range:ClearAllPoints()
-    self.range:SetPoint("TOPLEFT", SIDE, -8)
+    self.range:SetPoint("TOPLEFT", SIDE + pickW, -8)
     self.range:SetWidth(LEFT_W - 8)
     self.state:ClearAllPoints()
     self.state:SetPoint("TOPRIGHT", -SIDE, -8)
     self.state:SetWidth(80)
     self.crafters:ClearAllPoints()
     self.crafters:SetPoint("TOPRIGHT", -SIDE - 84, -6)
-    local x, y = LEFT_W + SIDE, -8
+    local x, y = LEFT_W + SIDE + pickW, -8
+    self.recipeIcon:ClearAllPoints()
+    self.recipeIcon:SetPoint("TOPLEFT", x, y + 2)
+    self.itemIcon:ClearAllPoints()
+    self.itemIcon:SetPoint("LEFT", self.recipeIcon, "RIGHT", STEP_ICON_GAP, 0)
+    local iconsW = self.recipeIcon:IsShown() and STEP_ICON + STEP_ICON_GAP or 0
+    if self.itemIcon:IsShown() then
+      iconsW = iconsW + STEP_ICON + STEP_ICON_GAP
+    end
     self.title:ClearAllPoints()
-    self.title:SetPoint("TOPLEFT", x, y)
-    self.title:SetWidth(math.max(40, textW - 80 - (self.crafters:IsShown() and CRAFTERS_SIDE + 6 or 0)))
-    y = y - math.max(self.title:GetStringHeight(), 14) - 2
+    local iconY = iconsW > 0 and 4 or 0
+    self.title:SetPoint("TOPLEFT", x + iconsW + iconY, y - iconY)
+    self.title:SetWidth(math.max(40, textW - iconsW - 84 - (self.crafters:IsShown() and CRAFTERS_SIDE + 6 or 0)))
+    y = y - math.max(self.title:GetStringHeight() + iconY, iconsW > 0 and STEP_ICON - 2 or 14) - 2 - iconY
     local subH = 0
     if self.sub:GetText() and self.sub:GetText() ~= "" then
       self.sub:SetWidth(textW)
@@ -260,6 +435,11 @@ local function paintStep(row, item)
   for _, part in ipairs({ row.range, row.state, row.title, row.sub, row.chips, row.src }) do
     part:SetShown(not row.isHead)
   end
+  row.recipeIcon:SetShown(false)
+  row.itemIcon:SetShown(false)
+  row.step = item.step
+  row.pick:SetShown(PICK.on and not row.isHead)
+  row.pick.Refresh()
   if row.isHead then
     row.spell, row.recipe, row.onToggle = nil, nil, item.onToggle
     row.crafters:SetSpell(nil)
@@ -274,6 +454,13 @@ local function paintStep(row, item)
   local colors = COLORS[status]
   local recipe = spellName(step.spell) or ns.T(step.name)
   row.spell, row.recipe = step.spell, recipe
+  row.product = productOf(S.Slug(), step.spell)
+  if row.product then
+    row.itemIcon.icon:SetTexture(productTexture(row.product))
+  end
+  -- A step without a recipe spell (effect text only) has neither icon.
+  row.recipeIcon:SetShown(type(step.spell) == "number")
+  row.itemIcon:SetShown(row.product ~= nil)
   row.crafters:SetSpell(type(step.spell) == "number" and step.spell or nil)
   row.range:SetText(string.format("%d-%d", step.from or 0, step.to or 0))
   W.SetColor(row.range, colors.title)
@@ -302,11 +489,12 @@ local function paintStep(row, item)
       name = ns.ItemInfo.name(m[1], { de = info.de, en = info.en }, "item:" .. tostring(m[1])),
       meta = tostring((m[2] or 1) * (step.crafts or 1)),
       tip = string.format(L["profroute.perCraft"], m[2] or 1),
+      itemId = m[1],
     }
     -- A material the route buys at a vendor names the nearest vendor, a click sets the waypoint there.
     local best = info.buy == "vendor" and ns.VendorSource and ns.VendorSource.Best(m[1], false) or nil
     if best then
-      chip.tip = chip.tip .. "\n" .. string.format(L["vendor.where"], best.text) .. "\n" .. L["vendor.listTip"]
+      chip.hint = string.format(L["vendor.where"], best.text) .. "\n" .. L["vendor.listTip"]
       chip.onClick = function()
         ns.VendorSource.SetWaypoint(best.place)
       end
@@ -450,15 +638,77 @@ local function build(container)
       ns.ProfessionShopWindow.Open()
     end,
   })
+  local small = ns.ProfessionTracker.NewOpenButton(controls, "profroute-small", { width = BUTTON_W, height = 28 })
+  -- The picked steps of the shown profession as { [index] = true } and their number.
+  local function pickedSteps()
+    local data = Data.Get(S.Slug())
+    local set, n = {}, 0
+    for i, step in ipairs(data and data.steps or {}) do
+      if PICK.steps[step] then
+        set[i], n = true, n + 1
+      end
+    end
+    return set, n
+  end
+  local add, pick
+  local function paintPick()
+    local _, n = pickedSteps()
+    W.SetText(add.label, nil, PICK.on and string.format(L["profroute.addPicked"], n) or L["profroute.addRange"])
+    W.SetText(pick.label, nil, L[PICK.on and "profroute.pickOff" or "profroute.pick"])
+    add:SetEnabled(not PICK.on or n > 0)
+  end
+  -- The two ways onto the list are the main actions of the page: filled and gold, not plain buttons.
+  add = W.Action(controls, {
+    label = "profroute.addRange",
+    variant = "primary",
+    icon = "plus",
+    height = 28,
+    tooltip = "profroute.addRange",
+    tooltipText = "profroute.addRangeTip",
+    onClick = function()
+      if PICK.on then
+        local set, n = pickedSteps()
+        if n > 0 then
+          ns.ProfessionList.AddRouteFromPage(S.Slug(), set)
+          PICK.on, PICK.steps = false, {}
+          refresh()
+        end
+      else
+        ns.ProfessionList.AddRouteFromPage(S.Slug())
+      end
+    end,
+  })
+  add.fgId = "profroute-addrange"
+  pick = W.Action(controls, {
+    label = "profroute.pick",
+    variant = "gold",
+    icon = "check",
+    height = 28,
+    tooltip = "profroute.pick",
+    tooltipText = "profroute.pickTip",
+    onClick = function()
+      PICK.on = not PICK.on
+      refresh()
+    end,
+  })
+  pick.fgId = "profroute-pick-mode"
+  -- The longest labels of the row: at their own width where they fit, never wider than the page.
+  add.naturalW = math.max(add:GetWidth(), 230)
+  pick.naturalW = pick:GetWidth()
+  ns.On("FG_PROFROUTE_PICKED", paintPick)
+  local buttons = { [shop] = true, [small] = true, [add] = true, [pick] = true }
   function controls:fgGridLayout(width)
     local x, y, rowH = 0, 0, 46
-    for _, item in ipairs({ dropdown, from, target, shop }) do
+    for _, item in ipairs({ dropdown, from, target, shop, small, add, pick }) do
+      if item.naturalW then
+        item:SetWidth(math.min(item.naturalW, width))
+      end
       local w = item:GetWidth()
       if x > 0 and x + w > width then
         x, y = 0, y + rowH + 8
       end
       item:ClearAllPoints()
-      if item == shop then
+      if buttons[item] then
         item:SetPoint("TOPLEFT", self, "TOPLEFT", x, -(y + 18))
       else
         item:SetPoint("TOPLEFT", self, "TOPLEFT", x, -y)
@@ -528,6 +778,7 @@ local function build(container)
   function refresh()
     fillOptions(S.Own())
     dropdown.Refresh()
+    paintPick()
     local slug = S.Slug()
     local data, status = Data.Get(slug)
     local name = R.Name(slug)

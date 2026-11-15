@@ -5,8 +5,29 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
-      version = "0.8.3",
+      version = "0.8.4",
       date = "2026-11-15",
+      highlights = {
+      },
+      added = {
+        { de = "Berufsroute: \"Start bis Ziel zur Einkaufsliste\" setzt die Materialien des Bereichs auf die Liste, mit \"Schritte auswählen\" nur die gewählten Schritte.", en = "Profession route: \"Start to target to the list\" puts the materials of the range on the list, \"Pick steps\" only the chosen steps.", go = "professionroute" },
+        { de = "Berufsroute: Jeder Schritt zeigt Rezeptrolle und fertiges Item mit eigenem Tooltip. Ein Klick öffnet das Rezept im Berufsfenster, der Hammer auf der Rolle immer.", en = "Profession route: Every step shows the recipe scroll and the finished item with its own tooltip. A click opens the recipe in the profession window, the hammer always does.", go = "professionroute" },
+        { de = "Berufe: Fehlt der Beruf oder das Rezept, sagt das Addon beim Klick, was fehlt, statt das Fenster zu öffnen.", en = "Professions: Without the profession or the recipe, a click says what is missing instead of opening the window.", go = "professionroute" },
+        { de = "Einkaufsliste: Knöpfe zum Öffnen der kleinen Liste auf den Seiten Berufe und Berufsroute, in den Einstellungen und in der Titelleiste.", en = "Shopping list: Buttons that open the small list on the professions and profession route pages, in the settings and in the title bar.", go = "professions" },
+      },
+      changed = {
+        { de = "Berufe: Materialien zeigen den vollen Item-Tooltip mit Icon, Herstellungskosten, Händlerpreis und den AH-Preisen aus dem letzten Scan.", en = "Professions: Materials show the full item tooltip with icon, crafting cost, vendor price and the auction prices of the last scan.", go = "professionroute" },
+        { de = "Berufe: \"Zur Einkaufsliste hinzufügen\" legt beim hergestellten Item die Reagenzien an, \"Fertig hinzufügen\" das fertige Item. Beides steht nebeneinander.", en = "Professions: \"Add to shopping list\" on a made item adds its reagents, \"Add finished\" the finished item. Both stand side by side.", go = "professions" },
+        { de = "Berufe: Die Seite merkt sich Beruf und Skill vom letzten Besuch.", en = "Professions: The page remembers profession and skill of the last visit.", go = "professions" },
+        { de = "Einkaufsliste: Die kleine Liste zeigt die Menge vor dem Namen und im Tooltip, wie viel noch zu kaufen ist und wie viel du schon hast.", en = "Shopping list: The small list shows the amount before the name and in the tooltip how much is left to buy and how much you have.", go = "professions" },
+      },
+      fixed = {
+        { de = "Berufsroute: Die Skill-Bereiche stehen immer ganz da, nicht mehr gekürzt wie \"100-...\".", en = "Profession route: Skill ranges are always shown in full, no longer cut like \"100-...\".", go = "professionroute" },
+      },
+    },
+    {
+      version = "0.8.3",
+      date = "2026-11-14",
       highlights = {
       },
       changed = {
@@ -121,17 +142,6 @@ ns.Data.Changelog = {
       fixed = {
         { de = "Forever Chat: Tippen im Eingabefeld bremst das Spiel nicht mehr aus.", en = "Forever Chat: typing in the input box no longer slows the game down.", go = "settings:foreverchat.options" },
         { de = "Forever Chat: Beginnst du zu tippen, bleibt die letzte Nachricht sichtbar und wird nicht mehr überdeckt.", en = "Forever Chat: when you start typing, the last message stays visible and is no longer covered.", go = "settings:foreverchat.options" },
-      },
-    },
-    {
-      version = "0.7.7",
-      date = "2026-11-13",
-      highlights = {
-        { head = { de = "Wo eine Quest beginnt", en = "Where a quest starts" }, text = { de = "Die Instanz-Questliste zeigt bei jeder Quest, ob du sie vor der Instanz oder erst darin bekommst.", en = "The instance quest list shows for each quest whether you get it before the instance or only inside it." }, go = "instances" },
-      },
-      added = {
-        { de = "Instanzen: Jede Quest nennt in der Liste \"Start: drinnen\" oder \"Start: draußen\", wenn der Annahmeort bekannt ist.", en = "Instances: Each quest says \"Start: inside\" or \"Start: outside\" in the list when the place to accept it is known.", go = "instances" },
-        { de = "Instanzen: Die Details einer Quest zeigen unter \"Annahme\", ob sie in der Instanz beginnt (mit Geber oder Gegenstand) oder außerhalb (mit Geber und Zone).", en = "Instances: The details of a quest show under \"Accepted\" whether it starts inside the instance (with giver or item) or outside (with giver and zone).", go = "instances" },
       },
     },
   },

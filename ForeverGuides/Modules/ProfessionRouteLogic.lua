@@ -113,6 +113,12 @@ local function stepsOf(data)
   return type(data) == "table" and type(data.steps) == "table" and data.steps or {}
 end
 
+-- The skill a route starts at without an own skill: the start of its first step, at least 1.
+function R.StartSkill(data)
+  local first = stepsOf(data)[1]
+  return math.max(1, R.Whole(first and first.from) or 1)
+end
+
 -- "done" once the skill has reached the end of the step, "current" for the first step that is not
 -- done, "open" after it.
 function R.Status(step, skill, isFirstOpen)
@@ -227,7 +233,8 @@ end
 
 -- Sum of the reagents of the skill range from..to.
 -- opts: surcharge (percent on top, default 10), stock { [itemId] = count } taken off afterwards,
--- auctionPrice(itemId) -> copper or nil for items bought at the auction house.
+-- auctionPrice(itemId) -> copper or nil for items bought at the auction house, steps { [index] = true }
+-- counts only those steps of the range.
 -- Returns the lines { id, name, icon, q, source, need, have, qty, price, total } (only items with
 -- qty > 0, sorted by name) and the number of items the stock covers completely.
 function R.Needs(data, from, to, opts)
@@ -235,7 +242,8 @@ function R.Needs(data, from, to, opts)
   local pct = R.Surcharge(opts.surcharge)
   local raw, order = {}, {}
   for _, e in ipairs(R.Range(data, from, to)) do
-    for _, m in ipairs(type(e.step.mats) == "table" and e.step.mats or {}) do
+    local mats = (not opts.steps or opts.steps[e.i]) and e.step.mats or nil
+    for _, m in ipairs(type(mats) == "table" and mats or {}) do
       local id, qty = tonumber(m[1]), tonumber(m[2])
       if id and qty and qty > 0 then
         if not raw[id] then

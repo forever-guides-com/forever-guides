@@ -4,6 +4,26 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.8.4] - 2026-11-15
+
+### Added
+
+- Profession route: "Start to target to the list" puts the materials of the range on the list, "Pick steps" only the chosen steps.
+- Profession route: Every step shows the recipe scroll and the finished item with its own tooltip. A click opens the recipe in the profession window, the hammer always does.
+- Professions: Without the profession or the recipe, a click says what is missing instead of opening the window.
+- Shopping list: Buttons that open the small list on the professions and profession route pages, in the settings and in the title bar.
+
+### Changed
+
+- Professions: Materials show the full item tooltip with icon, crafting cost, vendor price and the auction prices of the last scan.
+- Professions: "Add to shopping list" on a made item adds its reagents, "Add finished" the finished item. Both stand side by side.
+- Professions: The page remembers profession and skill of the last visit.
+- Shopping list: The small list shows the amount before the name and in the tooltip how much is left to buy and how much you have.
+
+### Fixed
+
+- Profession route: Skill ranges are always shown in full, no longer cut like "100-...".
+
 ## [0.8.3] - 2026-11-14
 
 ### Changed
@@ -653,6 +673,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.8.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.0...v0.8.1

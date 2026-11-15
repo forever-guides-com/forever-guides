@@ -35,9 +35,14 @@ ns.AddLocale("enUS", {
   ["profshop.nameTitle"] = "Item name",
   ["profshop.hint"] = "Click an item to search it in the Auction House.",
   ["profshop.rowHave"] = "Have %d of %d, still to buy: %d",
+  ["profshop.rowBuy"] = "Still to buy: %d",
+  ["profshop.rowHaveOf"] = "Have %d of %d",
   ["profshop.rowHaveInfo"] = "Have %d of %d (stock is not subtracted)",
   ["profshop.rowVendor"] = "Vendor item: buy it at a vendor.",
   ["price.header"] = "Price:",
+  ["item.craftCost"] = "Crafting cost",
+  ["item.craftCostPart"] = "%s (%d without price)",
+  ["item.vendorSell"] = "Sells to a vendor for",
   ["price.min"] = "Lowest",
   ["price.median"] = "Median",
   ["price.max"] = "Highest",
@@ -67,9 +72,14 @@ ns.AddLocale("deDE", {
   ["profshop.nameTitle"] = "Item-Name",
   ["profshop.hint"] = "Klicke ein Item, um es im Auktionshaus zu suchen.",
   ["profshop.rowHave"] = "Vorhanden %d von %d, noch zu kaufen: %d",
+  ["profshop.rowBuy"] = "Noch zu kaufen: %d",
+  ["profshop.rowHaveOf"] = "Vorhanden %d von %d",
   ["profshop.rowHaveInfo"] = "Vorhanden %d von %d (Bestand nicht abgezogen)",
   ["profshop.rowVendor"] = "Händlerware: beim Händler kaufen.",
   ["price.header"] = "Preis:",
+  ["item.craftCost"] = "Herstellungskosten",
+  ["item.craftCostPart"] = "%s (%d ohne Preis)",
+  ["item.vendorSell"] = "Verkauf beim Händler",
   ["price.min"] = "Niedrigster",
   ["price.median"] = "Median",
   ["price.max"] = "Höchster",
@@ -121,6 +131,20 @@ local function store()
 end
 -- The saved table (the scratch one without a database), migrated to the current schema.
 S.Root = store
+
+-- The profession and skill the professions page showed last, so it opens there again: { slug, skill },
+-- each nil when unknown or not set.
+function S.RecipeView()
+  local v = store().recipes
+  if type(v) ~= "table" then
+    return {}
+  end
+  return { slug = R.PROFESSIONS[v.slug] and v.slug or nil, skill = R.Whole(v.skill) }
+end
+
+function S.SetRecipeView(slug, skill)
+  store().recipes = { slug = R.PROFESSIONS[slug] and slug or nil, skill = R.Whole(skill) }
+end
 
 -- key: slug (a known slug), target and from (whole skill, nil = automatic), surcharge (percent),
 -- stock (take the stock off), all (stock of all characters), view ("combined" | "reason", one choice
@@ -449,6 +473,107 @@ end
 
 local MUTED_LINES = { hint = true, old = true, neutralOnly = true }
 
+-- Item tooltip helpers --------------------------------------------------------------------------------
+
+local function call(fn, ...)
+  if type(fn) ~= "function" then
+    return nil
+  end
+  local ok, a, b, c, d, e, f, g, h, i, j, k = pcall(fn, ...)
+  if ok then
+    return a, b, c, d, e, f, g, h, i, j, k
+  end
+end
+
+local function itemApi(name)
+  local api = rawget(_G, "C_Item")
+  return type(api) == "table" and api[name] or rawget(_G, name)
+end
+
+-- Icon of an item from the client, nil while it is not known.
+function S.ItemIcon(itemId)
+  return call(itemApi("GetItemIconByID"), itemId) or select(5, call(itemApi("GetItemInfoInstant"), itemId))
+end
+
+-- Cost of one craft of the item at auction prices: copper and the number of reagents without a price, nil
+-- when no recipe makes it or no reagent has a price. Asks the recipe data (loads it on first use).
+function S.CraftCost(itemId)
+  local access = ns.RecipeAccess
+  local made = access and access.Producers(itemId)
+  local recipe = made and made[1] and made[1].recipe
+  if not recipe or type(recipe.mats) ~= "table" then
+    return nil
+  end
+  local total, unpriced = 0, 0
+  for _, m in ipairs(recipe.mats) do
+    local unit = S.AuctionPrice(m[1])
+    if unit then
+      total = total + unit * (m[2] or 1)
+    else
+      unpriced = unpriced + 1
+    end
+  end
+  if total == 0 then
+    return nil
+  end
+  return total, unpriced
+end
+
+-- The client's own tooltip shows the vendor price on some clients: then it is not repeated.
+local function hasSellLine(tip)
+  local label = rawget(_G, "SELL_PRICE")
+  local name = type(tip.GetName) == "function" and tip:GetName()
+  if type(label) ~= "string" or not name then
+    return false
+  end
+  for i = 1, (tip:NumLines() or 0) do
+    local fs = rawget(_G, name .. "TextLeft" .. i)
+    local text = fs and fs:GetText()
+    if type(text) == "string" and text:find(label, 1, true) then
+      return true
+    end
+  end
+  return false
+end
+
+-- Extra lines of an item tooltip on the profession pages: crafting cost and vendor sell price. The auction
+-- prices (lowest, median, highest) and the vendors that sell the item come with every item tooltip
+-- (InventoryTooltip.lua). before: lines that go first (e.g. "2 per craft").
+function S.ItemLines(itemId, before)
+  return function(tip)
+    local L = ns.L
+    local lines = {}
+    for _, line in ipairs(before or {}) do
+      lines[#lines + 1] = line
+    end
+    local cost, unpriced = S.CraftCost(itemId)
+    if cost then
+      local text = money(cost)
+      if unpriced > 0 then
+        text = string.format(L["item.craftCostPart"], text, unpriced)
+      end
+      lines[#lines + 1] = { left = L["item.craftCost"], right = text, color = "textSecondary", rightColor = "text" }
+    end
+    local sell = select(11, call(itemApi("GetItemInfo"), itemId))
+    if type(sell) == "number" and sell > 0 and not hasSellLine(tip) then
+      lines[#lines + 1] =
+        { left = L["item.vendorSell"], right = money(sell), color = "textSecondary", rightColor = "text" }
+    end
+    return lines
+  end
+end
+
+-- The item tooltip of the profession pages: icon and client tooltip, the extra lines above, then the
+-- inventory, vendor and auction price blocks. before: lines that go first; hint: muted last line.
+function S.ShowItemTooltip(owner, itemId, before, hint)
+  return ns.W.Tooltip.Show(owner, {
+    link = "item:" .. tostring(itemId),
+    icon = S.ItemIcon(itemId),
+    lines = S.ItemLines(itemId, before),
+    hint = hint,
+  })
+end
+
 -- Tooltip of the price cell of a list row (nothing without a price).
 function S.PriceTooltip(owner, line)
   local lines = S.PriceLines(line.id)
@@ -603,11 +728,18 @@ end
 function S.RowTooltip(owner, line)
   local L = ns.L
   local best = line.source == "vendor" and ns.VendorSource and ns.VendorSource.Best(line.id) or nil
-  local lines = { best and L["vendor.listTip"] or L["profshop.rowSearch"], L["profshop.rowMore"] }
+  local lines = {}
+  -- What is still to buy comes first and in white, the clicks follow.
   if line.need and line.have then
-    local key = S.Option("stock") and "profshop.rowHave" or "profshop.rowHaveInfo"
-    lines[#lines + 1] = string.format(L[key], line.have, line.need, line.qty)
+    if S.Option("stock") then
+      lines[#lines + 1] = "|cffffffff" .. string.format(L["profshop.rowBuy"], line.qty or 0) .. "|r"
+      lines[#lines + 1] = string.format(L["profshop.rowHaveOf"], line.have, line.need)
+    else
+      lines[#lines + 1] = string.format(L["profshop.rowHaveInfo"], line.have, line.need)
+    end
   end
+  lines[#lines + 1] = best and L["vendor.listTip"] or L["profshop.rowSearch"]
+  lines[#lines + 1] = L["profshop.rowMore"]
   if line.source == "vendor" then
     lines[#lines + 1] = L["profshop.rowVendor"]
     if best then
@@ -749,7 +881,8 @@ local function finishPlan(plan)
   plan.total, plan.unpriced = R.Cost(plan.groups)
 end
 
-function S.Plan(slug)
+-- opts.fromStart: without a typed start the plan begins at the start of the route, not at the own skill.
+function S.Plan(slug, opts)
   slug = slug or S.Slug()
   local plan = { slug = slug, name = R.Name(slug) }
   local data, status = Data.Get(slug)
@@ -767,7 +900,9 @@ function S.Plan(slug)
   local skill, max = S.Skill(slug)
   plan.data, plan.skill = data, skill
   local routeMax = tonumber(data.max) or max or 0
-  plan.from = S.Option("from") or skill or 0
+  -- A profession the character does not have plans from the start of the route, so any route can
+  -- fill the list.
+  plan.from = S.Option("from") or (not (opts and opts.fromStart) and skill) or R.StartSkill(data)
   plan.to = math.min(S.Option("target") or routeMax, routeMax)
   -- The route needs come without stock: the stock is allocated once over the whole list afterwards.
   plan.lines = R.Needs(data, plan.from, plan.to, {

@@ -122,6 +122,8 @@ end
 --   ANCHOR_RIGHT), link (item/spell/... hyperlink) or spell (id) as the head of the tooltip
 --   (a link to an item also gets the owned-by-character block at the end, Modules/InventoryTooltip.lua).
 --   A line { separator = true } is a thin rule across the full width of the tooltip.
+--   lines may be a function(tip) that returns the list after the head is filled (to read what the client wrote).
+--   icon (texture path or fileID) goes in front of the first line, e.g. the item icon in front of its name.
 local Tooltip = {}
 W.Tooltip = Tooltip
 
@@ -208,6 +210,14 @@ local function head(tip, spec)
   if not filled and spec.title then
     tip:SetText(spec.title, 1, 1, 1, 1, true)
   end
+  if spec.icon and (filled or spec.title) then
+    local name = type(tip.GetName) == "function" and tip:GetName()
+    local first = name and rawget(_G, name .. "TextLeft1")
+    local text = first and first:GetText()
+    if text then
+      first:SetText("|T" .. tostring(spec.icon) .. ":18:18:0:0:64:64:5:59:5:59|t " .. text)
+    end
+  end
   return filled or spec.title ~= nil
 end
 
@@ -261,7 +271,12 @@ function Tooltip.Show(owner, spec)
   if spec.text and spec.text ~= "" then
     tip:AddLine(spec.text, nil, nil, nil, true)
   end
-  for _, line in ipairs(spec.lines or {}) do
+  local lines = spec.lines
+  if type(lines) == "function" then
+    local ok, list = pcall(lines, tip)
+    lines = ok and list or nil
+  end
+  for _, line in ipairs(lines or {}) do
     if type(line) == "string" then
       tip:AddLine(line, nil, nil, nil, true)
     elseif line.separator then
@@ -1585,6 +1600,8 @@ function W.Toggle(parent, opts)
   state:SetPoint("LEFT", track, "RIGHT", 6, 0)
   state:SetWidth(30)
   local label = W.Text(f, { key = opts.key, role = "ui" })
+  -- compact: track and state only, the name stays the accessible name and the tooltip (a row says the rest).
+  label:SetShown(not opts.compact)
   -- labelInset: room between the state text and the name (a decorative icon of the caller sits there).
   label:SetPoint("LEFT", state, "RIGHT", 4 + (opts.labelInset or 0), 0)
   label:SetPoint("RIGHT")

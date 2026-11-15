@@ -14,6 +14,8 @@ ns.AddLocale("enUS", {
   ["proflist.added"] = "Added to the shopping list: %s",
   ["proflist.raised"] = "%s: amount raised to %d",
   ["proflist.limit"] = "The shopping list is full (%d positions).",
+  ["proflist.routeAdded"] = "%s: %d positions added to the shopping list.",
+  ["proflist.routeEmpty"] = "%s: nothing to add for this range.",
   ["proflist.removed"] = "Removed: %s",
   ["proflist.removedDone"] = "Removed %d done positions.",
   ["proflist.cleared"] = "Shopping list emptied.",
@@ -24,6 +26,8 @@ ns.AddLocale("deDE", {
   ["proflist.added"] = "Zur Einkaufsliste hinzugefügt: %s",
   ["proflist.raised"] = "%s: Menge auf %d erhöht",
   ["proflist.limit"] = "Die Einkaufsliste ist voll (%d Positionen).",
+  ["proflist.routeAdded"] = "%s: %d Positionen zur Einkaufsliste hinzugefügt.",
+  ["proflist.routeEmpty"] = "%s: in diesem Bereich gibt es nichts hinzuzufügen.",
   ["proflist.removed"] = "Entfernt: %s",
   ["proflist.removedDone"] = "%d erledigte Positionen entfernt.",
   ["proflist.cleared"] = "Einkaufsliste geleert.",
@@ -170,6 +174,24 @@ function M.Add(entry, qty, buy)
     S.SetCraftChoice(id, "auction")
   end
   return status, item.qty, itemName(item)
+end
+
+-- Adds own positions without touching a route line of the same item (a merged row shows the sum).
+-- entries: { { entry, qty }, ... } as for Add. Returns the number added or raised and "limit" when full.
+function M.AddOwn(entries)
+  local chr, count, full = M.Char(), 0, false
+  for _, e in ipairs(entries or {}) do
+    if PL.AddItem(chr, e[1], e[2]) then
+      count = count + 1
+    else
+      full = true
+      break
+    end
+  end
+  if count > 0 then
+    changed("add")
+  end
+  return count, full and "limit" or nil
 end
 
 -- Add from a page: the same, and the answer as a notification. Returns what Add returned.
@@ -346,6 +368,57 @@ end
 function M.ResetEdits(slug)
   M.Char().edits[slug] = nil
   changed("reset")
+end
+
+-- Takes the route of a profession over as own positions: from the typed start to the typed target (the whole
+-- route where nothing is typed), or only the steps given as { [index] = true }. Computed from the route
+-- itself, so route lines hidden in the list earlier do not empty it. Own positions stay when the list shows
+-- another profession, the route lines taken over are hidden, nothing counts twice. Returns the number of
+-- positions taken over and "limit" when the list became full.
+function M.AddRoute(slug, steps)
+  local data = ns.ProfessionRouteData.Get(slug)
+  if not data then
+    return 0
+  end
+  local from, to = 0, R.MAX_SKILL
+  if not steps then
+    local plan = S.Plan(slug, { fromStart = true })
+    from, to = plan.from, plan.to
+  end
+  local needs = R.Needs(data, from, to, { surcharge = S.Option("surcharge"), steps = steps })
+  local chr, count, full = M.Char(), 0, false
+  for _, line in ipairs(needs) do
+    local need = tonumber(line.need) or 0
+    if need > 0 then
+      local entry = { id = line.id, slug = slug, de = line.de, en = line.en, icon = line.icon }
+      if PL.AddItem(chr, entry, need) then
+        PL.Edit(chr, slug, line.id).hidden = true
+        count = count + 1
+      else
+        full = true
+        break
+      end
+    end
+  end
+  if count > 0 then
+    changed("add")
+  end
+  return count, full and "limit" or nil
+end
+
+-- AddRoute with the answer as a notification.
+function M.AddRouteFromPage(slug, steps)
+  local count, status = M.AddRoute(slug, steps)
+  local name = R.Name(slug)
+  if count > 0 then
+    ns.Notify(string.format(ns.L["proflist.routeAdded"], name, count), "success")
+  else
+    ns.Notify(string.format(ns.L["proflist.routeEmpty"], name), "info")
+  end
+  if status == "limit" then
+    ns.Notify(string.format(ns.L["proflist.limit"], PL.MAX_ITEMS), "warning")
+  end
+  return count, status
 end
 
 -- Takes over positions of a shared list as own positions (all open). Returns the number taken over.

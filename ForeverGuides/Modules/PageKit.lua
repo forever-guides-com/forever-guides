@@ -1241,6 +1241,11 @@ local function showChipTooltip(chip)
   if not d then
     return
   end
+  -- An item chip shows the full item tooltip (icon, prices, vendors), tip as its first line, hint last.
+  local shop = ns.ProfessionShop
+  if d.itemId and shop and shop.ShowItemTooltip(chip, d.itemId, d.tip and { d.tip } or nil, d.hint) then
+    return
+  end
   -- The spell tooltip heads it and the tip follows; without a spell, name and meta take over.
   if d.sid and W.Tooltip.Show(chip, { spell = d.sid, text = d.tip }) then
     return

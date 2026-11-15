@@ -1,5 +1,5 @@
 -- Compact shopping list panel next to the quest tracker: the open lines of the chosen profession
--- route (item and quantity still needed, stock already taken off), ticked lines dimmed at the end,
+-- route (item and "have/need" like the shopping window), ticked lines dimmed at the end,
 -- a click on a row searches the item in the auction house (ProfessionShop.lua, RowClick). The panel
 -- is a frame of its own under UIParent, anchored below ObjectiveTrackerFrame so it follows the
 -- tracker, at the right screen edge while the tracker is missing or hidden. The tracker itself is
@@ -28,6 +28,11 @@ ns.AddLocale("enUS", {
   ["proftracker.send"] = "To shopping list",
   ["proftracker.window"] = "Window",
   ["proftracker.more"] = "+%d more",
+  ["proftracker.show"] = "Small list",
+  ["proftracker.showTitle"] = "Small shopping list",
+  ["proftracker.showTip"] = "Shows the small shopping list next to the quest tracker.",
+  ["proftracker.nothingOpen"] = "Nothing left to buy on the shopping list.",
+  ["proftracker.afterCombat"] = "The small shopping list appears after combat.",
 })
 ns.AddLocale("deDE", {
   ["proftracker.heading"] = "Einkaufsliste",
@@ -38,10 +43,18 @@ ns.AddLocale("deDE", {
   ["proftracker.send"] = "An Einkaufsliste",
   ["proftracker.window"] = "Fenster",
   ["proftracker.more"] = "+%d weitere",
+  ["proftracker.show"] = "Kleine Liste",
+  ["proftracker.showTitle"] = "Kleine Einkaufsliste",
+  ["proftracker.showTip"] = "Zeigt die kleine Einkaufsliste neben dem Quest-Tracker.",
+  ["proftracker.nothingOpen"] = "Auf der Einkaufsliste ist nichts mehr zu kaufen.",
+  ["proftracker.afterCombat"] = "Die kleine Einkaufsliste erscheint nach dem Kampf.",
 })
 
 local WIDTH, HEAD_H = 250, 22
 local PAD, ROW_H, BOX, BUTTON_H = 8, 20, 12, 24
+-- The "have/need" column: its least width, and the width of a digit as a share of the font size (the
+-- widest digit with some air). A wider amount widens the panel, so the names keep their room.
+local PROG_W, PROG_DIGIT = 44, 0.6
 local MAX_ROWS = 12
 local TRACKER_GAP = 8 -- below the tracker
 local SCREEN_X, SCREEN_Y = -12, -320 -- from the top right corner while there is no tracker
@@ -85,10 +98,33 @@ function T.NewToggle(parent)
   return toggle
 end
 
+-- The button that shows the panel (route page, recipe page, settings, shopping window). opts: width,
+-- height, size and iconOnly (no label, for a title bar).
+function T.NewOpenButton(parent, id, opts)
+  opts = opts or {}
+  local button = W.Action(parent, {
+    label = not opts.iconOnly and "proftracker.show" or nil,
+    icon = "pin",
+    size = opts.size,
+    width = opts.width,
+    height = opts.height,
+    tooltip = "proftracker.showTitle",
+    tooltipText = "proftracker.showTip",
+    opens = true,
+    onClick = function()
+      T.Open()
+    end,
+  })
+  button.fgId = id
+  return button
+end
+
 function T.AddSettings(view)
   ns.AddHeading(view, "proftracker.heading")
   view.stack:Add(T.NewToggle(view.content), { height = 24, gap = 6 })
-  ns.AddParagraph(view, "proftracker.hint", { role = "micro", color = "textMuted" })
+  ns.AddParagraph(view, "proftracker.hint", { role = "micro", color = "textMuted", gap = 6 })
+  local open = T.NewOpenButton(view.content, "proftracker-open", { width = 160, height = 28 })
+  view.stack:Add(open, { height = 28, width = open:GetWidth() })
 end
 
 -- Position ----------------------------------------------------------------------------------------
@@ -232,7 +268,7 @@ local function newRow(parent)
   row.mark:SetPoint("CENTER")
   row.qty = W.Text(row, { role = "ui", justify = "RIGHT" })
   row.qty:SetPoint("RIGHT", -PAD, 0)
-  row.qty:SetWidth(44)
+  row.qty:SetWidth(PROG_W)
   row.name = W.Text(row, { role = "ui" })
   row.name:SetPoint("LEFT", PAD + BOX + 6, 0)
   row.name:SetPoint("RIGHT", row.qty, "LEFT", -4, 0)
@@ -275,27 +311,58 @@ local function newRow(parent)
 end
 
 local function paintRow(row, item)
-  local line, ticked = item.line, item.ticked
+  -- The row of the big list for the same item carries the numbers, so both windows always agree.
+  local nums, ticked = item.view or item.line, item.ticked
+  local line = item.view and item.view.line or item.line
   row.line, row.slug, row.ticked = line, item.slug, ticked
   row.mark:SetShown(ticked)
   row.boxOn:SetShown(ticked)
   row.boxBorder.set(ticked and "actionHi" or "white", ticked and 1 or 0.4)
   local color = ticked and "textMuted" or "text"
   -- A ticked line is done and stays muted, an open one shows the quality color of its item.
-  row.name:SetText(ticked and line.name or ns.ItemInfo.ColorName(line.name, ns.ItemInfo.quality(line.id)))
+  local name = ticked and line.name or ns.ItemInfo.ColorName(line.name, ns.ItemInfo.quality(line.id))
+  -- The amount still to buy leads the name ("94x Grober Stein"), the column on the right shows have/need.
+  local buy = tonumber(nums.qty) or 0
+  if not ticked and buy > 0 then
+    name = "|cffffffff" .. buy .. "x|r " .. name
+  end
+  row.name:SetText(name)
   W.SetColor(row.name, color)
-  row.qty:SetText(tostring(line.qty))
-  W.SetColor(row.qty, color)
+  -- "have/need" in the colors of the big list; the numbers carry the state, the color only repeats it.
+  local progress, progressColor = S.Progress(nums)
+  row.qty:SetText(progress)
+  W.SetColor(row.qty, ticked and color or progressColor)
+end
+
+-- Width of the "have/need" column for the rows shown: the widest text, at least PROG_W. Measured on the
+-- painted rows where the font can tell, an estimate per digit before that.
+local function progressWidth(f, list, shown)
+  local size, widest = Theme.fontSize("ui"), PROG_W
+  for i = 1, shown do
+    local row = f.rows[i]
+    local measured = row and row:IsShown() ~= nil and row.qty:GetStringWidth() or 0
+    local item = list[i]
+    local estimate = math.ceil(#(S.Progress(item.view or item.line)) * size * PROG_DIGIT)
+    widest = math.max(widest, math.ceil(measured) + 4, estimate)
+  end
+  return widest
 end
 
 -- The lines of the plan, open ones first, ticked ones after them: { items, open }.
 local function entries(plan)
   local open, done, checked = {}, {}, S.Checked(plan.slug)
+  local rows = {}
+  for _, row in ipairs(S.View(plan.slug).lines or {}) do
+    if row.line and (row.depth or 0) == 0 and rows[row.line.id] == nil then
+      rows[row.line.id] = row
+    end
+  end
   for _, group in ipairs(plan.groups or {}) do
     for _, line in ipairs(group.lines) do
       local ticked = R.IsDone(line, checked)
       local list = ticked and done or open
-      list[#list + 1] = { line = line, slug = plan.slug, ticked = ticked }
+      local view = rows[line.id]
+      list[#list + 1] = { line = line, view = view, slug = plan.slug, ticked = ticked }
     end
   end
   local count = #open
@@ -405,6 +472,7 @@ local function create()
   f.body:SetPoint("TOPLEFT", 0, -HEAD_H)
   f.body:SetPoint("BOTTOMRIGHT", 0, 0)
   local half = math.floor((WIDTH - 2 * PAD - 6) / 2)
+  f.half = half
   f.send = W.Action(f.body, {
     label = "act.send",
     icon = "share",
@@ -460,12 +528,29 @@ local function rowAt(f, index)
   return row
 end
 
+-- The panel grows by what the "have/need" column needs beyond its least width; the buttons share it.
+local function fitWidth(f, progW)
+  local width = WIDTH + progW - PROG_W
+  f:SetWidth(width)
+  local half = math.floor((width - 2 * PAD - 6) / 2)
+  if half ~= f.half then
+    f.half = half
+    f.send:SetWidth(half)
+    f.window:SetWidth(half)
+  end
+end
+
 local function paint(f, list)
   local shown = math.min(#list, MAX_ROWS)
   for i = 1, shown do
     local row = rowAt(f, i)
     paintRow(row, list[i])
     row:Show()
+  end
+  local progW = progressWidth(f, list, shown)
+  fitWidth(f, progW)
+  for i = 1, shown do
+    f.rows[i].qty:SetWidth(progW)
   end
   for i = shown + 1, #f.rows do
     f.rows[i]:Hide()
@@ -538,6 +623,33 @@ end
 
 function T.Frame()
   return frame
+end
+
+-- Shows the panel on request: switches the setting on, picks the shown profession when none is chosen
+-- yet and expands a collapsed panel. Says why when there is nothing to show. Returns whether it shows.
+function T.Open()
+  if not ns.db then
+    return false
+  end
+  frameDb().collapsed = nil
+  if frame then
+    setCollapsed(frame, false)
+  end
+  if S.Option("slug") == nil then
+    S.SetOption("slug", S.Slug())
+  end
+  if T.Enabled() then
+    T.Refresh()
+  else
+    T.SetEnabled(true)
+  end
+  local shown = frame ~= nil and frame:IsShown()
+  if not shown then
+    -- An unplaced panel waits for the end of combat (T.Refresh), anything else has no open line.
+    local waits = inCombat() and not (frame and frame.placed)
+    ns.Notify(L[waits and "proftracker.afterCombat" or "proftracker.nothingOpen"], "info")
+  end
+  return shown
 end
 
 local function whenEnabled()

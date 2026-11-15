@@ -1,8 +1,8 @@
 -- Page "Professions" (/fg berufe): the recipe database of one profession. Controls on top (profession,
--- search, source, filters, skill slider with the color bands of the chosen recipe), the recipe list
--- on the left (categories like the game's profession window, or sections per skill color), the
--- detail with source, reagents and who knows the recipe on the right. The list is a virtual
--- W.ScrollList, so 600 recipes only build the visible rows.
+-- search, source, button of the small shopping list, filters, skill slider with the color bands of the
+-- chosen recipe), the recipe list on the left (categories like the game's profession window, or
+-- sections per skill color), the detail with source, reagents and who knows the recipe on the right.
+-- The list is a virtual W.ScrollList, so 600 recipes only build the visible rows.
 -- Data: Modules/RecipeData.lua, logic: RecipeLogic.lua, known recipes: RecipeKnown.lua.
 local _, ns = ...
 local W, L, Theme, K, U = ns.W, ns.L, ns.Theme, ns.PageKit, ns.U
@@ -23,6 +23,7 @@ local ICON = 18
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local ADD_H, ADD_QTY_W = 24, 60
 local FIN_QTY_W, NAME_MIN = 44, 140 -- amount field of the "add finished item" button, narrowest name
+local SMALL_W = 160 -- the button of the small shopping list
 
 ns.AddLocale("enUS", {
   ["recipes.intro"] = "Recipe database per profession",
@@ -78,6 +79,7 @@ ns.AddLocale("enUS", {
   ["recipes.addQty"] = "Amount",
   ["recipes.addInvalid"] = "Enter a whole amount from 1 to 9999.",
   ["recipes.addFinished"] = "Add finished",
+  ["recipes.addedMats"] = "%s: %d materials added to the shopping list.",
   ["recipes.addFinishedTitle"] = "Add finished item to shopping list",
   ["recipes.addFinishedTip"] = "Adds the item this recipe makes as a position to buy at the auction house. Switch it to Craft in the list to see its materials.",
 })
@@ -135,6 +137,7 @@ ns.AddLocale("deDE", {
   ["recipes.addQty"] = "Menge",
   ["recipes.addInvalid"] = "Gib eine ganze Menge von 1 bis 9999 ein.",
   ["recipes.addFinished"] = "Fertig hinzufügen",
+  ["recipes.addedMats"] = "%s: %d Materialien zur Einkaufsliste hinzugefügt.",
   ["recipes.addFinishedTitle"] = "Fertiges Item zur Einkaufsliste hinzufügen",
   ["recipes.addFinishedTip"] = "Fügt das Item, das dieses Rezept herstellt, als Position zum Kauf im Auktionshaus hinzu. In der Liste auf Herst. umstellen, um die Materialien zu sehen.",
 })
@@ -264,7 +267,8 @@ end
 -- Tooltip of a reagent line: the item tooltip, and for a craftable reagent the reagents of the recipe
 -- that makes it (one level) plus the click hint.
 local function showItemLine(b)
-  local spec = { link = "item:" .. b.id, title = b.label }
+  local shop = ns.ProfessionShop
+  local spec = { link = "item:" .. b.id, title = b.label, icon = shop.ItemIcon(b.id) }
   local made = b.producers
   if made then
     local first = made[1]
@@ -281,10 +285,13 @@ local function showItemLine(b)
       for i = 2, #made do
         others[#others + 1] = string.format("%s (%s)", R.Name(made[i].recipe, lang()), Route.Name(made[i].slug))
       end
-      lines[#lines + 1] = { text = string.format(L["recipes.alsoMade"], table.concat(others, ", ")), color = "textSecondary" }
+      lines[#lines + 1] =
+        { text = string.format(L["recipes.alsoMade"], table.concat(others, ", ")), color = "textSecondary" }
     end
     spec.lines, spec.hint = lines, L["recipes.openHint"]
   end
+  -- Crafting cost and vendor price after the recipe lines; prices and vendors follow with the item block.
+  spec.lines = shop.ItemLines(b.id, spec.lines)
   W.Tooltip.Show(b, spec)
 end
 
@@ -494,7 +501,30 @@ local function newDetail(parent)
       return
     end
     local qty = amountOf(self.add.qty)
-    if qty and ns.ProfessionList.AddFromPage(self.entry, qty) then
+    if not qty then
+      return
+    end
+    local r = self.recipe
+    -- The item the recipe makes puts its reagents on the list, each as its own position. The finished item
+    -- has its own button, so both can stand on the list next to each other.
+    if r and r.i and self.entry.id == r.i and type(r.mats) == "table" and #r.mats > 0 then
+      local items, entries = self.items or {}, {}
+      for _, m in ipairs(R.Reagents(r.mats)) do
+        local info = items[m.id] or {}
+        local entry = { id = m.id, slug = self.slug, de = info.de, en = info.en, icon = info.ico }
+        entries[#entries + 1] = { entry, m.need * qty }
+      end
+      local count, status = ns.ProfessionList.AddOwn(entries)
+      if status == "limit" then
+        ns.Notify(string.format(L["proflist.limit"], PL.MAX_ITEMS), "warning")
+      end
+      if count > 0 then
+        ns.Notify(string.format(L["recipes.addedMats"], R.Name(r, lang()), count), "success")
+        self.add.qty.edit:SetText("1")
+      end
+      return
+    end
+    if ns.ProfessionList.AddFromPage(self.entry, qty) then
       self.add.qty.edit:SetText("1")
     end
   end
@@ -602,6 +632,7 @@ local function paintDetail(d, r, ctx)
   local reagents, crafts = R.Reagents(r.mats, ctx.stock)
   d.crafts:SetText(crafts and crafts > 0 and string.format(L["recipes.crafts"], crafts) or "")
   local items = type(ctx.data.items) == "table" and ctx.data.items or {}
+  d.items = items
   for _, m in ipairs(reagents) do
     used = used + 1
     local b = line(d, used)
@@ -898,9 +929,11 @@ end
 local function build(container)
   local view = ns.NewPageView(container)
   local s = view.stack
+  -- The profession and skill come back from the last visit.
+  local saved = Shop.RecipeView()
   local state = {
-    slug = nil,
-    skill = nil,
+    slug = saved.slug,
+    skill = saved.skill,
     query = "",
     source = nil,
     changed = false,
@@ -928,6 +961,7 @@ local function build(container)
     end,
     set = function(slug)
       state.slug, state.skill, state.selected, state.collapsed = slug, nil, nil, {}
+      Shop.SetRecipeView(state.slug, state.skill)
       refresh()
     end,
   })
@@ -1002,6 +1036,7 @@ local function build(container)
     end,
     set = function(v)
       state.skill = v
+      Shop.SetRecipeView(state.slug, state.skill)
       update()
     end,
   }
@@ -1013,7 +1048,35 @@ local function build(container)
   strip:SetPoint("TOPRIGHT", 0, -48)
   skillBox.strip = strip
 
-  local groups = { { professions, search, source }, toggles, { skillBox } }
+  -- The small shopping list, on the line of the fields (below their labels).
+  local small = CreateFrame("Frame", nil, controls)
+  small:SetSize(SMALL_W, 46)
+  small.button = ns.ProfessionTracker.NewOpenButton(small, "recipes-small", { width = SMALL_W, height = 28 })
+  small.button:SetPoint("TOPLEFT", 0, -18)
+  small:SetWidth(small.button:GetWidth())
+  -- The big shopping list, opened on the profession this page shows.
+  local shop = CreateFrame("Frame", nil, controls)
+  shop:SetSize(SMALL_W, 46)
+  shop.button = W.Action(shop, {
+    label = "profroute.shop",
+    icon = "open",
+    width = SMALL_W,
+    height = 28,
+    tooltip = "profroute.shop",
+    tooltipText = "profroute.shopTip",
+    opens = true,
+    onClick = function()
+      if ctx.slug then
+        Shop.SetOption("slug", ctx.slug)
+      end
+      ns.ProfessionShopWindow.Open()
+    end,
+  })
+  shop.button.fgId = "recipes-shop"
+  shop.button:SetPoint("TOPLEFT", 0, -18)
+  shop:SetWidth(shop.button:GetWidth())
+
+  local groups = { { professions, search, source, shop, small }, toggles, { skillBox } }
   function controls:fgGridLayout(width)
     skillBox:SetWidth(math.min(SKILL_W, width))
     local y = 0
@@ -1226,6 +1289,7 @@ local function build(container)
     local slug = params and params[1]
     if slug and Route.PROFESSIONS[slug] then
       state.slug, state.skill, state.selected, state.collapsed = slug, nil, tonumber(params[2]), {}
+      Shop.SetRecipeView(state.slug, state.skill)
       state.query, state.source = "", nil
       state.changed, state.learnable, state.unknown, state.removed = false, false, false, false
       refresh()
@@ -1258,8 +1322,15 @@ local function build(container)
     ns.Debounce("recipes-items", 0.5, whenVisible)
   end)
   P.view, P.options, P.state, P.list, P.detail = view, options, state, list, detail
-  P.controls =
-    { professions = professions, search = search, source = source, toggles = by, slider = slider, strip = strip }
+  P.controls = {
+    professions = professions,
+    search = search,
+    source = source,
+    small = small.button,
+    toggles = by,
+    slider = slider,
+    strip = strip,
+  }
   return view
 end
 

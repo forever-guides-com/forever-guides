@@ -484,6 +484,7 @@ ns.SettingsIndexData = {
     id = "professions.shopping", feature = "professions", title = "proftracker.heading",
     controls = {
       { key = "proftracker.setting", kind = "toggle", id = "proftracker-enabled", hint = "proftracker.hint" },
+      { key = "proftracker.showTitle", kind = "action", id = "proftracker-open", tip = "proftracker.showTip" },
     },
   },
   {
