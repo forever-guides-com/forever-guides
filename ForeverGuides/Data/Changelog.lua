@@ -5,7 +5,17 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "0.10.2",
+      highlights = {
+      },
+      fixed = {
+        { de = "Instanzen & Raids: Die Tabs bleiben auch im schmalen Fenster oben, statt dass alle Bereiche untereinander stehen.", en = "Instances & Raids: The tabs stay at the top in a narrow window too, instead of every section following the other.", go = "instances" },
+        { de = "Changelog: Die Liste zeigt wieder alle veröffentlichten Versionen, 0.9.0 und 0.10.0 fehlten.", en = "Changelog: The list shows every released version again, 0.9.0 and 0.10.0 were missing." },
+      },
+    },
+    {
       version = "0.10.1",
+      date = "2026-11-16",
       highlights = {
       },
       changed = {
@@ -13,6 +23,55 @@ ns.Data.Changelog = {
       },
       fixed = {
         { de = "Stufen-Übersicht: Ränge, die es in Forever nicht mehr gibt, sind entfernt, etwa Mehrfachschuss und Skorpidstich (Jäger), Elunes Anmut (Priester), Rasende Regeneration (Druide) und Fluch der Schatten (Hexenmeister).", en = "Level overview: Ranks that no longer exist in Forever are gone, for example Multi-Shot and Scorpid Sting (Hunter), Elune's Grace (Priest), Frenzied Regeneration (Druid) and Curse of Shadow (Warlock).", go = "levels" },
+      },
+    },
+    {
+      version = "0.10.0",
+      date = "2026-11-16",
+      highlights = {
+        { head = { de = "Alternativen in der Berufsroute", en = "Alternatives in the profession route" }, text = { de = "Material sparende Wege stehen in einem zugeklappten Bereich unter der Hauptroute.", en = "Ways that save materials sit in a collapsed area below the main route." } },
+        { head = { de = "Rezeptquellen", en = "Recipe sources" }, text = { de = "Rezepte, die man nicht beim Lehrer lernt, zeigen ihre Herkunft mit Symbol, Tooltip und Filter.", en = "Recipes you do not learn at a trainer show their source with a marker, tooltip and filter." } },
+      },
+      added = {
+        { de = "Berufsroute: Alternativen stehen in einem zugeklappten Bereich unter der Hauptroute, zum Beispiel Wege, die Material sparen. Sie kommen nicht auf die Einkaufsliste.", en = "Profession route: Alternatives sit in a collapsed area below the main route, for example ways that save materials. They do not go on the shopping list.", go = "professionroute" },
+        { de = "Berufe: Rezepte, die man nicht beim Lehrer lernt, zeigen ein Symbol mit ihrer Herkunft: Händler, Gunst, Ruf, Gegnerbeute, Weltdrop, Quest, Objekt oder Dungeon.", en = "Professions: Recipes you do not learn at a trainer show a marker with their source: vendor, favor, reputation, creature drop, world drop, quest, object or dungeon.", go = "professions" },
+        { de = "Berufe: Der Tooltip des Symbols nennt NPC und Ort je Fraktion, Preis, Rufstufe, Quest, Gegner mit Droprate oder den Stufenbereich eines Weltdrops.", en = "Professions: The tooltip of the marker names NPC and place per faction, the price, the needed standing, the quest, the dropping creatures with their drop rate or the level range of a world drop.", go = "professions" },
+        { de = "Berufe: Ein Filter zeigt nur die Rezepte einer Herkunft.", en = "Professions: A filter shows only the recipes of one source.", go = "professions" },
+      },
+      changed = {
+        { de = "Berufsrouten: Neue Routen für alle zwölf Berufe, jeder Schritt gegen die aktuellen Spieldaten geprüft.", en = "Profession routes: New routes for all twelve professions, every step checked against the current game data.", go = "professionroute" },
+        { de = "Ingenieurskunst: Schweres Sprengpulver läuft nur noch bis 140, danach übernimmt Surrendes bronzenes Dingsda bis 150.", en = "Engineering: Heavy Blasting Powder now runs to 140 only, then Whirring Bronze Gizmo takes over to 150.", go = "professionroute" },
+        { de = "Berufe: Die Muster der beiden Zentauren-Rüstmeister in Desolace zeigen Rufstufe und Preis je Händler.", en = "Professions: The patterns of the two centaur quartermasters in Desolace show standing and price for each seller.", go = "professions" },
+      },
+      fixed = {
+        { de = "Berufe: Das ausgewählte Rezept bleibt nach einem Reload ausgewählt, wie der Beruf.", en = "Professions: The selected recipe stays selected after a reload, like the profession.", go = "professions" },
+        { de = "Berufe: Preise in Items erscheinen jetzt im Tooltip des Rezepts.", en = "Professions: Prices paid in items now show in the recipe tooltip.", go = "professions" },
+      },
+    },
+    {
+      version = "0.9.0",
+      date = "2026-11-15",
+      highlights = {
+        { head = { de = "Skillreihenfolge planen", en = "Plan your skill order" }, text = { de = "Lege im Talent-Editor fest, in welcher Reihenfolge du jeden Punkt vergibst, per Pfeil oder Ziehen.", en = "Set in the talent editor in which order you spend every point, with arrows or drag and drop." } },
+        { head = { de = "Reihenfolge am Talentfenster", en = "Order at the talent window" }, text = { de = "Eine Leiste am Talentfenster zeigt den nächsten Schritt, die Zahlen stehen direkt an den Talenten.", en = "A panel at the talent window shows your next step, the numbers sit right on the talents." } },
+        { head = { de = "Aktive Skillung", en = "Active build" }, text = { de = "Wähle eine Skillung als aktiv, Talentfenster und Editor richten sich dann nach ihr.", en = "Pick one build as active, the talent window and the editor then follow it." } },
+        { head = { de = "Bewertete Skillungen", en = "Rated builds" }, text = { de = "Mitgeliefert werden die Skillungen der Website mit den meisten Likes, samt ihrer Reihenfolge.", en = "The add-on ships the website builds with the most likes, including their skill order." } },
+      },
+      added = {
+        { de = "Talent-Editor: Der Kasten Skillreihenfolge zeigt jeden Punkt als Schritt mit Rang und Stufe. Pfeile, Ziehen und Umschalt+Hoch/Runter ändern die Reihenfolge.", en = "Talent editor: The skill order box shows every point as a step with rank and level. Arrows, drag and drop and Shift+Up/Down change the order.", go = "talents" },
+        { de = "Talent-Editor: Schrittnummern an den Talenten auf Wunsch, der Tooltip eines Talents nennt alle seine Schritte.", en = "Talent editor: Optional step numbers on the talents, the tooltip of a talent lists all of its steps.", go = "talents" },
+        { de = "Talent-Editor: \"Als neue Skillung nutzen\" speichert die Verteilung als neue Skillung und macht sie aktiv.", en = "Talent editor: \"Use as new build\" saves the distribution as a new build and makes it active.", go = "talents" },
+        { de = "Skillungen: Der Knopf Nutzen macht eine Skillung aktiv, je Charakter und Talentgruppe. \"Aktive Skillung öffnen\" und \"In aktive Skillung speichern\" auf der Talente-Seite.", en = "Builds: The Use button makes a build active, per character and talent group. \"Open active build\" and \"Save to active build\" on the talents page.", go = "talents" },
+        { de = "Talentfenster: Eine Leiste am rechten Rand klappt zu einem Bereich in Fensterhöhe auf, mit Fortschritt, gelernten Schritten und dem nächsten Schritt.", en = "Talent window: A bar on the right edge opens into a panel of window height with progress, learned steps and the next step.", go = "settings:talentframe.main" },
+        { de = "Talentfenster: Zahlen an den Talenten zeigen den nächsten offenen Rang, \"10+\" solange weitere Ränge folgen. Ein Haken im Bereich schaltet sie an und aus.", en = "Talent window: Numbers on the talents show the next open rank, \"10+\" while more ranks follow. A checkbox in the panel turns them on and off.", go = "settings:talentframe.main" },
+        { de = "Talentfenster: Ein Knopf blendet gelernte Schritte aus, beim Öffnen springt die Liste zum nächsten Schritt.", en = "Talent window: A button hides learned steps, on opening the list jumps to the next step.", go = "settings:talentframe.main" },
+      },
+      changed = {
+        { de = "Skillungen: Mitgeliefert werden nur noch bewertete Skillungen der Website, die meisten Likes zuerst, jede mit ihrer Skillreihenfolge.", en = "Builds: Only rated website builds are shipped, most liked first, each with its skill order.", go = "talents" },
+        { de = "Teilen: Links, Codes und Chat-Links tragen die Skillreihenfolge mit, ältere Codes ohne Reihenfolge bleiben gültig.", en = "Sharing: Links, codes and chat links carry the skill order, older codes without an order stay valid.", go = "talents" },
+      },
+      fixed = {
+        { de = "Fenster: Inhalte des Addon-Fensters liegen nicht mehr über anderen Fenstern, wenn das Fenster nach vorn kommt.", en = "Windows: Contents of the add-on window no longer sit above other windows when the window comes to the front." },
       },
     },
     {
@@ -101,48 +160,6 @@ ns.Data.Changelog = {
       fixed = {
         { de = "Instanzen: Fraktion, Stufe, Vorquests und Klasse der Dungeon- und Raid-Quests in allen Instanzen geprüft und korrigiert, unter anderem 11 falsche Fraktionen und 46 fehlende Stufen.", en = "Instances: Faction, level, prequests and class of the dungeon and raid quests checked and corrected in all instances, among them 11 wrong factions and 46 missing levels.", go = "instances" },
         { de = "Stufen-Übersicht: Fähigkeiten, die es im Spiel nicht mehr gibt, sind entfernt, darunter Tigerfuror beim Druiden. Fluch der Pein heißt jetzt Omen der Pein, Feuernova-Totem heißt Feuernova.", en = "Level overview: Abilities that no longer exist in the game are removed, among them Tiger's Fury for druids. Curse of Agony is now Bane of Agony, Fire Nova Totem is now Fire Nova." },
-      },
-    },
-    {
-      version = "0.7.11",
-      date = "2026-11-14",
-      highlights = {
-      },
-      changed = {
-        { de = "Daten: Spielbuild 1.60.1.70938 mit allen Hotfixes.", en = "Data: Game build 1.60.1.70938 with all hotfixes." },
-        { de = "Talente: Sieben neue Talente von Druide, Paladin, Priester und Schurke heißen im deutschen Spiel jetzt auf Deutsch.", en = "Talents: Seven new talents of druid, paladin, priest and rogue now have their German names in the German game.", go = "talents" },
-        { de = "Berufe: Die Skillstufen von 25 Rezepten und die Reagenzmengen von 5 Schneiderei-Rezepten entsprechen dem aktuellen Spielstand.", en = "Professions: The skill levels of 25 recipes and the reagent counts of 5 tailoring recipes match the current game.", go = "professions" },
-      },
-    },
-    {
-      version = "0.7.10",
-      date = "2026-11-14",
-      highlights = {
-      },
-      changed = {
-        { de = "Angelhilfe: Die Taste meldet sich im Chat nur noch, wenn Angeln gerade nicht geht, mit dem Grund und ohne Wiederholung.", en = "Fishing helper: The key only speaks up in chat when fishing is not possible right now, with the reason and without repeating itself.", go = "settings:fishing.cast" },
-      },
-      fixed = {
-        { de = "Angelhilfe: Ein Tastendruck im Kampf bei offenem Fangjournal schaltet die Angelhilfe nicht mehr aus.", en = "Fishing helper: A key press in combat while the catch journal is open no longer switches the fishing helper off.", go = "settings:fishing.cast" },
-        { de = "Angelhilfe: Blockiert das Spiel einen Aufruf, pausiert die Hilfe nur und läuft nach dem Kampf von selbst weiter. Wer seit dem Fehler festhing, kann sofort wieder angeln.", en = "Fishing helper: When the game blocks a call, the helper only pauses and resumes by itself after combat. Anyone stuck since the bug can fish again right away.", go = "settings:fishing.cast" },
-      },
-    },
-    {
-      version = "0.7.9",
-      date = "2026-11-14",
-      highlights = {
-      },
-      added = {
-        { de = "Berufe: Herstellbare Reagenzien tragen einen Pfeil. Ein Klick öffnet ihr Rezept, mit Zurück kommst du wieder hin, der Tooltip nennt ihre Reagenzien.", en = "Professions: Craftable reagents carry an arrow. One click opens their recipe, Back takes you there again, and the tooltip lists their reagents.", go = "professions" },
-      },
-      changed = {
-        { de = "Berufe: Gegenstände und Reagenzien heißen so wie in deinem Spiel, im deutschen Spiel also auf Deutsch.", en = "Professions: Items and reagents use the names of your game, so they appear in German in the German game.", go = "professions" },
-        { de = "Berufe: Ein Klick auf ein Reagenz setzt es nicht mehr auf die Einkaufsliste.", en = "Professions: Clicking a reagent no longer puts it on the shopping list.", go = "professions" },
-        { de = "Forever Chat: Das Fenster öffnet sich deutlich schneller, auch wenn eine neue Nachricht es von selbst öffnet.", en = "Forever Chat: The window opens much faster, also when a new message opens it by itself.", go = "settings:foreverchat.options" },
-      },
-      fixed = {
-        { de = "Forever Chat: Neue Nachrichten bei offenem Chat bremsen das Spiel nicht mehr aus.", en = "Forever Chat: New messages no longer slow the game down while the chat is open.", go = "settings:foreverchat.options" },
-        { de = "Gilde: Minimap, Karte und Berufsverzeichnis lesen die Gildenliste seltener neu und kosten in großen Gilden weniger Leistung.", en = "Guild: The minimap, the map and the crafter directory read the guild list less often and cost less performance in large guilds." },
       },
     },
   },

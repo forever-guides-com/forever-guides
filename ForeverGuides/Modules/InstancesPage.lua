@@ -246,7 +246,6 @@ function ns.InstanceQuestText(inst, faction)
   return table.concat(blocks, "\n\n")
 end
 
-local STACK_BELOW = 760 -- below this width every section follows the other and the tabs are gone
 local TABS = { "bosses", "quests", "items", "access", "map", "info" }
 local VALID_TAB = {}
 for _, id in ipairs(TABS) do
@@ -288,12 +287,12 @@ local function build(container)
   end
   s:Add(resetRow, { gap = 8 })
 
-  -- Decides what the page shows before anything below it is placed: the cards, or the chosen instance
-  -- (every section in a column when narrow, else the chosen tab).
+  -- Decides what the page shows before anything below it is placed: the cards, or the chosen tab of the
+  -- instance. The tab row stays at every width, a narrow page wraps it instead of stacking the sections.
   local probe = CreateFrame("Frame", nil, view.content)
   local showSections
   function probe:fgGridLayout()
-    showSections(view.area:GetWidth() < STACK_BELOW)
+    showSections()
     return 0
   end
   s:Add(probe, { height = 0, gap = 0 })
@@ -395,11 +394,10 @@ local function build(container)
     b:HookScript("OnLeave", paintTabs)
   end
 
-  -- A section is a heading (stacked layout only) and parts. A part with fgOn == false stays hidden.
+  -- A section is the parts of one tab. A part with fgOn == false stays hidden.
   local order = {}
   local function newSection(id)
     local sec = { id = id, parts = {} }
-    sec.heading = ns.AddHeading(view, "instances.dtab." .. id, { gap = 6 })
     order[#order + 1] = sec
     return sec
   end
@@ -466,7 +464,7 @@ local function build(container)
     part(infoSec, FL.ButtonRow(view.content, infoButtons), { gap = 14 })
   end
 
-  function showSections(stacked)
+  function showSections()
     local inst = state.inst
     cards:SetShown(inst == nil)
     intro:SetShown(inst == nil)
@@ -474,15 +472,14 @@ local function build(container)
     backRow:SetShown(inst ~= nil)
     header:SetShown(inst ~= nil)
     for _, sec in ipairs(order) do
-      local on = inst ~= nil and (stacked or state.dtab == sec.id)
-      sec.heading:SetShown(on and stacked)
+      local on = inst ~= nil and state.dtab == sec.id
       for _, item in ipairs(sec.parts) do
         item:SetShown(on and item.fgOn ~= false)
       end
     end
-    tabRow:SetShown(inst ~= nil and not stacked)
+    tabRow:SetShown(inst ~= nil)
     -- The map holds tile textures, so it only has an instance while it is on screen.
-    local mapOn = inst ~= nil and (stacked or state.dtab == "map")
+    local mapOn = inst ~= nil and state.dtab == "map"
     if mapOn then
       local key = inst.n.en
       if mapView.state.requested ~= key then

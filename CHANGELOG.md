@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.2
+
+### Fixed
+
+- Instances & Raids: The tabs stay at the top in a narrow window too, instead of every section following the other.
+- Changelog: The list shows every released version again, 0.9.0 and 0.10.0 were missing.
+
 ## 0.10.1
 
 ### Changed
