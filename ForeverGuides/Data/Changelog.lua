@@ -5,25 +5,14 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
-      version = "0.10.0",
+      version = "0.10.1",
       highlights = {
-        { head = { de = "Alternativen in der Berufsroute", en = "Alternatives in the profession route" }, text = { de = "Material sparende Wege stehen in einem zugeklappten Bereich unter der Hauptroute.", en = "Ways that save materials sit in a collapsed area below the main route." } },
-        { head = { de = "Rezeptquellen", en = "Recipe sources" }, text = { de = "Rezepte, die man nicht beim Lehrer lernt, zeigen ihre Herkunft mit Symbol, Tooltip und Filter.", en = "Recipes you do not learn at a trainer show their source with a marker, tooltip and filter." } },
-      },
-      added = {
-        { de = "Berufsroute: Alternativen stehen in einem zugeklappten Bereich unter der Hauptroute und kommen nicht auf die Einkaufsliste.", en = "Profession route: Alternatives sit in a collapsed area below the main route and do not go on the shopping list.", go = "professionroute" },
-        { de = "Berufe: Ein Symbol am Rezept nennt die Herkunft: Händler, Gunst, Ruf, Gegnerbeute, Weltdrop, Quest, Objekt oder Dungeon.", en = "Professions: A marker on the recipe names its source: vendor, favor, reputation, creature drop, world drop, quest, object or dungeon.", go = "professions" },
-        { de = "Berufe: Der Tooltip des Symbols nennt NPC und Ort je Fraktion, Preis, Rufstufe, Quest, Gegner mit Droprate oder den Stufenbereich eines Weltdrops.", en = "Professions: The marker tooltip names NPC and place per faction, price, standing, quest, creatures with drop rate or the level range of a world drop.", go = "professions" },
-        { de = "Berufe: Ein Filter zeigt nur die Rezepte einer Herkunft.", en = "Professions: A filter shows only the recipes of one source.", go = "professions" },
       },
       changed = {
-        { de = "Berufsrouten: Neue Routen für alle zwölf Berufe, jeder Schritt gegen die aktuellen Spieldaten geprüft.", en = "Profession routes: New routes for all twelve professions, every step checked against the current game data.", go = "professionroute" },
-        { de = "Ingenieurskunst: Schweres Sprengpulver nur noch bis 140, danach Surrendes bronzenes Dingsda bis 150.", en = "Engineering: Heavy Blasting Powder only to 140, then Whirring Bronze Gizmo to 150.", go = "professionroute" },
-        { de = "Berufe: Die Muster der beiden Zentauren-Rüstmeister in Desolace zeigen Rufstufe und Preis je Händler.", en = "Professions: The patterns of the two centaur quartermasters in Desolace show standing and price per seller.", go = "professions" },
+        { de = "Stufen-Übersicht: Ränge, die ein Talent brauchen, sind markiert, der Tooltip erklärt, dass der Lehrer sie erst mit dem Talent anbietet.", en = "Level overview: Ranks that need a talent are marked, the tooltip explains that the trainer offers them once you know the talent.", go = "levels" },
       },
       fixed = {
-        { de = "Berufe: Das ausgewählte Rezept bleibt nach einem Reload ausgewählt, wie der Beruf.", en = "Professions: The selected recipe stays selected after a reload, like the profession.", go = "professions" },
-        { de = "Berufe: Preise in Items erscheinen jetzt im Tooltip des Rezepts.", en = "Professions: Prices paid in items now show in the recipe tooltip.", go = "professions" },
+        { de = "Stufen-Übersicht: Ränge, die es in Forever nicht mehr gibt, sind entfernt, etwa Mehrfachschuss und Skorpidstich (Jäger), Elunes Anmut (Priester), Rasende Regeneration (Druide) und Fluch der Schatten (Hexenmeister).", en = "Level overview: Ranks that no longer exist in Forever are gone, for example Multi-Shot and Scorpid Sting (Hunter), Elune's Grace (Priest), Frenzied Regeneration (Druid) and Curse of Shadow (Warlock).", go = "levels" },
       },
     },
     {

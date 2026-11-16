@@ -1,7 +1,8 @@
 -- Learn list: what a class can learn at a class trainer at which level
 -- (abilities and ranks) plus the skills it teaches (Dual Wield, Parry, armor). Talents
 -- and the weapons of the weapon masters are not listed, weapons live on their own page. Of an ability that comes through a
--- talent only the ranks above the talent rank are taught.
+-- talent only the ranks above the talent rank are taught, and only to a player who knows the talent: those items
+-- carry talent = true.
 -- Pure logic over the generated data (Abilities, Spells, LevelSources).
 local _, ns = ...
 
@@ -40,6 +41,19 @@ local function talentNames(class)
       if name then
         out[name:lower()] = true
       end
+    end
+  end
+  return out
+end
+
+-- Lower case names of the spell chains whose rank 1 is a talent: the talent trees plus the
+-- talent spells of the catalog.
+local function talentChains(class)
+  local out = talentNames(class)
+  for _, s in ipairs((data().Spells and data().Spells[class]) or {}) do
+    local name = s.n and s.n.en
+    if s.k == "talent" and name and (s.c == nil or #s.c == 1) then
+      out[name:lower()] = true
     end
   end
   return out
@@ -278,7 +292,7 @@ local function addSkills(class, add)
   end
 end
 
--- levels[1..CAP] = { level, items = { { kind = "ability", n, rank, sid, sp, i } } }.
+-- levels[1..CAP] = { level, items = { { kind = "ability", n, rank, sid, sp, i, talent } } }.
 function LV.Build(class)
   local levels = {}
   for i = 1, LV.CAP do
@@ -287,6 +301,7 @@ function LV.Build(class)
   local ids = rankIds(class)
   local chains, named = rankChains(class)
   local talents = talentNames(class)
+  local gated = talentChains(class)
   local abilities = (data().Abilities and data().Abilities[class]) or {}
   local renamed, extra, skip = chainPlan(abilities, chains, named)
   local icons, byKey = {}, {}
@@ -311,6 +326,7 @@ function LV.Build(class)
         i = icon,
         only = only[chain.key],
         confirmed = r.ok or nil,
+        talent = (gated[chain.key] and r.rank >= 2) or nil,
       })
     end
   end
@@ -346,7 +362,8 @@ function LV.Build(class)
           local rank = #ranks > 1 and i or nil
           local sid = byName and byName[rank or 0] or (i == 1 and a.sid or nil)
           sid = sid or aliasId(class, name, rank)
-          add(l, { kind = "ability", n = a.n, rank = rank, sid = sid, sp = a.sp, i = a.i })
+          local gate = gated[key] and (rank or 0) >= 2 or nil
+          add(l, { kind = "ability", n = a.n, rank = rank, sid = sid, sp = a.sp, i = a.i, talent = gate })
         end
       end
     end

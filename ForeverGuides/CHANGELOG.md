@@ -4,6 +4,16 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [0.10.1] - 2026-11-16
+
+### Changed
+
+- Level overview: Ranks that need a talent are marked, the tooltip explains that the trainer offers them once you know the talent.
+
+### Fixed
+
+- Level overview: Ranks that no longer exist in Forever are gone, for example Multi-Shot and Scorpid Sting (Hunter), Elune's Grace (Priest), Frenzied Regeneration (Druid) and Curse of Shadow (Warlock).
+
 ## [0.10.0] - 2026-11-16
 
 ### Added
@@ -714,6 +724,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[0.10.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/forever-guides-com/forever-guides/compare/v0.8.3...v0.8.4

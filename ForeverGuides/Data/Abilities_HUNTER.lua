@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-22.
+-- Generated data, do not edit. Data as of 2026-11-14.
 -- Learn list of HUNTER.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -273,7 +273,7 @@ ns.Data.Abilities.HUNTER = {
     i="ability_upgrademoonglaive",
     l=18,
     n={de="Mehrfachschuss",en="Multi-Shot"},
-    rk={18,30,42,54,60},
+    rk={18},
     sid=2643,
     sp="hunter-marksmanship",
   },
@@ -313,7 +313,7 @@ ns.Data.Abilities.HUNTER = {
     i="ability_hunter_criticalshot",
     l=22,
     n={de="Skorpidstich",en="Scorpid Sting"},
-    rk={22,32,42,52},
+    rk={22},
     sid=3043,
     sp="hunter-marksmanship",
   },

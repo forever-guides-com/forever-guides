@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.10.1
+
+### Changed
+
+- Level overview: Ranks that need a talent are marked, the tooltip explains that the trainer offers them once you know the talent.
+
+### Fixed
+
+- Level overview: Ranks that no longer exist in Forever are gone, for example Multi-Shot and Scorpid Sting (Hunter), Elune's Grace (Priest), Frenzied Regeneration (Druid) and Curse of Shadow (Warlock).
+
 ## 0.10.0
 
 ### Added

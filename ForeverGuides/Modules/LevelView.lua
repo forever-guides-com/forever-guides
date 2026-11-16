@@ -111,13 +111,16 @@ local function itemMeta(item, pal)
   if item.quest then
     bits[#bits + 1] = L["levels.viaQuest"]
   end
+  if item.talent then
+    bits[#bits + 1] = L["levels.viaTalent"]
+  end
   if item.known then
     bits[#bits + 1] = Theme.hexText(pal.success, L["levels.learned"])
   end
   return table.concat(bits, " · ")
 end
 
--- Learned entries show no price, the cost is spent.
+-- Learned entries show no price, the cost is spent. Talent ranks explain the talent condition in the tooltip.
 local function toChips(items, pal, class)
   local chips = {}
   for i, item in ipairs(items) do
@@ -127,7 +130,11 @@ local function toChips(items, pal, class)
     if text then
       meta = meta ~= "" and (meta .. " · " .. text) or text
     end
-    chips[i] = { icon = itemIcon(item), name = itemName(item), meta = meta, sid = item.sid, tip = CL.Tip(price) }
+    local tip = CL.Tip(price)
+    if item.talent then
+      tip = tip and (L["levels.talentTip"] .. "\n" .. tip) or L["levels.talentTip"]
+    end
+    chips[i] = { icon = itemIcon(item), name = itemName(item), meta = meta, sid = item.sid, tip = tip }
   end
   return chips
 end

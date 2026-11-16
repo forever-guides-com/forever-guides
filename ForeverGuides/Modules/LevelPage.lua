@@ -6,7 +6,7 @@ local _, ns = ...
 local R, K = ns.RefLogic, ns.PageKit
 
 ns.AddLocale("enUS", {
-  ["levels.intro"] = "What your class gets at which level: new abilities and ranks you can learn at your class trainer. Talents and the weapons of the weapon masters are not listed here, weapon skills have their own page. Abilities marked as quest abilities are taught by the trainer too, you just need a quest first.",
+  ["levels.intro"] = "What your class gets at which level: new abilities and ranks you can learn at your class trainer. Talents and the weapons of the weapon masters are not listed here, weapon skills have their own page. Abilities marked as quest abilities are taught by the trainer too, you just need a quest first. Ranks marked 'needs talent' belong to a talent ability: the trainer offers them only once you know the talent.",
   ["levels.basis"] = "Levels from website data (Classic values, not all confirmed for Forever)\nNo trainer costs in the data",
   ["levels.search"] = "Search (ability)",
   ["levels.fromMe"] = "From level",
@@ -18,6 +18,8 @@ ns.AddLocale("enUS", {
   ["levels.level"] = "Level %d",
   ["levels.rank"] = "rank %d",
   ["levels.viaQuest"] = "via quest",
+  ["levels.viaTalent"] = "needs talent",
+  ["levels.talentTip"] = "Rank 1 comes from the talent. The trainer offers this rank only once you know the talent.",
   ["levels.learned"] = "learned",
   ["levels.empty"] = "Nothing matches.",
   ["tour.levels.title"] = "Level overview",
@@ -30,7 +32,7 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["levels.intro"] = 'Was deine Klasse bei welcher Stufe bekommt: neue Fähigkeiten und Ränge, die du beim Klassenlehrer lernen kannst. Talente und die Waffen der Waffenmeister stehen hier nicht, Waffenfertigkeiten haben eine eigene Seite. Fähigkeiten mit dem Hinweis "über Quest" lehrt der Lehrer ebenfalls, dafür brauchst du vorher eine Quest.',
+  ["levels.intro"] = 'Was deine Klasse bei welcher Stufe bekommt: neue Fähigkeiten und Ränge, die du beim Klassenlehrer lernen kannst. Talente und die Waffen der Waffenmeister stehen hier nicht, Waffenfertigkeiten haben eine eigene Seite. Fähigkeiten mit dem Hinweis "über Quest" lehrt der Lehrer ebenfalls, dafür brauchst du vorher eine Quest. Ränge mit dem Hinweis "braucht Talent" gehören zu einer Talentfähigkeit: der Lehrer bietet sie erst an, wenn du das Talent gelernt hast.',
   ["levels.basis"] = "Stufen aus Website-Daten (Classic-Werte, nicht alle für Forever bestätigt)\nKeine Lehrerkosten in den Daten",
   ["levels.search"] = "Suchen (Fähigkeit)",
   ["levels.fromMe"] = "Ab Stufe",
@@ -42,6 +44,8 @@ ns.AddLocale("deDE", {
   ["levels.level"] = "Stufe %d",
   ["levels.rank"] = "Rang %d",
   ["levels.viaQuest"] = "über Quest",
+  ["levels.viaTalent"] = "braucht Talent",
+  ["levels.talentTip"] = "Rang 1 kommt aus dem Talent. Der Lehrer bietet diesen Rang erst an, wenn du das Talent gelernt hast.",
   ["levels.learned"] = "gelernt",
   ["levels.empty"] = "Nichts passt.",
   ["tour.levels.title"] = "Stufen-Übersicht",

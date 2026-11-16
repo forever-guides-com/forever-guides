@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-10-16.
+-- Generated data, do not edit. Data as of 2026-11-14.
 -- Learn list of PRIEST.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -165,7 +165,7 @@ ns.Data.Abilities.PRIEST = {
     l=20,
     n={de="Elunes Anmut",en="Elune's Grace"},
     r={"night-elf"},
-    rk={20,30,40,50,60},
+    rk={20},
     sid=2651,
     sp="priest-discipline",
   },

@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-13.
+-- Generated data, do not edit. Data as of 2026-11-14.
 -- Learn list of WARLOCK.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -373,13 +373,6 @@ ns.Data.Abilities.WARLOCK = {
     n={de="Todesmantel",en="Death Coil"},
     rk={42,50,58},
     sid=6789,
-    sp="warlock-affliction",
-  },
-  {
-    i="spell_shadow_curseofachimonde",
-    l=44,
-    n={en="Curse of Shadow"},
-    rk={44,56},
     sp="warlock-affliction",
   },
   {

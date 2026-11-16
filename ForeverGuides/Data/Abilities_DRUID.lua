@@ -1,4 +1,4 @@
--- Generated data, do not edit. Data as of 2026-11-13.
+-- Generated data, do not edit. Data as of 2026-11-14.
 -- Learn list of DRUID.
 local _, ns = ...
 ns.Data = ns.Data or {}
@@ -351,8 +351,9 @@ ns.Data.Abilities.DRUID = {
   {
     i="ability_bullrush",
     l=36,
-    n={en="Frenzied Regeneration"},
-    rk={36,46,56},
+    n={de="Rasende Regeneration",en="Frenzied Regeneration"},
+    rk={36},
+    sid=22842,
     sp="druid-feral-combat",
   },
   {
