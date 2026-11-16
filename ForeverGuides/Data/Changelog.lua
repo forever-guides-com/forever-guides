@@ -5,28 +5,25 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
-      version = "0.9.0",
+      version = "0.10.0",
       highlights = {
-        { head = { de = "Skillreihenfolge planen", en = "Plan your skill order" }, text = { de = "Lege im Talent-Editor fest, in welcher Reihenfolge du jeden Punkt vergibst, per Pfeil oder Ziehen.", en = "Set in the talent editor in which order you spend every point, with arrows or drag and drop." } },
-        { head = { de = "Reihenfolge am Talentfenster", en = "Order at the talent window" }, text = { de = "Eine Leiste am Talentfenster zeigt den nächsten Schritt, die Zahlen stehen direkt an den Talenten.", en = "A panel at the talent window shows your next step, the numbers sit right on the talents." } },
-        { head = { de = "Aktive Skillung", en = "Active build" }, text = { de = "Wähle eine Skillung als aktiv, Talentfenster und Editor richten sich dann nach ihr.", en = "Pick one build as active, the talent window and the editor then follow it." } },
-        { head = { de = "Bewertete Skillungen", en = "Rated builds" }, text = { de = "Mitgeliefert werden die Skillungen der Website mit den meisten Likes, samt ihrer Reihenfolge.", en = "The add-on ships the website builds with the most likes, including their skill order." } },
+        { head = { de = "Alternativen in der Berufsroute", en = "Alternatives in the profession route" }, text = { de = "Material sparende Wege stehen in einem zugeklappten Bereich unter der Hauptroute.", en = "Ways that save materials sit in a collapsed area below the main route." } },
+        { head = { de = "Rezeptquellen", en = "Recipe sources" }, text = { de = "Rezepte, die man nicht beim Lehrer lernt, zeigen ihre Herkunft mit Symbol, Tooltip und Filter.", en = "Recipes you do not learn at a trainer show their source with a marker, tooltip and filter." } },
       },
       added = {
-        { de = "Talent-Editor: Der Kasten Skillreihenfolge zeigt jeden Punkt als Schritt mit Rang und Stufe. Pfeile, Ziehen und Umschalt+Hoch/Runter ändern die Reihenfolge.", en = "Talent editor: The skill order box shows every point as a step with rank and level. Arrows, drag and drop and Shift+Up/Down change the order.", go = "talents" },
-        { de = "Talent-Editor: Schrittnummern an den Talenten auf Wunsch, der Tooltip eines Talents nennt alle seine Schritte.", en = "Talent editor: Optional step numbers on the talents, the tooltip of a talent lists all of its steps.", go = "talents" },
-        { de = "Talent-Editor: \"Als neue Skillung nutzen\" speichert die Verteilung als neue Skillung und macht sie aktiv.", en = "Talent editor: \"Use as new build\" saves the distribution as a new build and makes it active.", go = "talents" },
-        { de = "Skillungen: Der Knopf Nutzen macht eine Skillung aktiv, je Charakter und Talentgruppe. \"Aktive Skillung öffnen\" und \"In aktive Skillung speichern\" auf der Talente-Seite.", en = "Builds: The Use button makes a build active, per character and talent group. \"Open active build\" and \"Save to active build\" on the talents page.", go = "talents" },
-        { de = "Talentfenster: Eine Leiste am rechten Rand klappt zu einem Bereich in Fensterhöhe auf, mit Fortschritt, gelernten Schritten und dem nächsten Schritt.", en = "Talent window: A bar on the right edge opens into a panel of window height with progress, learned steps and the next step.", go = "settings:talentframe.main" },
-        { de = "Talentfenster: Zahlen an den Talenten zeigen den nächsten offenen Rang, \"10+\" solange weitere Ränge folgen. Ein Haken im Bereich schaltet sie an und aus.", en = "Talent window: Numbers on the talents show the next open rank, \"10+\" while more ranks follow. A checkbox in the panel turns them on and off.", go = "settings:talentframe.main" },
-        { de = "Talentfenster: Ein Knopf blendet gelernte Schritte aus, beim Öffnen springt die Liste zum nächsten Schritt.", en = "Talent window: A button hides learned steps, on opening the list jumps to the next step.", go = "settings:talentframe.main" },
+        { de = "Berufsroute: Alternativen stehen in einem zugeklappten Bereich unter der Hauptroute und kommen nicht auf die Einkaufsliste.", en = "Profession route: Alternatives sit in a collapsed area below the main route and do not go on the shopping list.", go = "professionroute" },
+        { de = "Berufe: Ein Symbol am Rezept nennt die Herkunft: Händler, Gunst, Ruf, Gegnerbeute, Weltdrop, Quest, Objekt oder Dungeon.", en = "Professions: A marker on the recipe names its source: vendor, favor, reputation, creature drop, world drop, quest, object or dungeon.", go = "professions" },
+        { de = "Berufe: Der Tooltip des Symbols nennt NPC und Ort je Fraktion, Preis, Rufstufe, Quest, Gegner mit Droprate oder den Stufenbereich eines Weltdrops.", en = "Professions: The marker tooltip names NPC and place per faction, price, standing, quest, creatures with drop rate or the level range of a world drop.", go = "professions" },
+        { de = "Berufe: Ein Filter zeigt nur die Rezepte einer Herkunft.", en = "Professions: A filter shows only the recipes of one source.", go = "professions" },
       },
       changed = {
-        { de = "Skillungen: Mitgeliefert werden nur noch bewertete Skillungen der Website, die meisten Likes zuerst, jede mit ihrer Skillreihenfolge.", en = "Builds: Only rated website builds are shipped, most liked first, each with its skill order.", go = "talents" },
-        { de = "Teilen: Links, Codes und Chat-Links tragen die Skillreihenfolge mit, ältere Codes ohne Reihenfolge bleiben gültig.", en = "Sharing: Links, codes and chat links carry the skill order, older codes without an order stay valid.", go = "talents" },
+        { de = "Berufsrouten: Neue Routen für alle zwölf Berufe, jeder Schritt gegen die aktuellen Spieldaten geprüft.", en = "Profession routes: New routes for all twelve professions, every step checked against the current game data.", go = "professionroute" },
+        { de = "Ingenieurskunst: Schweres Sprengpulver nur noch bis 140, danach Surrendes bronzenes Dingsda bis 150.", en = "Engineering: Heavy Blasting Powder only to 140, then Whirring Bronze Gizmo to 150.", go = "professionroute" },
+        { de = "Berufe: Die Muster der beiden Zentauren-Rüstmeister in Desolace zeigen Rufstufe und Preis je Händler.", en = "Professions: The patterns of the two centaur quartermasters in Desolace show standing and price per seller.", go = "professions" },
       },
       fixed = {
-        { de = "Fenster: Inhalte des Addon-Fensters liegen nicht mehr über anderen Fenstern, wenn das Fenster nach vorn kommt.", en = "Windows: Contents of the add-on window no longer sit above other windows when the window comes to the front." },
+        { de = "Berufe: Das ausgewählte Rezept bleibt nach einem Reload ausgewählt, wie der Beruf.", en = "Professions: The selected recipe stays selected after a reload, like the profession.", go = "professions" },
+        { de = "Berufe: Preise in Items erscheinen jetzt im Tooltip des Rezepts.", en = "Professions: Prices paid in items now show in the recipe tooltip.", go = "professions" },
       },
     },
     {

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.0
+
+### Added
+
+- Profession route: Alternatives sit in a collapsed area below the main route, for example ways that save materials. They do not go on the shopping list.
+- Professions: Recipes you do not learn at a trainer show a marker with their source: vendor, favor, reputation, creature drop, world drop, quest, object or dungeon.
+- Professions: The tooltip of the marker names NPC and place per faction, the price, the needed standing, the quest, the dropping creatures with their drop rate or the level range of a world drop.
+- Professions: A filter shows only the recipes of one source.
+
+### Changed
+
+- Profession routes: New routes for all twelve professions, every step checked against the current game data.
+- Engineering: Heavy Blasting Powder now runs to 140 only, then Whirring Bronze Gizmo takes over to 150.
+- Professions: The patterns of the two centaur quartermasters in Desolace show standing and price for each seller.
+
+### Fixed
+
+- Professions: The selected recipe stays selected after a reload, like the profession.
+- Professions: Prices paid in items now show in the recipe tooltip.
+
 ## 0.9.0
 
 ### Added

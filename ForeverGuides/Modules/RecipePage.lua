@@ -7,6 +7,7 @@
 local _, ns = ...
 local W, L, Theme, K, U = ns.W, ns.L, ns.Theme, ns.PageKit, ns.U
 local R, Data, Known = ns.RecipeLogic, ns.RecipeAccess, ns.RecipeKnown
+local RL = ns.RareLogic
 local Route, Shop, PL = ns.ProfessionRouteLogic, ns.ProfessionShop, ns.ProfessionListLogic
 
 local P = {}
@@ -20,6 +21,7 @@ local WIDE = 560
 local SPLIT_GAP = 14
 local MIN_ROWS = 8
 local ICON = 18
+local ORIGIN_SIZE = 14
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local ADD_H, ADD_QTY_W = 24, 60
 local FIN_QTY_W, NAME_MIN = 44, 140 -- amount field of the "add finished item" button, narrowest name
@@ -61,6 +63,37 @@ ns.AddLocale("enUS", {
   ["recipes.srcTrainerRank"] = "Trainer (%s)",
   ["recipes.srcItem"] = "Recipe item",
   ["recipes.srcUnknown"] = "Source unknown",
+  ["recipes.src.favor"] = "Vendor favor",
+  ["recipes.src.rep"] = "Reputation vendor",
+  ["recipes.src.vendor"] = "Vendor",
+  ["recipes.src.drop"] = "Creature drop",
+  ["recipes.src.world"] = "World drop",
+  ["recipes.src.quest"] = "Quest reward",
+  ["recipes.src.object"] = "World object",
+  ["recipes.src.dungeon"] = "Dungeon drop",
+  ["recipes.src.unknown"] = "Source unknown",
+  ["recipes.tip.a"] = "Alliance",
+  ["recipes.tip.h"] = "Horde",
+  ["recipes.tip.b"] = "Both factions",
+  ["recipes.tip.cost"] = "Cost: %s",
+  ["recipes.tip.favor"] = "%d favor",
+  ["recipes.tip.item"] = "%dx %s",
+  ["recipes.tip.rep"] = "Reputation: %s",
+  ["recipes.tip.quest"] = "Quest: %s",
+  ["recipes.tip.dungeon"] = "Dungeon: %s",
+  ["recipes.tip.boss"] = "Boss: %s",
+  ["recipes.tip.object"] = "Object: %s",
+  ["recipes.tip.drops"] = "Drops from:",
+  ["recipes.tip.level"] = "Enemies of level %d to %d",
+  ["recipes.tip.levelOne"] = "Enemies of level %d",
+  ["recipes.st.hated"] = "Hated",
+  ["recipes.st.hostile"] = "Hostile",
+  ["recipes.st.unfriendly"] = "Unfriendly",
+  ["recipes.st.neutral"] = "Neutral",
+  ["recipes.st.friendly"] = "Friendly",
+  ["recipes.st.honored"] = "Honored",
+  ["recipes.st.revered"] = "Revered",
+  ["recipes.st.exalted"] = "Exalted",
   ["recipes.item"] = "Item %d",
   ["recipes.reagents"] = "Reagents",
   ["recipes.reagentCount"] = "%dx, have %d",
@@ -119,6 +152,37 @@ ns.AddLocale("deDE", {
   ["recipes.srcTrainerRank"] = "Lehrer (%s)",
   ["recipes.srcItem"] = "Rezept-Item",
   ["recipes.srcUnknown"] = "Quelle unbekannt",
+  ["recipes.src.favor"] = "Händlergunst",
+  ["recipes.src.rep"] = "Rufhändler",
+  ["recipes.src.vendor"] = "Händler",
+  ["recipes.src.drop"] = "Gegnerbeute",
+  ["recipes.src.world"] = "Weltdrop",
+  ["recipes.src.quest"] = "Questbelohnung",
+  ["recipes.src.object"] = "Weltobjekt",
+  ["recipes.src.dungeon"] = "Dungeonbeute",
+  ["recipes.src.unknown"] = "Quelle offen",
+  ["recipes.tip.a"] = "Allianz",
+  ["recipes.tip.h"] = "Horde",
+  ["recipes.tip.b"] = "Beide Fraktionen",
+  ["recipes.tip.cost"] = "Kosten: %s",
+  ["recipes.tip.favor"] = "%d Gunst",
+  ["recipes.tip.item"] = "%dx %s",
+  ["recipes.tip.rep"] = "Ruf: %s",
+  ["recipes.tip.quest"] = "Quest: %s",
+  ["recipes.tip.dungeon"] = "Dungeon: %s",
+  ["recipes.tip.boss"] = "Boss: %s",
+  ["recipes.tip.object"] = "Objekt: %s",
+  ["recipes.tip.drops"] = "Droppt von:",
+  ["recipes.tip.level"] = "Gegner der Stufe %d bis %d",
+  ["recipes.tip.levelOne"] = "Gegner der Stufe %d",
+  ["recipes.st.hated"] = "Hasserfüllt",
+  ["recipes.st.hostile"] = "Feindselig",
+  ["recipes.st.unfriendly"] = "Unfreundlich",
+  ["recipes.st.neutral"] = "Neutral",
+  ["recipes.st.friendly"] = "Freundlich",
+  ["recipes.st.honored"] = "Wohlwollend",
+  ["recipes.st.revered"] = "Respektvoll",
+  ["recipes.st.exalted"] = "Ehrfürchtig",
   ["recipes.item"] = "Item %d",
   ["recipes.reagents"] = "Reagenzien",
   ["recipes.reagentCount"] = "%dx, Besitz %d",
@@ -751,6 +815,183 @@ local function layoutDetail(d, width)
   return y
 end
 
+-- Source marker of a recipe not taught by a trainer ------------------------------------------------------
+
+local RAID_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_"
+local ORIGIN_ICONS = {
+  favor = "Interface\\Icons\\INV_Misc_Coin_17",
+  rep = "Interface\\Icons\\INV_Banner_01",
+  vendor = "Interface\\Icons\\INV_Misc_Coin_01",
+  drop = "Interface\\Icons\\INV_Misc_Bag_08",
+  world = "Interface\\Icons\\INV_Misc_Map_01",
+  quest = "Interface\\GossipFrame\\AvailableQuestIcon",
+  object = "Interface\\Icons\\INV_Misc_Gear_01",
+  dungeon = RAID_ICON .. "8",
+  unknown = FALLBACK_ICON,
+}
+local FACTION_ORDER = { a = { "a", "h", "b" }, h = { "h", "a", "b" } }
+local STANDINGS = {
+  hated = true,
+  hostile = true,
+  unfriendly = true,
+  neutral = true,
+  friendly = true,
+  honored = true,
+  revered = true,
+  exalted = true,
+}
+
+-- Marker texture of a recipe, nil for a trainer recipe and for item recipes without source data: a question
+-- mark on every undocumented pattern would drown the markers that carry information (filter still lists them).
+function P.OriginIcon(r)
+  if not r.rs then
+    return nil
+  end
+  return ns.ResolveIcon(ORIGIN_ICONS[R.Origin(r)], FALLBACK_ICON)
+end
+
+local function str(v)
+  return type(v) == "string" and v ~= "" and v or nil
+end
+
+-- Joins the non-empty parts; parts may hold nil holes, so the count is passed.
+local function placeText(...)
+  local out = {}
+  for i = 1, select("#", ...) do
+    local v = str((select(i, ...)))
+    if v then
+      out[#out + 1] = v
+    end
+  end
+  return table.concat(out, ", ")
+end
+
+local function costLine(cost)
+  local parts = {}
+  if type(cost.c) == "number" and cost.c > 0 then
+    parts[#parts + 1] = ns.CostLogic.Format(cost.c)
+  end
+  if type(cost.fv) == "number" and cost.fv > 0 then
+    parts[#parts + 1] = string.format(L["recipes.tip.favor"], cost.fv)
+  end
+  -- it is { item id (0 = unknown), count, name } as exported; named fields are accepted too.
+  local it = type(cost.it) == "table" and cost.it or nil
+  local itName = it and str(it.name or it[3])
+  if itName then
+    parts[#parts + 1] = string.format(L["recipes.tip.item"], tonumber(it.count or it[2]) or 1, itName)
+  end
+  if #parts == 0 then
+    return nil
+  end
+  return { text = string.format(L["recipes.tip.cost"], table.concat(parts, ", ")) }
+end
+
+local function repLine(rep)
+  if type(rep) ~= "table" or not str(rep.n) then
+    return nil
+  end
+  local st = STANDINGS[rep.st] and L["recipes.st." .. rep.st] or str(rep.st)
+  return { text = string.format(L["recipes.tip.rep"], st and (rep.n .. ", " .. st) or rep.n) }
+end
+
+-- Tooltip content of the marker: title (type of the source) and the lines of what the data knows. Every
+-- field but rs.k is optional. faction is "a", "h" or nil; the own faction's NPCs come first.
+function P.SourceSpec(r, faction)
+  local k = R.Origin(r)
+  local rs = type(r.rs) == "table" and r.rs or {}
+  local lines = {}
+  local byFaction = { a = {}, h = {}, b = {} }
+  local drops = {}
+  for _, npc in ipairs(type(rs.npcs) == "table" and rs.npcs or {}) do
+    -- Drop sources are creatures of no faction: one list under the drop header.
+    local list = k == "drop" and drops or byFaction[npc.fa] or byFaction.b
+    if str(npc.n) then
+      local text = placeText(npc.n, npc.pl, npc.z)
+      if type(npc.dr) == "number" and npc.dr > 0 then
+        text = text .. " (" .. RL.ChanceText(npc.dr, ns.GetActiveLocale()) .. ")"
+      end
+      list[#list + 1] = { text = text }
+      -- Sellers of one recipe can ask different standings and prices: those sit on the NPC.
+      local npcRep = repLine(npc.rep)
+      if npcRep then
+        npcRep.text = "  " .. npcRep.text
+        list[#list + 1] = npcRep
+      end
+      local npcCost = type(npc.cost) == "table" and costLine(npc.cost) or nil
+      if npcCost then
+        npcCost.text = "  " .. npcCost.text
+        list[#list + 1] = npcCost
+      end
+    end
+  end
+  if #drops > 0 then
+    lines[#lines + 1] = { text = L["recipes.tip.drops"], color = "accent2" }
+    for _, entry in ipairs(drops) do
+      lines[#lines + 1] = entry
+    end
+  end
+  for _, f in ipairs(FACTION_ORDER[faction] or FACTION_ORDER.a) do
+    if #byFaction[f] > 0 then
+      lines[#lines + 1] = { text = L["recipes.tip." .. f], color = "accent2" }
+      for _, entry in ipairs(byFaction[f]) do
+        lines[#lines + 1] = entry
+      end
+    end
+  end
+  local lv = type(rs.lv) == "table" and rs.lv or {}
+  local lo = type(lv[1]) == "number" and math.floor(lv[1]) or 0
+  if lo > 0 then
+    local hi = type(lv[2]) == "number" and math.floor(lv[2]) or 0
+    lines[#lines + 1] = {
+      text = hi > lo and string.format(L["recipes.tip.level"], lo, hi) or string.format(L["recipes.tip.levelOne"], lo),
+    }
+  end
+  local cost = type(rs.cost) == "table" and costLine(rs.cost) or nil
+  if cost then
+    lines[#lines + 1] = cost
+  end
+  local rep = repLine(rs.rep)
+  if rep then
+    lines[#lines + 1] = rep
+  end
+  if type(rs.quest) == "table" and str(rs.quest.n) then
+    lines[#lines + 1] = { text = string.format(L["recipes.tip.quest"], rs.quest.n) }
+  end
+  local dun = type(rs.dun) == "table" and rs.dun or nil
+  if dun and str(dun.n) then
+    lines[#lines + 1] = { text = string.format(L["recipes.tip.dungeon"], dun.n) }
+  end
+  if dun and str(dun.boss) then
+    lines[#lines + 1] = { text = string.format(L["recipes.tip.boss"], dun.boss) }
+  end
+  local obj = type(rs.obj) == "table" and rs.obj or nil
+  if obj and str(obj.n) then
+    lines[#lines + 1] = { text = string.format(L["recipes.tip.object"], placeText(obj.n, obj.z)) }
+  end
+  -- Known drop places, unless the dungeon block already names the boss.
+  if not dun and #drops == 0 and type(r.bd) == "table" and #r.bd > 0 then
+    lines[#lines + 1] = { text = L["recipes.tip.drops"], color = "accent2" }
+    for _, d in ipairs(r.bd) do
+      local zone = type(d.zone) == "table" and (d.zone[lang()] or d.zone.en or d.zone.de) or nil
+      if str(d.n) then
+        lines[#lines + 1] = { text = placeText(d.n, zone) }
+      end
+    end
+  end
+  return { title = L["recipes.src." .. k], lines = lines }
+end
+
+local function ownFaction()
+  local group = rawget(_G, "UnitFactionGroup") and UnitFactionGroup("player")
+  return group == "Alliance" and "a" or group == "Horde" and "h" or nil
+end
+
+function P.ShowSourceTooltip(owner, r)
+  local spec = P.SourceSpec(r, ownFaction())
+  spec.anchor = "ANCHOR_RIGHT"
+  W.Tooltip.Show(owner, spec)
+end
+
 -- Tooltip of a recipe: the item (else the spell) tooltip, then who knows it and what changed.
 function P.ShowTooltip(owner, r)
   local lines = {}
@@ -854,6 +1095,24 @@ local function newRow(parent)
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(ICON, ICON)
   row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  row.origin = CreateFrame("Button", nil, row)
+  row.origin:SetSize(ORIGIN_SIZE, ORIGIN_SIZE)
+  row.origin:SetPoint("RIGHT", row.changed, "LEFT", -4, 0)
+  row.origin.tex = row.origin:CreateTexture(nil, "ARTWORK")
+  row.origin.tex:SetAllPoints()
+  row.origin:SetScript("OnEnter", function(self)
+    if self.recipe then
+      P.ShowSourceTooltip(self, self.recipe)
+    end
+  end)
+  row.origin:SetScript("OnLeave", ns.HideTooltip)
+  row.origin:SetScript("OnClick", function(self)
+    self:GetParent():Click()
+  end)
+  ns.Focus.register(row.origin, function(self)
+    self:GetParent():Click()
+  end)
+  row.origin:Hide()
   row.title = W.Text(row, { role = "ui" })
   row.title:SetPoint("RIGHT", row.changed, "LEFT", -6, 0)
   row.hover = false
@@ -890,6 +1149,8 @@ local function bindRow(row, item, ctx)
   row.icon:SetShown(not isHead)
   row.check:SetShown(false)
   row.changed:SetShown(false)
+  row.origin.recipe = nil
+  row.origin:Hide()
   row.title:ClearAllPoints()
   row.title:SetPoint("RIGHT", row.changed, "LEFT", -6, 0)
   if isHead then
@@ -911,6 +1172,15 @@ local function bindRow(row, item, ctx)
     row.icon:SetPoint("LEFT", indent, 0)
     row.icon:SetTexture(recipeIcon(r))
     row.title:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+    local origin = P.OriginIcon(r)
+    if origin then
+      row.origin.recipe = r
+      row.origin.tex:SetTexture(origin)
+      row.origin:Show()
+      row.title:ClearAllPoints()
+      row.title:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+      row.title:SetPoint("RIGHT", row.origin, "LEFT", -4, 0)
+    end
     row.title:SetText(R.Name(r, lang()))
     W.SetColor(row.title, r.rm and "textMuted" or "text")
     local c = R.COLORS[R.Band(r.sk, ctx.skill)]
@@ -929,7 +1199,7 @@ end
 local function build(container)
   local view = ns.NewPageView(container)
   local s = view.stack
-  -- The profession and skill come back from the last visit.
+  -- The profession, skill and selected recipe come back from the last visit.
   local saved = Shop.RecipeView()
   local state = {
     slug = saved.slug,
@@ -941,7 +1211,7 @@ local function build(container)
     unknown = false,
     removed = false,
     collapsed = {},
-    selected = nil,
+    selected = saved.selected,
   }
   -- What refresh() worked out for the shown profession; update() reuses it while the user filters.
   local ctx = { slug = Route.SLUGS[1], skill = 1, known = {} }
@@ -961,7 +1231,7 @@ local function build(container)
     end,
     set = function(slug)
       state.slug, state.skill, state.selected, state.collapsed = slug, nil, nil, {}
-      Shop.SetRecipeView(state.slug, state.skill)
+      Shop.SetRecipeView(state.slug, state.skill, state.selected)
       refresh()
     end,
   })
@@ -983,7 +1253,10 @@ local function build(container)
   search.edit:SetWidth(SEARCH_W)
 
   local sourceOptions = {}
-  for _, v in ipairs({ "all", "t", "i", "u" }) do
+  for _, v in ipairs({ "all", "t", "i" }) do
+    sourceOptions[#sourceOptions + 1] = { value = v, key = "recipes.src." .. v }
+  end
+  for _, v in ipairs(R.ORIGINS) do
     sourceOptions[#sourceOptions + 1] = { value = v, key = "recipes.src." .. v }
   end
   local source = W.Dropdown(controls, {
@@ -1036,7 +1309,7 @@ local function build(container)
     end,
     set = function(v)
       state.skill = v
-      Shop.SetRecipeView(state.slug, state.skill)
+      Shop.SetRecipeView(state.slug, state.skill, state.selected)
       update()
     end,
   }
@@ -1134,7 +1407,8 @@ local function build(container)
           elseif shiftDown() then
             insertChatLink(chatLink(item.recipe, R.Name(item.recipe, lang())))
           else
-            state.selected = item.recipe.s
+            state.slug, state.selected = ctx.slug, item.recipe.s
+            Shop.SetRecipeView(state.slug, state.skill, state.selected)
             update()
           end
         end)
@@ -1289,7 +1563,7 @@ local function build(container)
     local slug = params and params[1]
     if slug and Route.PROFESSIONS[slug] then
       state.slug, state.skill, state.selected, state.collapsed = slug, nil, tonumber(params[2]), {}
-      Shop.SetRecipeView(state.slug, state.skill)
+      Shop.SetRecipeView(state.slug, state.skill, state.selected)
       state.query, state.source = "", nil
       state.changed, state.learnable, state.unknown, state.removed = false, false, false, false
       refresh()

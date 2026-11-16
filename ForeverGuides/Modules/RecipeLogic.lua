@@ -75,6 +75,22 @@ function R.SourceKind(r)
   return (r.src == "t" or r.src == "i") and r.src or "u"
 end
 
+-- Where a recipe not taught by a trainer comes from (field rs.k of the data), in dropdown order.
+R.ORIGINS = { "favor", "rep", "vendor", "drop", "world", "quest", "object", "dungeon", "unknown" }
+local ORIGIN_SET = {}
+for _, k in ipairs(R.ORIGINS) do
+  ORIGIN_SET[k] = true
+end
+
+-- "t" for a trainer recipe, else rs.k, "unknown" when the data names no (valid) source.
+function R.Origin(r)
+  if r.src == "t" then
+    return "t"
+  end
+  local k = type(r.rs) == "table" and r.rs.k or nil
+  return ORIGIN_SET[k] and k or "unknown"
+end
+
 -- Bands -------------------------------------------------------------------------------------------
 
 local function levels(sk)
@@ -226,8 +242,8 @@ function R.Matches(r, tokens)
   return true
 end
 
--- o: query (text), changed (only recipes changed against Classic or removed), source ("t", "i" or
--- "u"), learnable (only recipes learnable at o.skill), unknown (only recipes not in o.known, a set of
+-- o: query (text), changed (only recipes changed against Classic or removed), source ("t", "i", "u" or
+-- one of R.ORIGINS), learnable (only recipes learnable at o.skill), unknown (only recipes not in o.known, a set of
 -- spell ids), removed (also show the recipes removed in Forever, off by default).
 function R.Filter(list, o)
   o = o or {}
@@ -236,7 +252,7 @@ function R.Filter(list, o)
   for _, r in ipairs(list) do
     local keep = o.removed or not r.rm
     keep = keep and (not o.changed or r.ch or r.rm)
-    keep = keep and (not o.source or R.SourceKind(r) == o.source)
+    keep = keep and (not o.source or R.SourceKind(r) == o.source or R.Origin(r) == o.source)
     keep = keep and (not o.learnable or R.Learnable(r, o.skill))
     keep = keep and not (o.unknown and o.known and o.known[r.s])
     if keep and R.Matches(r, tokens) then

@@ -20,7 +20,7 @@ ForeverGuides.RecipeData["herbalism"] = {
   },
   list={
     {g=2716,i=279962,mats={{2447,1},{765,1}},n={"Räucherkerze","Incense Candle"},s=1229705,sk={0,20,20,20},src="t"},
-    {bd={{n="Shadetooth",zone={de="Ausgrabungsstätte: Sumpfland",en="Excavation Site: Wetlands"}}},g=2716,i=279964,mats={{4470,2},{8836,1},{8831,1}},n={"Gewächshaus","Greenhouse"},pat={273106},s=1262980,sk={140,140,140,140},src="i"},
+    {bd={{n="Shadetooth",zone={de="Ausgrabungsstätte: Sumpfland",en="Excavation Site: Wetlands"}}},g=2716,i=279964,mats={{4470,2},{8836,1},{8831,1}},n={"Gewächshaus","Greenhouse"},pat={273106},rs={dun={boss="Schemenzahn",bossId=260325,n="Ausgrabungsstätte: Sumpfland"},k="dungeon"},s=1262980,sk={140,140,140,140},src="i"},
     {g=2716,i=279947,mats={{13465,4},{8925,1},{14047,2}},n={"Saatenkreuzer","Seed Hybridizer"},pat={273120},s=1263070,sk={300,300,300,300},src="i"},
   },
   v=1,

@@ -42,6 +42,10 @@ ns.AddLocale("enUS", {
   ["profroute.state.done"] = "Done",
   ["profroute.area.before"] = "Before the start skill",
   ["profroute.area.after"] = "After the target skill",
+  ["profroute.area.alternatives"] = "Alternatives",
+  ["profroute.alt.intro"] = "These routes replace the named range of the main route.",
+  ["profroute.alt.intro2"] = "Worth it when the materials are cheaper.",
+  ["profroute.alt.head"] = "%d to %d: %s",
   ["profroute.crafts"] = "%dx",
   ["profroute.perCraft"] = "%d per craft",
   ["profroute.recipeIcon"] = "Recipe",
@@ -87,6 +91,10 @@ ns.AddLocale("deDE", {
   ["profroute.state.done"] = "Erledigt",
   ["profroute.area.before"] = "Vor dem Start-Skill",
   ["profroute.area.after"] = "Nach dem Ziel-Skill",
+  ["profroute.area.alternatives"] = "Alternativen",
+  ["profroute.alt.intro"] = "Diese Wege ersetzen den angegebenen Bereich der Hauptroute.",
+  ["profroute.alt.intro2"] = "Lohnt sich, wenn die Materialien günstiger sind.",
+  ["profroute.alt.head"] = "%d bis %d: %s",
   ["profroute.crafts"] = "%dx",
   ["profroute.perCraft"] = "%d pro Herstellung",
   ["profroute.recipeIcon"] = "Rezept",
@@ -244,9 +252,16 @@ local CRAFTERS_SIDE = 22
 local HEAD_H = 26
 local HEAD_GAP = 8
 -- Light fills that carry one black text color, the same as the areas of the level list.
-local AREA_COLORS = { before = "sectionLearned", after = "sectionLocked" }
--- Areas the user opened this session ("before" / "after"), closed by default.
+local AREA_COLORS = {
+  before = "sectionLearned",
+  after = "sectionLocked",
+  alternatives = "sectionLearned",
+  altblock = "sectionLocked",
+}
+-- Areas the user opened this session ("before" / "after" / "alternatives"), closed by default.
 local opened = {}
+-- Alternative blocks the user folded this session by slug and index, expanded while their area is open.
+local folded = {}
 
 -- Header of a collapsed or opened area, a real button so the keyboard reaches it.
 local function newAreaHead(row)
@@ -372,6 +387,12 @@ local function newStepRow(parent)
     if self.isHead then
       return K.scaledHeight(HEAD_H) + HEAD_GAP
     end
+    if self.isNote then
+      self.sub:ClearAllPoints()
+      self.sub:SetPoint("TOPLEFT", SIDE, -4)
+      self.sub:SetWidth(math.max(40, width - SIDE * 2))
+      return self.sub:GetStringHeight() + 12
+    end
     local pickW = self.pick:IsShown() and PICK_W or 0
     local LEFT_W = rangeWidth(self.range)
     local textW = math.max(40, width - LEFT_W - SIDE * 2 - pickW)
@@ -431,15 +452,27 @@ local COLORS = {
 -- item.area ("before" | "after") paints the header of a collapsed area instead of a step.
 local function paintStep(row, item)
   row.isHead = item.area ~= nil
+  row.isNote = item.note ~= nil
   row.head:SetShown(row.isHead)
-  for _, part in ipairs({ row.range, row.state, row.title, row.sub, row.chips, row.src }) do
-    part:SetShown(not row.isHead)
+  for _, part in ipairs({ row.range, row.state, row.title, row.chips, row.src }) do
+    part:SetShown(not row.isHead and not row.isNote)
   end
+  row.sub:SetShown(not row.isHead)
   row.recipeIcon:SetShown(false)
   row.itemIcon:SetShown(false)
   row.step = item.step
-  row.pick:SetShown(PICK.on and not row.isHead)
+  -- Only main steps can be picked, alternatives stay out of the shopping list.
+  row.pick:SetShown(PICK.on and not row.isHead and not row.isNote and not item.alt)
   row.pick.Refresh()
+  if row.isNote then
+    row.spell, row.recipe, row.onToggle, row.product = nil, nil, nil, nil
+    row.crafters:SetSpell(nil)
+    row.sub:SetText(item.note)
+    W.SetColor(row.sub, "textSecondary")
+    row.bg:SetColorTexture(1, 1, 1, 0)
+    row.mark:SetColorTexture(1, 1, 1, 0)
+    return
+  end
   if row.isHead then
     row.spell, row.recipe, row.onToggle = nil, nil, item.onToggle
     row.crafters:SetSpell(nil)
@@ -810,9 +843,9 @@ local function build(container)
     end
     bar.frac = state.frac
     local rows = {}
-    local function addSteps(entries)
+    local function addSteps(entries, alt)
       for _, e in ipairs(entries) do
-        rows[#rows + 1] = { step = e.step, data = data, status = e.status }
+        rows[#rows + 1] = { step = e.step, data = data, status = e.status, alt = alt }
       end
     end
     -- Only a typed start or target hides steps, the automatic skill keeps every step in view.
@@ -836,6 +869,65 @@ local function build(container)
     addArea("before", before)
     addSteps(shown)
     addArea("after", after)
+    -- Alternatives whose range touches the visible range, listed after the main steps.
+    local lo, hi = R.Whole(S.Option("from")) or 0, R.Whole(S.Option("target")) or R.MAX_SKILL
+    local blocks = {}
+    for i, block in ipairs(Data.Alternatives(slug)) do
+      local a, b = tonumber(block.from) or 0, tonumber(block.to) or 0
+      if math.min(b, hi) > math.max(a, lo) or (a == b and a >= lo and a <= hi) then
+        blocks[#blocks + 1] = { i = i, block = block }
+      end
+    end
+    if #blocks > 0 then
+      rows[#rows + 1] = {
+        area = "alternatives",
+        text = string.format(
+          "%s %s (%d)",
+          opened.alternatives and "v" or ">",
+          L["profroute.area.alternatives"],
+          #blocks
+        ),
+        onToggle = function()
+          opened.alternatives = not opened.alternatives or nil
+          refresh()
+        end,
+      }
+    end
+    if opened.alternatives then
+      rows[#rows + 1] = { note = L["profroute.alt.intro"] .. "\n" .. L["profroute.alt.intro2"] }
+      for _, b in ipairs(blocks) do
+        local key = slug .. b.i
+        local shut = folded[key]
+        rows[#rows + 1] = {
+          area = "altblock",
+          text = string.format(
+            "%s %s",
+            shut and ">" or "v",
+            string.format(
+              L["profroute.alt.head"],
+              tonumber(b.block.from) or 0,
+              tonumber(b.block.to) or 0,
+              ns.T(b.block.title) or ""
+            )
+          ),
+          onToggle = function()
+            folded[key] = not shut or nil
+            refresh()
+          end,
+        }
+        local note = ns.T(b.block.note)
+        if not shut and note and note ~= "" then
+          rows[#rows + 1] = { note = note }
+        end
+        if not shut then
+          local entries = {}
+          for j, step in ipairs(type(b.block.steps) == "table" and b.block.steps or {}) do
+            entries[#entries + 1] = { step = step, i = j, status = R.Status(step, skill or 0, false) }
+          end
+          addSteps(entries, true)
+        end
+      end
+    end
     if #rows == 0 then
       hint:SetText(L["profroute.noSteps"])
       hint:SetShown(true)

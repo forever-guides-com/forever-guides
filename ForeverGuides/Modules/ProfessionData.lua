@@ -58,6 +58,12 @@ function D.Get(slug)
   return nil, D.STATUS.noRoute
 end
 
+-- Alternative levelling blocks of a loaded route, an empty table without any. They never feed totals.
+function D.Alternatives(slug)
+  local data = route(slug)
+  return data and type(data.alternatives) == "table" and data.alternatives or {}
+end
+
 -- The hint text for a status other than "ok".
 function D.Hint(status)
   return ns.L[status == D.STATUS.missing and "profdata.missing" or "profdata.noRoute"]

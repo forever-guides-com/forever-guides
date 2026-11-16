@@ -132,18 +132,21 @@ end
 -- The saved table (the scratch one without a database), migrated to the current schema.
 S.Root = store
 
--- The profession and skill the professions page showed last, so it opens there again: { slug, skill },
--- each nil when unknown or not set.
+-- Upper bound for a stored spell id (signed 32 bit).
+local SPELL_MAX = 2147483647
+
+-- The profession, skill and selected recipe (spell id) the professions page showed last, so it opens
+-- there again: { slug, skill, selected }, each nil when unknown or not set.
 function S.RecipeView()
   local v = store().recipes
   if type(v) ~= "table" then
     return {}
   end
-  return { slug = R.PROFESSIONS[v.slug] and v.slug or nil, skill = R.Whole(v.skill) }
+  return { slug = R.PROFESSIONS[v.slug] and v.slug or nil, skill = R.Whole(v.skill), selected = R.Whole(v.sel, SPELL_MAX) }
 end
 
-function S.SetRecipeView(slug, skill)
-  store().recipes = { slug = R.PROFESSIONS[slug] and slug or nil, skill = R.Whole(skill) }
+function S.SetRecipeView(slug, skill, selected)
+  store().recipes = { slug = R.PROFESSIONS[slug] and slug or nil, skill = R.Whole(skill), sel = R.Whole(selected, SPELL_MAX) }
 end
 
 -- key: slug (a known slug), target and from (whole skill, nil = automatic), surcharge (percent),
