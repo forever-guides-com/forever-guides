@@ -5,6 +5,16 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "1.0.1",
+      date = "2026-11-22",
+      highlights = {
+        { head = { de = "Neuerungsfenster", en = "News window" }, text = { de = "Erscheint jetzt nach jedem Update zuverlässig, auch nach einer Neuinstallation.", en = "Now shows reliably after every update, also after a fresh install." } },
+      },
+      fixed = {
+        { de = "Neuerungen: Das Fenster erscheint nach dem Update auf 1.0 und nach einer Neuinstallation zuverlässig, bis du es abschaltest.", en = "News: The window now shows reliably after the update to 1.0 and after a fresh install, until you switch it off." },
+      },
+    },
+    {
       version = "1.0.0",
       date = "2026-11-22",
       important = true,
@@ -215,20 +225,6 @@ ns.Data.Changelog = {
         { de = "Sammelpunkte: Erze, Kräuter, Truhen und Fischschwärme sind ab Werk auf allen Karten aus. Bestehende Einstellungen bleiben, wie sie sind.", en = "Gathering: Ores, herbs, chests and fishing schools are off by default on all maps. Existing settings stay as they are.", go = "settings:gathering.pins" },
         { de = "Sammelpunkte: Einschalten geht im Setup, in den Einstellungen unter Sammeln oder im Kartenfilter, alle nutzen dieselbe Einstellung. Das Setup bietet jede der vier Arten einzeln.", en = "Gathering: Turn them on in the setup, the settings under Gathering or the map filter, all share one setting. The setup offers each of the four kinds.", go = "settings:gathering.pins" },
         { de = "Addon-Karte: Sind die Sammelpunkte aus, sagt die Zeile unter dem Schalter, wo man sie einschaltet.", en = "Addon map: When the gathering spots are off, the line under the switch tells where to turn them on.", go = "settings:gathering.pins" },
-      },
-    },
-    {
-      version = "0.8.0",
-      date = "2026-11-14",
-      highlights = {
-        { head = { de = "Seltene Gegner", en = "Rare enemies" }, text = { de = "Weltkarte und Minimap zeigen seltene Gegner mit Stufe, Beute und Spawnpunkten.", en = "The world map and the minimap show rare enemies with level, loot and spawn points." }, go = "settings:map.rares" },
-        { head = { de = "Fundhinweis", en = "Find alert" }, text = { de = "Taucht ein Seltener auf, zeigt ein Fenster Modell und Beute, ein Klick nimmt ihn ins Ziel.", en = "When a rare shows up, a window shows its model and loot, one click targets it." }, go = "settings:map.rares" },
-      },
-      added = {
-        { de = "Seltene Gegner: Scanner für 486 seltene Gegner mit Symbolen auf Weltkarte und Minimap. Ab Werk aus, einschalten in den Einstellungen unter Karte oder im Setup.", en = "Rare enemies: Scanner for 486 rare enemies with symbols on the world map and the minimap. Off by default, turn it on in the settings under Map or in the setup.", go = "settings:map.rares" },
-        { de = "Seltene Gegner: Eine Karte zeigt Porträt, Stufe und Status, auf der Weltkarte auch die Beute mit Dropchance. Ein Klick heftet sie an, kleine Marker zeigen die übrigen Spawnpunkte.", en = "Rare enemies: A card shows portrait, level and status, on the world map also the loot with drop chance. One click pins it, small markers show the other spawn points.", go = "settings:map.rares" },
-        { de = "Seltene Gegner: Ein Seltener in der Nähe wird erkannt und mit Fenster, Text in der Bildschirmmitte, Chatzeile und Ton gemeldet. Linksklick ins Fenster nimmt ihn ins Ziel, Rechtsklick schließt.", en = "Rare enemies: A rare nearby is recognised and reported with a window, a line in the screen center, a chat line and a sound. Left click on the window targets it, right click closes it.", go = "settings:map.rares" },
-        { de = "Seltene Gegner: Das Addon merkt sich, welche Seltenen du gesehen oder getötet hast. Noch nicht gesehene tragen einen roten Kreis.", en = "Rare enemies: The add-on remembers which rares you have seen or killed. Those not seen yet carry a red circle.", go = "settings:map.rares" },
       },
     },
   },

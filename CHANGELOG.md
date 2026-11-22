@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1
+
+### Fixed
+
+- News: The window now shows reliably after the update to 1.0 and after a fresh install, until you switch it off.
+
 ## 1.0.0
 
 ### Added

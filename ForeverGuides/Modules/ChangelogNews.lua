@@ -677,12 +677,30 @@ end
 
 -- Trigger -----------------------------------------------------------------------------------------------
 
+-- Without a seen mark (fresh install, or an update from before the window existed) every version from
+-- FIRST_NEWS on counts as unseen.
+N.FIRST_NEWS = "1.0.0"
+
+function N.PlanFrom(seen)
+  local versions = ns.Changelog.Versions()
+  if Logic.Parse(seen) then
+    return Logic.News(versions, seen, ns.version, N.Enabled())
+  end
+  local recent = {}
+  for _, item in ipairs(versions) do
+    if Logic.Compare(item.version, N.FIRST_NEWS) >= 0 then
+      recent[#recent + 1] = item
+    end
+  end
+  return Logic.News(recent, "0.0.0", ns.version, N.Enabled())
+end
+
 function N.Plan()
   local meta = ns.db and ns.db.meta
   if not meta then
     return nil
   end
-  return Logic.News(ns.Changelog.Versions(), meta.changelogSeen, ns.version, N.Enabled())
+  return N.PlanFrom(meta.changelogSeen)
 end
 
 local function wizardBusy()
@@ -698,14 +716,6 @@ function N.Check()
     return nil
   end
   local meta = ns.db.meta
-  if meta.changelogSeen == nil and ns.db.setup and ns.db.setup.fresh == true then
-    -- First install: there is nothing new to tell.
-    done = true
-    if Logic.Parse(ns.version) then
-      ns.Store.set("meta.changelogSeen", ns.version)
-    end
-    return nil
-  end
   local plan = N.Plan()
   if not plan then
     done = true
@@ -721,7 +731,7 @@ function N.Check()
   -- The seen mark moves on with the window, so a rebuild in another language starts from the mark it opened with.
   local seen = meta.changelogSeen
   local function rebuild()
-    return Logic.News(ns.Changelog.Versions(), seen, ns.version, N.Enabled())
+    return N.PlanFrom(seen)
   end
   return N.Show(plan, rebuild) and "shown" or nil
 end
