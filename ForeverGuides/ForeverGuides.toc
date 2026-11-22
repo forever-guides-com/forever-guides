@@ -3,8 +3,8 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 1.0.1
-## X-Release-Build: 1.0.1
+## Version: 1.1.0
+## X-Release-Build: 1.1.0
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -120,13 +120,14 @@ UI\Toast.lua
 UI\Page.lua
 Modules\NavLayoutLogic.lua
 UI\Sidebar.lua
-UI\SidebarEdit.lua
+UI\NavEditor.lua
 UI\FooterControls.lua
 UI\SaveUI.lua
 UI\MainFrame.lua
 UI\Minimap.lua
 UI\Dock.lua
 UI\Tutorial.lua
+Modules\NavCollapse.lua
 
 Modules\RaidLockLogic.lua
 Modules\RaidWeekLogic.lua

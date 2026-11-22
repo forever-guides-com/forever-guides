@@ -5,7 +5,7 @@
 ## Notes-deDE: Daten der Ruf-Anleitung: die besten Wege je Rufstufe und die Belohnungen jeder Fraktion. Wird von selbst geladen, sobald eine Funktion sie braucht.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 1.0.1
+## Version: 1.1.0
 ## Dependencies: ForeverGuides
 ## LoadOnDemand: 1
 ## X-Website: https://forever-guides.com

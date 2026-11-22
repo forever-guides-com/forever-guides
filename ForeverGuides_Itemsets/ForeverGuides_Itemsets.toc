@@ -5,7 +5,7 @@
 ## Notes-deDE: Rüstungs- und Waffensets mit Teilen, Set-Boni und Quellen. Wird von selbst geladen, sobald du die Seite öffnest.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 1.0.1
+## Version: 1.1.0
 ## Dependencies: ForeverGuides
 ## LoadOnDemand: 1
 ## X-Website: https://forever-guides.com

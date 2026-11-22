@@ -226,7 +226,7 @@ function Main.Relayout()
   if not frame then
     return
   end
-  local lay = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, sidebar.editing, sidebar:WantedWidth())
+  local lay = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, false, sidebar:WantedWidth())
   ns.MainLayout = lay
   sidebar:SetWidth(lay.sidebarWidth)
   sidebar:Layout(lay.sidebar == "icons")
@@ -239,7 +239,7 @@ end
 
 -- A language, font size or navigation rename changes what the longest label needs: the sidebar follows.
 ns.On("FG_UI_REFRESHED", function()
-  if frame and frame:IsShown() and sidebar and sidebar.WantedWidth and not sidebar.editing then
+  if frame and frame:IsShown() and sidebar and sidebar.WantedWidth then
     local wanted = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, false, sidebar:WantedWidth())
     if wanted.sidebarWidth ~= ns.MainLayout.sidebarWidth then
       Main.Relayout()
@@ -1345,12 +1345,8 @@ local function create()
     end
   end)
   -- After the own OnShow/OnHide above, so no SetScript can replace the hooks of the Esc stack.
-  -- Esc ends a drag or the navigation edit mode first, then leaves a keyboard focus of the window.
+  -- Esc leaves a keyboard focus of the window first.
   ns.WindowShell.RegisterEsc(frame, function()
-    if ns.SidebarEdit.Leave() then
-      ns.Focus.clear()
-      return true
-    end
     if pageBack() then
       return true
     end

@@ -562,8 +562,8 @@ local function newBox(view, part)
 end
 
 local function editMenu()
-  local SE = ns.SidebarEdit
-  if SE and (SE.Enter() or SE.IsEditing()) then
+  local NE = ns.NavEditor
+  if NE and NE.Open() then
     UI.Reveal()
   end
 end

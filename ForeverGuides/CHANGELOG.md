@@ -4,6 +4,27 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [1.1.0] - 2026-11-22
+
+### Added
+
+- Menu: Every section sits in a box that can be tinted. Colors that are too bright are darkened so the text stays readable.
+- Menu: The new "Customize menu" window previews the whole menu and sets color, name, order and visibility, also per character. It opens from the pencils in the menu.
+
+### Changed
+
+- Menu: The edit mode inside the sidebar is gone, everything runs through the "Customize menu" window.
+- Menu: A fresh install starts with every section except the overview collapsed. Existing users are asked once, afterwards the addon remembers what you open and close.
+- Mounts: The page no longer scrolls as a whole, only the list and the details scroll. The model is larger and fits the window, and the "I have this mount" checkbox sits right below the header.
+
+### Removed
+
+- Mounts: The two level 25 trainee mounts are removed, they do not exist on Forever.
+
+### Fixed
+
+- Mounts: Without a model of its own the page says "No preview available" instead of showing another mount's model, and the preview button is hidden.
+
 ## [1.0.1] - 2026-11-22
 
 ### Fixed
@@ -813,6 +834,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[1.1.0]: https://github.com/forever-guides-com/forever-guides/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/forever-guides-com/forever-guides/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.2...v1.0.0
 [0.10.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.1...v0.10.2

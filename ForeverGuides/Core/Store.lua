@@ -64,18 +64,23 @@ Store.defaults = {
     subaddons = { guildmanager = false, chat = false, fishing = false },
     -- settings.nav (navigation layout for all characters, Modules/NavLayoutLogic.lua) has no default on
     -- purpose: an absent key is the default menu.
-    -- Accordion state per sidebar group (UI/Sidebar.lua). A group id missing here (older saves)
-    -- counts as open.
+    -- Accordion state per sidebar group (UI/Sidebar.lua). A group id missing here (a group added later)
+    -- counts as closed, like every group but the overview.
     sidebarOpen = {
       main = true,
-      world = true,
-      character = true,
-      learn = true,
-      professions = true,
-      inventory = true,
-      tools = true,
-      system = true,
+      world = false,
+      character = false,
+      social = false,
+      learn = false,
+      professions = false,
+      guides = false,
+      inventory = false,
+      tools = false,
+      system = false,
     },
+    -- Marks that Store.migrateNavCollapse ran (a fresh database starts with it); navCollapsePrompt = 1 asks an
+    -- existing install once whether to keep its open groups (Modules/NavCollapse.lua).
+    navCollapseDefault = 1,
     minimap = { hide = false, angle = 200 },
     trainersView = "list",
     weaponsView = "list",
@@ -1195,6 +1200,29 @@ function Store.migrateInstancesView(account)
   s.instancesViewDefault = 1
 end
 
+-- The sidebar groups start collapsed now (only "main" open). An existing database (a session was saved) keeps its
+-- look: every group that was open under the old rule (a missing key counts as open) is written as true, and
+-- navCollapsePrompt = 1 asks once whether to keep or collapse. Runs before the defaults are filled in.
+function Store.migrateNavCollapse(account)
+  local s = account.settings
+  if type(s) ~= "table" or s.navCollapseDefault ~= nil then
+    return
+  end
+  s.navCollapseDefault = 1
+  if type(account.meta) ~= "table" or account.meta.lastSession == nil then
+    return
+  end
+  if type(s.sidebarOpen) ~= "table" then
+    s.sidebarOpen = {}
+  end
+  for _, group in ipairs((ns.Sidebar and ns.Sidebar.GROUPS) or {}) do
+    if s.sidebarOpen[group] == nil then
+      s.sidebarOpen[group] = true
+    end
+  end
+  s.navCollapsePrompt = 1
+end
+
 -- The window style default changed from "flat" to "forever". An existing database that still stores "flat"
 -- gets "forever" once, marked by skinDefault, and skinNotice = 1 triggers a hint at login. A choice made
 -- afterwards stays. Runs before the defaults are filled in (a fresh database gets the marker with them).
@@ -1314,6 +1342,7 @@ function Store.init(account, char)
   Store.migrateSaveHint(account)
   Store.migrateInstancesView(account)
   Store.migrateSkin(account)
+  Store.migrateNavCollapse(account)
   Store.migrateSparkles(account)
   Store.migratePriceHouses(account)
   Store.migrateInviteStyle(account)

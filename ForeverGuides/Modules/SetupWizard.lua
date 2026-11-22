@@ -708,7 +708,7 @@ end
 local PENCIL_STEPS = { start = true, menu = true, menu2 = true, done = true }
 
 local function paintPencilHint()
-  local SE = ns.SidebarEdit
+  local SE = ns.NavEditor
   if not (SE and SE.SetHint) then
     return
   end

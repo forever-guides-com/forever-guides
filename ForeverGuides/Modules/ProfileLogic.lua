@@ -15,7 +15,8 @@
 --   language, the options of the display modules, map and gathering options, selling and automation rules,
 --   invite rules, logo and badge options, and the menu layout "nav" (hidden, moved and renamed entries).
 -- Not in a profile (EXCLUDED), they stay as they are when a profile is applied, copied, imported or reset:
---   state and one-time flags   startHintSeen, skinDefault, saveHintDefault, instancesViewDefault, sellProtectSeeded, skinNotice
+--   state and one-time flags   startHintSeen, skinDefault, saveHintDefault, instancesViewDefault, sellProtectSeeded, skinNotice,
+--                              navCollapseDefault, navCollapsePrompt
 --   window and layout state    sidebarCollapsed, sidebarOpen, mapTab, worldMapPanelOpen, worldMapPanelTab,
 --                              instancesClosed, minimap (button angle), areas (HUD window positions), frames
 --                              (saved positions and opacity of game windows), guildCols
@@ -55,6 +56,8 @@ PL.EXCLUDED = {
   instancesViewDefault = true,
   sellProtectSeeded = true,
   skinNotice = true,
+  navCollapseDefault = true,
+  navCollapsePrompt = true,
   sidebarCollapsed = true,
   sidebarOpen = true,
   mapTab = true,

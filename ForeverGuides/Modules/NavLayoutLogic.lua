@@ -2,7 +2,8 @@
 -- The default menu comes from the page registry (group and order of each page); a layout only
 -- records what the user changed on top of it:
 --   layout = { v = 1,
---     groups = { order = { groupId, .. }, hidden = { [groupId] = true }, names = { [groupId] = text } },
+--     groups = { order = { groupId, .. }, hidden = { [groupId] = true }, names = { [groupId] = text },
+--                colors = { [groupId] = "rrggbb" } },
 --     pages  = { order = { [groupId] = { pageId, .. } }, group = { [pageId] = groupId },
 --                hidden = { [pageId] = true }, names = { [pageId] = text } } }
 -- nil means "the default menu". Ids the registry does not know (a sub-addon that is switched off)
@@ -90,6 +91,15 @@ local function cleanMap(map, keep)
   return out
 end
 
+-- A background color as typed ("#rrggbb" or "rrggbb"): lower-case "rrggbb" without alpha, or nil.
+function NL.CleanColor(value)
+  if type(value) ~= "string" then
+    return nil
+  end
+  local hex = value:match("^#?(%x%x%x%x%x%x)$")
+  return hex and hex:lower() or nil
+end
+
 local function isTrue(v)
   return v == true or nil
 end
@@ -116,6 +126,7 @@ local function normalized(raw)
       order = cleanList(groups.order),
       hidden = cleanMap(groups.hidden, isTrue),
       names = cleanMap(groups.names, NL.CleanName),
+      colors = cleanMap(groups.colors, NL.CleanColor),
     },
     pages = {
       order = order,
@@ -132,6 +143,7 @@ local function isEmpty(n)
   return #n.groups.order == 0
     and next(n.groups.hidden) == nil
     and next(n.groups.names) == nil
+    and next(n.groups.colors) == nil
     and next(n.pages.order) == nil
     and next(n.pages.group) == nil
     and next(n.pages.hidden) == nil
@@ -206,7 +218,7 @@ local function orderedGroups(defaults, saved)
 end
 
 -- The menu as a list of groups, each with its entries in display order:
---   { groups = { { id, name, hidden, locked, pages = { { id, name, hidden, protected, moved, page } } } } }
+--   { groups = { { id, name, color, hidden, locked, pages = { { id, name, hidden, protected, moved, page } } } } }
 -- name is the user's text or nil (default title), hidden the effective flag (a group that holds a
 -- protected page is never hidden: locked). editing = false is the menu itself: hidden entries and
 -- groups, and groups without an entry, are left out. editing = true lists everything the user can
@@ -282,7 +294,7 @@ function NL.Resolve(defaultGroups, defaultPages, layout, editing)
       keep = not hidden and #entries > 0
     end
     if keep then
-      out[#out + 1] = { id = g, name = n.groups.names[g], hidden = hidden, locked = locked, pages = entries }
+      out[#out + 1] = { id = g, name = n.groups.names[g], color = n.groups.colors[g], hidden = hidden, locked = locked, pages = entries }
     end
   end
   return { groups = out }
@@ -589,6 +601,17 @@ function NL.Rename(layout, _, kind, id, text)
   return NL.Sanitize(n), true
 end
 
+-- Background color of a group box, "rrggbb" (hex without # and alpha). nil or an invalid value clears it
+-- (the theme fill). base is not used, the argument list is the same as with the other edits.
+function NL.SetColor(layout, _, groupId, hex)
+  if not validId(groupId) then
+    return NL.Sanitize(layout), false
+  end
+  local n = normalized(layout)
+  n.groups.colors[groupId] = NL.CleanColor(hex)
+  return NL.Sanitize(n), true
+end
+
 -- Back to the default menu.
 function NL.Reset()
   return nil, true
@@ -629,6 +652,12 @@ function NL.EditLayout(scope)
   return (NL.Pick(nil, accountNav()))
 end
 
+-- The color of a group box in the layout this character sees ("rrggbb"), nil for the theme fill.
+function NL.GroupColor(groupId)
+  local layout = NL.Layout()
+  return layout and layout.groups.colors[groupId] or nil
+end
+
 function NL.HasCharLayout()
   return NL.Sanitize(charNav()) ~= nil
 end
@@ -644,7 +673,7 @@ function NL.Save(scope, layout)
   ns.Emit("FG_NAV_CHANGED", scope)
 end
 
--- Runs one edit (NL.Move, NL.Step, NL.SetHidden, NL.Rename) on a layer and saves it when it changed
+-- Runs one edit (NL.Move, NL.Step, NL.SetHidden, NL.Rename, NL.SetColor) on a layer and saves it when it changed
 -- something. Returns whether it did.
 function NL.Apply(scope, op, ...)
   local layout, ok = NL[op](NL.EditLayout(scope), NL.Base(), ...)

@@ -61,6 +61,7 @@ ns.AddLocale("enUS", {
   ["mounts.classSub"] = "Learned from your class trainer after the quest",
   ["mounts.mapTip"] = "Show the place on the map",
   ["mounts.markerTip"] = "Set a waypoint here",
+  ["mounts.noPreview"] = "No preview available",
 })
 
 ns.AddLocale("deDE", {
@@ -117,9 +118,17 @@ ns.AddLocale("deDE", {
   ["mounts.classSub"] = "Beim Klassenlehrer nach der Quest gelernt",
   ["mounts.mapTip"] = "Ort auf der Karte zeigen",
   ["mounts.markerTip"] = "Wegpunkt hier setzen",
+  ["mounts.noPreview"] = "Keine Vorschau verfügbar",
 })
 
-local MODEL_HEIGHT = 170
+-- Model box: 4:3 of the detail width, never below MODEL_MIN and at most MODEL_SHARE of the pane height.
+local MODEL_MIN = 220
+local MODEL_SHARE = 0.45
+local MODEL_DIST = 1.3
+local NO_PREVIEW_PAD = Theme.space.md
+-- The split gets the height the page has left; below this the page scrolls as a whole.
+local SPLIT_MIN = 360
+local WIDE_FROM = 640
 local LIST_ROW = 46
 local RIDING = { [40] = 75, [60] = 150 }
 
@@ -315,10 +324,27 @@ local function build(container)
         state.detail = on
       end
     end,
-    detail = function(width)
-      return layoutDetail(width)
+    detail = function(width, height)
+      return layoutDetail(width, height)
     end,
   })
+  -- The head (intro, filters, totals) keeps its height, the split takes the rest of the view: the page does not
+  -- scroll, only the list and the detail pane do.
+  local baseLayout = split.fgGridLayout
+  function split:fgGridLayout(width, room)
+    if not room or not room.viewHeight then
+      return baseLayout(self, width, room)
+    end
+    local free = math.floor(room.viewHeight - room.top - room.pad)
+    local height = math.max(K.scaledHeight(SPLIT_MIN), free)
+    local filled = { top = room.top, viewHeight = room.viewHeight, pad = room.pad, gap = room.gap }
+    filled.fill = {
+      height = height,
+      mode = width < WIDE_FROM and "narrow" or "wide",
+      listW = math.max(240, math.min(340, math.floor(width * 0.36))),
+    }
+    return baseLayout(self, width, filled)
+  end
   K.Anchor("FG.Mounts.Detail", split.detail)
   local content = split.content
 
@@ -377,6 +403,9 @@ local function build(container)
     model:SetScript("OnModelLoaded", applyView)
     return model
   end
+  local noPreview = CreateFrame("Frame", nil, content)
+  W.Fill(noPreview, "surface", 1)
+  local noPreviewText = W.Text(noPreview, { key = "mounts.noPreview", role = "ui", color = "textMuted", wrap = true })
   local previewBtn = W.IconButton(content, {
     icon = "eye",
     boxed = true,
@@ -467,7 +496,6 @@ local function build(container)
         value = ns.T(m.rep.n) .. ", " .. L["mounts.rank." .. P.RANKS[m.rep.r]],
       }
     end
-    out[#out + 1] = { labelKey = "mounts.status", value = L["mounts.state." .. (P.Owned(m) or "none")] }
     return out
   end
 
@@ -475,17 +503,21 @@ local function build(container)
     local on = selected ~= nil
     hero:SetShown(on)
     have:SetShown(on)
-    local shownModel = on and selected.cr ~= nil and ensureModel() or false
+    local hasCreature = on and selected.cr ~= nil
+    local shownModel = hasCreature and ensureModel() or false
     if model then
+      -- Never keep the model of the previous mount around.
+      pcall(model.ClearModel, model)
       model:SetShown(shownModel and true or false)
     end
     previewBtn:SetShown(shownModel and true or false)
+    noPreview:SetShown(on and not shownModel)
     if not on then
       sources:Hide()
       return
     end
     if shownModel then
-      facing, dist = 0, 1
+      facing, dist = 0, MODEL_DIST
       pcall(model.SetCreature, model, selected.cr)
       applyView()
     end
@@ -508,27 +540,36 @@ local function build(container)
     srcList:SetData(m.s)
   end
 
-  function layoutDetail(width)
+  function layoutDetail(width, height)
     if not selected then
       return 0
     end
     local gap = Theme.space.lg
     hero:ClearAllPoints()
     hero:SetPoint("TOPLEFT", content, "TOPLEFT", 0, 0)
-    local y = hero:fgLayout(width) + gap
-    if model and model:IsShown() then
-      model:ClearAllPoints()
-      model:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
-      model:SetSize(width, MODEL_HEIGHT)
-      previewBtn:SetFrameLevel(model:GetFrameLevel() + 2)
-      previewBtn:ClearAllPoints()
-      previewBtn:SetPoint("TOPRIGHT", model, "TOPRIGHT", -4, -4)
-      y = y + MODEL_HEIGHT + gap
-    end
+    local y = hero:fgLayout(width) + Theme.space.sm
     have:ClearAllPoints()
     have:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
     have:SetWidth(width)
     y = y + have:fgGridLayout(width) + gap
+    if model and model:IsShown() then
+      local h = math.max(MODEL_MIN, math.min(math.floor(width * 0.75), math.floor((height or 0) * MODEL_SHARE)))
+      model:ClearAllPoints()
+      model:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+      model:SetSize(width, h)
+      previewBtn:SetFrameLevel(model:GetFrameLevel() + 2)
+      previewBtn:ClearAllPoints()
+      previewBtn:SetPoint("TOPRIGHT", model, "TOPRIGHT", -4, -4)
+      y = y + h + gap
+    elseif noPreview:IsShown() then
+      local h = W.FitLabel(noPreviewText, width - 2 * NO_PREVIEW_PAD) + 2 * NO_PREVIEW_PAD
+      noPreview:ClearAllPoints()
+      noPreview:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
+      noPreview:SetSize(width, h)
+      noPreviewText:ClearAllPoints()
+      noPreviewText:SetPoint("TOPLEFT", noPreview, "TOPLEFT", NO_PREVIEW_PAD, -NO_PREVIEW_PAD)
+      y = y + h + gap
+    end
     if sources:IsShown() then
       sources:ClearAllPoints()
       sources:SetPoint("TOPLEFT", content, "TOPLEFT", 0, -y)
@@ -537,7 +578,7 @@ local function build(container)
     return y - gap
   end
 
-  s:Add(split, { gap = Theme.space.lg })
+  s:Add(split, { gap = 0 })
   local emptyList = view.stack:Add(W.EmptyState(view.content, { text = "mounts.empty", icon = "search", compact = true }))
 
   function refresh()

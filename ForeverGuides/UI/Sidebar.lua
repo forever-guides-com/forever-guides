@@ -1,6 +1,6 @@
 -- Left navigation: grouped page list, active state, collapses to an icon rail. The list follows the
 -- default menu (page registry) plus the layout of the user (Modules/NavLayoutLogic.lua); the edit
--- mode that changes that layout is UI/SidebarEdit.lua.
+-- window that changes that layout is UI/NavEditor.lua.
 local _, ns = ...
 local W, Theme, L, NL = ns.W, ns.Theme, ns.L, ns.NavLayout
 
@@ -10,6 +10,10 @@ local GROUPS =
   { "main", "world", "character", "social", "learn", "professions", "guides", "inventory", "tools", "system" }
 local HEADER_HEIGHT = 24
 local ITEM_HEIGHT = 28
+-- Box around a group: it starts BOX_X from the edge of the list, the rows sit ROW_X from it (so the box shows
+-- as a frame of ROW_X - BOX_X px), BOX_PAD above the header and below the last row. A custom color fills at BOX_ALPHA.
+local BOX_X, ROW_X, BOX_PAD, BOX_GAP, BOX_ALPHA = 3, 5, 2, 3, 0.3
+local PENCIL_SIZE = 20
 
 -- Short menu names for pages whose title is long (page.navTitle, a locale key, wins over this list). The page keeps
 -- its full title in the page header, the crumbs and the search.
@@ -26,6 +30,7 @@ local NAV_TITLES = {
 ns.AddLocale("enUS", {
   ["sidebar.groupHint"] = "Click to expand or collapse",
   ["nav.shareHint"] = "Right-click: share link",
+  ["nav.customizeGroup"] = "Customize section",
   ["nav.title.shots"] = "Screenshots",
   ["nav.title.proftrainers"] = "Prof. trainers",
   ["nav.title.cursor"] = "Cursor ring",
@@ -37,6 +42,7 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["sidebar.groupHint"] = "Klick zum Auf- oder Zuklappen",
   ["nav.shareHint"] = "Rechtsklick: Link teilen",
+  ["nav.customizeGroup"] = "Bereich anpassen",
   ["nav.title.shots"] = "Screenshots",
   ["nav.title.proftrainers"] = "Berufslehrer",
   ["nav.title.cursor"] = "Mauszeiger",
@@ -53,7 +59,10 @@ end
 
 local function isOpen(group)
   local open = ns.db.settings.sidebarOpen
-  return type(open) ~= "table" or open[group] ~= false
+  if type(open) == "table" and open[group] ~= nil then
+    return open[group] ~= false
+  end
+  return ns.Store.defaults.settings.sidebarOpen[group] == true
 end
 
 local Sidebar = {}
@@ -64,7 +73,7 @@ Sidebar.NavKey = navKey
 
 -- Room around a label: item = icon column left and the right pad, header = chevron column and the right pad, plus
 -- the edge line and the scroll area inset.
-local ITEM_ROOM, HEADER_ROOM, EDGE_ROOM = 45, 30, 2
+local ITEM_ROOM, HEADER_ROOM, EDGE_ROOM = 45, 30 + PENCIL_SIZE + 2, 2 + 2 * ROW_X
 
 -- Moves the entries of `frames` (rows and their edit controls, in display order) to the slots they
 -- already hold in the focus list, so Tab and the arrow keys follow what is on screen.
@@ -85,6 +94,27 @@ local function syncFocusOrder(frames)
   for k, i in ipairs(slots) do
     ns.Focus.items[i] = frames[k]
   end
+end
+
+Sidebar.SyncFocusOrder = syncFocusOrder
+
+-- Fill of a group box with a user color ("rrggbb"): returns r, g, b, alpha of the texture. The color is darkened
+-- toward black until the muted and the secondary text keep the minimum contrast on the fill as it shows on the surface.
+function Sidebar.BoxFill(hex)
+  local surface = Theme.hex("surface")
+  local color = "#" .. hex
+  for step = 0, 20 do
+    color = step == 0 and "#" .. hex or Theme.mix("#" .. hex, "#000000", step * 0.05)
+    local shown = Theme.mix(surface, color, BOX_ALPHA)
+    if
+      Theme.contrastRatio(Theme.hex("textMuted"), shown) >= Theme.MIN_CONTRAST
+      and Theme.contrastRatio(Theme.hex("textSecondary"), shown) >= Theme.MIN_CONTRAST
+    then
+      break
+    end
+  end
+  local r, g, b = ns.U.hex(color)
+  return r, g, b, BOX_ALPHA
 end
 
 function Sidebar.Create(parent)
@@ -124,7 +154,7 @@ function Sidebar.Create(parent)
   )
   f.toggle = toggle
   -- Right behind the arrow, so the pencil sits there in the Tab order too.
-  ns.SidebarEdit.Attach(f)
+  ns.NavEditor.Attach(f)
 
   local area = W.ScrollArea(f)
   area:SetPoint("TOPLEFT", 0, -34)
@@ -133,7 +163,6 @@ function Sidebar.Create(parent)
   local content = area.content
   f.items = {}
   f.headers = {}
-  f.editing = false
 
   -- Headers and buttons are made once per group and page and reused by Rebuild.
   local headerOf, buttonOf = {}, {}
@@ -157,14 +186,9 @@ function Sidebar.Create(parent)
     header.arrow:SetPoint("LEFT", 8, 0)
     header.label = W.Text(header, { key = "nav.group." .. group, role = "micro", color = "textMuted" })
     header.label:SetPoint("LEFT", header.arrow, "RIGHT", 4, 0)
-    header.label:SetPoint("RIGHT", -6, 0)
     header:SetScript(
       "OnClick",
       ns.Wrap("sidebar-group", function()
-        -- A drop that ends on the row it started on also counts as a click.
-        if f.editing and ns.SidebarEdit.JustDragged() then
-          return
-        end
         ns.Store.set("settings.sidebarOpen." .. group, not isOpen(group))
         f:Layout(f.collapsed)
       end)
@@ -175,6 +199,9 @@ function Sidebar.Create(parent)
       self.bg:SetColorTexture(Theme.fillColor(hot and "hover" or nil))
       W.SetColor(self.label, hot and "text" or "textMuted")
       self.arrow:SetColorToken(hot and "text" or "textMuted")
+      if self.pencil then
+        self.pencil:SetAlpha((hot or self.pencil.hover) and 1 or 0)
+      end
     end
     ns.Bind(header, function(self)
       paint(self)
@@ -182,7 +209,7 @@ function Sidebar.Create(parent)
     header:SetScript("OnEnter", function(self)
       self.hover = true
       paint(self)
-      ns.ShowTooltip(self, groupName(self), L[f.editing and "nav.edit.dragHint" or "sidebar.groupHint"])
+      ns.ShowTooltip(self, groupName(self), L["sidebar.groupHint"])
     end)
     header:SetScript("OnLeave", function(self)
       self.hover = false
@@ -197,6 +224,28 @@ function Sidebar.Create(parent)
       self.focused = false
       paint(self)
     end
+    -- After the header's own OnEnter and OnLeave (a later SetScript would drop the hooks). It shows on hover and
+    -- focus; a click opens the nav editor and does not reach the header, so the group stays as it is.
+    local pencil = W.Action(header, {
+      icon = "pencil",
+      size = PENCIL_SIZE,
+      tooltip = "nav.customizeGroup",
+      opens = true,
+      onClick = function()
+        ns.NavEditor.Open(group)
+      end,
+    })
+    pencil:SetPoint("RIGHT", header, "RIGHT", -4, 0)
+    pencil:SetAlpha(0)
+    for _, script in ipairs({ "OnEnter", "OnLeave" }) do
+      pencil:HookScript(script, function(self)
+        self.hover = script == "OnEnter"
+        paint(header)
+      end)
+    end
+    header.pencil = pencil
+    header.fgLabelStop = pencil
+    header.label:SetPoint("RIGHT", pencil, "LEFT", -2, 0)
     header.sep = content:CreateTexture(nil, "ARTWORK")
     header.sep:SetHeight(1)
     ns.Bind(header.sep, function(t)
@@ -264,10 +313,6 @@ function Sidebar.Create(parent)
     b:SetScript(
       "OnClick",
       ns.Wrap("sidebar", function(_, button)
-        -- In the edit mode a row is moved, not opened. The right button shares the page as a link.
-        if f.editing then
-          return
-        end
         if button ~= "RightButton" then
           ns.Router:navigate(b.page.id)
         elseif shareable then
@@ -278,18 +323,14 @@ function Sidebar.Create(parent)
     b:SetScript("OnEnter", function(self)
       self.hover = true
       f.paintItem(self)
-      if f.editing then
-        ns.ShowTooltip(self, pageName(self), L["nav.edit.dragHint"])
-      else
-        local hint = self.page.placeholder and L["common.soon"] or nil
-        if self.dot:IsShown() and self.page.badgeHint then
-          hint = L[self.page.badgeHint]
-        end
-        if shareable then
-          hint = hint and (hint .. "\n" .. L["nav.shareHint"]) or L["nav.shareHint"]
-        end
-        ns.ShowTooltip(self, pageName(self), hint)
+      local hint = self.page.placeholder and L["common.soon"] or nil
+      if self.dot:IsShown() and self.page.badgeHint then
+        hint = L[self.page.badgeHint]
       end
+      if shareable then
+        hint = hint and (hint .. "\n" .. L["nav.shareHint"]) or L["nav.shareHint"]
+      end
+      ns.ShowTooltip(self, pageName(self), hint)
     end)
     b:SetScript("OnLeave", function(self)
       self.hover = false
@@ -321,6 +362,32 @@ function Sidebar.Create(parent)
     return b
   end
 
+  -- One box per group (behind the rows, no mouse): theme fill by default, the user color when the layout has one.
+  local boxOf = {}
+  f.boxes = boxOf
+
+  local function paintBox(box)
+    if box.color then
+      box.fill:SetColorTexture(Sidebar.BoxFill(box.color))
+    else
+      box.fill:SetColorTexture(Theme.fillColor("rowRest"))
+    end
+  end
+
+  local function boxFor(group)
+    local box = boxOf[group]
+    if not box then
+      box = CreateFrame("Frame", nil, content)
+      box:SetFrameLevel(content:GetFrameLevel())
+      box.fill = box:CreateTexture(nil, "BACKGROUND")
+      box.fill:SetAllPoints()
+      W.Border(box, "white")
+      ns.Bind(box, paintBox)
+      boxOf[group] = box
+    end
+    return box
+  end
+
   local function defaultPages()
     local out = {}
     for _, page in ipairs(ns.Router:list()) do
@@ -331,19 +398,11 @@ function Sidebar.Create(parent)
     return out
   end
 
-  -- The layer the list follows: the layout of the character, or in the edit mode the layer being edited.
-  local function activeLayout()
-    if f.editing then
-      return NL.EditLayout(ns.SidebarEdit.Scope())
-    end
-    return (NL.Layout())
-  end
-
   -- Lists the menu: a group without a listed page gets no header and no gap in the icon rail, hidden
-  -- entries and groups are left out (the edit mode lists them dimmed).
+  -- entries and groups are left out.
   local function populate()
     f.items, f.headers = {}, {}
-    local view = NL.Resolve(GROUPS, defaultPages(), activeLayout(), f.editing)
+    local view = NL.Resolve(GROUPS, defaultPages(), (NL.Layout()), false)
     for _, group in ipairs(view.groups) do
       local h = headerOf[group.id] or newHeader(group.id)
       headerOf[group.id] = h
@@ -353,6 +412,7 @@ function Sidebar.Create(parent)
       else
         W.SetText(h.label, "nav.group." .. group.id)
       end
+      h.color = group.color
       f.headers[#f.headers + 1] = h
       for index, entry in ipairs(group.pages) do
         local b = buttonOf[entry.id] or newItem(entry.page)
@@ -366,12 +426,6 @@ function Sidebar.Create(parent)
         h.items[#h.items + 1] = b
         f.items[#f.items + 1] = b
       end
-    end
-    for _, h in ipairs(f.headers) do
-      ns.SidebarEdit.Decorate(f, h)
-    end
-    for _, b in ipairs(f.items) do
-      ns.SidebarEdit.Decorate(f, b)
     end
   end
   populate()
@@ -475,6 +529,9 @@ function Sidebar.Create(parent)
     for _, h in pairs(headerOf) do
       h:Hide()
     end
+    for _, box in pairs(boxOf) do
+      box:Hide()
+    end
     for _, b in pairs(buttonOf) do
       b:Hide()
     end
@@ -487,9 +544,9 @@ function Sidebar.Create(parent)
     area:ScrollTo(scroll)
     local frames = {}
     for _, h in ipairs(f.headers) do
-      ns.SidebarEdit.AppendFrames(frames, h)
+      frames[#frames + 1] = h
       for _, b in ipairs(h.items) do
-        ns.SidebarEdit.AppendFrames(frames, b)
+        frames[#frames + 1] = b
       end
     end
     syncFocusOrder(frames)
@@ -501,7 +558,6 @@ function Sidebar.Create(parent)
   function f:Layout(collapsed)
     f.collapsed = collapsed
     toggle.icon:SetIcon(collapsed and "chevron-right" or "chevron-left")
-    toggle:SetEnabled(not f.editing)
     logo:SetShown(not collapsed)
     toggle:ClearAllPoints()
     if collapsed then
@@ -509,13 +565,7 @@ function Sidebar.Create(parent)
     else
       toggle:SetPoint("TOPRIGHT", -10, -6)
     end
-    local top, bottom = ns.SidebarEdit.Place(f, collapsed)
-    if top ~= f.insetTop or bottom ~= f.insetBottom then
-      f.insetTop, f.insetBottom = top, bottom
-      area:ClearAllPoints()
-      area:SetPoint("TOPLEFT", 0, -34 - top)
-      area:SetPoint("BOTTOMRIGHT", -1, 4 + bottom)
-    end
+    f.fgEdit.toggle:SetShown(not collapsed)
     local y = -4
     for _, h in ipairs(f.headers) do
       local open = isOpen(h.group)
@@ -530,11 +580,15 @@ function Sidebar.Create(parent)
       else
         h.sep:Hide()
       end
+      local box = boxFor(h.group)
+      local boxTop = y - BOX_GAP
+      h.pencil:SetShown(not collapsed)
       if not collapsed then
-        h:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y - 2)
-        h:SetPoint("RIGHT", content, "RIGHT", 0, 0)
-        h.navTop, h.navHeight = -(y - 2), HEADER_HEIGHT
-        y = y - HEADER_HEIGHT - 2
+        y = boxTop - BOX_PAD
+        h:SetPoint("TOPLEFT", content, "TOPLEFT", ROW_X, y)
+        h:SetPoint("RIGHT", content, "RIGHT", -ROW_X, 0)
+        h.navTop, h.navHeight = -y, HEADER_HEIGHT
+        y = y - HEADER_HEIGHT
       else
         h.navTop = nil
         y = y - 8
@@ -546,19 +600,28 @@ function Sidebar.Create(parent)
         b:SetShown(show)
         b.label:SetShown(not collapsed)
         if b.soon then
-          b.soon:SetShown(not collapsed and not f.editing)
+          b.soon:SetShown(not collapsed)
         end
         if b.share then
-          b.share:SetShown(not collapsed and not f.editing)
+          b.share:SetShown(not collapsed)
         end
         if show then
-          b:SetPoint("TOPLEFT", content, "TOPLEFT", 0, y)
-          b:SetPoint("RIGHT", content, "RIGHT", 0, 0)
+          b:SetPoint("TOPLEFT", content, "TOPLEFT", collapsed and 0 or ROW_X, y)
+          b:SetPoint("RIGHT", content, "RIGHT", collapsed and 0 or -ROW_X, 0)
           b.navTop, b.navHeight = -y, ITEM_HEIGHT
           y = y - ITEM_HEIGHT
         else
           b.navTop = nil
         end
+      end
+      box.color = h.color
+      box:ClearAllPoints()
+      box:SetShown(not collapsed)
+      if not collapsed then
+        y = y - BOX_PAD
+        box:SetPoint("TOPLEFT", content, "TOPLEFT", BOX_X, boxTop)
+        box:SetPoint("BOTTOMRIGHT", content, "TOPRIGHT", -BOX_X, y)
+        paintBox(box)
       end
     end
     area:SetContentHeight(-y + 8)

@@ -5,6 +5,27 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "1.1.0",
+      date = "2026-11-22",
+      highlights = {
+        { head = { de = "Menü anpassen", en = "Customize menu" }, text = { de = "Ein eigenes Fenster mit Vorschau, darin Farbe, Name, Reihenfolge und Sichtbarkeit jedes Bereichs.", en = "A window of its own with a preview, for color, name, order and visibility of every section." }, go = "settings:menu.main" },
+        { head = { de = "Aufgeräumtes Menü", en = "Tidier menu" }, text = { de = "Jeder Bereich liegt in einem eigenen Kasten, neu installiert ist nur die Übersicht offen.", en = "Every section sits in a box of its own, a fresh install opens only the overview." } },
+        { head = { de = "Reittiere", en = "Mounts" }, text = { de = "Größeres Modell, nur Liste und Details scrollen.", en = "Larger model, only the list and the details scroll." }, go = "mounts" },
+      },
+      added = {
+        { de = "Menü: Jeder Bereich liegt in einem Kasten, der sich einfärben lässt. Zu helle Farben werden abgedunkelt, damit die Schrift lesbar bleibt.", en = "Menu: Every section sits in a box that can be tinted. Colors that are too bright are darkened so the text stays readable." },
+        { de = "Menü: Das neue Fenster \"Menü anpassen\" zeigt das ganze Menü als Vorschau und stellt Farbe, Name, Reihenfolge und Sichtbarkeit ein, auch je Charakter. Es öffnet sich über die Stifte im Menü.", en = "Menu: The new \"Customize menu\" window previews the whole menu and sets color, name, order and visibility, also per character. It opens from the pencils in the menu.", go = "settings:menu.main" },
+      },
+      changed = {
+        { de = "Menü: Der Bearbeitungsmodus direkt in der Seitenleiste entfällt, alles läuft über das Fenster \"Menü anpassen\".", en = "Menu: The edit mode inside the sidebar is gone, everything runs through the \"Customize menu\" window.", go = "settings:menu.main" },
+        { de = "Menü: Bei einer Neuinstallation sind alle Bereiche außer der Übersicht zugeklappt. Wer das Addon schon nutzt, wird einmal gefragt, danach merkt sich das Addon, was du auf- und zuklappst.", en = "Menu: A fresh install starts with every section except the overview collapsed. Existing users are asked once, afterwards the addon remembers what you open and close." },
+        { de = "Reittiere: Die Seite scrollt nicht mehr als Ganzes, nur Liste und Details scrollen. Das Modell ist größer und passt sich dem Fenster an, das Häkchen \"Ich habe dieses Reittier\" steht direkt unter dem Kopf.", en = "Mounts: The page no longer scrolls as a whole, only the list and the details scroll. The model is larger and fits the window, and the \"I have this mount\" checkbox sits right below the header.", go = "mounts" },
+      },
+      fixed = {
+        { de = "Reittiere: Ohne eigenes Modell steht \"Keine Vorschau verfügbar\" statt des Modells eines anderen Reittiers, der Vorschau-Knopf entfällt dann.", en = "Mounts: Without a model of its own the page says \"No preview available\" instead of showing another mount's model, and the preview button is hidden.", go = "mounts" },
+      },
+    },
+    {
       version = "1.0.1",
       date = "2026-11-22",
       highlights = {
@@ -214,17 +235,6 @@ ns.Data.Changelog = {
       changed = {
         { de = "Seltene Gegner: Die einzelnen Schalter für Weltkarte, Minikarte und Hinweis stehen jetzt unter Weitere Einstellungen.", en = "Rare enemies: The single switches for world map, minimap and alert are now under More settings.", go = "settings:map.rares" },
         { de = "Setup: Sammelpunkte funkeln steht wieder in einer eigenen Zeile, die Sätze unter Sammeln und Seltene Gegner zeigt der Tooltip.", en = "Setup: Gathering sparkles has a line of its own again, the tooltip shows the sentences of Gathering and Rare enemies.", go = "settings:setup.wizard" },
-      },
-    },
-    {
-      version = "0.8.1",
-      date = "2026-11-14",
-      highlights = {
-      },
-      changed = {
-        { de = "Sammelpunkte: Erze, Kräuter, Truhen und Fischschwärme sind ab Werk auf allen Karten aus. Bestehende Einstellungen bleiben, wie sie sind.", en = "Gathering: Ores, herbs, chests and fishing schools are off by default on all maps. Existing settings stay as they are.", go = "settings:gathering.pins" },
-        { de = "Sammelpunkte: Einschalten geht im Setup, in den Einstellungen unter Sammeln oder im Kartenfilter, alle nutzen dieselbe Einstellung. Das Setup bietet jede der vier Arten einzeln.", en = "Gathering: Turn them on in the setup, the settings under Gathering or the map filter, all share one setting. The setup offers each of the four kinds.", go = "settings:gathering.pins" },
-        { de = "Addon-Karte: Sind die Sammelpunkte aus, sagt die Zeile unter dem Schalter, wo man sie einschaltet.", en = "Addon map: When the gathering spots are off, the line under the switch tells where to turn them on.", go = "settings:gathering.pins" },
       },
     },
   },

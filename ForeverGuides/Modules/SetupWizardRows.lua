@@ -510,7 +510,7 @@ local PENCIL_ICON = 16
 
 -- One line with the pencil of the menu (the same symbol as the button above the menu) and the sentence that says
 -- what it does. The steps start, menu and done show it; while one of them is open the pencil in the menu glows
--- (SidebarEdit.SetHint). Returns the line.
+-- (NavEditor.SetHint). Returns the line.
 function R.PencilLine(view)
   local holder = CreateFrame("Frame", nil, view.content or view.area.content)
   holder.fgId = "wizard-pencil-line"
