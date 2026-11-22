@@ -1,7 +1,7 @@
 -- Waypoint state, persistence and behavior. The list and the active waypoint live in
 -- ns.db.waypoints = { v, list = { waypoint }, active = id | nil, settings = { ... } }
 -- (defaults in Core/Store.lua, waypoint fields in Modules/WaypointLogic.lua). Changes
--- are announced with ns.Emit("FG_WAYPOINTS_CHANGED", kind, id), kind = add | remove |
+-- are announced with ns.Emit("FG_WAYPOINTS_CHANGED", kind, id), kind = add | remove | order |
 -- clear | update | active | settings; the arrow, the list and later map pages listen.
 -- The arrival check runs on a slow OnUpdate that exists only while a waypoint is active.
 local _, ns = ...
@@ -10,9 +10,16 @@ local L, U, WL = ns.L, ns.U, ns.WaypointLogic
 local WP = {}
 ns.Waypoints = WP
 
-WP.SCHEMA = 1
+WP.SCHEMA = 2
 -- migrations[n] upgrades the saved table from schema n - 1 to n (schema 1 is the first layout).
-WP.migrations = {}
+WP.migrations = {
+  -- The arrival radius default went from 15 to 10 yards; an untouched old default follows it.
+  [2] = function(db)
+    if type(db.settings) == "table" and db.settings.arrivalRadius == 15 then
+      db.settings.arrivalRadius = 10
+    end
+  end,
+}
 
 local TICK = 0.5
 local MAX_ZONE_HITS = 5
@@ -22,10 +29,10 @@ ns.AddLocale("enUS", {
   ["wp.duplicate"] = "There is already a waypoint here: %s",
   ["wp.full"] = "Waypoint list full (%d), remove some first.",
   ["wp.noPosition"] = "No position (instance, loading screen or no map data).",
-  ["wp.err.empty"] = "Nothing to read, example: 45.2 63.1",
-  ["wp.err.format"] = "Unreadable, e.g. 45.2 63.1 or Zone name 45.2 63.1",
+  ["wp.err.empty"] = "Nothing to read. Example: 45.2 63.1",
+  ["wp.err.format"] = "Cannot read this. Example: 45.2 63.1 or Zone name 45.2 63.1",
   ["wp.err.range"] = "Coordinates: 0 to 100 (percent) or 0 to 1.",
-  ["wp.err.noMap"] = "No map here, use #number or a zone name.",
+  ["wp.err.noMap"] = "No map here. Use #number or a zone name.",
   ["wp.err.unknownZone"] = 'No zone named "%s" was found.',
   ["wp.err.ambiguous"] = "Several matches: %s. Use #number or a longer name.",
   ["wp.err.link"] = "This map link could not be read.",
@@ -48,13 +55,13 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["wp.set"] = "Wegpunkt gesetzt: %s (%s) in %s",
   ["wp.duplicate"] = "Hier gibt es schon einen Wegpunkt: %s",
-  ["wp.full"] = "Wegpunkt-Liste voll (%d), entferne zuerst einige.",
+  ["wp.full"] = "Wegpunktliste voll (%d), entferne zuerst einige.",
   ["wp.noPosition"] = "Keine Position (Instanz, Ladebildschirm oder keine Karte).",
-  ["wp.err.empty"] = "Nichts zu lesen, Beispiel: 45,2 63,1",
-  ["wp.err.format"] = "Nicht lesbar, z. B. 45,2 63,1 oder Zonenname 45,2 63,1",
+  ["wp.err.empty"] = "Nichts zu lesen. Beispiel: 45,2 63,1",
+  ["wp.err.format"] = "Nicht lesbar. Beispiel: 45,2 63,1 oder Zonenname 45,2 63,1",
   ["wp.err.range"] = "Koordinaten: 0 bis 100 (Prozent) oder 0 bis 1.",
-  ["wp.err.noMap"] = "Keine Karte hier, nutze #Nummer oder einen Zonennamen.",
-  ["wp.err.unknownZone"] = 'Eine Zone namens "%s" wurde nicht gefunden.',
+  ["wp.err.noMap"] = "Hier gibt es keine Karte. Nutze #Nummer oder einen Zonennamen.",
+  ["wp.err.unknownZone"] = "Eine Zone namens „%s“ wurde nicht gefunden.",
   ["wp.err.ambiguous"] = "Mehrere Treffer: %s. Nimm #Nummer oder einen längeren Namen.",
   ["wp.err.link"] = "Dieser Kartenlink ließ sich nicht lesen.",
   ["wp.err.unknownMap"] = "Es gibt keine Karte mit dieser Nummer.",
@@ -66,11 +73,11 @@ ns.AddLocale("deDE", {
   ["wp.none"] = "Es gibt noch keine Wegpunkte.",
   ["wp.arrived"] = "Angekommen: %s",
   ["wp.imported"] = "%d Wegpunkt(e) importiert, %d übersprungen.",
-  ["wp.arrowOn"] = "Wegpunkt-Pfeil eingeblendet.",
-  ["wp.arrowOff"] = "Wegpunkt-Pfeil ausgeblendet.",
+  ["wp.arrowOn"] = "Wegpunktpfeil eingeblendet.",
+  ["wp.arrowOff"] = "Wegpunktpfeil ausgeblendet.",
   ["wp.slash.badNumber"] = "Kein Wegpunkt Nr. %s, siehe /fg way list.",
   ["binding.wpNext"] = "Nächster Wegpunkt",
-  ["binding.wpArrow"] = "Wegpunkt-Pfeil ein oder aus",
+  ["binding.wpArrow"] = "Wegpunktpfeil ein oder aus",
   ["binding.wpHere"] = "Wegpunkt hier setzen",
 })
 
@@ -107,7 +114,35 @@ end
 local CLEANERS = {
   arrow = bool,
   autoClear = bool,
+  keepOnArrival = bool,
   nativeMarker = bool,
+  screenNav = bool,
+  navBeam = bool,
+  navReplaceQuest = bool,
+  navMarker = bool,
+  navNear = function(v)
+    if v == "keep" or v == "marker" or v == "native" then
+      return v
+    end
+  end,
+  navNearDistance = WL.clampNear,
+  adoptNative = bool,
+  -- 0 = up to the top of the screen, else a fixed height.
+  navBeamHeight = function(v)
+    if v == 0 or v == 150 or v == 300 or v == 500 then
+      return v
+    end
+  end,
+  navSize = function(v)
+    if type(v) == "number" and WL.finite(v) then
+      return U.round(U.clamp(v, 0.5, 2), 0.05)
+    end
+  end,
+  navCvarBefore = function(v)
+    if v == "" or v == "0" or v == "1" then
+      return v
+    end
+  end,
   locked = bool,
   arrivalRadius = function(v)
     return type(v) == "number" and WL.clampRadius(v) or nil
@@ -369,8 +404,10 @@ end
 
 -- Blizzard marker ---------------------------------------------------------------------------------
 
+local writing = false
+
 -- Sets the game's own map pin. Never errors: the map may not allow a pin, or the API may be
--- missing on this client. The pin is not super-tracked (the client blocks that).
+-- missing on this client. Super-tracking is left to WaypointNav (own switch).
 function WP.SetNative(map, x, y)
   if not (ns.can.userWaypoint and ns.can.uiMapPoint) then
     return false
@@ -382,21 +419,61 @@ function WP.SetNative(map, x, y)
     end
   end
   ns.MapOps.Record("SetUserWaypoint", map)
-  return pcall(function()
+  writing = true
+  local ok = pcall(function()
     C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(map, x, y))
   end)
+  writing = false
+  return ok
 end
 
 function WP.ClearNative()
   if C_Map and C_Map.ClearUserWaypoint then
     ns.MapOps.Record("ClearUserWaypoint")
+    writing = true
     pcall(C_Map.ClearUserWaypoint)
+    writing = false
+    if ns.WaypointNav then
+      ns.WaypointNav.Track(false)
+    end
+  end
+end
+
+-- True while our own write to the game's user waypoint runs, so its event is not taken for the player's.
+function WP.WritingNative()
+  return writing
+end
+
+-- map, x, y of the game's user waypoint (x, y as fractions), or nil when there is none or it is unreadable.
+function WP.UserWaypoint()
+  if not (C_Map and C_Map.GetUserWaypoint) then
+    return nil
+  end
+  local point = call(C_Map.GetUserWaypoint)
+  local pos = type(point) == "table" and point.position
+  if type(pos) ~= "table" then
+    return nil
+  end
+  local x, y = pos.x, pos.y
+  if type(pos.GetXY) == "function" then
+    local ok, px, py = pcall(pos.GetXY, pos)
+    if ok then
+      x, y = px, py
+    end
+  end
+  if WL.readable(point.uiMapID) and point.uiMapID > 0 and WL.readable(x) and WL.readable(y) then
+    return point.uiMapID, U.clamp(x, 0, 1), U.clamp(y, 0, 1)
   end
 end
 
 -- Id of the waypoint our pin stands for: only that pin is cleared again, never one the
 -- player placed by hand in the meantime.
 local nativeFor
+
+-- Id of the waypoint whose pin we put on the game's map, nil when we have none there.
+function WP.NativeFor()
+  return nativeFor
+end
 -- A sync that came up in combat waits for its end: the map rebuilds its waypoint pin on the event.
 local nativeWaiting
 
@@ -407,10 +484,14 @@ local function syncNative(force)
   end
   nativeWaiting = nil
   local wp = WP.Active()
-  if wp and WP.Settings().nativeMarker then
+  local settings = WP.Settings()
+  if wp and (settings.nativeMarker or settings.screenNav) then
     if force or nativeFor ~= wp.id then
       if WP.SetNative(wp.map, wp.x, wp.y) then
         nativeFor = wp.id
+        if ns.WaypointNav then
+          ns.WaypointNav.Track(true)
+        end
       elseif nativeFor then
         WP.ClearNative()
         nativeFor = nil
@@ -467,6 +548,10 @@ function WP.CheckArrival()
   if not armed then
     return false
   end
+  -- Keep the last target: the marker stays until the player clears it; a route still steps on.
+  if WP.Settings().keepOnArrival and not WL.nextAfterArrival(WP.data().list, wp.id) then
+    return false
+  end
   WP.Arrive(wp)
   return true
 end
@@ -506,6 +591,17 @@ function WP.Activate(id)
   syncNative()
   updateDriver()
   emit("active", wp.id)
+  return wp
+end
+
+-- Puts a waypoint at the top of the list and guides there next.
+function WP.MoveToTop(id)
+  local wp = WL.moveToTop(WP.data().list, id)
+  if not wp then
+    return nil
+  end
+  WP.Activate(wp.id)
+  emit("order", wp.id)
   return wp
 end
 
@@ -562,9 +658,38 @@ function WP.Set(input)
   return wp, status
 end
 
--- Like Set, with the toast the player sees. Used by the slash command and the list window.
-function WP.Command(input)
-  local wp, status, detail = WP.Set(input)
+-- The focus mark of the "Map" and "Marker" buttons: a pinned, active waypoint that replaces the previous focus
+-- mark. Its id is kept in the character store (charDB.focusMark), so it stays across /reload until the player
+-- sets another one or removes it (marker menu). A spot that already is a waypoint becomes the focus without
+-- being owned by it: only waypoints this function created are removed again. spec as WP.Add, returns wp, status
+-- like WP.Set.
+function WP.Focus(spec)
+  local prev = ns.charDB and ns.charDB.focusMark
+  if type(prev) == "table" then
+    local old = WL.find(WP.data().list, prev.id)
+    if old and old.map == prev.map and old.x == prev.x and old.y == prev.y then
+      WP.Remove(old.id, true)
+    end
+    ns.Store.setChar("focusMark", nil)
+  end
+  local copy = U.copy(spec)
+  copy.pinned, copy.source = true, "map"
+  local wp, status = WP.Set(copy)
+  if wp and status == "added" then
+    ns.Store.setChar("focusMark", { id = wp.id, map = wp.map, x = wp.x, y = wp.y })
+  end
+  return wp, status
+end
+
+-- Like Set, with the toast the player sees. Used by the slash command and the list window. opts.focus sets
+-- the focus mark instead (WP.Focus).
+function WP.Command(input, opts)
+  local wp, status, detail
+  if opts and opts.focus then
+    wp, status = WP.Focus(input)
+  else
+    wp, status, detail = WP.Set(input)
+  end
   if not wp then
     if status == "full" then
       ns.Notify(string.format(L["wp.full"], WL.MAX), "warning")
@@ -712,6 +837,16 @@ function WP.Import(text)
   return added, skipped, result.errors
 end
 
+local NAV_KEYS = {
+  navBeam = true,
+  navReplaceQuest = true,
+  navSize = true,
+  navBeamHeight = true,
+  navMarker = true,
+  navNear = true,
+  navNearDistance = true,
+}
+
 -- Validated setting change. Returns false for an unknown key or an invalid value.
 function WP.SetSetting(key, value)
   local clean = CLEANERS[key] and CLEANERS[key](value)
@@ -721,9 +856,74 @@ function WP.SetSetting(key, value)
   WP.Settings()[key] = clean
   if key == "nativeMarker" then
     syncNative()
+  elseif key == "screenNav" then
+    if ns.WaypointNav then
+      ns.WaypointNav.Apply()
+    end
+    syncNative(true)
+  elseif NAV_KEYS[key] and ns.WaypointNav then
+    ns.WaypointNav.Update()
   end
   emit("settings", key)
   return true
+end
+
+-- Dropdown of the beam height, shared by the waypoint settings tab and the navigation card.
+function WP.BeamHeightDropdown(parent)
+  return ns.W.Dropdown(parent, {
+    key = "wp.set.navBeamHeight",
+    width = 240,
+    options = {
+      { value = 0, key = "wp.set.navBeamHeight.edge" },
+      { value = 150, key = "wp.set.navBeamHeight.short" },
+      { value = 300, key = "wp.set.navBeamHeight.medium" },
+      { value = 500, key = "wp.set.navBeamHeight.long" },
+    },
+    get = function()
+      return WP.Settings().navBeamHeight
+    end,
+    set = function(v)
+      WP.SetSetting("navBeamHeight", v)
+    end,
+  })
+end
+
+-- Dropdown of the near-target behaviour and the slider of its distance, shared by the navigation card and the
+-- quest card of the automation tab.
+function WP.NearDropdown(parent)
+  return ns.W.Dropdown(parent, {
+    key = "wp.set.navNear",
+    width = 240,
+    options = {
+      { value = "keep", key = "wp.set.navNear.keep" },
+      { value = "marker", key = "wp.set.navNear.marker" },
+      { value = "native", key = "wp.set.navNear.native" },
+    },
+    get = function()
+      return WP.Settings().navNear
+    end,
+    set = function(v)
+      WP.SetSetting("navNear", v)
+    end,
+  })
+end
+
+function WP.NearDistanceSlider(parent)
+  return ns.W.Slider(parent, {
+    key = "wp.set.navNearDistance",
+    min = WL.NEAR_MIN,
+    max = WL.NEAR_MAX,
+    step = 5,
+    get = function()
+      return WP.Settings().navNearDistance
+    end,
+    set = function(v)
+      WP.SetSetting("navNearDistance", v)
+    end,
+    format = function(v)
+      return WL.formatDistance(v, ns.GetActiveLocale())
+    end,
+  })
 end
 
 function WP.ToggleArrow()

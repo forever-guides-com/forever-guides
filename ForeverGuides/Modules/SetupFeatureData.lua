@@ -240,6 +240,7 @@ D.PAGES = {
 -- breaks the registry test until it is placed here, in ROWS or in PAGES).
 D.SKIP = {
   setup = "the wizard itself",
+  profiles = "personal choice per character, stays in the settings",
   messages = "special wish, red errors and chat feedback stay in the settings",
   automation = "overview of helpers that are asked for one by one",
   diagnostics = "developer tools",
@@ -249,6 +250,9 @@ D.SKIP = {
   farmhud = "session only, no stored switch, opened by key",
   sleepbag = "rare situational display, off by default, stays in the settings",
   talentframe = "only matters with an active skill order, stays in the settings",
+  tooltips = "personal taste, stays in the settings",
+  unitframes = "personal taste, protected frames, stays in the settings",
+  spells = "personal taste, stays in the settings",
   professions = "covered by the menu step (page Professions)",
   instances = "covered by the menu step (page Instances)",
   bosses = "covered by the menu step (page Instances)",

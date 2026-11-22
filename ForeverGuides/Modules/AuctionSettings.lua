@@ -12,14 +12,11 @@ ns.AuctionSettings = AS
 ns.AddLocale("enUS", {
   ["auctionset.heading.data"] = "Price data",
   ["auctionset.house"] = "Auction house: %s",
-  ["auctionset.house.Horde"] = "Horde",
-  ["auctionset.house.Alliance"] = "Alliance",
-  ["auctionset.house.Neutral"] = "Neutral",
-  ["auctionset.house.unknown"] = "Auction house: unknown, stand at the auctioneer",
+  ["auctionset.house.unknown"] = "Auction house: unknown, go to the auctioneer",
   ["auctionset.items"] = "Saved prices (%s): %d items",
   ["auctionset.last"] = "Last scan: %s (%d items, %d auctions, %d s)",
   ["auctionset.lastNone"] = "No scan yet",
-  ["auctionset.neutral"] = "Neutral: %d items. %s",
+  ["auctionset.other"] = "%s: %d items. %s",
   ["auctionset.dateFormat"] = "%Y-%m-%d %H:%M",
   ["auctionset.heading.scan"] = "Full scan",
   ["auctionset.scan.start"] = "Start full scan",
@@ -35,27 +32,26 @@ ns.AddLocale("enUS", {
   ["auctionset.percent"] = "%d%%",
   ["auctionset.scan.note"] = "The scan reads the whole auction list once (about 10 to 20 seconds, the game may stutter briefly). The game allows it only every 15 minutes.",
   ["auctionset.scan.passive"] = "Normal searches in the auction house update the prices automatically as well.",
-  ["auctionset.heading.options"] = "Options",
+  ["auctionset.heading.options"] = "Settings",
   ["auctionset.autoOpen"] = "Open the shopping list at the auction house",
   ["auctionset.tooltip"] = "Show auction house price in tooltips",
+  ["auctionset.showOther"] = "Show prices of other auction houses",
+  ["auctionset.live"] = "Update prices on every search",
   ["auctionset.days"] = "Mark data as old after (days, 1 to 90)",
   ["auctionset.clear"] = "Delete price data",
   ["auctionset.clearTitle"] = "Delete price data",
   ["auctionset.clearText"] = "Delete all saved auction house prices of every house? A new scan or normal searches fill them again.",
   ["auctionset.cleared"] = "Price data deleted",
-  ["auctionset.addon"] = "Price add-on found: used as a fallback.",
+  ["auctionset.addon"] = "Price addon found. It serves as a fallback.",
 })
 ns.AddLocale("deDE", {
   ["auctionset.heading.data"] = "Preisdaten",
   ["auctionset.house"] = "Auktionshaus: %s",
-  ["auctionset.house.Horde"] = "Horde",
-  ["auctionset.house.Alliance"] = "Allianz",
-  ["auctionset.house.Neutral"] = "Neutral",
-  ["auctionset.house.unknown"] = "Auktionshaus: unbekannt, stelle dich zum Auktionator",
+  ["auctionset.house.unknown"] = "Auktionshaus: unbekannt, geh zum Auktionator",
   ["auctionset.items"] = "Gespeicherte Preise (%s): %d Items",
   ["auctionset.last"] = "Letzter Scan: %s (%d Items, %d Auktionen, %d s)",
   ["auctionset.lastNone"] = "Noch kein Scan",
-  ["auctionset.neutral"] = "Neutral: %d Items. %s",
+  ["auctionset.other"] = "%s: %d Items. %s",
   ["auctionset.dateFormat"] = "%d.%m.%Y %H:%M",
   ["auctionset.heading.scan"] = "Kompletter Scan",
   ["auctionset.scan.start"] = "Kompletten Scan starten",
@@ -71,15 +67,17 @@ ns.AddLocale("deDE", {
   ["auctionset.percent"] = "%d %%",
   ["auctionset.scan.note"] = "Der Scan liest die ganze Auktionsliste einmal (etwa 10 bis 20 Sekunden, das Spiel kann kurz ruckeln). Das Spiel erlaubt ihn nur alle 15 Minuten.",
   ["auctionset.scan.passive"] = "Normale Suchen im Auktionshaus aktualisieren die Preise ebenfalls automatisch.",
-  ["auctionset.heading.options"] = "Optionen",
+  ["auctionset.heading.options"] = "Einstellungen",
   ["auctionset.autoOpen"] = "Einkaufsliste im Auktionshaus öffnen",
   ["auctionset.tooltip"] = "Auktionshaus-Preis in Tooltips anzeigen",
+  ["auctionset.showOther"] = "Preise anderer Auktionshäuser zeigen",
+  ["auctionset.live"] = "Preise bei jeder Suche aktualisieren",
   ["auctionset.days"] = "Daten als alt markieren nach (Tage, 1 bis 90)",
   ["auctionset.clear"] = "Preisdaten löschen",
   ["auctionset.clearTitle"] = "Preisdaten löschen",
   ["auctionset.clearText"] = "Alle gespeicherten Auktionshaus-Preise aller Häuser löschen? Ein neuer Scan oder normale Suchen füllen sie wieder.",
   ["auctionset.cleared"] = "Preisdaten gelöscht",
-  ["auctionset.addon"] = "Preis-Addon gefunden: wird als Rückfall genutzt.",
+  ["auctionset.addon"] = "Preis-Addon gefunden. Es dient als Ersatz.",
 })
 
 AS.DAYS_MIN, AS.DAYS_MAX, AS.DAYS_DEFAULT = 1, 90, 14
@@ -184,9 +182,7 @@ local pages = {}
 -- Page ----------------------------------------------------------------------------------------------
 
 local function houseName(house)
-  local key = "auctionset.house." .. tostring(house)
-  local text = L[key]
-  return text ~= key and text or tostring(house)
+  return ns.PriceDb.HouseName(house)
 end
 
 local function setShown(frame, on)
@@ -215,13 +211,26 @@ local function refresh(page)
   local house = db.House()
   local shown = house or db.OwnHouse()
   page.house:SetText(house and string.format(L["auctionset.house"], houseName(house)) or L["auctionset.house.unknown"])
-  page.items:SetText(string.format(L["auctionset.items"], houseName(shown), whole(db.Count(shown))))
+  page.items:SetText(string.format(L["auctionset.items"], shown and houseName(shown) or "?", whole(db.Count(shown))))
   page.last:SetText(AS.LastScanText(db.LastScan(shown)))
   W.SetColor(page.last, holding and "success" or "textSecondary")
-  local neutralScan = shown ~= "Neutral" and db.LastScan("Neutral") or nil
-  local neutralItems = shown ~= "Neutral" and whole(db.Count("Neutral")) or 0
-  setShown(page.neutral, neutralScan ~= nil or neutralItems > 0)
-  page.neutral:SetText(string.format(L["auctionset.neutral"], neutralItems, AS.LastScanText(neutralScan)))
+  -- Every other house with saved prices: its name, item count and last scan.
+  local others = {}
+  local keys = {}
+  for _, key in ipairs(db.NeutralHouses()) do
+    keys[#keys + 1] = key
+  end
+  keys[#keys + 1] = db.OtherHouse()
+  keys[#keys + 1] = db.LegacyHouse(db.OwnHouse())
+  keys[#keys + 1] = db.LegacyHouse()
+  for _, key in ipairs(keys) do
+    local n, last = whole(db.Count(key)), db.LastScan(key)
+    if key ~= shown and (n > 0 or last) then
+      others[#others + 1] = string.format(L["auctionset.other"], houseName(key), n, AS.LastScanText(last))
+    end
+  end
+  setShown(page.others, #others > 0)
+  page.others:SetText(table.concat(others, "\n"))
 
   -- Scan: one button (start, cancel or try again), why it is off, the progress.
   local can, reason, seconds = db.CanScan()
@@ -241,8 +250,9 @@ local function refresh(page)
     local pct = math.floor(AS.Fraction(scan) * 100 + 0.5)
     page.bar:SetValue(pct)
     page.pct:SetText(string.format(L["auctionset.percent"], pct))
+    local scanned = scan.house and (houseName(scan.house) .. "  ·  ") or ""
     page.phase:SetText(
-      AS.PhaseText(scan) .. "  ·  " .. string.format(L["auctionset.elapsed"], math.floor(scan.elapsed))
+      scanned .. AS.PhaseText(scan) .. "  ·  " .. string.format(L["auctionset.elapsed"], math.floor(scan.elapsed))
     )
   end
   setShown(page.failure, failed)
@@ -254,6 +264,8 @@ local function refresh(page)
   -- Options.
   page.autoOpen.Refresh()
   page.tooltip.Refresh()
+  page.showOther.Refresh()
+  page.live.Refresh()
   if not page.days.edit:HasFocus() then
     page.days.edit:SetText(tostring(AS.MaxAgeDays()))
   end
@@ -352,8 +364,8 @@ function AS.Build(parent)
   stack:Add(page.items, { gap = 4 })
   page.last = text("ui", "textSecondary")
   stack:Add(page.last, { gap = 4 })
-  page.neutral = text("ui", "textSecondary")
-  stack:Add(page.neutral, { gap = 4 })
+  page.others = text("ui", "textSecondary")
+  stack:Add(page.others, { gap = 4 })
 
   -- Full scan.
   ns.AddHeading(view, "auctionset.heading.scan", { gap = 6 })
@@ -427,7 +439,29 @@ function AS.Build(parent)
       Store.set("settings.priceDb.tooltip", v)
     end,
   })
-  stack:Add(page.tooltip, { height = 22, gap = 8 })
+  stack:Add(page.tooltip, { height = 22, gap = 6 })
+  page.showOther = W.Checkbox(content, {
+    key = "auctionset.showOther",
+    tooltip = "auctionset.showOther",
+    get = function()
+      return Store.get("settings.priceDb.showOther") == true
+    end,
+    set = function(v)
+      Store.set("settings.priceDb.showOther", v)
+    end,
+  })
+  stack:Add(page.showOther, { height = 22, gap = 6 })
+  page.live = W.Checkbox(content, {
+    key = "auctionset.live",
+    tooltip = "auctionset.live",
+    get = function()
+      return Store.get("settings.priceDb.live") ~= false
+    end,
+    set = function(v)
+      Store.set("settings.priceDb.live", v)
+    end,
+  })
+  stack:Add(page.live, { height = 22, gap = 8 })
   stack:Add(text("ui", "text", "auctionset.days"), { gap = 4 })
   page.days = W.EditBox(content, {
     height = 26,
@@ -477,7 +511,7 @@ function AS.Build(parent)
     end
   end
 
-  page.controls = { page.scan, page.autoOpen, page.tooltip, page.days, page.clear }
+  page.controls = { page.scan, page.autoOpen, page.tooltip, page.showOther, page.live, page.days, page.clear }
   page.Refresh = function()
     refresh(page)
   end

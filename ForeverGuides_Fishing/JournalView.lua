@@ -63,13 +63,14 @@ FG.AddLocale("enUS", {
   ["fishj.empty"] = "Nothing caught yet. Every fish you catch while fishing is listed here from now on.",
   ["fishj.noMatch"] = "Nothing matches your search.",
   ["fishj.off"] = "Recording is switched off in the settings of the fishing helper. Nothing new is added.",
-  ["fishj.newer"] = "The saved catches come from a newer version of the add-on. They are not touched and not shown.",
+  ["fishj.newer"] = "The saved catches come from a newer version of the addon. They are not touched and not shown.",
   ["fishj.hint"] = "Arrow keys select. Enter opens a place. V view, S sort, C characters, / search, Esc close.",
+  ["fishj.hint.page"] = "Arrow keys select. Enter opens a place. V view, S sort, C characters, / search.",
   ["fishj.row.fish"] = "%s, %d caught, last %s, %d places",
   ["fishj.row.place"] = "%s, %d caught, %d kinds of fish",
   ["fishj.legend.fish"] = "Bar and percent: share of all catches. A full bar is 100 %.",
   ["fishj.legend.fishAt"] = "Bar and percent: share of the catches at this place. A full bar is 100 %.",
-  ["fishj.legend.places"] = "Bar and percent: catch rate, the casts with a catch. A full bar is 100 %.",
+  ["fishj.legend.places"] = "Bar and percent: catch rate, the share of casts with a catch. A full bar is 100 %.",
   ["fishj.bar.fish"] = "Bar: %s of all catches (%d of %d). A full bar is 100 %%.",
   ["fishj.bar.fishAt"] = "Bar: %s of the catches at %s (%d of %d). A full bar is 100 %%.",
   ["fishj.bar.place"] = "Bar: catch rate %s, %d of %d casts had a catch. A full bar is 100 %%.",
@@ -124,6 +125,7 @@ FG.AddLocale("enUS", {
   ["fishj.prof.other"] = "Profession",
   ["fishj.dateFormat"] = "%Y-%m-%d",
   ["fishj.open"] = "Open the catch journal",
+  ["fishj.asWindow"] = "Open as window",
   ["fishj.set.heading"] = "Catch journal",
   ["fishj.set.hint"] = "Command: /fg fishing journal",
 })
@@ -152,11 +154,12 @@ FG.AddLocale("deDE", {
   ["fishj.off"] = "Die Aufzeichnung ist in den Einstellungen der Angelhilfe ausgeschaltet. Es kommt nichts Neues dazu.",
   ["fishj.newer"] = "Die gespeicherten Fänge stammen aus einer neueren Version des Addons. Sie bleiben unberührt und werden nicht angezeigt.",
   ["fishj.hint"] = "Pfeiltasten wählen aus. Eingabe öffnet einen Fundort. V Ansicht, S Sortierung, C Charaktere, / Suche, Esc schließen.",
+  ["fishj.hint.page"] = "Pfeiltasten wählen aus. Eingabe öffnet einen Fundort. V Ansicht, S Sortierung, C Charaktere, / Suche.",
   ["fishj.row.fish"] = "%s, %d gefangen, zuletzt %s, %d Fundorte",
   ["fishj.row.place"] = "%s, %d gefangen, %d Fischarten",
   ["fishj.legend.fish"] = "Balken und Prozent: Anteil an allen Fängen. Ein voller Balken sind 100 %.",
   ["fishj.legend.fishAt"] = "Balken und Prozent: Anteil an den Fängen an diesem Fundort. Ein voller Balken sind 100 %.",
-  ["fishj.legend.places"] = "Balken und Prozent: Fangquote, die Würfe mit einem Fang. Ein voller Balken sind 100 %.",
+  ["fishj.legend.places"] = "Balken und Prozent: Fangquote, der Anteil der Würfe mit einem Fang. Ein voller Balken sind 100 %.",
   ["fishj.bar.fish"] = "Balken: %s aller Fänge (%d von %d). Ein voller Balken sind 100 %%.",
   ["fishj.bar.fishAt"] = "Balken: %s der Fänge in %s (%d von %d). Ein voller Balken sind 100 %%.",
   ["fishj.bar.place"] = "Balken: Fangquote %s, bei %d von %d Würfen gab es einen Fang. Ein voller Balken sind 100 %%.",
@@ -211,6 +214,7 @@ FG.AddLocale("deDE", {
   ["fishj.prof.other"] = "Beruf",
   ["fishj.dateFormat"] = "%d.%m.%Y",
   ["fishj.open"] = "Fangjournal öffnen",
+  ["fishj.asWindow"] = "Als Fenster öffnen",
   ["fishj.set.heading"] = "Fangjournal",
   ["fishj.set.hint"] = "Befehl: /fg angeln journal",
 })
@@ -219,7 +223,8 @@ FG.AddLocale("deDE", {
 
 V.state = { mode = "fish", scope = "account", sort = "name", query = "", place = nil, index = 1 }
 local state = V.state
-local frame
+-- frame is the view that is in use: the floating window or the page (embedded), whichever was shown last.
+local frame, window, page
 
 local function saved()
   local db = fish.Controller and fish.Controller.Saved and fish.Controller.Saved() or nil
@@ -849,46 +854,67 @@ local function textButton(parent, onClick)
   return W.Button(parent, { text = " ", width = BUTTON_W, height = 26, onClick = onClick })
 end
 
-local function create()
-  local f = CreateFrame("Frame", "FGFishJournalWindow", UIParent)
-  f:SetFrameStrata("DIALOG")
-  f:SetToplevel(true)
-  f:SetClampedToScreen(true)
-  f:SetMovable(true)
-  f:SetResizable(true)
-  f:EnableMouse(true)
-  if f.SetResizeBounds then
-    f:SetResizeBounds(MIN_W, MIN_H, 1400, 1000)
+local function create(host)
+  local embedded = host ~= nil
+  local f = CreateFrame("Frame", embedded and nil or "FGFishJournalWindow", host or UIParent)
+  if embedded then
+    f:SetAllPoints(host)
+  else
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:SetResizable(true)
+    f:EnableMouse(true)
+    if f.SetResizeBounds then
+      f:SetResizeBounds(MIN_W, MIN_H, 1400, 1000)
+    end
+    f.bg = f:CreateTexture(nil, "BACKGROUND")
+    f.bg:SetAllPoints()
+    f.shell = FG.WindowShell.Attach(f, { title = "fishj.title", titleHeight = HEAD_H, shadow = true })
+    f.bar = f.shell.titleBar
+    f.close = W.Action(f.bar, { icon = "close", size = 18, tooltip = "fishj.close" })
+    f.close:SetPoint("RIGHT", -2, 0)
+    f.close:SetScript(
+      "OnClick",
+      FG.Wrap("fishj-close", function()
+        f:Hide()
+      end)
+    )
   end
-  f.bg = f:CreateTexture(nil, "BACKGROUND")
-  f.bg:SetAllPoints()
-  f.shell = FG.WindowShell.Attach(f, { title = "fishj.title", titleHeight = HEAD_H, shadow = true })
-  f.bar = f.shell.titleBar
-  f.close = W.Action(f.bar, { icon = "close", size = 18, tooltip = "fishj.close" })
-  f.close:SetPoint("RIGHT", -2, 0)
-  f.close:SetScript(
-    "OnClick",
-    FG.Wrap("fishj-close", function()
-      f:Hide()
-    end)
-  )
-  f.placesButton = W.Button(f.bar, {
+  f.placesButton = W.Button(embedded and f or f.bar, {
     text = " ",
     width = 120,
-    height = 18,
+    height = embedded and 26 or 18,
     onClick = function()
       if fish.PlacesView then
         fish.PlacesView.Toggle()
       end
     end,
   })
-  f.placesButton:SetPoint("RIGHT", f.close, "LEFT", -6, 0)
   W.SetText(f.placesButton.label, nil, L["fishp.open"])
-  f.shell.titleText:ClearAllPoints()
-  f.shell.titleText:SetPoint("LEFT", 8, 0)
-  f.shell.titleText:SetPoint("RIGHT", f.placesButton, "LEFT", -4, 0)
+  if embedded then
+    f.placesButton:SetPoint("TOPRIGHT", -10, -8)
+    -- One view at a time: the main window steps aside so the floating window is the one that refreshes.
+    f.windowButton = W.Button(f, {
+      key = "fishj.asWindow",
+      width = 150,
+      height = 26,
+      opens = true,
+      onClick = function()
+        FG.Main.Hide()
+        V.Open()
+      end,
+    })
+    f.windowButton:SetPoint("RIGHT", f.placesButton, "LEFT", -6, 0)
+  else
+    f.placesButton:SetPoint("RIGHT", f.close, "LEFT", -6, 0)
+    f.shell.titleText:ClearAllPoints()
+    f.shell.titleText:SetPoint("LEFT", 8, 0)
+    f.shell.titleText:SetPoint("RIGHT", f.placesButton, "LEFT", -4, 0)
+  end
 
-  local top = -(HEAD_H + 8)
+  local top = embedded and -8 or -(HEAD_H + 8)
   f.viewButton = textButton(f, function()
     V.SetMode(state.mode == "places" and "fish" or "places")
   end)
@@ -936,7 +962,8 @@ local function create()
   f.hint = W.Text(f, { role = "micro", color = "textMuted", wrap = true })
   f.hint:SetPoint("BOTTOMLEFT", 10, 8)
   f.hint:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -22, 8)
-  f.hint:SetText(L["fishj.hint"])
+  f.hint:SetText(L[embedded and "fishj.hint.page" or "fishj.hint"])
+  f.embedded = embedded
 
   f.list = W.ScrollList(f, { rowHeight = ROW_H, createRow = createRow, bindRow = bindRow })
   f.list:SetPoint("TOPLEFT", f.legend, "BOTTOMLEFT", 0, -6)
@@ -961,64 +988,72 @@ local function create()
     FG.PropagateKeys(self, not handled)
   end)
 
-  local grip = CreateFrame("Button", nil, f)
-  grip:SetSize(14, 14)
-  grip:SetPoint("BOTTOMRIGHT", -1, 1)
-  grip:SetFrameLevel(f:GetFrameLevel() + 10)
-  local tex = grip:CreateTexture(nil, "OVERLAY")
-  tex:SetAllPoints()
-  tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-  grip:SetScript("OnMouseDown", function()
-    f:StartSizing("BOTTOMRIGHT")
-  end)
-  grip:SetScript(
-    "OnMouseUp",
-    FG.Wrap("fishj-size", function()
-      f:StopMovingOrSizing()
-      remember(f)
-      V.Refresh()
+  if not embedded then
+    local grip = CreateFrame("Button", nil, f)
+    grip:SetSize(14, 14)
+    grip:SetPoint("BOTTOMRIGHT", -1, 1)
+    grip:SetFrameLevel(f:GetFrameLevel() + 10)
+    local tex = grip:CreateTexture(nil, "OVERLAY")
+    tex:SetAllPoints()
+    tex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    grip:SetScript("OnMouseDown", function()
+      f:StartSizing("BOTTOMRIGHT")
     end)
-  )
-  grip:SetScript("OnEnter", function(self)
-    FG.ShowTooltip(self, L["fishj.grip"])
-  end)
-  grip:SetScript("OnLeave", FG.HideTooltip)
-  f.grip = grip
+    grip:SetScript(
+      "OnMouseUp",
+      FG.Wrap("fishj-size", function()
+        f:StopMovingOrSizing()
+        remember(f)
+        V.Refresh()
+      end)
+    )
+    grip:SetScript("OnEnter", function(self)
+      FG.ShowTooltip(self, L["fishj.grip"])
+    end)
+    grip:SetScript("OnLeave", FG.HideTooltip)
+    f.grip = grip
 
-  f.styleParts = {
-    bg = { f.bg },
-    bars = { f.shell.barFill },
-    border = f.shell.border,
-    shadow = f.shell.shadow,
-    chrome = { f.bar, grip },
-  }
-  f.bar:EnableMouse(true)
-  f.bar:RegisterForDrag("LeftButton")
-  f.bar:SetScript("OnDragStart", function()
-    WS.Hold(f, "move", true)
-    f:StartMoving()
-  end)
-  f.bar:SetScript(
-    "OnDragStop",
-    FG.Wrap("fishj-move", function()
-      f:StopMovingOrSizing()
-      WS.Hold(f, "move", false)
-      remember(f)
+    f.styleParts = {
+      bg = { f.bg },
+      bars = { f.shell.barFill },
+      border = f.shell.border,
+      shadow = f.shell.shadow,
+      chrome = { f.bar, grip },
+    }
+    f.bar:EnableMouse(true)
+    f.bar:RegisterForDrag("LeftButton")
+    f.bar:SetScript("OnDragStart", function()
+      WS.Hold(f, "move", true)
+      f:StartMoving()
     end)
-  )
-  FG.WindowShell.RegisterEsc(f, function()
-    if state.query ~= "" then
-      f.search.edit:SetText("")
-      V.SetQuery("")
-    else
-      f:Hide()
-    end
-  end)
+    f.bar:SetScript(
+      "OnDragStop",
+      FG.Wrap("fishj-move", function()
+        f:StopMovingOrSizing()
+        WS.Hold(f, "move", false)
+        remember(f)
+      end)
+    )
+    FG.WindowShell.RegisterEsc(f, function()
+      if state.query ~= "" then
+        f.search.edit:SetText("")
+        V.SetQuery("")
+      else
+        f:Hide()
+      end
+    end)
+  end
   f:SetScript("OnShow", function()
+    if embedded and window then
+      window:Hide()
+    end
+    frame = f
     V.Refresh()
   end)
   f:SetScript("OnHide", fish.Game.StopNameWatch)
-  f:Hide()
+  if not embedded then
+    f:Hide()
+  end
   return f
 end
 
@@ -1032,31 +1067,40 @@ function V.Frame()
   return frame
 end
 
--- Opens the window. Not in combat: the window needs no protected call, it only stays out of the way.
+-- Opens the floating window. Not in combat: the window needs no protected call, it only stays out of the way.
 function V.Open()
-  if not frame then
-    frame = create()
+  if not window then
+    window = create()
   end
-  place(frame)
-  WS.Apply(frame, WS.Resolve("fishjournal", nil), frame.styleParts)
-  frame:Show()
-  frame:Raise()
+  frame = window
+  place(window)
+  WS.Apply(window, WS.Resolve("fishjournal", nil), window.styleParts)
+  window:Show()
+  window:Raise()
   V.Refresh()
-  return frame
+  return window
 end
 
 function V.Hide()
-  if frame then
-    frame:Hide()
+  if window then
+    window:Hide()
   end
 end
 
 function V.Toggle()
-  if V.IsShown() then
+  if window and window:IsShown() then
     V.Hide()
   else
     V.Open()
   end
+end
+
+-- The journal as a part of a page: fills `host` and follows it. The window closes while the page shows it.
+function V.Embed(host)
+  if not page then
+    page = create(host)
+  end
+  return page
 end
 
 -- A catch was recorded or a name arrived: the open window follows.
@@ -1083,7 +1127,11 @@ end)
 -- The language changed.
 FG.On("FG_LOCALE_CHANGED", function()
   if frame then
-    frame.hint:SetText(L["fishj.hint"])
+    for _, f in ipairs({ window or false, page or false }) do
+      if f then
+        f.hint:SetText(L[f.embedded and "fishj.hint.page" or "fishj.hint"])
+      end
+    end
     if V.IsShown() then
       V.Refresh()
     end

@@ -423,9 +423,9 @@ ns.AddLocale(
     ["areas.defaultName"] = "Fenster %d",
     ["areas.el.cooldown"] = "Abklingzeit",
     ["areas.el.aura"] = "Aura",
-    ["areas.el.itemcount"] = "Gegenstandsanzahl",
+    ["areas.el.itemcount"] = "Item-Anzahl",
     ["areas.preset.cooldown"] = "Eine Abklingzeit",
     ["areas.preset.aura"] = "Eine Aura",
-    ["areas.preset.itemcount"] = "Eine Gegenstandsanzahl",
+    ["areas.preset.itemcount"] = "Eine Item-Anzahl",
   })
 )

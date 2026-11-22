@@ -17,14 +17,28 @@ local CONTROL_GAP = 12
 local ROW_GAP = 8
 local DROPDOWN_W, SEARCH_W, SOURCE_W, TOGGLE_W, SKILL_W = 220, 200, 150, 190, 380
 local STRIP_H = 10
+local PROFESSION_ICON = {
+  alchemy = "Trade_Alchemy",
+  blacksmithing = "Trade_BlackSmithing",
+  cooking = "INV_Misc_Food_15",
+  enchanting = "Trade_Engraving",
+  engineering = "Trade_Engineering",
+  ["first-aid"] = "Spell_Holy_SealOfSacrifice",
+  fishing = "Trade_Fishing",
+  herbalism = "Trade_Herbalism",
+  leatherworking = "Trade_LeatherWorking",
+  mining = "Trade_Mining",
+  skinning = "INV_Misc_Pelt_Wolf_01",
+  tailoring = "Trade_Tailoring",
+}
 local WIDE = 560
 local SPLIT_GAP = 14
 local MIN_ROWS = 8
-local ICON = 18
+local SHARE_SIZE = 20
 local ORIGIN_SIZE = 14
 local FALLBACK_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local ADD_H, ADD_QTY_W = 24, 60
-local FIN_QTY_W, NAME_MIN = 44, 140 -- amount field of the "add finished item" button, narrowest name
+local FIN_QTY_W = 44 -- amount field of the "add finished item" button
 local SMALL_W = 160 -- the button of the small shopping list
 
 ns.AddLocale("enUS", {
@@ -96,9 +110,9 @@ ns.AddLocale("enUS", {
   ["recipes.st.exalted"] = "Exalted",
   ["recipes.item"] = "Item %d",
   ["recipes.reagents"] = "Reagents",
-  ["recipes.reagentCount"] = "%dx, have %d",
   ["recipes.crafts"] = "Craftable: %dx",
-  ["recipes.knownBy"] = "Learned by: %s",
+  ["recipes.durHours"] = "%d h",
+  ["recipes.durMinutes"] = "%d min",
   ["recipes.learned"] = "Learned: %s",
   ["recipes.changedNote"] = "Changed against Classic",
   ["recipes.removedNote"] = "Removed in Forever",
@@ -114,6 +128,22 @@ ns.AddLocale("enUS", {
   ["recipes.addFinished"] = "Add finished",
   ["recipes.addedMats"] = "%s: %d materials added to the shopping list.",
   ["recipes.addFinishedTitle"] = "Add finished item to shopping list",
+  ["recipes.card.details"] = "Details",
+  ["recipes.kv.skill"] = "Skill",
+  ["recipes.kv.use"] = "Use",
+  ["recipes.kv.spec"] = "Specialization",
+  ["recipes.kv.cooldown"] = "Cooldown",
+  ["recipes.kv.source"] = "Learned from",
+  ["recipes.kv.known"] = "Known by",
+  ["recipes.haveNeed"] = "Have / need",
+  ["recipes.skillLine"] = "Your skill: %d/%d",
+  ["recipes.skillNone"] = "You do not have this profession",
+  ["recipes.counts"] = "%d recipes, %d known",
+  ["recipes.legend.known"] = "I know it",
+  ["recipes.legend.alt"] = "Another character knows it",
+  ["recipes.legend.bands"] = "Skill colors:",
+  ["recipes.rowSkill"] = "Learn at skill %d",
+  ["recipes.vendorTip"] = "Opens the vendor page.",
   ["recipes.addFinishedTip"] = "Adds the item this recipe makes as a position to buy at the auction house. Switch it to Craft in the list to see its materials.",
 })
 ns.AddLocale("deDE", {
@@ -121,10 +151,10 @@ ns.AddLocale("deDE", {
   ["recipes.profession"] = "Beruf",
   ["recipes.search"] = "Suche",
   ["recipes.searchPh"] = "Rezeptname",
-  ["recipes.source"] = "Gelehrt von",
+  ["recipes.source"] = "Gelernt bei",
   ["recipes.src.all"] = "Alle",
   ["recipes.src.t"] = "Lehrer",
-  ["recipes.src.i"] = "Rezept-Item",
+  ["recipes.src.i"] = "Rezeptitem",
   ["recipes.src.u"] = "Unbekannt",
   ["recipes.changed"] = "Classic-Änderungen",
   ["recipes.changedTip"] = "Nur Rezepte, die sich gegenüber Classic ändern.",
@@ -132,11 +162,11 @@ ns.AddLocale("deDE", {
   ["recipes.learnableTip"] = "Nur Rezepte, die du beim gewählten Skill lernen kannst.",
   ["recipes.unknown"] = "Nur unbekannte",
   ["recipes.unknownTip"] = "Blendet Rezepte aus, die dieser Charakter kennt.",
-  ["recipes.removed"] = "Entfernte zeigen",
+  ["recipes.removed"] = "Entfernte anzeigen",
   ["recipes.removedTip"] = "Zeigt auch Rezepte, die in Forever entfernt sind.",
   ["recipes.skill"] = "Skill",
   ["recipes.count"] = "%d von %d Rezepten",
-  ["recipes.noneKnown"] = "Berufefenster öffnen erfasst deine Rezepte",
+  ["recipes.noneKnown"] = "Öffne das Berufsfenster, um deine Rezepte zu erfassen",
   ["recipes.empty"] = "Keine Treffer.",
   ["recipes.pick"] = "Rezept wählen.",
   ["recipes.other"] = "Sonstige",
@@ -145,12 +175,12 @@ ns.AddLocale("deDE", {
   ["recipes.band.green"] = "Grün",
   ["recipes.band.gray"] = "Grau",
   ["recipes.band.locked"] = "Noch nicht lernbar",
-  ["recipes.band.none"] = "Ohne Skill-Angabe",
+  ["recipes.band.none"] = "Ohne Skillangabe",
   ["recipes.bandAt"] = "Bei Skill %d: %s",
   ["recipes.bandsTip"] = "Farben des gewählten Rezepts",
   ["recipes.srcTrainer"] = "Lehrer",
   ["recipes.srcTrainerRank"] = "Lehrer (%s)",
-  ["recipes.srcItem"] = "Rezept-Item",
+  ["recipes.srcItem"] = "Rezeptitem",
   ["recipes.srcUnknown"] = "Quelle unbekannt",
   ["recipes.src.favor"] = "Händlergunst",
   ["recipes.src.rep"] = "Rufhändler",
@@ -160,7 +190,7 @@ ns.AddLocale("deDE", {
   ["recipes.src.quest"] = "Questbelohnung",
   ["recipes.src.object"] = "Weltobjekt",
   ["recipes.src.dungeon"] = "Dungeonbeute",
-  ["recipes.src.unknown"] = "Quelle offen",
+  ["recipes.src.unknown"] = "Quelle unbekannt",
   ["recipes.tip.a"] = "Allianz",
   ["recipes.tip.h"] = "Horde",
   ["recipes.tip.b"] = "Beide Fraktionen",
@@ -172,7 +202,7 @@ ns.AddLocale("deDE", {
   ["recipes.tip.dungeon"] = "Dungeon: %s",
   ["recipes.tip.boss"] = "Boss: %s",
   ["recipes.tip.object"] = "Objekt: %s",
-  ["recipes.tip.drops"] = "Droppt von:",
+  ["recipes.tip.drops"] = "Beute von:",
   ["recipes.tip.level"] = "Gegner der Stufe %d bis %d",
   ["recipes.tip.levelOne"] = "Gegner der Stufe %d",
   ["recipes.st.hated"] = "Hasserfüllt",
@@ -185,9 +215,9 @@ ns.AddLocale("deDE", {
   ["recipes.st.exalted"] = "Ehrfürchtig",
   ["recipes.item"] = "Item %d",
   ["recipes.reagents"] = "Reagenzien",
-  ["recipes.reagentCount"] = "%dx, Besitz %d",
   ["recipes.crafts"] = "Herstellbar: %dx",
-  ["recipes.knownBy"] = "Gelernt von: %s",
+  ["recipes.durHours"] = "%d Std.",
+  ["recipes.durMinutes"] = "%d Min.",
   ["recipes.learned"] = "Gelernt: %s",
   ["recipes.changedNote"] = "Geändert gegenüber Classic",
   ["recipes.removedNote"] = "In Forever entfernt",
@@ -203,7 +233,23 @@ ns.AddLocale("deDE", {
   ["recipes.addFinished"] = "Fertig hinzufügen",
   ["recipes.addedMats"] = "%s: %d Materialien zur Einkaufsliste hinzugefügt.",
   ["recipes.addFinishedTitle"] = "Fertiges Item zur Einkaufsliste hinzufügen",
-  ["recipes.addFinishedTip"] = "Fügt das Item, das dieses Rezept herstellt, als Position zum Kauf im Auktionshaus hinzu. In der Liste auf Herst. umstellen, um die Materialien zu sehen.",
+  ["recipes.card.details"] = "Details",
+  ["recipes.kv.skill"] = "Skill",
+  ["recipes.kv.use"] = "Benutzen",
+  ["recipes.kv.spec"] = "Spezialisierung",
+  ["recipes.kv.cooldown"] = "Abklingzeit",
+  ["recipes.kv.source"] = "Gelernt bei",
+  ["recipes.kv.known"] = "Bekannt bei",
+  ["recipes.haveNeed"] = "Vorhanden / nötig",
+  ["recipes.skillLine"] = "Dein Skill: %d/%d",
+  ["recipes.skillNone"] = "Du hast diesen Beruf nicht",
+  ["recipes.counts"] = "%d Rezepte, %d bekannt",
+  ["recipes.legend.known"] = "Ich kenne es",
+  ["recipes.legend.alt"] = "Ein anderer Charakter kennt es",
+  ["recipes.legend.bands"] = "Skillfarben:",
+  ["recipes.rowSkill"] = "Lernbar ab Skill %d",
+  ["recipes.vendorTip"] = "Öffnet die Händlerseite.",
+  ["recipes.addFinishedTip"] = "Fügt das Item, das dieses Rezept herstellt, als Position zum Kauf im Auktionshaus hinzu. Stelle es in der Liste auf Herstellen um, um die Materialien zu sehen.",
 })
 
 -- Game helpers ---------------------------------------------------------------------------------------
@@ -258,11 +304,11 @@ end
 local function chatLink(r, name)
   if r.i then
     local _, link = call(itemApi("GetItemInfo") or rawget(_G, "GetItemInfo"), r.i)
-    return type(link) == "string" and link ~= "" and link or string.format("|Hitem:%d|h[%s]|h", r.i, name)
+    return type(link) == "string" and link ~= "" and link or ("[" .. name .. "]")
   end
   local api = rawget(_G, "C_Spell")
   local link = call(type(api) == "table" and api.GetSpellLink or rawget(_G, "GetSpellLink"), r.s)
-  return type(link) == "string" and link ~= "" and link or string.format("|Hspell:%d|h[%s]|h", r.s, name)
+  return type(link) == "string" and link ~= "" and link or ("[" .. name .. "]")
 end
 
 -- Into the open chat edit box, else opens the chat with the link in it.
@@ -284,8 +330,21 @@ local function shiftDown()
   return type(IsShiftKeyDown) == "function" and IsShiftKeyDown() == true
 end
 
+-- Color of a skill band: the AA-checked difficulty palette, else the logic's own colors (locked, none).
+local function bandColor(band)
+  local hexColor = Theme.difficulty[band]
+  if hexColor then
+    return hexColor
+  end
+  return band == "locked" and "statDown" or "textMuted"
+end
+
 local function hex(band)
   local c = R.COLORS[band] or R.COLORS.none
+  local own = Theme.difficulty[band]
+  if own then
+    return "|cff" .. own:sub(2)
+  end
   return string.format(
     "|cff%02x%02x%02x",
     math.floor(c[1] * 255 + 0.5),
@@ -307,6 +366,30 @@ local function bandsText(sk)
     end
   end
   return table.concat(parts, "  ")
+end
+
+-- Rows of the Use, Specialization and Cooldown facts as { key, value }.
+local function needRows(r, data)
+  local needs = R.Needs(r, data, lang())
+  local rows, what = {}, {}
+  for _, name in ipairs(needs.tools or {}) do
+    what[#what + 1] = name
+  end
+  what[#what + 1] = needs.station
+  if #what > 0 then
+    rows[#rows + 1] = { key = "recipes.kv.use", value = table.concat(what, ", ") }
+  end
+  if needs.spec then
+    rows[#rows + 1] = { key = "recipes.kv.spec", value = needs.spec }
+  end
+  if needs.cooldown then
+    local value, unit = R.Duration(needs.cooldown)
+    rows[#rows + 1] = {
+      key = "recipes.kv.cooldown",
+      value = string.format(L[unit == "h" and "recipes.durHours" or "recipes.durMinutes"], value),
+    }
+  end
+  return rows
 end
 
 -- Stock of the current character { [itemId] = n }, empty without a snapshot.
@@ -369,14 +452,17 @@ local function openRecipe(d, made)
   ns.Router:navigate("professions/" .. made.slug .. "/" .. made.recipe.s)
 end
 
-local function newItemLine(parent)
-  local b = CreateFrame("Button", nil, parent)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
-  b.icon:SetSize(ICON, ICON)
+local function newItemLine(parent, host)
+  local b = CreateFrame("Button", nil, host or parent)
+  b.icon = K.IconFrame(b, { size = Theme.size.iconFrame.sm })
   b.icon:SetPoint("LEFT", 0, 0)
-  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  b.right = W.Text(b, { role = "micro", color = "textSecondary", justify = "RIGHT" })
+  b.right = W.Meta(b, { justify = "RIGHT" })
   b.right:SetPoint("RIGHT", -4, 0)
+  b.vendorLink = ns.VendorsPage.Link(b, b.right)
+  -- Next to the have / need numbers: a check mark once the stock covers the need (the numbers stay the cue).
+  b.check = W.CheckMark(b, 12, "statUp")
+  b.check:SetPoint("RIGHT", b.right, "LEFT", -4, 0)
+  b.check:Hide()
   -- Marks a reagent that a recipe makes: a click opens that recipe.
   b.go = b:CreateTexture(nil, "ARTWORK")
   b.go:SetSize(12, 12)
@@ -395,13 +481,17 @@ local function newItemLine(parent)
   b:SetScript("OnLeave", ns.HideTooltip)
   b.sel = b:CreateTexture(nil, "BACKGROUND")
   b.sel:SetAllPoints()
-  b.sel:SetColorTexture(1, 1, 1, 0.08)
+  b.sel:SetColorTexture(Theme.fillColor("hover"))
   b.sel:Hide()
   b:SetScript(
     "OnClick",
-    ns.Wrap("recipes-item-line", function(self)
+    ns.Wrap("recipes-item-line", function(self, button)
+      -- Shift+click links the item (a name known from the data stands in while it is not cached), Ctrl+click
+      -- previews it.
       if shiftDown() and self.id then
-        insertChatLink(self.link or string.format("|Hitem:%d|h[%s]|h", self.id, self.label or tostring(self.id)))
+        insertChatLink(self.link or ("[" .. (self.label or tostring(self.id)) .. "]"))
+      elseif ns.ItemActions.Click(self.id, button) then
+        return
       elseif self.producers then
         openRecipe(parent, self.producers[1])
       elseif self.id then
@@ -444,40 +534,67 @@ local function madeEntry(r)
   return { id = r.i, de = type(r.n) == "table" and r.n[1] or nil, en = type(r.n) == "table" and r.n[2] or nil }
 end
 
+local layoutDetails, layoutReagents
+
 local function newDetail(parent)
   local d = CreateFrame("Frame", nil, parent)
   d.pick = W.Text(d, { role = "ui", color = "textMuted", wrap = true })
-  d.icon = d:CreateTexture(nil, "ARTWORK")
-  d.icon:SetSize(32, 32)
-  d.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  d.name = W.Text(d, { role = "h3", family = "heading", wrap = true })
+  -- Hero: square item portrait with its quality edge, name, band at the chosen skill, who knows it, tags and the
+  -- star and share icon at the top right.
+  d.hero = K.Hero(d, {})
+  d.name = d.hero.title
+  d.actions = CreateFrame("Frame", nil, d.hero)
+  d.star = ns.WishlistStar.Create(d.actions, function()
+    return d.recipe and d.recipe.i or nil
+  end)
+  d.star:SetPoint("LEFT", 0, 0)
+  -- Page link of this recipe (professions/<slug>/<spell ID>).
+  d.share = ns.PageShare.Button(d.actions, {})
+  d.share:SetPoint("LEFT", d.star, "RIGHT", 6, 0)
+  d.actions:SetSize(ns.WishlistStar.SIZE + 6 + d.share:GetWidth(), math.max(ns.WishlistStar.SIZE, d.share:GetHeight()))
+  d.hero:SetActions(d.actions)
+  -- The hit area over portrait and name: tooltip, shift+click links, click picks the item the recipe makes.
   d.nameButton = CreateFrame("Button", nil, d)
   d.nameButton:SetScript("OnEnter", function(self)
     if d.recipe then
-      P.ShowTooltip(self, d.recipe)
+      P.ShowTooltip(self, d.recipe, d.skill)
     end
   end)
   d.nameButton:SetScript("OnLeave", ns.HideTooltip)
   d.nameButton:SetScript(
     "OnClick",
-    ns.Wrap("recipes-name", function()
+    ns.Wrap("recipes-name", function(_, button)
       if shiftDown() and d.recipe then
         insertChatLink(chatLink(d.recipe, R.Name(d.recipe, lang())))
+      elseif d.recipe and ns.ItemActions.Click(d.recipe.i, button) then
+        return
       elseif d.recipe and d.recipe.i then
         d:Select(d.recipe.i)
       end
     end)
   )
   ns.Focus.register(d.nameButton, function() end)
-  d.bands = W.Text(d, { role = "ui", wrap = true })
-  d.bandNow = W.Text(d, { role = "ui", wrap = true })
-  d.source = W.Text(d, { role = "ui", color = "textSecondary", wrap = true })
-  d.notes = W.Text(d, { role = "ui", color = "accent2", wrap = true })
-  d.known = W.Text(d, { role = "ui", color = "textSecondary", wrap = true })
-  d.crafts = W.Text(d, { role = "ui", color = "textSecondary", wrap = true })
-  d.reagentHead = W.Text(d, { key = "recipes.reagents", role = "h3", family = "heading", color = "accent2" })
   d.hint = W.Text(d, { key = "recipes.linkHint", role = "micro", color = "textMuted", wrap = true })
   d.lines = {}
+  -- DETAILS card: skill colors, use, learned from (with the pattern items and vendor links), crafters.
+  d.detailsCard = K.SectionCard(d, {
+    key = "recipes.card.details",
+    body = function(width)
+      return layoutDetails(d, width)
+    end,
+  })
+  d.kv = K.KeyValue(d.detailsCard.body, {})
+  -- Opens the list of the guild members that can make the recipe (CraftersView).
+  d.crafters = ns.CraftersView.Action(d.detailsCard.body, { key = "cv.button", id = "recipes-crafters" })
+  d.crafters:Hide()
+  -- REAGENTS card: have / need per reagent, what the stock allows.
+  d.reagentCard = K.SectionCard(d, {
+    key = "recipes.reagents",
+    body = function(width)
+      return layoutReagents(d, width)
+    end,
+  })
+  d.crafts = W.Text(d.reagentCard.body, { role = "ui", color = "textSecondary", wrap = true })
   -- The item picked by a click (a reagent, a recipe item or the item the recipe makes) and the bar that
   -- adds it to the shopping list.
   d.addHint = W.Text(d, { key = "recipes.addHint", role = "micro", color = "textMuted", wrap = true })
@@ -524,9 +641,6 @@ local function newDetail(parent)
   d.finished.button:SetPoint("TOPLEFT", d.finished.qty, "TOPRIGHT", 6, 0)
   d.finished:SetHeight(ADD_H)
   d.finished:Hide()
-  -- Opens the list of the guild members that can make the recipe (CraftersView).
-  d.crafters = ns.CraftersView.Action(d, { key = "cv.button", id = "recipes-crafters" })
-  d.crafters:Hide()
   function d:Select(id)
     self.target = id
     self:ShowTarget()
@@ -608,24 +722,34 @@ local function newDetail(parent)
   return d
 end
 
-local function line(d, i)
+local function line(d, i, host)
   local b = d.lines[i]
   if not b then
-    b = newItemLine(d)
+    b = newItemLine(d, host)
     d.lines[i] = b
   end
+  b:SetParent(host)
   b.producers = nil
   b.go:Hide()
+  b.check:Hide()
   return b
+end
+
+-- Quality edge of the portrait: the quality color of the item the recipe makes, nil when it is not cached.
+local function qualityEdge(r)
+  local q = r.i and ns.ItemInfo.quality(r.i)
+  local hexColor = q and ns.ItemInfo.qualityHex(q)
+  return hexColor and ("#" .. hexColor) or nil
 end
 
 -- Fills the detail for one recipe; ctx: { data, own (skill), known (set of the character), skill }.
 local function paintDetail(d, r, ctx)
   d.recipe = r
+  d.skill = ctx.skill
+  d.share:SetTarget(r and ctx.slug and ("professions/" .. ctx.slug .. "/" .. r.s) or nil)
+  d.star:Refresh()
   d.pick:SetShown(r == nil)
-  local widgets =
-    { d.icon, d.name, d.nameButton, d.bands, d.bandNow, d.source, d.notes, d.known, d.crafts, d.reagentHead, d.hint }
-  for _, w in ipairs(widgets) do
+  for _, w in ipairs({ d.hero, d.nameButton, d.detailsCard, d.reagentCard, d.hint }) do
     w:SetShown(r ~= nil)
   end
   -- Only a recipe that makes an item can be bought finished (spell-only recipes make none).
@@ -647,51 +771,51 @@ local function paintDetail(d, r, ctx)
     d.targetFor, d.target = r.s, r.i
   end
   local name = ns.ItemInfo.spellName(r.s, R.Name(r, lang()))
-  d.icon:SetTexture(recipeIcon(r))
-  d.name:SetText(name)
-  d.bands:SetText(bandsText(r.sk))
   local band = R.Band(r.sk, ctx.skill)
-  d.bandNow:SetText(string.format(L["recipes.bandAt"], ctx.skill, hex(band) .. bandName(band) .. "|r"))
+  d.hero:SetPortrait({ texture = recipeIcon(r), shape = "square", edge = qualityEdge(r), name = name })
+  d.hero:SetTitle(name)
+  d.hero:SetSubtitle(string.format(L["recipes.bandAt"], ctx.skill, hex(band) .. bandName(band) .. "|r"))
+  local names = {}
+  for _, o in ipairs(Known.Owners(r.s)) do
+    names[#names + 1] = o.name
+  end
+  d.hero:SetAttrs(#names > 0 and { { label = L["recipes.kv.known"], value = table.concat(names, ", ") } } or nil)
+  local tags = {}
+  if r.ch then
+    tags[#tags + 1] = { text = L["recipes.changedNote"], color = "accent2" }
+  end
+  if r.rm then
+    tags[#tags + 1] = { text = L["recipes.removedNote"], color = "warning" }
+  end
+  d.hero:SetTags(tags)
+  -- DETAILS rows: skill colors with word and number, what the recipe needs, where it is learned.
+  local rows = { { key = "recipes.kv.skill", value = bandsText(r.sk) } }
+  for _, row in ipairs(needRows(r, ctx.data)) do
+    rows[#rows + 1] = row
+  end
+  for _, row in ipairs(P.SourceRows(r)) do
+    rows[#rows + 1] = row
+  end
+  d.kv:SetRows(rows)
   local used = 0
-  -- Source: trainer with rank, recipe items (names from the client), or unknown.
-  local kind = R.SourceKind(r)
-  local sourceText = L["recipes.srcUnknown"]
-  if kind == "t" then
-    local rank = r.rank and L["profroute.rank." .. r.rank]
-    sourceText = rank and rank ~= "profroute.rank." .. r.rank and string.format(L["recipes.srcTrainerRank"], rank)
-      or L["recipes.srcTrainer"]
-  elseif kind == "i" then
-    sourceText = L["recipes.srcItem"]
+  if R.SourceKind(r) == "i" then
     for _, id in ipairs(type(r.pat) == "table" and r.pat or {}) do
       if type(id) == "number" then
         used = used + 1
-        local b = line(d, used)
+        local b = line(d, used, d.detailsCard.body)
         local label = clientItemName(id) or string.format(L["recipes.item"], id)
         b.id, b.label, b.link, b.entry = id, label, nil, { id = id }
         b.icon:SetTexture(itemIcon(id) or FALLBACK_ICON)
         b.name:SetText(ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(id)))
         local best = ns.VendorSource and ns.VendorSource.Best(id)
-        b.right:SetText(best and best.seller.vendor.name or "")
+        b.right:SetText(best and ns.VendorLogic.Name(best.seller.vendor) or "")
+        W.SetColor(b.right, "textSecondary")
+        b.vendorLink:SetNpc(best and best.seller.vendor.npc or nil)
         b:Show()
         d.layout.patterns[#d.layout.patterns + 1] = b
       end
     end
   end
-  d.source:SetText(sourceText)
-  local notes = {}
-  if r.ch then
-    notes[#notes + 1] = L["recipes.changedNote"]
-  end
-  if r.rm then
-    notes[#notes + 1] = L["recipes.removedNote"]
-  end
-  d.notes:SetText(table.concat(notes, "\n"))
-  local owners = Known.Owners(r.s)
-  local names = {}
-  for _, o in ipairs(owners) do
-    names[#names + 1] = o.name
-  end
-  d.known:SetText(#names > 0 and string.format(L["recipes.knownBy"], table.concat(names, ", ")) or "")
   -- Reagents with the stock of this character.
   local reagents, crafts = R.Reagents(r.mats, ctx.stock)
   d.crafts:SetText(crafts and crafts > 0 and string.format(L["recipes.crafts"], crafts) or "")
@@ -699,7 +823,7 @@ local function paintDetail(d, r, ctx)
   d.items = items
   for _, m in ipairs(reagents) do
     used = used + 1
-    local b = line(d, used)
+    local b = line(d, used, d.reagentCard.body)
     local info = items[m.id] or {}
     local label = ns.ItemInfo.name(m.id, { de = info.de, en = info.en }, string.format(L["recipes.item"], m.id))
     b.id, b.label, b.link = m.id, label, nil
@@ -708,16 +832,78 @@ local function paintDetail(d, r, ctx)
     b.entry = { id = m.id, de = info.de, en = info.en, icon = info.ico }
     b.icon:SetTexture(iconPath(info.ico) or itemIcon(m.id) or FALLBACK_ICON)
     b.name:SetText(ns.ItemInfo.ColorName(label, ns.ItemInfo.quality(m.id)))
-    b.right:SetText(string.format(L["recipes.reagentCount"], m.need, m.have))
+    -- Have / need: green with a check mark once the stock covers the need, else the lighter red.
+    local enough = m.have >= m.need
+    b.right:SetText(string.format("%d / %d", m.have, m.need))
+    W.SetColor(b.right, enough and "statUp" or "statDown")
+    b.check:SetShown(enough)
+    b.vendorLink:SetNpc(nil)
     b:Show()
     d.layout.reagents[#d.layout.reagents + 1] = b
   end
-  d.reagentHead:SetShown(#reagents > 0)
+  d.reagentCard:SetShown(#reagents > 0)
+  d.reagentCard:SetSub(L["recipes.haveNeed"])
   for i = used + 1, #d.lines do
     d.lines[i]:Hide()
   end
   d.layout.used = used
   d:ShowTarget()
+end
+
+local function lineRowH()
+  return K.scaledHeight(26)
+end
+
+-- Places an item line and anchors its chevron left of what sits at its right.
+local function layoutLine(b, y, width, rowH)
+  b:ClearAllPoints()
+  b:SetPoint("TOPLEFT", 0, -y)
+  b:SetSize(math.max(40, width), rowH)
+  local last = b.check:IsShown() and b.check or b.right
+  b.go:ClearAllPoints()
+  b.go:SetPoint("RIGHT", last, "LEFT", -4, 0)
+end
+
+-- Body of the DETAILS card: the facts, then the pattern items of a recipe item, then the crafters button.
+function layoutDetails(d, width)
+  d.kv:ClearAllPoints()
+  d.kv:SetPoint("TOPLEFT", d.detailsCard.body, "TOPLEFT", 0, 0)
+  local y = d.kv:fgLayout(width)
+  local rowH = lineRowH()
+  if #d.layout.patterns > 0 then
+    y = y + 6
+    for _, b in ipairs(d.layout.patterns) do
+      layoutLine(b, y, width, rowH)
+      y = y + rowH
+    end
+  end
+  if d.crafters:IsShown() then
+    y = y + 8
+    d.crafters:ClearAllPoints()
+    d.crafters:SetPoint("TOPLEFT", d.detailsCard.body, "TOPLEFT", 0, -y)
+    d.crafters:SetWidth(math.min(width, d.crafters:Fit(width)))
+    y = y + d.crafters:GetHeight()
+  end
+  return y
+end
+
+-- Body of the REAGENTS card: one line per reagent, then what the stock allows.
+function layoutReagents(d, width)
+  local rowH = lineRowH()
+  local y = 0
+  for _, b in ipairs(d.layout.reagents) do
+    layoutLine(b, y, width, rowH)
+    y = y + rowH
+  end
+  local text = d.crafts:GetText()
+  local h = text ~= nil and text ~= "" and W.FitLabel(d.crafts, width) or 0
+  d.crafts:SetShown(h > 0)
+  if h > 0 then
+    d.crafts:ClearAllPoints()
+    d.crafts:SetPoint("TOPLEFT", d.reagentCard.body, "TOPLEFT", 0, -(y + 6))
+    y = y + 6 + h
+  end
+  return y
 end
 
 -- Places the detail widgets from the top and returns the height; the wrapped texts get their width
@@ -730,74 +916,31 @@ local function layoutDetail(d, width)
   if not d.recipe then
     return math.max(d.pick:GetStringHeight(), 16)
   end
-  local y = 0
-  local function text(fs, gap)
-    fs:ClearAllPoints()
-    fs:SetPoint("TOPLEFT", 0, -y)
-    fs:SetWidth(width)
-    local h = fs:GetText() ~= nil and fs:GetText() ~= "" and fs:GetStringHeight() or 0
-    fs:SetShown(h > 0)
-    y = y + (h > 0 and h + (gap or 6) or 0)
-  end
-  -- The "add finished item" controls sit right of the name when the name keeps its minimum width, else
-  -- on a row of their own below it.
-  local fin, beside = d.finished, false
+  local gap = Theme.space.md
+  d.hero:ClearAllPoints()
+  d.hero:SetPoint("TOPLEFT", d, "TOPLEFT", 0, 0)
+  local heroH = d.hero:fgLayout(width)
+  local actionsW = d.actions:GetWidth() + Theme.space.sm
+  d.nameButton:ClearAllPoints()
+  d.nameButton:SetPoint("TOPLEFT", d, "TOPLEFT", 0, 0)
+  d.nameButton:SetSize(math.max(20, width - actionsW), math.max(20, heroH))
+  local y = heroH + gap
+  local fin = d.finished
   if fin:IsShown() then
-    local room = width - 40 - NAME_MIN - 8 - FIN_QTY_W - 6
     local button = fin.button
-    beside = room >= button.fgSide
-    button:SetWidth(button:Fit(beside and room or width - FIN_QTY_W - 6))
+    button:SetWidth(button:Fit(math.max(60, width - FIN_QTY_W - 6)))
     fin:SetSize(FIN_QTY_W + 6 + button:GetWidth(), ADD_H)
     fin:ClearAllPoints()
+    fin:SetPoint("TOPLEFT", d, "TOPLEFT", 0, -y)
+    y = y + ADD_H + gap
   end
-  local nameW = width - 40 - (beside and fin:GetWidth() + 8 or 0)
-  d.icon:ClearAllPoints()
-  d.icon:SetPoint("TOPLEFT", 0, 0)
-  d.name:ClearAllPoints()
-  d.name:SetPoint("TOPLEFT", 40, 0)
-  d.name:SetWidth(math.max(40, nameW))
-  local nameH = math.max(d.name:GetStringHeight(), 32)
-  d.nameButton:ClearAllPoints()
-  d.nameButton:SetPoint("TOPLEFT", 0, 0)
-  d.nameButton:SetSize(40 + math.max(40, nameW), nameH)
-  y = nameH + 8
-  if beside then
-    fin:SetPoint("TOPRIGHT", 0, -math.floor((nameH - ADD_H) / 2))
-  elseif fin:IsShown() then
-    fin:SetPoint("TOPLEFT", 0, -y + 4)
-    y = y + ADD_H + 4
-  end
-  text(d.bands, 4)
-  text(d.bandNow, 8)
-  text(d.source, 4)
-  local rowH = K.scaledHeight(22)
-  for _, b in ipairs(d.layout.patterns) do
-    b:ClearAllPoints()
-    b:SetPoint("TOPLEFT", 8, -y)
-    b:SetSize(math.max(40, width - 8), rowH)
-    y = y + rowH
-  end
-  y = y + 4
-  text(d.notes, 4)
-  text(d.known, 4)
-  text(d.crafts, 8)
-  if d.crafters:IsShown() then
-    d.crafters:ClearAllPoints()
-    d.crafters:SetPoint("TOPLEFT", 0, -y)
-    d.crafters:SetWidth(math.min(width, d.crafters:Fit(width)))
-    y = y + d.crafters:GetHeight() + 8
-  end
-  if #d.layout.reagents > 0 then
-    d.reagentHead:ClearAllPoints()
-    d.reagentHead:SetPoint("TOPLEFT", 0, -y)
-    y = y + 22
-    for _, b in ipairs(d.layout.reagents) do
-      b:ClearAllPoints()
-      b:SetPoint("TOPLEFT", 0, -y)
-      b:SetSize(width, rowH)
-      y = y + rowH
-    end
-    y = y + 8
+  d.detailsCard:ClearAllPoints()
+  d.detailsCard:SetPoint("TOPLEFT", d, "TOPLEFT", 0, -y)
+  y = y + d.detailsCard:fgLayout(width) + gap
+  if d.reagentCard:IsShown() then
+    d.reagentCard:ClearAllPoints()
+    d.reagentCard:SetPoint("TOPLEFT", d, "TOPLEFT", 0, -y)
+    y = y + d.reagentCard:fgLayout(width) + gap
   end
   if d.add:IsShown() then
     d.add:ClearAllPoints()
@@ -806,7 +949,9 @@ local function layoutDetail(d, width)
     d.add.button:SetWidth(width)
     y = y + d.add:GetHeight() + 8
   elseif d.addHint:IsShown() then
-    text(d.addHint, 6)
+    d.addHint:ClearAllPoints()
+    d.addHint:SetPoint("TOPLEFT", 0, -y)
+    y = y + W.FitLabel(d.addHint, width) + 6
   end
   d.hint:ClearAllPoints()
   d.hint:SetPoint("TOPLEFT", 0, -y)
@@ -986,6 +1131,68 @@ local function ownFaction()
   return group == "Alliance" and "a" or group == "Horde" and "h" or nil
 end
 
+local MAX_SELLERS = 5
+
+-- Rows of the "Learned from" fact for K.KeyValue: the kind of source first, then every seller or drop NPC (own
+-- faction first) with a link to its vendor page and a map place where the vendor data knows one, then quest,
+-- dungeon, object, price and standing as far as the data has them.
+function P.SourceRows(r)
+  local rs = type(r.rs) == "table" and r.rs or {}
+  local kind = R.SourceKind(r)
+  local text = L["recipes.srcUnknown"]
+  if kind == "t" then
+    local rank = r.rank and L["profroute.rank." .. r.rank]
+    text = rank and rank ~= "profroute.rank." .. r.rank and string.format(L["recipes.srcTrainerRank"], rank)
+      or L["recipes.srcTrainer"]
+  elseif kind == "i" then
+    local origin = R.Origin(r)
+    text = origin ~= "unknown" and L["recipes.src." .. origin] or L["recipes.srcItem"]
+  end
+  local rows = { { key = "recipes.kv.source", value = text } }
+  local npcs = {}
+  for _, f in ipairs(FACTION_ORDER[ownFaction()] or FACTION_ORDER.a) do
+    for _, npc in ipairs(type(rs.npcs) == "table" and rs.npcs or {}) do
+      if (npc.fa or "b") == f and str(npc.n) then
+        npcs[#npcs + 1] = npc
+      end
+    end
+  end
+  local index = #npcs > 0 and ns.VendorSource.Index() or nil
+  for i = 1, math.min(#npcs, MAX_SELLERS) do
+    local npc = npcs[i]
+    local entry = index and type(npc.id) == "number" and index.byNpc[npc.id] or nil
+    local value = placeText(npc.n, npc.pl, npc.z)
+    if type(npc.dr) == "number" and npc.dr > 0 then
+      value = value .. " (" .. RL.ChanceText(npc.dr, ns.GetActiveLocale()) .. ")"
+    end
+    rows[#rows + 1] = {
+      value = value,
+      color = entry and "accent2" or nil,
+      tip = entry and L["recipes.vendorTip"] or nil,
+      onClick = entry and function()
+        ns.VendorsPage.OpenVendor(npc.id)
+      end or nil,
+      place = entry and ns.VendorLogic.Place(entry, ns.VendorSource.ZoneName(entry)) or nil,
+    }
+  end
+  local function add(value)
+    if value then
+      rows[#rows + 1] = { value = value }
+    end
+  end
+  add(type(rs.quest) == "table" and str(rs.quest.n) and string.format(L["recipes.tip.quest"], rs.quest.n) or nil)
+  local dun = type(rs.dun) == "table" and rs.dun or nil
+  add(dun and str(dun.n) and string.format(L["recipes.tip.dungeon"], dun.n) or nil)
+  add(dun and str(dun.boss) and string.format(L["recipes.tip.boss"], dun.boss) or nil)
+  local obj = type(rs.obj) == "table" and rs.obj or nil
+  add(obj and str(obj.n) and string.format(L["recipes.tip.object"], placeText(obj.n, obj.z)) or nil)
+  local cost = type(rs.cost) == "table" and costLine(rs.cost) or nil
+  add(cost and cost.text)
+  local rep = repLine(rs.rep)
+  add(rep and rep.text)
+  return rows
+end
+
 function P.ShowSourceTooltip(owner, r)
   local spec = P.SourceSpec(r, ownFaction())
   spec.anchor = "ANCHOR_RIGHT"
@@ -993,8 +1200,17 @@ function P.ShowSourceTooltip(owner, r)
 end
 
 -- Tooltip of a recipe: the item (else the spell) tooltip, then who knows it and what changed.
-function P.ShowTooltip(owner, r)
+function P.ShowTooltip(owner, r, skill)
   local lines = {}
+  if skill then
+    -- The difficulty in words next to its color.
+    local band = R.Band(r.sk, skill)
+    lines[#lines + 1] = { text = string.format(L["recipes.bandAt"], skill, bandName(band)), color = bandColor(band) }
+    local level = R.Level(r)
+    if level ~= math.huge then
+      lines[#lines + 1] = { text = string.format(L["recipes.rowSkill"], level), color = "textSecondary" }
+    end
+  end
   local owners = Known.Owners(r.s)
   if #owners > 0 then
     local names = {}
@@ -1052,8 +1268,7 @@ local function newStrip(parent)
         t = self:CreateTexture(nil, "ARTWORK")
         self.segments[i] = t
       end
-      local c = R.COLORS[s.band]
-      t:SetColorTexture(c[1], c[2], c[3], 1)
+      t:SetColorTexture(Theme.color(bandColor(s.band)))
       t:ClearAllPoints()
       t:SetPoint("TOPLEFT", self, "TOPLEFT", math.floor((s.from - 1) / max * width), 0)
       t:SetSize(math.max(1, math.floor((s.to - s.from + 1) / max * width)), STRIP_H)
@@ -1076,25 +1291,36 @@ local function newStrip(parent)
   return strip
 end
 
+local BAR_W = 3
+
 local function newRow(parent)
   local row = CreateFrame("Button", nil, parent)
   row.bg = row:CreateTexture(nil, "BACKGROUND")
   row.bg:SetAllPoints()
-  row.level = W.Text(row, { role = "micro", color = "textSecondary", justify = "RIGHT" })
-  row.level:SetPoint("RIGHT", -8, 0)
+  -- Gold edge of the selected row.
+  row.edge = W.Border(row, "selected", 1, 1)
+  row.edge.show(false)
+  -- Difficulty bar at the left edge; the name color and the tooltip carry the same band in words.
+  row.bar = row:CreateTexture(nil, "ARTWORK")
+  row.bar:SetWidth(BAR_W)
+  row.bar:SetPoint("TOPLEFT", 0, 0)
+  row.bar:SetPoint("BOTTOMLEFT", 0, 0)
+  row.level = W.Meta(row, { justify = "RIGHT" })
+  -- Leaves room for the wishlist star and the share icon at the right edge.
+  row.level:SetPoint("RIGHT", -(8 + ns.WishlistStar.SIZE + SHARE_SIZE + 6), 0)
   row.level:SetWidth(34)
   row.dot = row:CreateTexture(nil, "ARTWORK")
   row.dot:SetSize(8, 8)
   row.dot:SetPoint("RIGHT", row.level, "LEFT", -6, 0)
-  row.check = W.CheckMark(row, 12, "success")
-  row.check:SetPoint("RIGHT", row.dot, "LEFT", -6, 0)
+  -- Known dot: filled for this character, ring for another character of the roster (legend under the list).
+  row.check = K.StatusDot(row, { state = "ok" })
+  row.check:EnableMouse(false)
+  row.check:SetPoint("RIGHT", row.level, "LEFT", -6, 0)
   row.changed = W.Text(row, { text = "*", role = "ui", color = "accent2", justify = "CENTER" })
   row.changed:SetPoint("RIGHT", row.check, "LEFT", -4, 0)
   row.changed:SetWidth(10)
-  row.arrow = W.Text(row, { role = "ui", color = "accent2" })
-  row.icon = row:CreateTexture(nil, "ARTWORK")
-  row.icon:SetSize(ICON, ICON)
-  row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  row.arrow = W.Glyph(row, "chevron-right", 12, "textSecondary")
+  row.icon = K.IconFrame(row, { size = Theme.size.iconFrame.sm })
   row.origin = CreateFrame("Button", nil, row)
   row.origin:SetSize(ORIGIN_SIZE, ORIGIN_SIZE)
   row.origin:SetPoint("RIGHT", row.changed, "LEFT", -4, 0)
@@ -1117,14 +1343,23 @@ local function newRow(parent)
   row.title:SetPoint("RIGHT", row.changed, "LEFT", -6, 0)
   row.hover = false
   function row:paint()
-    local selected = self.selected
-    self.bg:SetColorTexture(1, 1, 1, selected and 0.1 or (self.hover and 0.05 or 0))
+    local head = self.item and self.item.kind == "head"
+    if self.selected then
+      self.bg:SetColorTexture(Theme.fillColor("selected"))
+    elseif self.hover then
+      self.bg:SetColorTexture(Theme.fillColor("hover"))
+    elseif head then
+      self.bg:SetColorTexture(Theme.color("surface2"))
+    else
+      self.bg:SetColorTexture(Theme.fillColor())
+    end
+    self.edge.show(self.selected == true)
   end
   row:SetScript("OnEnter", function(self)
     self.hover = true
     self:paint()
     if self.recipe then
-      P.ShowTooltip(self, self.recipe)
+      P.ShowTooltip(self, self.recipe, self.skill)
     end
   end)
   row:SetScript("OnLeave", function(self)
@@ -1132,44 +1367,65 @@ local function newRow(parent)
     self:paint()
     ns.HideTooltip()
   end)
+  -- After the row's own OnEnter and OnLeave: a later SetScript would drop the hooks of the icon.
+  row.share = ns.PageShare.RowButton(row, { size = SHARE_SIZE })
+  row.share:SetPoint("RIGHT", row, "RIGHT", -(2 + ns.WishlistStar.SIZE + 2), 0)
   ns.Focus.register(row, function(self)
     self:Click()
   end)
+  -- Spoken name: the recipe with its difficulty word (the bar and the name color alone would be color only).
+  function row.fgName()
+    local item = row.item
+    if not item then
+      return nil
+    end
+    if item.kind == "head" then
+      return item.band and bandName(item.band) or item.name
+    end
+    return string.format("%s, %s", R.Name(item.recipe, lang()), bandName(R.Band(item.recipe.sk, row.skill or 1)))
+  end
   return row
 end
 
 -- Paints one display row (head or recipe) of R.Rows.
 local function bindRow(row, item, ctx)
   row.item = item
+  row.skill = ctx.skill
   local indent = 6 + item.depth * 12
   local isHead = item.kind == "head"
   row.recipe = not isHead and item.recipe or nil
   row.selected = row.recipe ~= nil and row.recipe.s == ctx.selected
+  row.share:SetTarget(not isHead and ctx.slug and item.recipe.s and ("professions/" .. ctx.slug .. "/" .. item.recipe.s) or nil)
   row.arrow:SetShown(isHead)
   row.icon:SetShown(not isHead)
+  row.bar:SetShown(not isHead)
   row.check:SetShown(false)
   row.changed:SetShown(false)
   row.origin.recipe = nil
   row.origin:Hide()
+  row.check:ClearAllPoints()
+  row.check:SetPoint("RIGHT", isHead and row.dot or row.level, "LEFT", -6, 0)
   row.title:ClearAllPoints()
   row.title:SetPoint("RIGHT", row.changed, "LEFT", -6, 0)
   if isHead then
     row.arrow:ClearAllPoints()
     row.arrow:SetPoint("LEFT", indent, 0)
-    row.arrow:SetText(item.open and "-" or "+")
-    row.title:SetPoint("LEFT", indent + 14, 0)
+    row.arrow:SetIcon(item.open and "chevron-down" or "chevron-right")
+    row.title:SetPoint("LEFT", indent + 18, 0)
     row.title:SetText(item.band and bandName(item.band) or item.name)
-    W.SetColor(row.title, "accent2")
+    W.SetColor(row.title, "heading")
     row.level:SetText(tostring(item.count))
     if item.band then
-      local c = R.COLORS[item.band]
-      row.dot:SetColorTexture(c[1], c[2], c[3], 1)
+      row.dot:SetColorTexture(Theme.color(bandColor(item.band)))
     end
     row.dot:SetShown(item.band ~= nil)
   else
     local r = item.recipe
+    local band = R.Band(r.sk, ctx.skill)
+    row.dot:Hide()
+    row.bar:SetColorTexture(Theme.color(bandColor(band)))
     row.icon:ClearAllPoints()
-    row.icon:SetPoint("LEFT", indent, 0)
+    row.icon:SetPoint("LEFT", indent + BAR_W + 2, 0)
     row.icon:SetTexture(recipeIcon(r))
     row.title:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
     local origin = P.OriginIcon(r)
@@ -1182,14 +1438,21 @@ local function bindRow(row, item, ctx)
       row.title:SetPoint("RIGHT", row.origin, "LEFT", -4, 0)
     end
     row.title:SetText(R.Name(r, lang()))
-    W.SetColor(row.title, r.rm and "textMuted" or "text")
-    local c = R.COLORS[R.Band(r.sk, ctx.skill)]
-    row.dot:SetColorTexture(c[1], c[2], c[3], 1)
-    row.dot:SetShown(true)
+    W.SetColor(row.title, r.rm and "textMuted" or bandColor(band))
     local level = R.Level(r)
     row.level:SetText(level == math.huge and "-" or tostring(level))
-    row.check:SetShown(ctx.known[r.s] == true)
+    local mine = ctx.known[r.s] == true
+    local alt = not mine and ctx.altKnown and ctx.altKnown[r.s] == true
+    row.check:SetShown(mine or alt)
+    row.check:SetState(mine and "ok" or "info", mine and L["recipes.legend.known"] or L["recipes.legend.alt"])
     row.changed:SetShown(r.ch == true or r.rm == true)
+  end
+  if isHead then
+    ns.WishlistStar.Bind(row, nil)
+  else
+    ns.WishlistStar.Bind(row, item.recipe.i)
+    row.star:ClearAllPoints()
+    row.star:SetPoint("RIGHT", row, "RIGHT", -2, 0)
   end
   row:paint()
 end
@@ -1217,7 +1480,29 @@ local function build(container)
   local ctx = { slug = Route.SLUGS[1], skill = 1, known = {} }
   local refresh, update
 
-  ns.AddParagraph(view, "recipes.intro")
+  ns.AddIntro(view, "recipes.intro")
+
+  -- Header: profession icon, name and the skill line of the character.
+  local header = CreateFrame("Frame", nil, view.content)
+  header.icon = K.IconFrame(header, { size = Theme.size.iconFrame.lg })
+  header.title = W.Text(header, { role = "h2", family = "heading", color = "heading", wrap = true })
+  header.line = W.Text(header, { role = "ui", color = "textSecondary", wrap = true })
+  function header:fgGridLayout(width)
+    local iconW = Theme.size.iconFrame.lg
+    local textX = iconW + Theme.space.md
+    self.icon:ClearAllPoints()
+    self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    local titleH = W.FitLabel(self.title, math.max(20, width - textX))
+    self.title:ClearAllPoints()
+    self.title:SetPoint("TOPLEFT", self, "TOPLEFT", textX, 0)
+    local lineH = W.FitLabel(self.line, math.max(20, width - textX))
+    self.line:ClearAllPoints()
+    self.line:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(titleH + Theme.space.xs))
+    local h = math.max(K.scaledHeight(iconW), titleH + Theme.space.xs + lineH)
+    self:SetSize(width, h)
+    return h
+  end
+  s:Add(header, { gap = Theme.space.md })
 
   -- Controls -----------------------------------------------------------------------------------------
   local controls = CreateFrame("Frame", nil, view.content)
@@ -1349,7 +1634,13 @@ local function build(container)
   shop.button:SetPoint("TOPLEFT", 0, -18)
   shop:SetWidth(shop.button:GetWidth())
 
-  local groups = { { professions, search, source, shop, small }, toggles, { skillBox } }
+  -- Page link of the shown profession (professions/<slug>), level with the fields below their labels.
+  local profShare = CreateFrame("Frame", nil, controls)
+  profShare:SetSize(W.MAP_ACTION_SIZE, 46)
+  profShare.button = ns.PageShare.Button(profShare, {})
+  profShare.button:SetPoint("TOPLEFT", 0, -18)
+
+  local groups = { { professions, profShare, search, source, shop, small }, toggles, { skillBox } }
   function controls:fgGridLayout(width)
     skillBox:SetWidth(math.min(SKILL_W, width))
     local y = 0
@@ -1371,9 +1662,9 @@ local function build(container)
     self:SetHeight(y)
     return y
   end
-  s:Add(controls, { gap = 12 })
+  s:Add(controls, { gap = Theme.space.md })
 
-  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = 8 })
+  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = Theme.space.sm })
   -- Instead of the hint while the recipe add-on is off or missing: the button that switches it on.
   local banner = ns.PackageUI.Banner(view.content, Data.ADDON, {
     onLoaded = function()
@@ -1383,9 +1674,9 @@ local function build(container)
       view:Layout()
     end,
   })
-  s:Add(banner, { gap = 8 })
-  local note = ns.AddParagraph(view, nil, { role = "ui", color = "textMuted", gap = 8 })
-  local summary = ns.AddParagraph(view, nil, { role = "ui", color = "textSecondary", gap = 8 })
+  s:Add(banner, { gap = Theme.space.sm })
+  local note = ns.AddParagraph(view, nil, { role = "ui", color = "textMuted", gap = Theme.space.sm })
+  local summary = ns.AddParagraph(view, nil, { role = "ui", color = "textSecondary", gap = Theme.space.sm })
 
   -- List and detail -------------------------------------------------------------------------------------
   local split = CreateFrame("Frame", nil, view.content)
@@ -1396,7 +1687,7 @@ local function build(container)
       local row = newRow(parent)
       row:SetScript(
         "OnClick",
-        ns.Wrap("recipes-row", function(self)
+        ns.Wrap("recipes-row", function(self, button)
           local item = self.item
           if not item then
             return
@@ -1406,6 +1697,8 @@ local function build(container)
             update()
           elseif shiftDown() then
             insertChatLink(chatLink(item.recipe, R.Name(item.recipe, lang())))
+          elseif ns.ItemActions.Click(item.recipe.i, button) then
+            return
           else
             state.slug, state.selected = ctx.slug, item.recipe.s
             Shop.SetRecipeView(state.slug, state.skill, state.selected)
@@ -1416,9 +1709,23 @@ local function build(container)
       return row
     end,
     bindRow = function(row, item)
-      bindRow(row, item, { skill = ctx.skill, known = ctx.known, selected = state.selected })
+      bindRow(row, item, {
+        slug = ctx.slug,
+        skill = ctx.skill,
+        known = ctx.known,
+        altKnown = ctx.altKnown,
+        selected = state.selected,
+      })
     end,
   })
+  -- Under the list: what the known dots and the difficulty colors mean, in words.
+  local legend = K.StatusLegend(split, {
+    states = {
+      { state = "ok", key = "recipes.legend.known" },
+      { state = "info", key = "recipes.legend.alt" },
+    },
+  })
+  local bandLegend = W.Text(split, { role = "small", color = "textSecondary", wrap = true })
   local detail = newDetail(split)
   detail.relayout = function()
     view:Layout()
@@ -1439,27 +1746,41 @@ local function build(container)
     return math.max(rowH * MIN_ROWS, math.floor(free))
   end
 
+  -- Legend rows below the list; returns their height (with the gap above).
+  local function layoutLegend(width)
+    local gap = Theme.space.sm
+    local h = legend:fgGridLayout(width)
+    legend:ClearAllPoints()
+    local bandH = W.FitLabel(bandLegend, width)
+    bandLegend:ClearAllPoints()
+    return h, bandH, gap
+  end
+
   function split:fgGridLayout(width)
-    local listH = listHeight()
+    local wide = width >= WIDE
+    local leftW = wide and math.floor(width * 0.52) or width
+    local legendH, bandH, gap = layoutLegend(leftW)
+    local listH = math.max(rowH * MIN_ROWS, listHeight() - legendH - bandH - 2 * gap)
     list:ClearAllPoints()
     list:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    list:SetSize(leftW, listH)
+    legend:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -(listH + gap))
+    bandLegend:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -(listH + gap + legendH + gap))
+    local leftH = listH + gap + legendH + gap + bandH
     detail:ClearAllPoints()
     local total
-    if width >= WIDE then
-      local leftW = math.floor(width * 0.52)
-      list:SetSize(leftW, listH)
+    if wide then
       detail:SetPoint("TOPLEFT", self, "TOPLEFT", leftW + SPLIT_GAP, 0)
-      total = math.max(listH, layoutDetail(detail, width - leftW - SPLIT_GAP))
+      total = math.max(leftH, layoutDetail(detail, width - leftW - SPLIT_GAP))
     else
-      list:SetSize(width, listH)
-      detail:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -(listH + SPLIT_GAP))
-      total = listH + SPLIT_GAP + layoutDetail(detail, width)
+      detail:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -(leftH + SPLIT_GAP))
+      total = leftH + SPLIT_GAP + layoutDetail(detail, width)
     end
     detail:SetHeight(total)
     self:SetHeight(total)
     return total
   end
-  s:Add(split, { gap = 12 })
+  s:Add(split, { gap = Theme.space.md })
 
   -- Refresh ------------------------------------------------------------------------------------------------
 
@@ -1505,6 +1826,11 @@ local function build(container)
       presorted = true,
     })
     list:SetData(rows)
+    local words = {}
+    for _, band in ipairs(R.BANDS) do
+      words[#words + 1] = hex(band) .. bandName(band) .. "|r"
+    end
+    bandLegend:SetText(L["recipes.legend.bands"] .. " " .. table.concat(words, "  "))
     summary:SetText(string.format(L["recipes.count"], #filtered, #ctx.list))
     local current = ctx.byId[state.selected]
     strip:Paint(current and current.sk or nil, ctx.max, ctx.skill)
@@ -1520,17 +1846,26 @@ local function build(container)
     local own = Shop.Own()
     fillOptions(own)
     ctx.slug = state.slug or (own[1] and own[1].slug) or Route.SLUGS[1]
-    ctx.ownSkill = nil
+    ctx.ownSkill, ctx.ownMax = nil, nil
     for _, p in ipairs(own) do
       if p.slug == ctx.slug then
-        ctx.ownSkill = p.skill
+        ctx.ownSkill, ctx.ownMax = p.skill, p.max
       end
     end
     professions.Refresh()
+    profShare.button:SetTarget("professions/" .. ctx.slug)
     local data, recipes, status = Data.Get(ctx.slug)
     ctx.data = data
     local key = ns.CharRoster.CurrentKey()
     ctx.known = key and Known.Set(key) or {}
+    ctx.altKnown = {}
+    for other, set in pairs(Known.Sets()) do
+      if other ~= key then
+        for id in pairs(set) do
+          ctx.altKnown[id] = true
+        end
+      end
+    end
     local offered = banner:Update(data == nil and status == Data.STATUS.missing)
     hint:SetShown(data == nil and not offered)
     note:SetShown(false)
@@ -1548,12 +1883,28 @@ local function build(container)
       ctx.byId[r.s] = r
     end
     ctx.max = math.min(R.MaxSkill(ctx.list), R.MAX_SKILL)
+    local knownCount = 0
+    for _, r in ipairs(ctx.list) do
+      if ctx.known[r.s] then
+        knownCount = knownCount + 1
+      end
+    end
+    header.icon:SetTexture(iconPath(PROFESSION_ICON[ctx.slug]) or FALLBACK_ICON)
+    header.title:SetText(Route.Name(ctx.slug))
+    local ownLine = ctx.ownSkill and string.format(L["recipes.skillLine"], ctx.ownSkill, ctx.ownMax or ctx.max)
+      or L["recipes.skillNone"]
+    header.line:SetText(ownLine .. " | " .. string.format(L["recipes.counts"], #ctx.list, knownCount))
     sliderOpts.max = ctx.max
     slider.slider:SetMinMaxValues(1, ctx.max)
     local noKnown = key == nil or #Known.Ids(key) == 0
     note:SetShown(noKnown)
     note:SetText(noKnown and L["recipes.noneKnown"] or "")
     update()
+  end
+
+  -- Page link of the header: the profession. A recipe has its own share button.
+  function view:ShareState()
+    return { ctx.slug }
   end
 
   -- Deep link professions/<slug>/<spell id> (from the search): that profession with the recipe
@@ -1604,6 +1955,7 @@ local function build(container)
     toggles = by,
     slider = slider,
     strip = strip,
+    share = profShare.button,
   }
   return view
 end

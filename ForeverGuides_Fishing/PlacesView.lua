@@ -22,35 +22,33 @@ FG.AddLocale("enUS", {
   ["fishp.title"] = "Fishing places",
   ["fishp.close"] = "Close the fishing places",
   ["fishp.open"] = "Fishing places",
-  ["fishp.openTip"] = "Areas with the lowest skill to cast and the fish you can catch there",
+  ["fishp.openTip"] = "Shows the areas with the lowest skill to cast and the fish you can catch there.",
   ["fishp.search"] = "Search area",
   ["fishp.skill"] = "From skill %d",
   ["fishp.detail"] = "Cast from skill %d, no failed casts from skill %d",
   ["fishp.areas"] = "%d areas",
   ["fishp.empty"] = "Choose an area on the left.",
   ["fishp.none"] = "No area matches.",
-  ["fishp.note"] = "Values of the base game, they can differ in the Forever client. Chance per cast.",
+  ["fishp.note"] = "Values of the base game. They can differ in the Forever client. Chance per cast.",
   ["fishp.map"] = "On the map",
-  ["fishp.mapTip"] = "Opens the map on this area. The panel of the map lists the fish there with their chance (tab Gather, Fishing places of this zone). Not in combat.",
+  ["fishp.mapTip"] = "Opens the map at this area. The map panel lists the fish there with their chance (Gather tab, Fishing places of this zone). In combat, the map page of the addon opens instead.",
   ["fishp.mapNone"] = "No zone map belongs to this area.",
-  ["fishp.mapCombat"] = "Not in combat.",
 })
 FG.AddLocale("deDE", {
   ["fishp.title"] = "Angelplätze",
   ["fishp.close"] = "Angelplätze schließen",
   ["fishp.open"] = "Angelplätze",
-  ["fishp.openTip"] = "Gebiete mit dem Mindest-Skill zum Auswerfen und den Fischen, die dort anbeißen",
+  ["fishp.openTip"] = "Zeigt die Gebiete mit dem Mindest-Skill zum Auswerfen und den Fischen, die dort anbeißen.",
   ["fishp.search"] = "Gebiet suchen",
   ["fishp.skill"] = "Ab Skill %d",
   ["fishp.detail"] = "Auswerfen ab Skill %d, ohne Fehlwürfe ab Skill %d",
   ["fishp.areas"] = "%d Gebiete",
   ["fishp.empty"] = "Wähle links ein Gebiet.",
   ["fishp.none"] = "Kein Gebiet passt.",
-  ["fishp.note"] = "Werte des Basisspiels, im Forever-Client können sie abweichen. Chance pro Wurf.",
+  ["fishp.note"] = "Werte des Basisspiels. Im Forever-Client können sie abweichen. Chance pro Wurf.",
   ["fishp.map"] = "Auf der Karte",
-  ["fishp.mapTip"] = "Öffnet die Karte in diesem Gebiet. Das Panel der Karte listet dort die Fische mit ihrer Chance (Reiter Sammeln, Angelplätze dieser Zone). Nicht im Kampf.",
+  ["fishp.mapTip"] = "Öffnet die Karte bei diesem Gebiet. Das Kartenpanel listet dort die Fische mit ihrer Chance (Reiter Sammeln, Angelplätze dieser Zone). Im Kampf öffnet sich stattdessen die Kartenseite des Addons.",
   ["fishp.mapNone"] = "Zu diesem Gebiet gehört keine Zonenkarte.",
-  ["fishp.mapCombat"] = "Nicht im Kampf.",
 })
 
 local function data()
@@ -157,8 +155,6 @@ function V.ShowOnMap()
   local result = shower and shower.ShowArea(names) or "nomap"
   if result == "nomap" then
     FG.Notify(L["fishp.mapNone"], "warning")
-  elseif result == "combat" then
-    FG.Notify(L["fishp.mapCombat"], "warning")
   end
   return result
 end

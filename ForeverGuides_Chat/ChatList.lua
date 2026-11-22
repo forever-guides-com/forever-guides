@@ -48,11 +48,13 @@ function List.DateOf(format, time)
   return hit
 end
 
--- The placeholder of an edit box (W.EditBox) is anchored on the left only and would run past the box and into
--- its neighbours: bound it on the right too, the client cuts a longer text.
+-- The placeholder of an edit box must not run past the box into its neighbours: held on both sides, the client
+-- cuts a longer text. Anchored afresh, so a box that already bounds it does not collect extra points.
 function List.FitPlaceholder(box)
   for _, region in ipairs({ box:GetRegions() }) do
     if region.GetObjectType and region:GetObjectType() == "FontString" then
+      region:ClearAllPoints()
+      region:SetPoint("LEFT", box, "LEFT", 8, 0)
       region:SetPoint("RIGHT", box, "RIGHT", -8, 0)
       region:SetWordWrap(false)
     end
@@ -488,12 +490,6 @@ function List.Create(parent, win)
     list.more:ClearAllPoints()
     list.more:SetPoint("BOTTOMLEFT", list.hint, "TOPLEFT", 0, 2)
     list.more:SetPoint("BOTTOMRIGHT", list.hint, "TOPRIGHT", 0, 2)
-  end
-
-  -- True while the list would have to build row frames it does not have (not done in combat).
-  function list:NeedsFrames()
-    local h = list.host:GetHeight()
-    return type(h) == "number" and math.floor(h / rowHeight()) > list.built
   end
 
   function list:Context()

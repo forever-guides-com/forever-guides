@@ -29,7 +29,7 @@ ns.AddLocale("deDE", {
   ["map.card.asDest"] = "Als Ziel",
   ["map.card.toArrow"] = "Zum Pfeil",
   ["map.card.toArrowTip"] = "Setzt den Ort als aktiven Wegpunkt.\nBraucht eine Spielkarten-Position.",
-  ["map.card.show"] = "Auf Karte zeigen",
+  ["map.card.show"] = "Auf Karte anzeigen",
   ["map.card.showTip"] = "Öffnet die Zonenkarte und hebt den Ort hervor.\nDoppelklick geht auch.",
 })
 
@@ -89,7 +89,7 @@ end
 --   data(), opts(), query()     travel data, route options (faction, level), search text
 --   zone()                      slug of the zone that is open on the map, or nil
 --   nameOf(node), zoneName(slug)
---   state                       { start, dest, selected, hover } place slugs
+--   state                       { selected, hover } place slugs (start and goal come from RoutePlan)
 --   onSelect(slug)              a click on a card (as before: selects the place)
 --   hover(slug), unhover(slug)  the mouse is on a card or left it
 --   setRoute(which, slug)       which = "start" | "dest"
@@ -108,9 +108,9 @@ function PL.Attach(ctx)
     end
     local slug = item.node.s
     local selected, hovered = st.selected == slug, st.hover == slug
-    row.bg:SetColorTexture(1, 1, 1, selected and 0.1 or (hovered and 0.06 or 0))
+    row.bg:SetColorTexture(Theme.fillColor(selected and "selected" or (hovered and "hover" or nil)))
     row.border.show(selected)
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
   end
 
   local function createRow(parent)
@@ -282,9 +282,10 @@ function PL.Attach(ctx)
     end
     W.SetText(row.sub, nil, table.concat(parts, " · "))
     local tag = ""
-    if st.start == n.s then
+    local start, dest = ns.RoutePlan.Ends()
+    if start == n.s then
       tag = Theme.hexText("success", L["map.tagStart"])
-    elseif st.dest == n.s then
+    elseif dest == n.s then
       tag = Theme.hexText("warning", L["map.tagDest"])
     elseif n.f == "A" or n.f == "H" then
       tag = L[n.f == "A" and "faction.alliance" or "faction.horde"]

@@ -173,7 +173,7 @@ function C.Headline(highlights)
   return table.concat(heads, C.HEADLINE_SEPARATOR)
 end
 
--- The versions of the table as { version, date, beta, highlights = { { head, text } }, headline, sections = { {
+-- The versions of the table as { version, date, beta, important, highlights = { { head, text } }, headline, sections = { {
 -- key, lines = { text }, go = { [line number] = target } } }, count }, newest first, at most `limit` (default MAX_VERSIONS). count is the number
 -- of lines in the sections (the highlights do not count). A version without a single line is left out, so are
 -- broken entries. The table is not changed.
@@ -185,8 +185,14 @@ function C.Build(data, locale, limit)
   end
   for _, item in ipairs(versions) do
     if type(item) == "table" and C.Parse(item.version) then
-      local view =
-        { version = item.version, date = C.Date(item.date, locale), beta = item.beta == true, sections = {}, count = 0 }
+      local view = {
+        version = item.version,
+        date = C.Date(item.date, locale),
+        beta = item.beta == true,
+        important = item.important == true,
+        sections = {},
+        count = 0,
+      }
       view.highlights = C.Highlights(item.highlights, locale)
       view.headline = C.Headline(view.highlights)
       for _, key in ipairs(C.SECTIONS) do
@@ -233,4 +239,51 @@ function C.Unseen(versions, seen)
     end
   end
   return set, count
+end
+
+-- News window after an update: versions shown at most, in the window.
+C.NEWS_VERSIONS = 2
+
+-- What the news window shows: { shown = { version views }, seenTo = version, important = boolean } or nil for no
+-- window. `versions` is C.Build output (newest first), `seen` the newest version seen before, `current` the version
+-- running now (a version above it is not installed yet, an unparsable one is a development build: no window).
+-- Only versions with highlights show. With `enabled` false only important versions show. Important versions come
+-- first, then the newest, at most NEWS_VERSIONS. seenTo is the newest version the window answers for.
+function C.News(versions, seen, current, enabled)
+  if not C.Parse(current) then
+    return nil
+  end
+  local known = C.Parse(seen) ~= nil
+  local fresh, first = {}, true
+  for _, item in ipairs(versions) do
+    if C.Compare(item.version, current) <= 0 then
+      if (known and C.Compare(item.version, seen) > 0) or (not known and first) then
+        fresh[#fresh + 1] = item
+      end
+      first = false
+    end
+  end
+  local shown, seenTo, important = {}, nil, false
+  for _, item in ipairs(fresh) do
+    if enabled or item.important then
+      seenTo = seenTo or item.version
+      if #item.highlights > 0 then
+        shown[#shown + 1] = item
+        important = important or item.important
+      end
+    end
+  end
+  if #shown == 0 then
+    return nil
+  end
+  table.sort(shown, function(a, b)
+    if a.important ~= b.important then
+      return a.important
+    end
+    return C.Compare(a.version, b.version) > 0
+  end)
+  for i = #shown, C.NEWS_VERSIONS + 1, -1 do
+    shown[i] = nil
+  end
+  return { shown = shown, seenTo = seenTo, important = important }
 end

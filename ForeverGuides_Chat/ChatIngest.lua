@@ -36,16 +36,7 @@ local dirty = {}
 -- Game access -----------------------------------------------------------------------------------------
 
 local function realmName()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local fn = rawget(_G, name)
-    if type(fn) == "function" then
-      local ok, realm = pcall(fn)
-      if ok and type(realm) == "string" and realm ~= "" then
-        return realm
-      end
-    end
-  end
-  return nil
+  return FG.Realm.Get() or nil
 end
 
 local function guildName()

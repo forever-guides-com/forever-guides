@@ -254,7 +254,7 @@ local function region()
   pcall(holder.SetFrameLevel, holder, host:GetFrameLevel() + PANEL_LEVEL)
   local bg = holder:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints()
-  bg:SetColorTexture(0, 0, 0, PANEL_ALPHA)
+  bg:SetColorTexture(ns.Theme.scrim(PANEL_ALPHA))
   local rec = { host = host, holder = holder, lines = {} }
   local fs = holder:CreateFontString(nil, "OVERLAY")
   fs:SetDrawLayer("OVERLAY", 7)

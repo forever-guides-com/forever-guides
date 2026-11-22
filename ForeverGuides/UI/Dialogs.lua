@@ -32,11 +32,12 @@ local function base(name, width, height)
   close:SetScript("OnClick", function()
     f:Hide()
   end)
-  f:SetScript("OnShow", function()
+  -- Hooks: WindowShell.Attach hooked OnShow and OnHide above, a SetScript would drop them.
+  f:HookScript("OnShow", function()
     Dialogs.open[f] = true
     f:SetScale(ns.Theme.windowScale())
   end)
-  f:SetScript("OnHide", function()
+  f:HookScript("OnHide", function()
     Dialogs.open[f] = nil
   end)
   -- A hook, so a module that sets its own OnShow keeps it: the newest dialog is on top and on screen.

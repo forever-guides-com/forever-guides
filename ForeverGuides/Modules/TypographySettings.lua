@@ -10,7 +10,7 @@ ns.TypographySettings = TS
 
 ns.AddLocale("enUS", {
   ["typo.title"] = "Font sizes by kind of text",
-  ["typo.hint"] = "Each slider changes one kind of text on top of the font size above. Nothing gets smaller than 11 px, and a smaller window zoom raises that limit so the text on screen stays readable.",
+  ["typo.hint"] = "Each slider adjusts one kind of text on top of the font size above. Text never gets smaller than 11 px. A smaller window zoom raises this limit, so text stays readable.",
   ["typo.presets"] = "Presets",
   ["typo.preset.default"] = "Default",
   ["typo.preset.large"] = "Large 125 %",
@@ -36,7 +36,7 @@ ns.AddLocale("enUS", {
 
 ns.AddLocale("deDE", {
   ["typo.title"] = "Schriftgrößen nach Textart",
-  ["typo.hint"] = "Jeder Regler ändert eine Textart zusätzlich zur Schriftgröße darüber. Unter 11 px wird nichts kleiner, und bei kleinerem Fensterzoom steigt diese Grenze, damit der Text auf dem Bildschirm lesbar bleibt.",
+  ["typo.hint"] = "Jeder Regler passt eine Textart zusätzlich zur Schriftgröße darüber an. Text wird nie kleiner als 11 px. Bei kleinerem Fensterzoom steigt diese Grenze, damit der Text lesbar bleibt.",
   ["typo.presets"] = "Voreinstellungen",
   ["typo.preset.default"] = "Standard",
   ["typo.preset.large"] = "Groß 125 %",
@@ -57,7 +57,7 @@ ns.AddLocale("deDE", {
   ["typo.sample.h3"] = "Zwischenüberschrift",
   ["typo.sample.body"] = "So sieht Text in Knöpfen, Reitern und Listentiteln aus.",
   ["typo.sample.small"] = "Hinweise und die zweite Zeile einer Liste.",
-  ["typo.sample.micro"] = "Seitenleistengruppen, Fußzeile und Statuszeilen.",
+  ["typo.sample.micro"] = "Gruppen der Seitenleiste, Fußzeile und Statuszeilen.",
 })
 
 -- Factor of every preset (all six roles get the same one).

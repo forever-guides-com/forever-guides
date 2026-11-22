@@ -14,12 +14,18 @@ add("gm.tab.lists", "Lists", "Listen")
 add("gm.lists.page.bans", "Ban list", "Banliste")
 add("gm.lists.page.former", "Former members", "Ehemalige")
 add("gm.lists.page.alts", "Alt groups", "Alt-Gruppen")
+add("gm.lists.page.suggest", "Alt suggestions", "Alt-Vorschläge")
 add("gm.lists.hint.bans", "Typed by hand, stays on this PC.", "Von Hand eingetragen, bleibt auf diesem PC.")
 add("gm.lists.hint.former", "From the events: who left and when.", "Aus den Ereignissen: wer ging und wann.")
 add(
   "gm.lists.hint.alts",
   "Main and alt links from the member list.",
   "Main- und Alt-Verbindungen aus der Mitgliederliste."
+)
+add(
+  "gm.lists.hint.suggest",
+  "Guesses from notes. Linked only when you click.",
+  "Vermutungen aus Notizen. Verknüpft wird nur per Klick."
 )
 add("gm.lists.count", "Entries: %d of %d", "Einträge: %d von %d")
 add("gm.lists.noMatch", "Nothing matches the search.", "Nichts passt zur Suche.")
@@ -30,6 +36,27 @@ add(
   "No alt links yet. Set a main in the member list.",
   "Noch keine Alt-Verbindungen. Lege einen Main in der Mitgliederliste fest."
 )
+add(
+  "gm.lists.empty.suggest",
+  "No suggestions. Notes like \"Alt von Name\" or \"Name's alt\" produce some.",
+  "Keine Vorschläge. Notizen wie „Alt von Name“ oder „Name's alt“ liefern welche."
+)
+
+add("gm.alt.title", "%s: alt of %s?", "%s: Alt von %s?")
+add("gm.alt.link", "Link as alt", "Als Alt verknüpfen")
+add("gm.alt.dismiss", "Discard the suggestion", "Vorschlag verwerfen")
+add("gm.alt.conf.high", "high", "hoch")
+add("gm.alt.conf.medium", "medium", "mittel")
+add("gm.alt.conf.low", "low", "niedrig")
+add("gm.alt.src.public", "guild note", "Gildennotiz")
+add("gm.alt.src.officer", "officer note", "Offiziersnotiz")
+add("gm.alt.src.own", "own note", "eigene Notiz")
+add("gm.alt.reason.altOf", "%s names %s as the main", "%s nennt %s als Main")
+add("gm.alt.reason.mainIs", "%s names %s as the main", "%s nennt %s als Main")
+add("gm.alt.reason.possessive", "%s: \"%s's alt\"", "%s: „%s's Alt“")
+add("gm.alt.reason.paren", "%s names %s in brackets", "%s nennt %s in Klammern")
+add("gm.alt.reason.sameNote", "Same %s as %s", "Gleiche %s wie bei %s")
+add("gm.alt.err.changed", "The links changed. The suggestion no longer fits.", "Die Verknüpfungen haben sich geändert. Der Vorschlag passt nicht mehr.")
 
 add("gm.ban.add", "Add ban", "Ban eintragen")
 add("gm.ban.title", "Ban list entry", "Banlisten-Eintrag")

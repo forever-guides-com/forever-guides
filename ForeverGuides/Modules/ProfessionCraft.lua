@@ -18,7 +18,7 @@ local WINDOWS = { "ProfessionsFrame", "TradeSkillFrame", "CraftFrame" }
 
 ns.AddLocale("enUS", {
   ["craft.open"] = "Click: open in the profession window",
-  ["craft.badge"] = "Open the profession window on this recipe",
+  ["craft.badge"] = "Opens the profession window on this recipe.",
   ["craft.noProfession"] = "You do not have %s.",
   ["craft.unknown"] = "You do not know this recipe yet (trainer or recipe item).",
   ["craft.combat"] = "Not possible in combat.",
@@ -26,9 +26,9 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["craft.open"] = "Klick: im Berufsfenster öffnen",
-  ["craft.badge"] = "Berufsfenster bei diesem Rezept öffnen",
+  ["craft.badge"] = "Öffnet das Berufsfenster bei diesem Rezept.",
   ["craft.noProfession"] = "Du hast %s nicht.",
-  ["craft.unknown"] = "Dieses Rezept kannst du noch nicht (Lehrer oder Rezept-Item).",
+  ["craft.unknown"] = "Du kennst dieses Rezept noch nicht (Lehrer oder Rezeptitem).",
   ["craft.combat"] = "Im Kampf nicht möglich.",
   ["craft.useBadge"] = "Das Spiel öffnet das Fenster nur über den Hammer auf dem Rezept-Symbol.",
 })

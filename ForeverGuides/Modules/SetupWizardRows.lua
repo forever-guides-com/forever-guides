@@ -28,7 +28,7 @@ R.ICON, R.ICON_GAP = 18, 6
 
 ns.AddLocale("enUS", {
   ["setup.row.optionsTip"] = "Opens every setting of this area in a new window.",
-  ["setup.restart.text"] = "Switched-off add-ons end only after a reload of the interface.",
+  ["setup.restart.text"] = "Switched-off addons end only after a reload of the interface.",
   ["setup.restart.button"] = "Reload now",
   ["setup.restart.tip"] = "Reloads the interface. Your settings stay.",
   ["setup.collapse.resume"] = "Continue setup",
@@ -39,7 +39,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["setup.row.optionsTip"] = "Öffnet alle Einstellungen dieses Bereichs in einem neuen Fenster.",
-  ["setup.restart.text"] = "Ausgeschaltete Zusatzaddons enden erst mit einem Neustart der Oberfläche.",
+  ["setup.restart.text"] = "Ausgeschaltete Zusatzaddons enden erst nach dem Neuladen der Oberfläche.",
   ["setup.restart.button"] = "Jetzt neu laden",
   ["setup.restart.tip"] = "Lädt die Oberfläche neu. Deine Einstellungen bleiben.",
   ["setup.collapse.resume"] = "Weiter einrichten",

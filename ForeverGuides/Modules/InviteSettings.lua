@@ -10,7 +10,7 @@ ns.InviteSettings = S
 
 ns.AddLocale("enUS", {
   ["invite.set.heading"] = "Group and guild",
-  ["invite.set.hint"] = "- Whisper a keyword to get invited\n- Off until you set a keyword\n- Guild needs the right to invite\n- Up to 8 words, 20 letters each",
+  ["invite.set.hint"] = "- Whisper a keyword to get invited\n- Off until you set a keyword\n- Guild needs the right to invite\n- Up to 8 words, 20 characters each",
   ["invite.set.groupHeading"] = "Group",
   ["invite.set.guildHeading"] = "Guild",
   ["invite.set.enable"] = "Invite by whisper",
@@ -29,11 +29,11 @@ ns.AddLocale("enUS", {
   ["invite.set.block"] = "Blocked, names comma separated",
   ["invite.set.skipAway"] = "Not while AFK or busy",
   ["invite.set.cooldown"] = "Wait per sender",
-  ["invite.set.cooldownTip"] = "Pause per sender, also after you decline",
-  ["invite.set.cooldownHint"] = "For this long the add-on ignores another invite request from the same person, also after you declined.",
-  ["invite.set.globalLimit"] = "At most requests per minute",
-  ["invite.set.globalLimitTip"] = "Limit over all senders",
-  ["invite.set.globalLimitHint"] = "Protection against spam, default: unlimited",
+  ["invite.set.cooldownTip"] = "Ignores repeat requests, even after you decline",
+  ["invite.set.cooldownHint"] = "The addon ignores another invite request from the same person for this long, also after you declined.",
+  ["invite.set.globalLimit"] = "Maximum requests per minute",
+  ["invite.set.globalLimitTip"] = "Limits requests across all senders",
+  ["invite.set.globalLimitHint"] = "Protects against spam. Default: unlimited",
   ["invite.cd.0"] = "Off",
   ["invite.cd.15"] = "15 seconds",
   ["invite.cd.30"] = "30 seconds",
@@ -49,7 +49,6 @@ ns.AddLocale("enUS", {
   ["invite.set.confirmKeyTip"] = "The game only allows the invite on a real click or key press, not automatically.",
   ["invite.set.style"] = "Look of the invite",
   ["invite.set.preview"] = "Show preview",
-  ["invite.set.previewCombat"] = "Not possible in combat.",
   ["invite.style.window"] = "Window (default)",
   ["invite.style.bar"] = "Bar",
   ["invite.set.log"] = "Last invites",
@@ -62,8 +61,8 @@ ns.AddLocale("enUS", {
   ["invite.mode.own"] = "My characters",
   ["invite.mode.list"] = "List only",
   ["invite.why.ok"] = "Invited",
-  ["invite.why.no-api"] = "Function missing",
-  ["invite.why.error"] = "Failed",
+  ["invite.why.no-api"] = "Not available in this client",
+  ["invite.why.error"] = "Refused by the game",
   ["invite.why.no-sender"] = "Unknown sender",
   ["invite.why.self"] = "Yourself",
   ["invite.why.blocked"] = "Blocked",
@@ -82,7 +81,7 @@ ns.AddLocale("enUS", {
   ["invite.why.rate-global"] = "Too many invites",
   ["invite.why.ready"] = "Waiting for your click",
   ["invite.why.queued"] = "Waiting in line",
-  ["invite.why.waiting"] = "Waiting for the combat to end",
+  ["invite.why.waiting"] = "Waiting for combat to end",
   ["invite.why.not-in-game"] = "Contact not in the game",
   ["invite.why.other-client"] = "Other WoW version",
 })
@@ -105,13 +104,13 @@ ns.AddLocale("deDE", {
   ["invite.set.shared"] = "Beide",
   ["invite.set.allow"] = "Liste, Namen mit Komma getrennt",
   ["invite.set.block"] = "Gesperrt, Namen mit Komma getrennt",
-  ["invite.set.skipAway"] = "Nicht bei AFK oder Beschäftigt",
+  ["invite.set.skipAway"] = "Nicht bei AFK oder beschäftigt",
   ["invite.set.cooldown"] = "Wartezeit je Absender",
-  ["invite.set.cooldownTip"] = "Pause je Absender, auch nach dem Ablehnen",
+  ["invite.set.cooldownTip"] = "Ignoriert erneute Anfragen, auch nach dem Ablehnen",
   ["invite.set.cooldownHint"] = "So lange ignoriert das Addon eine erneute Einladungsanfrage derselben Person, auch nachdem du abgelehnt hast.",
-  ["invite.set.globalLimit"] = "Höchstens Anfragen je Minute",
-  ["invite.set.globalLimitTip"] = "Grenze über alle Absender",
-  ["invite.set.globalLimitHint"] = "Schutz vor Spam, Standard: unbegrenzt",
+  ["invite.set.globalLimit"] = "Maximale Anfragen pro Minute",
+  ["invite.set.globalLimitTip"] = "Begrenzt die Anfragen über alle Absender hinweg",
+  ["invite.set.globalLimitHint"] = "Schützt vor Spam. Standard: unbegrenzt",
   ["invite.cd.0"] = "Aus",
   ["invite.cd.15"] = "15 Sekunden",
   ["invite.cd.30"] = "30 Sekunden",
@@ -126,8 +125,7 @@ ns.AddLocale("deDE", {
   ["invite.set.confirmKeyHint"] = "Die Taste lädt den ersten offenen ginv-Spieler ein, solange eine Einladung offen ist.",
   ["invite.set.confirmKeyTip"] = "Das Spiel erlaubt die Einladung nur auf einen echten Klick oder Tastendruck, nicht automatisch.",
   ["invite.set.style"] = "Darstellung der Einladung",
-  ["invite.set.preview"] = "Vorschau zeigen",
-  ["invite.set.previewCombat"] = "Im Kampf nicht möglich.",
+  ["invite.set.preview"] = "Vorschau anzeigen",
   ["invite.style.window"] = "Fenster (Standard)",
   ["invite.style.bar"] = "Leiste",
   ["invite.set.log"] = "Letzte Einladungen",
@@ -140,8 +138,8 @@ ns.AddLocale("deDE", {
   ["invite.mode.own"] = "Meine Charaktere",
   ["invite.mode.list"] = "Nur Liste",
   ["invite.why.ok"] = "Eingeladen",
-  ["invite.why.no-api"] = "Funktion fehlt",
-  ["invite.why.error"] = "Fehlgeschlagen",
+  ["invite.why.no-api"] = "In diesem Client nicht verfügbar",
+  ["invite.why.error"] = "Vom Spiel abgelehnt",
   ["invite.why.no-sender"] = "Absender unbekannt",
   ["invite.why.self"] = "Du selbst",
   ["invite.why.blocked"] = "Gesperrt",
@@ -438,10 +436,7 @@ function S.Add(view)
     height = 24,
     onClick = function()
       local prompt = ns.InvitePrompt
-      local shown = prompt.ShowDemo({ prompt.Style() })
-      if not shown or shown == 0 then
-        ns.Notify(ns.L["invite.set.previewCombat"], "info")
-      end
+      prompt.ShowDemo({ prompt.Style() })
     end,
   })
   preview.fgId = "invite-preview"

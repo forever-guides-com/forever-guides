@@ -353,7 +353,7 @@ local function sendTo(channel, text)
     return false
   end
   return (pcall(function()
-    send(text, channel)
+    ns.ChatSafe.Send(text, channel, nil, send)
   end))
 end
 

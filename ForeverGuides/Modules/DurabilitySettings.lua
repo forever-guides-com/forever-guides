@@ -11,7 +11,7 @@ ns.DurabilitySettings = S
 
 ns.AddLocale("enUS", {
   ["dur.set.heading"] = "Durability window",
-  ["dur.set.hint"] = "A window with the condition of your equipment: percent and bar per part, in combat too.\nThe colors change below the limits set here, the percent is always shown as text.",
+  ["dur.set.hint"] = "A window with the condition of your equipment: percent and bar per part, in combat too.\nThe colors change at the limits set here. The percent always shows as text.",
   ["dur.set.show"] = "Show durability window",
   ["dur.set.showTip"] = "Opens or closes the window, same as the key binding and /fg durability.",
   ["dur.set.yellow"] = "Yellow below",
@@ -21,13 +21,13 @@ ns.AddLocale("enUS", {
   ["dur.set.onlyBelowTip"] = "The window stays hidden until a part falls below the limit. Opening it by hand shows it until you close it.",
   ["dur.set.onlyBelowPct"] = "Show below",
   ["dur.set.warn"] = "Chat warning when a part gets low",
-  ["dur.set.warnTip"] = "One chat line per part and drop, not during combat. It comes again after a repair and a new drop.",
+  ["dur.set.warnTip"] = "Posts one chat line per part when it drops below the limit, never in combat. The warning comes back after a repair and a new drop.",
   ["dur.set.warnPct"] = "Warn below",
 })
 ns.AddLocale("deDE", {
-  ["dur.set.heading"] = "Haltbarkeits-Fenster",
-  ["dur.set.hint"] = "Ein Fenster mit dem Zustand deiner Ausrüstung: Prozent und Balken je Teil, auch im Kampf.\nDie Farben wechseln unter den hier gesetzten Grenzen, der Prozentwert steht immer als Text da.",
-  ["dur.set.show"] = "Haltbarkeits-Fenster anzeigen",
+  ["dur.set.heading"] = "Haltbarkeitsfenster",
+  ["dur.set.hint"] = "Ein Fenster mit dem Zustand deiner Ausrüstung: Prozent und Balken je Teil, auch im Kampf.\nDie Farben wechseln an den hier gesetzten Grenzen. Den Prozentwert zeigt das Fenster immer als Text.",
+  ["dur.set.show"] = "Haltbarkeitsfenster anzeigen",
   ["dur.set.showTip"] = "Öffnet oder schließt das Fenster, wie die Tastenbelegung und /fg haltbarkeit.",
   ["dur.set.yellow"] = "Gelb unter",
   ["dur.set.orange"] = "Orange unter",
@@ -36,7 +36,7 @@ ns.AddLocale("deDE", {
   ["dur.set.onlyBelowTip"] = "Das Fenster bleibt verborgen, bis ein Teil unter die Grenze fällt. Öffnest du es von Hand, bleibt es bis zum Schließen sichtbar.",
   ["dur.set.onlyBelowPct"] = "Anzeigen unter",
   ["dur.set.warn"] = "Chat-Warnung, wenn ein Teil niedrig wird",
-  ["dur.set.warnTip"] = "Eine Chat-Zeile je Teil und Unterschreitung, nie im Kampf. Nach einer Reparatur und einem neuen Abfall kommt sie wieder.",
+  ["dur.set.warnTip"] = "Schreibt eine Chat-Zeile je Teil, sobald es unter die Grenze fällt, nie im Kampf. Nach einer Reparatur und einem neuen Abfall kommt die Warnung wieder.",
   ["dur.set.warnPct"] = "Warnen unter",
 })
 

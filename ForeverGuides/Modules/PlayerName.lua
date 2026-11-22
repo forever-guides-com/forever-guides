@@ -183,9 +183,9 @@ end
 -- Own realm is dropped, chat names carry a realm only for other realms.
 function PN.Normalize(full)
   full = PN.Clean(full)
-  local ok, realm = pcall(GetNormalizedRealmName)
+  local realm = ns.Realm.Get()
   local _, realmSep = separators()
-  if ok and type(realm) == "string" and realm ~= "" then
+  if realm then
     local tail = realmSep .. realm
     if #full > #tail and full:sub(-#tail):lower() == tail:lower() then
       return full:sub(1, -#tail - 1)

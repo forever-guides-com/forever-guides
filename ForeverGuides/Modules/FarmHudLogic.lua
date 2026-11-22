@@ -59,6 +59,7 @@ FH.DEFAULTS = {
   ringYards = FH.RING_YARDS_DEFAULT,
   pinScale = FH.PIN_SCALE_DEFAULT,
   rotation = FH.ROTATION_DEFAULT,
+  blipTips = true,
   frame = false,
   frameColor = FH.FRAME_COLOR_DEFAULT,
   frameThickness = FH.FRAME_THICKNESS_DEFAULT,
@@ -143,6 +144,7 @@ function FH.Settings(raw)
     ringYards = math.floor(yards / FH.RING_YARDS_STEP + 0.5) * FH.RING_YARDS_STEP,
     pinScale = ML.Clamp(raw.pinScale, FH.PIN_SCALE_MIN, FH.PIN_SCALE_MAX, d.pinScale),
     rotation = choice(raw.rotation, IS_ROTATION, d.rotation),
+    blipTips = flag(raw.blipTips, d.blipTips),
     frame = flag(raw.frame, d.frame),
     frameColor = FH.Color(raw.frameColor, d.frameColor),
     frameThickness = math.floor(
@@ -348,14 +350,18 @@ end
 -- Plan --------------------------------------------------------------------------------------------------
 
 -- What to do now. state = { attached (the minimap sits in the HUD), shown (the HUD is visible) }; ctx = {
--- wanted (the player's switch), suspended (a loading screen: the minimap goes back), combat, instance,
--- hideInCombat, hideInInstance }. Returns "enter", "leave", "show", "hide", "defer" (a change of the
--- minimap is due and waits for the end of the combat) or "none". Only "show" and "hide" are allowed in
--- combat, they change our own frames and nothing of Blizzard's.
+-- wanted (the player's switch), suspended (a loading screen: the minimap goes back), combat, canMove (in
+-- combat: the client lets the add-on move the minimap, it is not protected), instance, hideInCombat,
+-- hideInInstance }. Returns "enter", "leave", "show", "hide", "defer" (a change of the minimap is due and
+-- waits for the end of the combat) or "none". In combat the minimap moves only with canMove; without it a
+-- switch off hides the HUD at once (our own frame) and the minimap goes back when the combat ends.
 function FH.Plan(state, ctx)
   local want = ctx.wanted == true and not ctx.suspended and not (ctx.instance == true and ctx.hideInInstance == true)
   if want ~= (state.attached == true) then
-    if ctx.combat == true then
+    if ctx.combat == true and ctx.canMove ~= true then
+      if not want and state.shown == true then
+        return "hide"
+      end
       return "defer"
     end
     return want and "enter" or "leave"
@@ -367,6 +373,22 @@ function FH.Plan(state, ctx)
     end
   end
   return "none"
+end
+
+-- Mouse for the client's blip tooltips ---------------------------------------------------------------------
+
+-- What to do with the mouse of the minimap. ctx = { attached, shown (the HUD is visible), enabled (setting),
+-- down (the registry key is held), blocked (combat while the minimap is protected), on (the mouse is on now) }.
+-- Returns "on", "off" or "none". While blocked nothing is touched, the put back of the HUD does it later.
+function FH.MousePlan(ctx)
+  if ctx.blocked == true then
+    return "none"
+  end
+  local want = ctx.attached == true and ctx.shown == true and ctx.enabled == true and ctx.down == true
+  if want == (ctx.on == true) then
+    return "none"
+  end
+  return want and "on" or "off"
 end
 
 -- Compass and ring -------------------------------------------------------------------------------------

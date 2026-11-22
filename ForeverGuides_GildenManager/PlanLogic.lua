@@ -11,7 +11,8 @@
 --           only = id of the one rule to check (also when it is off),
 --           members = { Member... } }
 --   Member = { key, name, guid, rank, level, online, publicNote, officerNote (nil unless readable),
---              ownNote, mainKey, tags = { [tag] = true }, away = untilDay, returnedDay,
+--              ownNote, mainKey, tags = { [tag] = true }, away = untilDay, returnedDay, returnedAfter,
+--              historyKnown (false = no log yet), banned (true/false, nil = ban list unknown),
 --              joined, rankSince, lastOnline = { minDay, maxDay, src } }
 --
 -- Result: { today, entries, rules, rulesSkipped, counts, summary, quality }. An entry is one member

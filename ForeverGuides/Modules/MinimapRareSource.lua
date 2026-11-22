@@ -80,6 +80,7 @@ local function hideParts(pin)
     parts.hit.rare, parts.hit.id = nil, nil
     -- The red disc of a new rare is a texture of its own on the layer frame: it has to go with the symbol.
     ns.RareCard.PaintMark(parts.mark, nil)
+    parts.rare, parts.status, parts.mark_ = nil, nil, nil
   end
 end
 
@@ -107,21 +108,33 @@ local function paint(pin, host, anchor, alpha, scale)
   local factor = minor and RL.OTHER_SCALE or 1
   local size = math.max(4, math.floor(custom.size * factor * scale + 0.5))
   local status = ns.RareCard.Standing(custom.id)
-  ns.RareCard.SetIcon(parts.tex, custom.rare, status)
-  parts.tex:ClearAllPoints()
-  parts.tex:SetPoint("CENTER", anchor, "CENTER")
-  parts.tex:SetSize(size, size)
+  -- The layer paints every pin on each layout (many per second while riding): the symbol, the mark and the
+  -- anchors are only set again when they change, the pin itself already moves with its anchor.
+  local mark = not minor and status or nil
+  if parts.rare ~= custom.rare or parts.status ~= status or parts.mark_ ~= mark then
+    ns.RareCard.SetIcon(parts.tex, custom.rare, status)
+    ns.RareCard.PaintMark(parts.mark, mark)
+    parts.rare, parts.status, parts.mark_ = custom.rare, status, mark
+  end
+  if parts.anchor ~= anchor then
+    parts.tex:ClearAllPoints()
+    parts.tex:SetPoint("CENTER", anchor, "CENTER")
+    parts.hit:ClearAllPoints()
+    parts.hit:SetPoint("CENTER", anchor, "CENTER")
+    parts.anchor = anchor
+  end
+  if parts.size ~= size then
+    parts.tex:SetSize(size, size)
+    parts.hit:SetSize(math.max(HIT, size), math.max(HIT, size))
+    parts.size = size
+  end
   if MR.NearPlayer(pin.cx, pin.cy, size) then
     alpha = alpha * NEAR_ALPHA
   end
   parts.tex:SetAlpha(minor and alpha * RL.OTHER_ALPHA or alpha)
   parts.tex:Show()
-  ns.RareCard.PaintMark(parts.mark, not minor and status or nil)
   parts.mark:SetAlpha(alpha)
   parts.mark.back:SetAlpha(alpha)
-  parts.hit:ClearAllPoints()
-  parts.hit:SetPoint("CENTER", anchor, "CENTER")
-  parts.hit:SetSize(math.max(HIT, size), math.max(HIT, size))
   parts.hit.rare, parts.hit.id = custom.rare, custom.id
   parts.hit:SetShown(not minor)
   return true

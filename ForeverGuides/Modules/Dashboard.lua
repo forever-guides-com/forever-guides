@@ -4,9 +4,9 @@ local W, L, Theme = ns.W, ns.L, ns.Theme
 
 ns.AddLocale("enUS", {
   ["roster.title"] = "Your characters",
-  ["roster.note"] = "Logged-in characters, stored locally, never sent.",
-  ["roster.off"] = "List is off, switch it on in the settings.",
-  ["roster.empty"] = "No characters yet, log in with each once.",
+  ["roster.note"] = "Characters you logged in with. Stored locally, never sent.",
+  ["roster.off"] = "The list is switched off. Switch it on in the settings.",
+  ["roster.empty"] = "No characters yet. Log in with each one once.",
   ["roster.total"] = "Total: %d characters, gold of all: %s",
   ["roster.total1"] = "Total: 1 character, gold: %s",
   ["roster.sort.seen"] = "Last seen",
@@ -14,8 +14,10 @@ ns.AddLocale("enUS", {
   ["roster.sort.level"] = "Level",
   ["roster.sort.gold"] = "Gold",
   ["roster.sort.played"] = "Played",
+  ["roster.sort.rested"] = "Rested XP",
   ["roster.col.name"] = "Character",
-  ["roster.col.level"] = "Lvl",
+  ["roster.col.level"] = "Level",
+  ["roster.col.rested"] = "XP / rested",
   ["roster.col.gold"] = "Gold",
   ["roster.col.played"] = "Played",
   ["roster.col.ilvl"] = "iLvl",
@@ -31,7 +33,7 @@ ns.AddLocale("enUS", {
   ["roster.dateFormat"] = "%Y-%m-%d %H:%M",
   ["roster.forget"] = "Remove from list",
   ["roster.forget.title"] = "Remove character",
-  ["roster.forget.text"] = "Remove? It appears again on next login.",
+  ["roster.forget.text"] = "Remove this character from the list? It appears again at your next login.",
   ["roster.tip.level"] = "Level %s %s",
   ["roster.tip.zone"] = "Zone: %s",
   ["roster.tip.guild"] = "Guild: %s",
@@ -42,15 +44,15 @@ ns.AddLocale("enUS", {
   ["roster.played.unknown"] = "not recorded yet",
   ["roster.tip.professions"] = "Professions: %s",
   ["roster.tip.seen"] = "Last seen: %s",
-  ["roster.tip.asOf"] = "Gold, item level and place read: %s",
+  ["roster.tip.asOf"] = "Gold, item level and place as of %s",
   ["roster.tip.build"] = "Game %s, addon %s",
 })
 
 ns.AddLocale("deDE", {
   ["roster.title"] = "Deine Charaktere",
-  ["roster.note"] = "Angemeldete Charaktere, lokal, nie gesendet.",
-  ["roster.off"] = "Liste aus, einschalten in den Einstellungen.",
-  ["roster.empty"] = "Noch keine Charaktere, melde jeden einmal an.",
+  ["roster.note"] = "Charaktere, mit denen du dich angemeldet hast. Lokal gespeichert, nie gesendet.",
+  ["roster.off"] = "Die Liste ist ausgeschaltet. Schalte sie in den Einstellungen ein.",
+  ["roster.empty"] = "Noch keine Charaktere. Melde dich einmal mit jedem an.",
   ["roster.total"] = "Gesamt: %d Charaktere, Summe Gold: %s",
   ["roster.total1"] = "Gesamt: 1 Charakter, Gold: %s",
   ["roster.sort.seen"] = "Zuletzt",
@@ -58,8 +60,10 @@ ns.AddLocale("deDE", {
   ["roster.sort.level"] = "Stufe",
   ["roster.sort.gold"] = "Gold",
   ["roster.sort.played"] = "Spielzeit",
+  ["roster.sort.rested"] = "Erholt",
   ["roster.col.name"] = "Charakter",
   ["roster.col.level"] = "Stufe",
+  ["roster.col.rested"] = "EP / Erholt",
   ["roster.col.gold"] = "Gold",
   ["roster.col.played"] = "Spielzeit",
   ["roster.col.ilvl"] = "iLvl",
@@ -75,18 +79,18 @@ ns.AddLocale("deDE", {
   ["roster.dateFormat"] = "%d.%m.%Y %H:%M",
   ["roster.forget"] = "Aus der Liste entfernen",
   ["roster.forget.title"] = "Charakter entfernen",
-  ["roster.forget.text"] = "Entfernen? Er erscheint beim nächsten Login wieder.",
+  ["roster.forget.text"] = "Charakter aus der Liste entfernen? Er erscheint bei deiner nächsten Anmeldung wieder.",
   ["roster.tip.level"] = "Stufe %s %s",
   ["roster.tip.zone"] = "Zone: %s",
   ["roster.tip.guild"] = "Gilde: %s",
-  ["roster.tip.ilvl"] = "Gegenstandsstufe: %.1f",
+  ["roster.tip.ilvl"] = "Itemlevel: %.1f",
   ["roster.tip.played"] = "Spielzeit: %s",
   ["roster.total.played"] = "Spielzeit gesamt: %s",
   ["roster.total.playedMissing"] = "Spielzeit gesamt: %s (%d noch nicht erfasst)",
   ["roster.played.unknown"] = "noch nicht erfasst",
   ["roster.tip.professions"] = "Berufe: %s",
   ["roster.tip.seen"] = "Zuletzt gesehen: %s",
-  ["roster.tip.asOf"] = "Gold, Gegenstandsstufe und Ort: Stand %s",
+  ["roster.tip.asOf"] = "Gold, Itemlevel und Ort: Stand %s",
   ["roster.tip.build"] = "Spiel %s, Addon %s",
 })
 
@@ -104,6 +108,7 @@ local HEADER_H, HEADER_GAP = 18, 2
 -- room makes the table scroll sideways (S.ColumnLayout, W.HScrollArea).
 local COLUMNS = {
   { id = "level", w = 40, justify = "RIGHT" },
+  { id = "rested", w = 150 },
   { id = "played", w = 84, justify = "RIGHT" },
   { id = "gold", w = 124, justify = "RIGHT" },
   { id = "ilvl", w = 44, justify = "RIGHT" },
@@ -112,7 +117,7 @@ local COLUMNS = {
   { id = "guild", w = 120 },
 }
 local FIT = { lead = NAME_X, tail = DELETE + GAP, gap = GAP, nameMin = NAME_MIN, columns = COLUMNS }
-local SORTS = { "seen", "name", "level", "gold", "played" }
+local SORTS = { "seen", "name", "level", "rested", "gold", "played" }
 local sortMode = "seen"
 
 -- Icons: the specs come from PageKit (the class, faction and race icons of the
@@ -226,6 +231,10 @@ local function tooltipText(e, live, now)
   if e.ilvl then
     lines[#lines + 1] = string.format(L["roster.tip.ilvl"], e.ilvl)
   end
+  local _, restedLines = ns.RosterView.RestedTip(e, { now = now })
+  if restedLines then
+    lines[#lines + 1] = restedLines
+  end
   local S = ns.RosterStatsLogic
   local playLines = live and S.TooltipLines(live, "playtime", now)
   if playLines then
@@ -274,7 +283,7 @@ local function newPin(owner)
   pin.line:SetPoint("BOTTOMLEFT")
   pin.line:SetPoint("BOTTOMRIGHT")
   pin.line:SetHeight(1)
-  pin.line:SetColorTexture(1, 1, 1, 0.08)
+  pin.line:SetColorTexture(Theme.fillColor("line"))
   function pin:Place(x)
     pin:ClearAllPoints()
     pin:SetPoint("TOPLEFT", owner, "TOPLEFT", x, 0)
@@ -319,7 +328,7 @@ local function makeRow(parent, onForget, getLayout, pins)
   row.line:SetPoint("BOTTOMLEFT")
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
-  row.line:SetColorTexture(1, 1, 1, 0.08)
+  row.line:SetColorTexture(Theme.fillColor("line"))
   row.pin = newPin(row)
   pins[#pins + 1] = row.pin
   row.crest = newIcon(row.pin, CREST)
@@ -374,6 +383,7 @@ local function paintRow(row, e, live, now)
   local c = row.cells
   c.name:SetText(nameText(e))
   c.level:SetText(e.level and tostring(e.level) or "-")
+  c.rested:SetText(ns.RosterView.XpRestedText(e, now) or Theme.hexText("textMuted", "-"))
   c.played:SetText(
     live and live.played and ns.RosterStatsLogic.Duration(live.played) or Theme.hexText("textMuted", "-")
   )
@@ -608,7 +618,7 @@ end
 
 -- Smaller card under the stream invitation: the community server with the same copy dialog. The address and the
 -- texts come from ns.Community (UI/MainFrame.lua). Address and button share a row when they fit.
-local COMMUNITY_PAD, COMMUNITY_GAP, COMMUNITY_BUTTON_W, COMMUNITY_BUTTON_H = 12, 10, 210, 30
+local COMMUNITY_GAP, COMMUNITY_BUTTON_W, COMMUNITY_BUTTON_H = 10, 210, 30
 
 local function communityCard(view)
   local community = ns.Community
@@ -620,7 +630,7 @@ local function communityCard(view)
   local address = W.Text(card, { text = community.text, role = "ui", color = "text" })
   local button = W.Action(card, {
     key = "community.button",
-    icon = "share",
+    icon = "open",
     height = COMMUNITY_BUTTON_H,
     width = COMMUNITY_BUTTON_W,
     tooltip = "community.dialog",
@@ -632,6 +642,7 @@ local function communityCard(view)
   })
 
   function card:fgGridLayout(width)
+    local COMMUNITY_PAD = card.pad
     local inner = math.max(1, width - 2 * COMMUNITY_PAD)
     local y = COMMUNITY_PAD
     for _, fs in ipairs({ title, text }) do

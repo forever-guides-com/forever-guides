@@ -150,7 +150,7 @@ function Router:crumbs(path)
   local acc = id
   for i, param in ipairs(params) do
     acc = acc .. "/" .. param
-    local label = page.crumbLabel and page.crumbLabel(param, i) or param
+    local label = page.crumbLabel and page.crumbLabel(param, i, params) or param
     out[#out + 1] = { label = label, path = acc }
   end
   return out

@@ -38,7 +38,7 @@ ns.AddLocale("enUS", {
   ["cursor.variant.swing.mainhand"] = "Swing timer: main hand",
   ["cursor.variant.swing.offhand"] = "Swing timer: off hand",
   ["cursor.variant.swing.ranged"] = "Swing timer: ranged",
-  ["cursor.timers.swingOne"] = "Add one element per weapon: main hand, off hand and ranged each get their own swing timer.",
+  ["cursor.timers.swingOne"] = "Adds one element per weapon: main hand, off hand and ranged each get their own swing timer.",
   ["cursor.preset.timers"] = "Timers (cooldown and cast)",
   ["cursor.preset.swing"] = "Swing timer",
   ["cursor.el.swing"] = "Main hand swing",
@@ -57,7 +57,7 @@ ns.AddLocale("enUS", {
   ["cursor.panel.hand.ranged"] = "Ranged",
   ["cursor.panel.style.ring"] = "Ring",
   ["cursor.panel.style.bar"] = "Bar",
-  ["cursor.timers.swingNative"] = "The game's own swing bars are switched on. They show in addition to this timer. Switch them off in the combat options of the game if you want only one.",
+  ["cursor.timers.swingNative"] = "The game's own swing bars are switched on and show in addition to this timer. Switch them off in the combat options of the game if you want only one.",
 })
 ns.AddLocale("deDE", {
   ["cursor.type.gcd"] = "Ring der globalen Abklingzeit",
@@ -69,7 +69,7 @@ ns.AddLocale("deDE", {
   ["cursor.variant.swing.mainhand"] = "Schwung-Zeitgeber: Waffenhand",
   ["cursor.variant.swing.offhand"] = "Schwung-Zeitgeber: Schildhand",
   ["cursor.variant.swing.ranged"] = "Schwung-Zeitgeber: Fernkampf",
-  ["cursor.timers.swingOne"] = "Füge pro Waffe ein eigenes Element hinzu: Waffenhand, Schildhand und Fernkampf bekommen je einen eigenen Schwung-Zeitgeber.",
+  ["cursor.timers.swingOne"] = "Fügt ein Element pro Waffe hinzu: Waffenhand, Schildhand und Fernkampf bekommen je einen eigenen Schwung-Zeitgeber.",
   ["cursor.preset.timers"] = "Zeitgeber (Abklingzeit und Zauber)",
   ["cursor.preset.swing"] = "Schwung-Zeitgeber",
   ["cursor.el.swing"] = "Schwung Waffenhand",
@@ -88,7 +88,7 @@ ns.AddLocale("deDE", {
   ["cursor.panel.hand.ranged"] = "Fernkampf",
   ["cursor.panel.style.ring"] = "Ring",
   ["cursor.panel.style.bar"] = "Balken",
-  ["cursor.timers.swingNative"] = "Die eigenen Schwungleisten des Spiels sind eingeschaltet. Sie erscheinen zusätzlich zu diesem Zeitgeber. Schalte sie in den Kampfoptionen des Spiels aus, wenn du nur eine Anzeige willst.",
+  ["cursor.timers.swingNative"] = "Die eigenen Schwungleisten des Spiels sind eingeschaltet und erscheinen zusätzlich zu diesem Zeitgeber. Schalte sie in den Kampfoptionen des Spiels aus, wenn du nur eine Anzeige willst.",
 })
 
 -- Guarded game access ----------------------------------------------------------------------------------

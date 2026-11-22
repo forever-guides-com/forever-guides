@@ -4,11 +4,14 @@
 -- category sorted by name, with a switch per entry and "All" and "None" per group. Used in the panel of the
 -- world map and in the settings, later on the minimap. It takes the width of its parent and a list height
 -- that the host sets, nothing is fixed.
+-- With opts.windowed the long list is left out: each area is one line with its switch and a button that
+-- opens the small filter window of that area (ns.GatherPick), the button shows how many entries are on.
 -- Without the data add-on the list gives way to the package banner.
 local _, ns = ...
 local W, L, K = ns.W, ns.L, ns.PageKit
 local F, G, Data, R = ns.GatherFilter, ns.GatheringLogic, ns.GatherDataAccess, ns.ProfessionRouteLogic
 local GO = ns.GatherObjects
+local P = ns.GatherPick
 
 local UI = {}
 ns.GatherFilterUI = UI
@@ -48,14 +51,14 @@ ns.AddLocale("deDE", {
   ["gather.filter.hiddenSuffix"] = " (ausgeblendet)",
   ["gather.filter.itemTip"] = "Klick: Fundorte dieses Materials auf der Karte zeigen oder ausblenden.",
   ["gather.filter.groupTip"] = "Materialien dieses Berufs. Alle und Keine schalten die ganze Gruppe um.",
-  ["gather.filter.groupOffTip"] = "Die Fundorte dieses Berufs sind ausgeblendet. Mit dem Schalter über der Liste einschalten.",
+  ["gather.filter.groupOffTip"] = "Die Fundorte dieses Berufs sind ausgeblendet. Schalte sie mit dem Haken über der Liste ein.",
   ["gather.filter.treasure"] = "Truhen",
   ["gather.filter.treasureTip"] = "Zeigt die Fundorte von Truhen, Muscheln und weiteren Fundstücken, die in der Liste nicht abgewählt sind.",
   ["gather.filter.school"] = "Fischschwärme",
   ["gather.filter.schoolTip"] = "Zeigt die Fundorte von Fischschwärmen und Wrackteilen auf der Karte, die Arten, die in der Liste nicht abgewählt sind. Aus blendet alle Schwärme auf der Karte aus.",
   ["gather.filter.kindTip"] = "Klick: Fundorte dieser Art auf der Karte zeigen oder ausblenden.",
   ["gather.filter.catTip"] = "Arten dieser Kategorie. Alle und Keine schalten die ganze Gruppe um.",
-  ["gather.filter.catOffTip"] = "Die Fundorte dieser Kategorie sind ausgeblendet. Mit dem Schalter über der Liste einschalten.",
+  ["gather.filter.catOffTip"] = "Die Fundorte dieser Kategorie sind ausgeblendet. Schalte sie mit dem Haken über der Liste ein.",
 })
 
 local ROW_H = 26
@@ -65,6 +68,9 @@ local SMALL_H = 20
 UI.LIST_ROWS = 10
 -- Height of the switches above the list: two rows of two (professions, then categories) with a 2 px gap.
 UI.TOP = 2 * CHECK_H + 2
+-- Windowed: height of the line of one area (switch and button).
+local PICK_ROW = SMALL_H + 6
+local LABEL_INSET, MIN_LABEL = 24, 72 -- box plus gap before a label; narrowest label column beside a button
 
 -- The entries of the list: a heading per profession, then its items by skill (only professions with items),
 -- then a heading per category of the spots without an item, then its kinds by name.
@@ -88,12 +94,88 @@ function UI.Entries(data)
   return out
 end
 
--- Opts: leaveFocusRing (the control sits on a Blizzard frame: Tab of the main window must not reach it).
+-- The entries of one area for the filter window, in the order of the list: { id, name, icon, sub, skill, prof }.
+local function pickEntries(def)
+  local data = Data.Get()
+  local out = {}
+  if not data then
+    return out
+  end
+  if def.prof then
+    for _, e in ipairs(G.Items(data, { prof = def.prof })) do
+      out[#out + 1] = {
+        id = e.id,
+        name = e.name,
+        icon = G.IconPath(e.id, e),
+        sub = string.format(L["gather.filter.skill"], e.skill),
+        skill = e.skill,
+        prof = e.prof,
+      }
+    end
+    return out
+  end
+  for _, item in ipairs(GO.Entries(data)) do
+    local e = item.entry
+    if item.kind == "object" and e.cat == def.cat then
+      out[#out + 1] = {
+        id = e.id,
+        name = e.name,
+        icon = e.icon,
+        sub = e.lock and string.format(L["gather.win.lock"], e.lock) or "",
+        skill = e.lock,
+      }
+    end
+  end
+  return out
+end
+
+-- The four areas: the switch, how its entries are read and written.
+local AREAS = {
+  {
+    id = "mining",
+    prof = "mining",
+    isOn = F.ItemOn,
+    setMany = F.SetItems,
+    areaOn = function()
+      return F.ProfessionOn("mining")
+    end,
+  },
+  {
+    id = "herbalism",
+    prof = "herbalism",
+    isOn = F.ItemOn,
+    setMany = F.SetItems,
+    areaOn = function()
+      return F.ProfessionOn("herbalism")
+    end,
+  },
+  {
+    id = "treasure",
+    cat = "treasure",
+    isOn = GO.KindOn,
+    setMany = GO.SetKinds,
+    areaOn = function()
+      return GO.CategoryOn("treasure")
+    end,
+  },
+  {
+    id = "school",
+    cat = "school",
+    isOn = GO.KindOn,
+    setMany = GO.SetKinds,
+    areaOn = function()
+      return GO.CategoryOn("school")
+    end,
+  },
+}
+
+-- Opts: windowed (see the head of the file), leaveFocusRing (the control sits on a Blizzard frame: Tab of the main window must not reach it).
 -- Returns the frame. Methods: Update() (reads the settings and the data again), SetListHeight(h) (the
 -- height of the list, returns the height of the whole control), Height() (the height the control needs now).
 function UI.Build(parent, opts)
   opts = opts or {}
   local f = CreateFrame("Frame", nil, parent)
+  local windowed = opts.windowed == true
   local listH = K.scaledHeight(ROW_H) * UI.LIST_ROWS
   local leave = opts.leaveFocusRing and ns.BlizzardLinks and ns.BlizzardLinks.LeaveFocusRing
 
@@ -139,15 +221,49 @@ function UI.Build(parent, opts)
   end
   local treasure = checkCategory("treasure")
   local schools = checkCategory("school")
-  -- Two columns: ores and herbs on the first row, chests and fishing schools below.
-  mining:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-  mining:SetPoint("TOPRIGHT", f, "TOP", -2, 0)
-  herbs:SetPoint("TOPLEFT", f, "TOP", 2, 0)
-  herbs:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-  treasure:SetPoint("TOPLEFT", mining, "BOTTOMLEFT", 0, -2)
-  treasure:SetPoint("TOPRIGHT", mining, "BOTTOMRIGHT", 0, -2)
-  schools:SetPoint("TOPLEFT", herbs, "BOTTOMLEFT", 0, -2)
-  schools:SetPoint("TOPRIGHT", herbs, "BOTTOMRIGHT", 0, -2)
+  -- The button of an area in the windowed control: opens the filter window of the area.
+  local pickers = {}
+  local checks = { mining = mining, herbalism = herbs, treasure = treasure, school = schools }
+  if windowed then
+    for _, def in ipairs(AREAS) do
+      local key = "gather.win.t." .. def.id
+      local b = plain(W.Button(f, {
+        text = "",
+        width = 64,
+        height = SMALL_H,
+        tooltip = key,
+        tooltipText = "gather.win.openTip",
+        opens = true,
+        onClick = function()
+          P.Open({
+            title = key,
+            hint = def.prof and ("gather.spots.hint." .. def.prof) or nil,
+            entries = function()
+              return pickEntries(def)
+            end,
+            isOn = def.isOn,
+            setMany = def.setMany,
+            canGather = def.prof and P.SkillGate() or nil,
+            dim = function()
+              return not def.areaOn()
+            end,
+          })
+        end,
+      }))
+      b.fgId = "gather-pick-" .. def.id
+      pickers[def.id] = b
+    end
+  else
+    -- Two columns: ores and herbs on the first row, chests and fishing schools below.
+    mining:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
+    mining:SetPoint("TOPRIGHT", f, "TOP", -2, 0)
+    herbs:SetPoint("TOPLEFT", f, "TOP", 2, 0)
+    herbs:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    treasure:SetPoint("TOPLEFT", mining, "BOTTOMLEFT", 0, -2)
+    treasure:SetPoint("TOPRIGHT", mining, "BOTTOMRIGHT", 0, -2)
+    schools:SetPoint("TOPLEFT", herbs, "BOTTOMLEFT", 0, -2)
+    schools:SetPoint("TOPRIGHT", herbs, "BOTTOMRIGHT", 0, -2)
+  end
 
   -- Rows ---------------------------------------------------------------------------------------------
 
@@ -269,6 +385,9 @@ function UI.Build(parent, opts)
         name = name .. L["gather.filter.hiddenSuffix"]
       end
       row.title:SetText(name)
+      -- The buttons take the width of their text, only the title gives way on a narrow row.
+      row.none:SetWidth(row.none:Fit())
+      row.all:SetWidth(row.all:Fit())
       row.paintHover()
       return
     end
@@ -296,11 +415,12 @@ function UI.Build(parent, opts)
     row.paintHover()
   end
 
-  local list = W.ScrollList(f, {
-    rowHeight = K.scaledHeight(ROW_H),
-    createRow = createRow,
-    bindRow = bindRow,
-  })
+  local list = not windowed
+    and W.ScrollList(f, {
+      rowHeight = K.scaledHeight(ROW_H),
+      createRow = createRow,
+      bindRow = bindRow,
+    })
 
   local banner = ns.PackageUI.Banner(f, Data.ADDON, {
     onLoaded = function()
@@ -319,13 +439,44 @@ function UI.Build(parent, opts)
 
   -- Layout and refresh -------------------------------------------------------------------------------
 
-  local top = UI.TOP
+  local top = windowed and #AREAS * PICK_ROW or UI.TOP
   local missing = false
+
+  -- Windowed: one block per area, the switch label wraps and the button sits beside it. A column narrower than
+  -- MIN_LABEL puts the button on a line of its own below the switch, so no text is ever cut. Returns the height.
+  local function placeAreas()
+    local width = math.max(1, f:GetWidth() or 0)
+    local y = 0
+    for _, def in ipairs(AREAS) do
+      local box, b = checks[def.id], pickers[def.id]
+      local side = b:IsShown() and b:GetWidth() + 4 or 0
+      local stacked = side > 0 and width - side - LABEL_INSET < MIN_LABEL
+      local boxW = stacked and width or width - side
+      box:ClearAllPoints()
+      box:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
+      box:SetWidth(boxW)
+      local h = math.max(PICK_ROW, box:fgGridLayout(boxW))
+      b:ClearAllPoints()
+      if stacked then
+        b:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -(y + h))
+        h = h + SMALL_H + 4
+      else
+        b:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -y)
+      end
+      y = y + h
+    end
+    return y
+  end
 
   -- Places the list or the banner and sets the height of the control. Returns it.
   function f:Layout()
+    if windowed then
+      top = placeAreas()
+    end
     local y = top + GAP
-    list:ClearAllPoints()
+    if list then
+      list:ClearAllPoints()
+    end
     banner:ClearAllPoints()
     if missing then
       local width = math.max(1, f:GetWidth() or 0)
@@ -343,6 +494,10 @@ function UI.Build(parent, opts)
       f:SetHeight(y + h)
       return y + h
     end
+    if windowed then
+      f:SetHeight(top)
+      return top
+    end
     list:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -y)
     list:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -y)
     list:SetHeight(listH)
@@ -357,7 +512,9 @@ function UI.Build(parent, opts)
     schools.Refresh()
     local data, status = Data.Get()
     missing = data == nil
-    list:SetShown(not missing)
+    if list then
+      list:SetShown(not missing)
+    end
     local bannerShown = banner:Update(missing and status == Data.STATUS.missing)
     empty:SetShown(missing and not bannerShown)
     if missing then
@@ -365,14 +522,32 @@ function UI.Build(parent, opts)
     end
     -- The height first: the list shows as many rows as it is high.
     local height = f:Layout()
-    list:SetData(data and UI.Entries(data) or {})
+    if list then
+      list:SetData(data and UI.Entries(data) or {})
+    end
+    for _, def in ipairs(AREAS) do
+      local b = pickers[def.id]
+      if b then
+        b:SetShown(not missing)
+        if not missing then
+          W.SetText(b.label, nil, P.ButtonText(pickEntries(def), def.isOn))
+          b:SetWidth(b:Fit())
+        end
+      end
+    end
+    if windowed then
+      -- The buttons have their final text and width now, the switches lay out beside them.
+      height = f:Layout()
+    end
     return height
   end
 
   function f:SetListHeight(h)
     listH = math.max(K.scaledHeight(ROW_H), h)
     local height = f:Layout()
-    list.Refresh()
+    if list then
+      list.Refresh()
+    end
     return height
   end
 
@@ -385,7 +560,15 @@ function UI.Build(parent, opts)
     return f:Layout()
   end
 
-  f.parts = { mining = mining, herbs = herbs, treasure = treasure, schools = schools, list = list, banner = banner }
+  f.parts = {
+    mining = mining,
+    herbs = herbs,
+    treasure = treasure,
+    schools = schools,
+    list = list,
+    banner = banner,
+    pickers = pickers,
+  }
   f:HookScript("OnShow", function()
     f:Update()
   end)

@@ -60,6 +60,7 @@ function OV.Input()
     inactiveDays = setting("inactiveDays"),
     roster = snap.members,
     store = guild.members,
+    banned = gm.BansLogic.BanIndex(guild),
     ranks = snap.ranks,
     events = guild.events,
     plan = plan,
@@ -169,10 +170,11 @@ function OV.Lines(model)
     out.returners[1] = row(string.format(L["gm.rem.returners.empty"], RM.RETURN_WINDOW), "textMuted")
   else
     for _, r in ipairs(model.returners) do
-      out.returners[#out.returners + 1] = row(
-        r.after and string.format(L["gm.rem.returner.line"], r.name, agoText(r.ago), r.after)
-          or string.format(L["gm.rem.returner.lineShort"], r.name, agoText(r.ago))
-      )
+      local text = r.after and string.format(L["gm.rem.returner.line"], r.name, agoText(r.ago), r.after)
+        or string.format(L["gm.rem.returner.lineShort"], r.name, agoText(r.ago))
+      -- A returner on the ban list (or with a banned main or alt) is a warning, never an action.
+      out.returners[#out.returners + 1] =
+        row(r.banned and text .. ". " .. L["gm.rem.returner.banned"] or text, r.banned and "warning" or nil)
     end
   end
 

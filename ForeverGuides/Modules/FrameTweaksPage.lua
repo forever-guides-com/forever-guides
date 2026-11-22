@@ -26,8 +26,6 @@ ns.AddLocale("enUS", {
   ["win.intro"] = "Move, zoom and fade game windows.",
   ["win.enabled"] = "Adjust windows",
   ["win.enabledTip"] = "Off: windows stay as the game has them.",
-  ["win.combat"] = "No changes in combat",
-  ["win.combatTip"] = "Protected windows wait either way.",
   ["win.bar"] = "Bar below windows",
   ["win.barTip"] = "Opacity, zoom and grip.",
   ["win.barMode"] = "Window controls",
@@ -115,14 +113,12 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["page.windows"] = "Fenster",
-  ["win.intro"] = "Spielfenster verschieben, zoomen und ausblenden.",
+  ["win.intro"] = "Spielfenster verschieben, zoomen und abblenden.",
   ["win.enabled"] = "Fenster anpassen",
   ["win.enabledTip"] = "Aus: Fenster bleiben wie im Spiel.",
-  ["win.combat"] = "Im Kampf nichts ändern",
-  ["win.combatTip"] = "Geschützte Fenster warten immer.",
   ["win.bar"] = "Leiste unter Fenstern",
   ["win.barTip"] = "Deckkraft, Zoom und Griff.",
-  ["win.barMode"] = "Leiste am Fenster",
+  ["win.barMode"] = "Fenstersteuerung",
   ["win.barModeTip"] = "Griff: kleiner Knopf, Panel per Klick.",
   ["win.barMode.grip"] = "Griff (Standard)",
   ["win.barMode.bar"] = "Leiste",
@@ -184,8 +180,8 @@ ns.AddLocale("deDE", {
   ["win.export.none"] = "Nichts zu exportieren.",
   ["win.import"] = "Importieren",
   ["win.import.title"] = "Fenster importieren",
-  ["win.import.hint"] = "Text einfügen, dann Anwenden.",
-  ["win.import.empty"] = "Erst Text einfügen.",
+  ["win.import.hint"] = "Füge Text ein, dann klicke auf Anwenden.",
+  ["win.import.empty"] = "Füge zuerst Text ein.",
   ["win.import.badHead"] = "Kein Fenster-Export.",
   ["win.import.preview"] = "Neu %d, ersetzt %d, abgelehnt %d",
   ["win.import.do"] = "Anwenden",
@@ -488,7 +484,7 @@ local function build(container)
   local allRows = {}
   local refresh, layoutLeft, layoutRight
 
-  ns.AddParagraph(view, "win.intro", { role = "ui", color = "textSecondary", gap = 8 })
+  ns.AddIntro(view, "win.intro", { gap = 8 })
   conflict = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = 8 })
 
   -- Two columns: the settings (own scroll area) and the window list that takes the rest of the page.
@@ -549,7 +545,6 @@ local function build(container)
     return add(widget, { height = 24, gap = 6 })
   end
   toggle("frameTweaks", "win.enabled", "win.enabledTip", true)
-  toggle("frameTweaksCombat", "win.combat", "win.combatTip", true)
   -- The old switch frameBar (false = off) is cleared with the choice, so the choice counts from then on.
   local function barModeGet()
     return ns.FrameTweaksBar.Mode()
@@ -733,8 +728,8 @@ local function build(container)
     row.line:SetPoint("BOTTOMRIGHT")
     row.line:SetHeight(1)
     local function paint()
-      row.bg:SetColorTexture(1, 1, 1, row.selected and 0.1 or (row.hover and 0.05 or 0))
-      row.line:SetColorTexture(1, 1, 1, ns.Theme.lineAlpha())
+      row.bg:SetColorTexture(ns.Theme.fillColor(row.selected and "selected" or (row.hover and "hover" or nil)))
+      row.line:SetColorTexture(ns.Theme.fillColor("line"))
     end
     row.paint = paint
     ns.Bind(row, paint)

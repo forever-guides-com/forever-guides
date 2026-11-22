@@ -255,13 +255,22 @@ local function chatPatterns()
   return patterns
 end
 
+-- The guild change a system message tells (HistoryLogic.ParseChat), nil for any other line and for a
+-- message the client hides from add-ons.
+function H.Parse(msg)
+  if not FG.ItemInfo.accessible(msg) or type(msg) ~= "string" then
+    return nil
+  end
+  return HL.ParseChat(msg, chatPatterns())
+end
+
 -- Parses one system message and records it. A message the client hides from add-ons is skipped; the
 -- roster comparison finds the same change later.
 function H.OnChat(msg)
-  if not FG.ItemInfo.accessible(msg) or type(msg) ~= "string" or not active() then
+  if not active() then
     return false
   end
-  local parsed = HL.ParseChat(msg, chatPatterns())
+  local parsed = H.Parse(msg)
   local today = parsed and H.Clock()
   if not today then
     return false

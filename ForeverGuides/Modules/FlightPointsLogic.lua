@@ -14,7 +14,7 @@ ns.AddLocale("enUS", {
   ["fp.hint"] = "Click: set waypoint",
   ["fp.legend.dim"] = "Dimmed: flight point not yet discovered",
   ["fp.set.world"] = "Flight points in the world map",
-  ["fp.set.addon"] = "Dim undiscovered flight points on the add-on map",
+  ["fp.set.addon"] = "Dim undiscovered flight points on the addon map",
   ["fp.set.listCount"] = "Flight points in the list",
   ["fp.set.onlyKnown"] = "List only discovered flight points",
   ["fp.tab"] = "Flights",

@@ -6,7 +6,7 @@
 -- the consent crafting.receive the hint with its button stands in place of the list and nothing is asked.
 -- Opened by CraftersView.Open(spell) from the recipe page, the profession route, the shopping list and the
 -- search; the small buttons come from CraftersView.Action. Rows, order, texts and keys are
--- CraftersViewLogic; no frame is built in combat.
+-- CraftersViewLogic; it opens and paints in combat too (own frames only).
 local _, ns = ...
 local W, L, Theme, U, K = ns.W, ns.L, ns.Theme, ns.U, ns.PageKit
 local CVL, CD, Consent = ns.CraftersViewLogic, ns.CraftDirectory, ns.Consent
@@ -19,11 +19,11 @@ ns.AddLocale("enUS", {
   ["cv.close"] = "Close list",
   ["cv.grip"] = "Drag to resize",
   ["cv.button"] = "Who can make this?",
-  ["cv.button.tip"] = "Guild members that can make it.",
+  ["cv.button.tip"] = "Shows guild members who can make it.",
   ["cv.refresh"] = "Refresh",
   ["cv.refresh.tip"] = "Asks the guild again.",
-  ["cv.chat"] = "Ask in guild chat",
-  ["cv.chat.tip"] = "Prepares the line. Nothing is sent.",
+  ["cv.chat"] = "Ask in chat",
+  ["cv.chat.tip"] = "Opens the share window with the question. Nothing is sent until you click Send.",
   ["cv.whisper"] = "Whisper",
   ["cv.whisper.tip"] = "Prepares a whisper. You send it.",
   ["cv.invite"] = "Invite",
@@ -45,7 +45,7 @@ ns.AddLocale("enUS", {
   ["cv.stale"] = "(outdated)",
   ["cv.needRecv"] = "Crafters of other members need sharing.",
   ["cv.empty.noGuild"] = "You are not in a guild.",
-  ["cv.empty.nobody"] = "Nobody shares recipes yet.\nMembers need the add-on with sharing on.",
+  ["cv.empty.nobody"] = "Nobody shares recipes yet.\nMembers need the addon and must switch sharing on.",
   ["cv.empty.none"] = "No sharing member knows this recipe.",
   ["cv.empty.asking"] = "Asking the guild (%d s)",
   ["cv.unknown"] = "Loading details of %d members",
@@ -61,7 +61,6 @@ ns.AddLocale("enUS", {
   ["cv.tpl.whisper"] = "Hi, can you make %s for me?",
   ["cv.tpl.guild"] = "Who can make %s?",
   ["cv.recipe"] = "Recipe %d",
-  ["cv.combat"] = "Open the list after combat.",
   ["cv.hint"] = "Arrows move, Enter runs, Tab walks, Esc closes",
   ["cv.stats"] = "Saved: %d members, covered %d of %d, %s",
   ["cv.statsShort"] = "Saved: %d members, %s",
@@ -73,11 +72,11 @@ ns.AddLocale("deDE", {
   ["cv.close"] = "Liste schließen",
   ["cv.grip"] = "Zum Ändern der Größe ziehen",
   ["cv.button"] = "Wer kann das herstellen?",
-  ["cv.button.tip"] = "Gildenmitglieder, die es herstellen.",
+  ["cv.button.tip"] = "Zeigt Gildenmitglieder, die es herstellen können.",
   ["cv.refresh"] = "Aktualisieren",
   ["cv.refresh.tip"] = "Fragt die Gilde erneut.",
-  ["cv.chat"] = "Im Gildenchat fragen",
-  ["cv.chat.tip"] = "Bereitet die Zeile vor. Nichts wird gesendet.",
+  ["cv.chat"] = "Im Chat fragen",
+  ["cv.chat.tip"] = "Öffnet das Teilen-Fenster mit der Frage. Gesendet wird erst mit Klick auf Senden.",
   ["cv.whisper"] = "Flüstern",
   ["cv.whisper.tip"] = "Bereitet ein Flüstern vor. Du sendest es.",
   ["cv.invite"] = "Einladen",
@@ -99,10 +98,10 @@ ns.AddLocale("deDE", {
   ["cv.stale"] = "(veraltet)",
   ["cv.needRecv"] = "Hersteller anderer Mitglieder brauchen Teilen.",
   ["cv.empty.noGuild"] = "Du bist in keiner Gilde.",
-  ["cv.empty.nobody"] = "Noch teilt niemand Rezepte.\nMitglieder brauchen das Addon mit Teilen.",
+  ["cv.empty.nobody"] = "Noch teilt niemand Rezepte.\nMitglieder brauchen das Addon und müssen Teilen einschalten.",
   ["cv.empty.none"] = "Kein teilendes Mitglied kennt dieses Rezept.",
   ["cv.empty.asking"] = "Frage läuft (%d s)",
-  ["cv.unknown"] = "Details von %d Mitgliedern werden geladen",
+  ["cv.unknown"] = "Lade Details von %d Mitgliedern",
   ["cv.why.consent"] = "Teilen ist aus.",
   ["cv.why.guild"] = "Du bist in keiner Gilde.",
   ["cv.why.spell"] = "Dieses Rezept lässt sich nicht erfragen.",
@@ -115,7 +114,6 @@ ns.AddLocale("deDE", {
   ["cv.tpl.whisper"] = "Hallo, kannst du mir %s herstellen?",
   ["cv.tpl.guild"] = "Wer kann %s herstellen?",
   ["cv.recipe"] = "Rezept %d",
-  ["cv.combat"] = "Öffne die Liste nach dem Kampf.",
   ["cv.hint"] = "Pfeile bewegen, Eingabe führt aus, Tab wechselt, Esc schließt",
   ["cv.stats"] = "Gespeichert: %d Mitglieder, Abdeckung %d von %d, %s",
   ["cv.stats.clear"] = "Verzeichnis löschen",
@@ -133,7 +131,7 @@ CW.MIN_W, CW.MIN_H, CW.MAX_W, CW.MAX_H = MIN_W, MIN_H, MAX_W, MAX_H
 CW.ACTIONS = { "whisper", "invite" }
 
 local frame
-local state = { spell = nil, note = nil, askStart = nil, built = 0, pending = false, rows = {} }
+local state = { spell = nil, note = nil, askStart = nil, rows = {} }
 local ticking, depth = false, 0
 
 local function g(name)
@@ -211,9 +209,9 @@ end
 -- The chat link of the recipe: the item it makes, else the spell.
 local function recipeLink(spell, r, name)
   if r and r.i then
-    return itemLink(r.i) or string.format("|Hitem:%d|h[%s]|h", r.i, name)
+    return itemLink(r.i) or ("[" .. name .. "]")
   end
-  return spellLink(spell) or string.format("|Hspell:%d|h[%s]|h", spell, name)
+  return spellLink(spell) or ("[" .. name .. "]")
 end
 
 -- Data ------------------------------------------------------------------------------------------------------
@@ -261,9 +259,13 @@ function CW.Whisper(entry)
   return line ~= nil and openChat(line)
 end
 
+-- The guild question goes through the common channel picker (Guild is its first choice while in a guild).
 function CW.GuildLine()
-  local line = CVL.ChatLine("guild", nil, CVL.GuildText(recipeText(), L))
-  return line ~= nil and openChat(line)
+  local text = CVL.GuildText(recipeText(), L)
+  if CVL.ChatLine("guild", nil, text) == nil then
+    return false
+  end
+  return ns.Share.Open("", text) ~= nil
 end
 
 local function inviteBlock(entry)
@@ -314,8 +316,7 @@ end
 
 local function newRow(parent)
   local row = CreateFrame("Frame", nil, parent)
-  state.built = state.built + 1
-  state.rows[state.built] = row
+  state.rows[#state.rows + 1] = row
   row.bg = W.Fill(row, "surface2", 0.5)
   row.name = W.Text(row, { role = "ui", color = "text", wrap = true })
   row.head = W.Text(row, { role = "ui", color = "accent2", wrap = true })
@@ -323,7 +324,7 @@ local function newRow(parent)
   row.buttons = {}
   for i, id in ipairs(CW.ACTIONS) do
     local b = W.Action(row, {
-      icon = id == "whisper" and "share" or "plus",
+      icon = id == "whisper" and "open" or "plus",
       size = ACTION,
       boxed = true,
       tooltip = "cv." .. id,
@@ -585,8 +586,7 @@ local function layout(f)
   f.stack:Layout()
 end
 
--- Paints the window for the data now. In combat only the rows that exist are drawn (no frame is built);
--- the rest follows after the fight.
+-- Paints the window for the data now (own frames only, also in combat).
 function CW.Refresh()
   local f = frame
   if not (f and f:IsShown() and state.spell) then
@@ -596,13 +596,6 @@ function CW.Refresh()
   local recv = receiving()
   if not recv then
     rows = {}
-  end
-  local count = #rows
-  if ns.InCombat() and count > state.built then
-    for i = count, state.built + 1, -1 do
-      rows[i] = nil
-    end
-    state.pending = true
   end
   local kind = CVL.State({ receiving = recv, inGuild = inGuild(), count = #rows, info = info })
   f.shownRows = #rows
@@ -833,19 +826,13 @@ function CW.Spell()
   return state.spell
 end
 
--- Opens the window for a spell id (builds it once, not in combat), asks the guild when receiving is on
--- and brings it to the front. Returns false for a bad spell or in combat before the first build.
+-- Opens the window for a spell id (builds it once), asks the guild when receiving is on
+-- and brings it to the front. Returns false for a bad spell.
 function CW.Open(spell)
   if not ns.db or not (finite(spell) and spell == math.floor(spell) and spell > 0) then
     return false
   end
-  if not frame then
-    if ns.InCombat() then
-      ns.Notify(L["cv.combat"], "warning")
-      return false
-    end
-    frame = create()
-  end
+  frame = frame or create()
   local changed = state.spell ~= spell
   state.spell, state.note = spell, nil
   if changed then
@@ -929,12 +916,9 @@ ns.On("FG_CONSENT_WITHDRAWN", function(_, fn)
     follow()
   end
 end)
-ns.On("PLAYER_REGEN_ENABLED", function()
-  if state.pending then
-    state.pending = false
-    follow()
-  end
-end)
+-- The buttons that depend on the combat state (invite, ask) follow it.
+ns.On("PLAYER_REGEN_DISABLED", follow)
+ns.On("PLAYER_REGEN_ENABLED", follow)
 ns.On("PLAYER_LOGOUT", function()
   if frame and frame:IsShown() then
     save(frame)

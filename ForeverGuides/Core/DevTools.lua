@@ -5,7 +5,8 @@
 -- the headings of a slot come from the extension (D.SetHead).
 local _, ns = ...
 
-local D = { version = 1, list = {}, byId = {}, diag = {}, heads = {}, parts = {} }
+-- active: set by the optional add-on when it is loaded (the version check never sends then).
+local D = { version = 1, active = false, list = {}, byId = {}, diag = {}, heads = {}, parts = {} }
 ns.DevTools = D
 
 -- The slot of a tool without `slot`: the buttons of the help page.

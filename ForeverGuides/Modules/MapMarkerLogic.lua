@@ -11,7 +11,7 @@ ns.AddLocale("enUS", {
   ["mm.hint.map"] = "Click: dungeon map",
   ["mm.hint.page"] = "Click: instance page",
   ["mm.set.world"] = "Instance markers in the world map",
-  ["mm.set.addon"] = "Instance markers on the add-on map",
+  ["mm.set.addon"] = "Instance markers on the addon map",
   ["mm.set.dungeons"] = "Show dungeon markers",
   ["mm.set.raids"] = "Show raid markers",
 })
@@ -21,10 +21,10 @@ ns.AddLocale("deDE", {
   ["mm.players"] = "Spieler: %s",
   ["mm.hint.map"] = "Klicken: Dungeonkarte",
   ["mm.hint.page"] = "Klicken: Instanzseite",
-  ["mm.set.world"] = "Instanz-Marker in der Weltkarte",
-  ["mm.set.addon"] = "Instanz-Marker auf der Addon-Karte",
-  ["mm.set.dungeons"] = "Dungeon-Marker anzeigen",
-  ["mm.set.raids"] = "Raid-Marker anzeigen",
+  ["mm.set.world"] = "Instanzmarker in der Weltkarte",
+  ["mm.set.addon"] = "Instanzmarker auf der Addon-Karte",
+  ["mm.set.dungeons"] = "Dungeonmarker anzeigen",
+  ["mm.set.raids"] = "Raidmarker anzeigen",
 })
 
 local M = {}

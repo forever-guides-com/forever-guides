@@ -76,6 +76,9 @@ end)
 register("errors", function()
   ns.Main.Show("errors")
 end)
+register("news", function()
+  ns.ChangelogNews.ShowCurrent()
+end)
 register("tour", function(rest)
   if not ns.TutorialUI.Start(rest ~= "" and rest or "addon-start") then
     ns.Main.Show("tutorials")
@@ -147,6 +150,9 @@ end)
 register("cursor", function(rest)
   ns.Cursor.Slash(rest)
 end)
+register("console", function()
+  ns.Main.Show("console")
+end)
 register("farmhud", function(rest)
   ns.FarmHud.Slash(rest)
 end)
@@ -217,6 +223,20 @@ register("share", function(rest)
     return
   end
   ns.Share.OpenNote(note)
+end)
+register("pagelink", function()
+  ns.PageShare.Open()
+end)
+register("opencode", function(rest)
+  if rest == "" then
+    ns.Notify(L["pageshare.openUsage"], "warning")
+    return
+  end
+  if ns.Router:get(rest) then
+    ns.Main.Show(rest)
+    return
+  end
+  ns.PageShare.OpenCode(rest)
 end)
 register("dock", function()
   ns.Dock.Toggle()
@@ -371,9 +391,9 @@ ns.AddLocale("deDE", {
   ["slash.todoAdded"] = "Todo hinzugefügt: %s",
   ["slash.todoError"] = "Todo nicht hinzugefügt: %s",
   ["slash.todoUsage"] = "Beispiel: /fg todo Gildenbank leeren",
-  ["slash.noInstance"] = 'Keine Instanz "%s".',
-  ["slash.unknownGuess"] = 'Unbekannter Befehl "%s", meintest du: %s? /fg hilfe zeigt alle.',
-  ["slash.unknownNamed"] = 'Unbekannter Befehl "%s", /fg hilfe zeigt alle.',
+  ["slash.noInstance"] = "Keine Instanz „%s“.",
+  ["slash.unknownGuess"] = "Unbekannter Befehl „%s“, meintest du: %s? /fg hilfe zeigt alle.",
+  ["slash.unknownNamed"] = "Unbekannter Befehl „%s“, /fg hilfe zeigt alle.",
 })
 
 -- Edit distance for short command names (typo suggestions only).

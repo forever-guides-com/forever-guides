@@ -20,10 +20,10 @@ local N = {}
 ns.NearbyContacts = N
 
 ns.AddLocale("enUS", {
-  ["nearby.off"] = "Contact detection switched off after %d errors, see /fg errors",
+  ["nearby.off"] = "Contact detection switched off after %d errors. See /fg errors",
 })
 ns.AddLocale("deDE", {
-  ["nearby.off"] = "Kontakt-Erkennung ausgeschaltet nach %d Fehlern, siehe /fg fehler",
+  ["nearby.off"] = "Kontakterkennung nach %d Fehlern ausgeschaltet. Siehe /fg fehler",
 })
 
 local gate = NL.NewGate()

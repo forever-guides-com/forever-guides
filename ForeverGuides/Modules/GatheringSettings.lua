@@ -9,17 +9,26 @@ ns.GatheringSettings = S
 
 ns.AddLocale("enUS", {
   ["gather.set.heading"] = "Ores and herbs",
-  ["gather.set.hint"] = "Shows where ore veins and herbs grow, and where chests and fishing schools are. Everything starts off, switch on below or in the setup what you want to see. The choice of materials, chests and schools below counts for both maps and is the same in every zone.",
+  ["gather.set.hint"] = "Shows where ore veins and herbs grow, and where chests and fishing schools are. Everything starts switched off. Switch on below or in the setup what you want to see. The choice of materials, chests and schools below applies to both maps and is the same in every zone.",
   ["gather.set.forever"] = "Show ores and herbs on the addon map",
   ["gather.set.foreverHint"] = "The page Ores and herbs narrows the items down per zone.",
   ["gather.set.foreverObjects"] = "Show chests and fishing schools on the addon map",
-  ["gather.set.foreverObjectsHint"] = "Chests, clams and other finds and fishing schools of the zone. The choice of kinds is in the list below.",
+  ["gather.set.foreverObjectsHint"] = "Shows chests, clams, other finds and fishing schools of the zone. You pick the kinds in the list below.",
   ["gather.set.worldmap"] = "Show on Blizzard's world map",
-  ["gather.set.worldmapHint"] = "Spots of the zone the map window shows, in the big and the small window.",
+  ["gather.set.worldmapHint"] = "Shows the spots of the zone in the map window, in the big and the small window.",
   ["gather.set.minimap"] = "Show on the minimap",
-  ["gather.set.minimapHint"] = "Ore and herb spots around you as pins on the minimap. They hide in instances and where the game gives no position.",
+  ["gather.set.minimapHint"] = "Shows ore and herb spots around you as pins on the minimap. They hide in instances and where the game gives no position.",
+  ["gather.set.spotMarker"] = "Mark spots with several possible finds",
+  ["gather.set.spotMarkerHint"] = "Draws a colored arc per possible item around the symbol and the number of possibilities at its corner. Small symbols show the number only.",
+  ["gather.spots.hint.mining"] = "Symbols show possible spots. One spawn point can hold different veins, you only see which one when you are there.",
+  ["gather.spots.hint.herbalism"] = "Symbols show possible spots. One spawn point can hold different plants, you only see which one when you are there.",
+  ["gather.spots.hint.both"] = "Symbols show possible spots. One spawn point can hold different ores or herbs, you only see which one when you are there.",
   ["gather.set.minimapEdge"] = "Spots just beyond the minimap edge",
   ["gather.set.minimapEdgeHint"] = "Pull onto the edge shows them faint on the rim as a direction hint. Hide drops them until they come into view.",
+  ["gather.set.minimapStyle"] = "Style of spot symbols on minimap/HUD",
+  ["gather.set.minimapStyleHint"] = "Spots are possible places, the nodes you can really gather are the icons of the game's own tracking. Subtle draws a small faint ring in the item color so the tracking icons stay easy to see. Item symbol draws the item icon as before. The maps keep their symbols.",
+  ["gather.set.style.subtle"] = "Subtle",
+  ["gather.set.style.icon"] = "Item symbol",
   ["gather.set.edge.clamp"] = "Pull onto the edge",
   ["gather.set.edge.hide"] = "Hide",
   ["gather.set.minimapSize"] = "Pin size on the minimap",
@@ -29,44 +38,53 @@ ns.AddLocale("enUS", {
   ["gather.set.minimapNearUnit"] = "%d yd",
   ["gather.set.minimapNearOff"] = "Off",
   ["gather.set.minimapRingSize"] = "Circle size on the minimap",
-  ["gather.set.minimapRingSizeHint"] = "Diameter of the circle in pixels.",
+  ["gather.set.minimapRingSizeHint"] = "Sets the diameter of the circle in pixels.",
   ["gather.set.minimapRingWidth"] = "Circle line width",
-  ["gather.set.minimapRingWidthHint"] = "Thickness of the circle line in pixels. The nearest ring file is used.",
+  ["gather.set.minimapRingWidthHint"] = "Sets the thickness of the circle line in pixels. The addon uses the nearest ring file.",
   ["gather.set.minimapEmpty"] = "Ores and herbs are switched off in the filter, so the minimap stays empty.",
   ["gather.set.minimapEmptyButton"] = "Switch on",
   ["gather.set.reveal"] = "Show Blizzard's world map as explored",
-  ["gather.set.revealHint"] = "Draws every area of a zone map as if you had explored it. Needs the data add-on Map data, works on its own without the spots. Off puts the normal look back.",
+  ["gather.set.revealHint"] = "Draws every area of a zone map as if you had explored it. Needs the data addon Map data. Works on its own, without the spots. Off puts the normal look back.",
   ["gather.set.materials"] = "Materials",
 })
 ns.AddLocale("deDE", {
   ["gather.set.heading"] = "Erze und Kräuter",
-  ["gather.set.hint"] = "Zeigt, wo Erzadern und Kräuter wachsen und wo Truhen und Fischschwärme liegen. Zu Beginn ist alles aus, schalte unten oder im Setup ein, was du sehen willst. Die Auswahl der Materialien, Truhen und Schwärme unten gilt für beide Karten und ist in jedem Gebiet gleich.",
-  ["gather.set.forever"] = "Erze und Kräuter auf der Addon-Karte zeigen",
+  ["gather.set.hint"] = "Zeigt, wo Erzadern und Kräuter wachsen und wo Truhen und Fischschwärme liegen. Zu Beginn ist alles ausgeschaltet. Schalte unten oder im Setup ein, was du sehen willst. Die Auswahl der Materialien, Truhen und Schwärme unten gilt für beide Karten und ist in jedem Gebiet gleich.",
+  ["gather.set.forever"] = "Erze und Kräuter auf der Addonkarte anzeigen",
   ["gather.set.foreverHint"] = "Die Seite Erze und Kräuter schränkt die Items je Gebiet ein.",
-  ["gather.set.foreverObjects"] = "Truhen und Fischschwärme auf der Addon-Karte zeigen",
-  ["gather.set.foreverObjectsHint"] = "Truhen, Muscheln und weitere Fundstücke sowie Fischschwärme des Gebiets. Die Auswahl der Arten steht in der Liste unten.",
-  ["gather.set.worldmap"] = "Auf der Blizzard-Weltkarte zeigen",
-  ["gather.set.worldmapHint"] = "Fundorte des Gebiets, das das Kartenfenster zeigt, im großen und im kleinen Fenster.",
-  ["gather.set.minimap"] = "Auf der Minimap zeigen",
-  ["gather.set.minimapHint"] = "Erz- und Kräuterfundorte um dich herum als Pins auf der Minimap. In Instanzen und ohne Positionsangabe des Spiels sind sie ausgeblendet.",
-  ["gather.set.minimapEdge"] = "Fundorte knapp hinter dem Minimap-Rand",
+  ["gather.set.foreverObjects"] = "Truhen und Fischschwärme auf der Addonkarte anzeigen",
+  ["gather.set.foreverObjectsHint"] = "Zeigt Truhen, Muscheln, weitere Fundstücke und Fischschwärme des Gebiets. Die Arten wählst du in der Liste unten.",
+  ["gather.set.worldmap"] = "Auf der Blizzard-Weltkarte anzeigen",
+  ["gather.set.worldmapHint"] = "Zeigt die Fundorte des Gebiets im Kartenfenster, im großen und im kleinen Fenster.",
+  ["gather.set.minimap"] = "Auf der Minimap anzeigen",
+  ["gather.set.minimapHint"] = "Zeigt Erz- und Kräuterfundorte um dich herum als Pins auf der Minimap. In Instanzen und ohne Positionsangabe des Spiels sind sie ausgeblendet.",
+  ["gather.set.spotMarker"] = "Fundorte mit mehreren möglichen Funden markieren",
+  ["gather.set.spotMarkerHint"] = "Zeichnet pro möglichem Item einen farbigen Bogen um das Symbol und die Anzahl der Möglichkeiten an der Ecke. Kleine Symbole zeigen nur die Zahl.",
+  ["gather.spots.hint.mining"] = "Symbole zeigen mögliche Fundorte. Ein Spawnpunkt kann verschiedene Adern tragen, sichtbar ist das erst vor Ort.",
+  ["gather.spots.hint.herbalism"] = "Symbole zeigen mögliche Fundorte. Ein Spawnpunkt kann verschiedene Pflanzen tragen, sichtbar ist das erst vor Ort.",
+  ["gather.spots.hint.both"] = "Symbole zeigen mögliche Fundorte. Ein Spawnpunkt kann verschiedene Erze oder Kräuter tragen, sichtbar ist das erst vor Ort.",
+  ["gather.set.minimapEdge"] = "Fundorte knapp hinter dem Minimaprand",
   ["gather.set.minimapEdgeHint"] = "Auf den Rand ziehen zeigt sie blass am Rand als Richtungshinweis. Ausblenden lässt sie weg, bis sie ins Bild kommen.",
   ["gather.set.edge.clamp"] = "Auf den Rand ziehen",
   ["gather.set.edge.hide"] = "Ausblenden",
-  ["gather.set.minimapSize"] = "Pin-Größe auf der Minimap",
-  ["gather.set.minimapAlpha"] = "Pin-Deckkraft auf der Minimap",
+  ["gather.set.minimapStyle"] = "Stil der Fundort-Symbole auf Minimap/HUD",
+  ["gather.set.minimapStyleHint"] = "Fundorte sind mögliche Stellen. Die Knoten, die du wirklich sammeln kannst, zeigt das eigene Aufspüren des Spiels. Dezent zeichnet einen kleinen, blassen Ring in der Itemfarbe, damit die Symbole des Aufspürens gut sichtbar bleiben. Item-Symbol zeichnet wie bisher das Itemsymbol. Die Karten behalten ihre Symbole.",
+  ["gather.set.style.subtle"] = "Dezent",
+  ["gather.set.style.icon"] = "Item-Symbol",
+  ["gather.set.minimapSize"] = "Pingröße auf der Minimap",
+  ["gather.set.minimapAlpha"] = "Pindeckkraft auf der Minimap",
   ["gather.set.minimapNear"] = "Kreise bis zu dieser Entfernung",
   ["gather.set.minimapNearHint"] = "Fundorte bis zu dieser Entfernung erscheinen nur als Kreis, damit das Erz oder Kraut, das das Spiel selbst zeichnet, sichtbar bleibt. Weiter entfernte Fundorte zeigen ihr Symbol. 0 schaltet die Kreise aus.",
   ["gather.set.minimapNearUnit"] = "%d Yards",
   ["gather.set.minimapNearOff"] = "Aus",
   ["gather.set.minimapRingSize"] = "Kreisgröße auf der Minimap",
-  ["gather.set.minimapRingSizeHint"] = "Durchmesser des Kreises in Pixeln.",
+  ["gather.set.minimapRingSizeHint"] = "Legt den Durchmesser des Kreises in Pixeln fest.",
   ["gather.set.minimapRingWidth"] = "Linienstärke des Kreises",
-  ["gather.set.minimapRingWidthHint"] = "Dicke der Kreislinie in Pixeln. Es wird die nächstpassende Ringdatei genutzt.",
+  ["gather.set.minimapRingWidthHint"] = "Legt die Dicke der Kreislinie in Pixeln fest. Das Addon nutzt die nächstpassende Ringdatei.",
   ["gather.set.minimapEmpty"] = "Erze und Kräuter sind im Filter ausgeschaltet, deshalb bleibt die Minimap leer.",
   ["gather.set.minimapEmptyButton"] = "Einschalten",
-  ["gather.set.reveal"] = "Blizzard-Weltkarte als erkundet zeigen",
-  ["gather.set.revealHint"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Braucht das Daten-Addon Kartendaten, wirkt für sich allein ohne die Fundorte. Aus stellt die normale Darstellung wieder her.",
+  ["gather.set.reveal"] = "Blizzard-Weltkarte als erkundet anzeigen",
+  ["gather.set.revealHint"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Braucht das Datenaddon Kartendaten. Wirkt für sich allein, ohne die Fundorte. Aus stellt die normale Darstellung wieder her.",
   ["gather.set.materials"] = "Materialien",
 })
 
@@ -117,6 +135,22 @@ local function minimapOptions(view)
   })
   edge.fgId = "gather-set-minimapEdge"
   view.stack:Add(edge, { height = 46, width = 240, gap = 4 })
+  local style = W.Dropdown(view.content, {
+    key = "gather.set.minimapStyle",
+    tooltip = "gather.set.minimapStyle",
+    tooltipText = "gather.set.minimapStyleHint",
+    width = 240,
+    options = {
+      { value = "subtle", key = "gather.set.style.subtle" },
+      { value = "icon", key = "gather.set.style.icon" },
+    },
+    get = Layer.SpotStyle,
+    set = function(value)
+      Store.set("settings.gather.minimapStyle", value)
+    end,
+  })
+  style.fgId = "gather-set-minimapStyle"
+  view.stack:Add(style, { height = 46, width = 240, gap = 4 })
   -- format: a pattern with one %d, or a function (value) -> text; tip: the hint is the tooltip and a line below.
   local function slider(id, min, max, step, get, format, tip)
     local control = W.Slider(view.content, {
@@ -207,6 +241,8 @@ function S.Add(view)
   toggle(view, "foreverObjects", "settings.gather.foreverObjects")
   toggle(view, "worldmap", "settings.gather.worldmap")
   toggle(view, "minimap", "settings.gather.minimap")
+  toggle(view, "spotMarker", "settings.gather.spotMarker")
+  ns.AddParagraph(view, "gather.spots.hint.both", { role = "micro", color = "textMuted", gap = 6 })
   emptyNotice(view)
   ns.AddHeading(view, "gather.set.materials")
   local filter = ns.GatherFilterUI.Build(view.content)

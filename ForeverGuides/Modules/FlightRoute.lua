@@ -39,10 +39,6 @@ local function factionCode()
   return faction == "Alliance" and "A" or faction == "Horde" and "H" or nil
 end
 
-local function inCombat()
-  return InCombatLockdown ~= nil and InCombatLockdown() == true
-end
-
 -- Name of the flight window that is shown ("FlightMapFrame" or "TaxiFrame"), or nil.
 function FR.OpenFrame()
   for _, name in ipairs(FRAMES) do
@@ -67,7 +63,7 @@ end
 -- nil and the reason ("combat", "closed", "empty"). match is FlightLogic.match of the name.
 -- anyTime reads the client lists without a shown window (TAXIMAP_OPENED can come before it is shown).
 function FR.Nodes(anyTime)
-  if inCombat() then
+  if ns.CombatLocked() then
     return nil, "combat"
   end
   if not (anyTime or FR.OpenFrame()) then
@@ -134,7 +130,7 @@ end
 -- toSlot } ... }, total = FlightLogic.estimateRoute }, or nil and the reason. fromNode and toNode
 -- are our node ids (nil when the name is not matched clearly). nodes: result of FR.Nodes().
 function FR.Route(slot, nodes)
-  if inCombat() then
+  if ns.CombatLocked() then
     return nil, "combat"
   end
   local count = tonumber(try(game("GetNumRoutes"), slot))

@@ -33,7 +33,8 @@ local GROUP_GAP = 8
 local ROW_GAP = 8
 local HEAD_H = 26
 local SECTION_COLORS = { learned = "sectionLearned", available = "sectionAvailable", locked = "sectionLocked" }
-local EVENTS = { "SPELLS_CHANGED", "PLAYER_LEVEL_UP", "LEARNED_SPELL_IN_TAB" }
+local EVENTS =
+  { "SPELLS_CHANGED", "PLAYER_LEVEL_UP", "LEARNED_SPELL_IN_TAB", "FG_LEARNED_SPELLS", "FG_RECIPES_CHANGED" }
 
 -- Theme tokens per palette. "parchment" is for lists that sit directly on WoW's
 -- own spellbook page: dark brown text and no dark card fill, the page shows through.
@@ -48,7 +49,7 @@ local PALETTES = {
     muted = "textMuted",
     accent = "accent2",
     success = "success",
-    chips = { name = "text", meta = "textMuted", hover = { 1, 1, 1, 0.08 } },
+    chips = { name = "text", meta = "textSecondary" },
   },
   dark = {
     compact = true,
@@ -58,7 +59,7 @@ local PALETTES = {
     muted = "textMuted",
     accent = "accent2",
     success = "success",
-    chips = { name = "text", meta = "textMuted", hover = { 1, 1, 1, 0.08 } },
+    chips = { name = "text", meta = "textSecondary" },
   },
   parchment = {
     compact = true,
@@ -590,6 +591,7 @@ for _, event in ipairs(EVENTS) do
 end
 
 V.RefreshLive = refreshLive
+V.Events = EVENTS
 -- Chip data of items for a palette name, for tests.
 function V.Chips(items, palette, class)
   return toChips(items, PALETTES[palette or "default"], class)

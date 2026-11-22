@@ -13,11 +13,11 @@ ns.AddLocale("enUS", {
   ["talents.editor.exportShare"] = "Share in chat",
   ["talents.builds.nameHint"] = "Name of the build",
   ["talents.builds.nameSave"] = "Save",
-  ["talents.apply.intro"] = "Points you already spent stay as they are. The game only refunds them at the class trainer for gold, so this build is added to your talents and never set over them.",
+  ["talents.apply.intro"] = "Points you already spent stay as they are. The game only refunds them at the class trainer for gold, so the addon adds this build to your talents and never overwrites them.",
   ["talents.apply.now"] = "Can be set now: %d points",
   ["talents.apply.later"] = "Later (after level or other talents): %d points",
   ["talents.apply.blocked"] = "Not possible: %d points",
-  ["talents.apply.conflict"] = "Does not fit (already spent differently, can only be reset at the class trainer for gold): %d points",
+  ["talents.apply.conflict"] = "Does not fit (already spent differently, reset only at the class trainer for gold): %d points",
   ["talents.apply.more"] = "and %d more",
   ["talents.apply.nothing"] = "None of the missing points can be bought right now. Nothing would change.",
   ["talents.apply.go"] = "Set purchasable talents",
@@ -25,17 +25,17 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["talents.editor.exportLink"] = "Web-Link (forever-guides.com)",
+  ["talents.editor.exportLink"] = "Weblink (forever-guides.com)",
   ["talents.editor.exportCode"] = "Nur der Code (für Chat oder Notizen)",
-  ["talents.editor.exportEmpty"] = "Build ohne Punkte: erst Punkte vergeben",
+  ["talents.editor.exportEmpty"] = "Skillung ohne Punkte: erst Punkte vergeben",
   ["talents.editor.exportShare"] = "Im Chat teilen",
   ["talents.builds.nameHint"] = "Name der Skillung",
   ["talents.builds.nameSave"] = "Speichern",
-  ["talents.apply.intro"] = "Bereits vergebene Punkte bleiben, wie sie sind. Das Spiel erstattet sie nur beim Klassenlehrer gegen Gold, deshalb wird diese Skillung zu deinen Talenten hinzugefügt und nie darüber gelegt.",
+  ["talents.apply.intro"] = "Bereits vergebene Punkte bleiben unverändert. Das Spiel erstattet sie nur beim Klassenlehrer gegen Gold. Deshalb ergänzt das Addon deine Talente um diese Skillung und überschreibt sie nie.",
   ["talents.apply.now"] = "Jetzt kaufbar: %d Punkte",
   ["talents.apply.later"] = "Später (nach Stufe oder anderen Talenten): %d Punkte",
   ["talents.apply.blocked"] = "Nicht möglich: %d Punkte",
-  ["talents.apply.conflict"] = "Passt nicht (bereits anders verteilt, nur beim Lehrer gegen Gold zurücksetzbar): %d Punkte",
+  ["talents.apply.conflict"] = "Passt nicht (bereits anders verteilt, Zurücksetzen nur beim Klassenlehrer gegen Gold): %d Punkte",
   ["talents.apply.more"] = "und %d weitere",
   ["talents.apply.nothing"] = "Von den fehlenden Punkten ist gerade keiner kaufbar. Es würde sich nichts ändern.",
   ["talents.apply.go"] = "Kaufbare Talente setzen",
@@ -166,12 +166,9 @@ function TD.Export(data)
       end,
     })
     close:SetPoint("BOTTOMRIGHT", -SIDE, 14)
-    d.share = W.Action(d, {
-      label = "act.share",
-      icon = "share",
+    d.share = ns.PageShare.Button(d, {
+      size = 28,
       tooltip = "talents.editor.exportShare",
-      width = 150,
-      height = 28,
       onClick = function()
         local share = d.onShare
         d:Hide()

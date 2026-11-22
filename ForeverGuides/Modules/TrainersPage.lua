@@ -18,17 +18,20 @@ ns.AddLocale("enUS", {
   ["trainers.emptyTitle"] = "Not recorded in Forever yet",
   ["trainers.races"] = "Playable as: %s (website 2026-10-06, no trainer known)",
   ["trainers.emptyHint"] = "Visit a trainer in game and the addon remembers it.",
-  ["trainers.mapTip"] = "Show the trainer's zone on the map",
-  ["trainers.markerTip"] = "Set a waypoint at the trainer",
+  ["trainers.mapTip"] = "Shows the zone on the map.",
+  ["trainers.markerTip"] = "Sets a waypoint at this trainer.",
+  ["trainers.stable"] = "Stable masters",
+  ["trainers.kind.stable"] = "Stable master",
   ["trainers.search"] = "Search",
   ["trainers.searchPh"] = "Name or place",
   ["trainers.count"] = "%d of %d trainers",
+  ["trainers.groupCount"] = "%d trainers",
   ["trainers.searchEmpty"] = "No trainer matches this search.",
   ["tour.trainers.title"] = "Class trainers",
   ["tour.trainers.intro.title"] = "Class trainers",
   ["tour.trainers.intro.text"] = "Find your class trainers (Enter: next, Esc: end)",
   ["tour.trainers.filters.title"] = "Class and faction",
-  ["tour.trainers.filters.text"] = "Class and faction default to you, change them to look up others",
+  ["tour.trainers.filters.text"] = "Class and faction default to yours. Change them to look up others.",
   ["tour.trainers.levels.title"] = "Level overview",
   ["tour.trainers.levels.text"] = "This link opens the level overview for this class",
   ["tour.trainers.list.title"] = "List",
@@ -49,17 +52,20 @@ ns.AddLocale("deDE", {
   ["trainers.emptyTitle"] = "In Forever noch nicht erfasst",
   ["trainers.races"] = "Spielbar als: %s (Website 06.10.2026, kein Lehrer belegt)",
   ["trainers.emptyHint"] = "Besuche einen Lehrer im Spiel, das Addon merkt ihn sich.",
-  ["trainers.mapTip"] = "Lehrerzone auf der Karte zeigen",
-  ["trainers.markerTip"] = "Wegpunkt am Lehrer setzen",
+  ["trainers.mapTip"] = "Zeigt die Zone auf der Karte.",
+  ["trainers.markerTip"] = "Setzt einen Wegpunkt am Lehrer.",
+  ["trainers.stable"] = "Stallmeister",
+  ["trainers.kind.stable"] = "Stallmeister",
   ["trainers.search"] = "Suchen",
   ["trainers.searchPh"] = "Name oder Ort",
   ["trainers.count"] = "%d von %d Lehrern",
+  ["trainers.groupCount"] = "%d Lehrer",
   ["trainers.searchEmpty"] = "Kein Lehrer passt zu dieser Suche.",
   ["tour.trainers.title"] = "Klassenlehrer",
   ["tour.trainers.intro.title"] = "Klassenlehrer",
   ["tour.trainers.intro.text"] = "Finde deine Klassenlehrer (Enter: weiter, Esc: Ende)",
   ["tour.trainers.filters.title"] = "Klasse und Fraktion",
-  ["tour.trainers.filters.text"] = "Klasse und Fraktion sind vorbelegt, ändere sie zum Nachschlagen",
+  ["tour.trainers.filters.text"] = "Klasse und Fraktion sind mit deinen Werten vorbelegt. Ändere sie, um andere nachzuschlagen.",
   ["tour.trainers.levels.title"] = "Stufenübersicht",
   ["tour.trainers.levels.text"] = "Dieser Link öffnet die Stufenübersicht der Klasse",
   ["tour.trainers.list.title"] = "Liste",
@@ -89,15 +95,12 @@ local function paintClassIcon(icon, class)
   end
 end
 
--- Row height and the top inset of the button pair: the buttons end above the confidence line
--- at the bottom right, so the two never touch.
-local ROW_HEIGHT = 48
-local ROW_ACTION_TOP = 5
+local ROW_HEIGHT = 52
 local FIELD_W = 220
 local FIELD_H = 46
 
 local KIND_BADGE_COLOR =
-  { start = "success", town = "textMuted", capital = "accent2", own = "accent2", pet = "warning" }
+  { start = "success", town = "textMuted", capital = "accent2", own = "accent2", pet = "warning", stable = "accent2" }
 
 -- Shared by the card and list views so both always show the exact same
 -- title/sub text for a given trainer entry. A pet trainer shows its role
@@ -154,30 +157,10 @@ local function trainerPlace(t)
   end
 end
 
--- One list row: class icon, title and sub line on the left, the Map and
--- Waypoint buttons top right, the confidence under them. The title and sub
--- anchor to those, so nothing overlaps at any width.
-local function createTrainerRow(parent)
-  local row = CreateFrame("Frame", nil, parent)
-  row:SetClipsChildren(true)
-  row.icon = classIcon(row, 20)
-  row.icon:SetPoint("TOPLEFT", 8, -8)
-  row.actions = W.MapActionButtons(row, { mapTip = "trainers.mapTip", markerTip = "trainers.markerTip" })
-  row.actions:SetPoint("TOPRIGHT", -8, -ROW_ACTION_TOP)
-  row.conf = W.Text(row, { role = "micro", color = "textMuted", justify = "RIGHT" })
-  row.conf:SetPoint("BOTTOMRIGHT", -8, 5)
-  row.title = W.Text(row, { role = "ui" })
-  row.sub = W.Text(row, { role = "micro", color = "textSecondary" })
-  row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -2)
-  row.sub:SetPoint("RIGHT", row.conf, "LEFT", -8, 0)
-  row.line = row:CreateTexture(nil, "ARTWORK")
-  row.line:SetPoint("BOTTOMLEFT")
-  row.line:SetPoint("BOTTOMRIGHT")
-  row.line:SetHeight(1)
-  ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
-  end)
-  return row
+-- "#rrggbb" of the class color for the left bar of a row.
+local function classBar(class)
+  local hex = K.ClassColorHex(class)
+  return hex and (hex:sub(1, 1) == "#" and hex or "#" .. hex) or "accent2"
 end
 
 local function build(container)
@@ -191,7 +174,7 @@ local function build(container)
   }
   local refresh
 
-  ns.AddParagraph(view, "trainers.intro")
+  ns.AddIntro(view, "trainers.intro")
   local basis = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted" })
 
   local filters = CreateFrame("Frame", nil, view.content)
@@ -201,7 +184,7 @@ local function build(container)
       return state.class
     end,
     set = function(v)
-      state.class = v
+      state.class, state.npc = v, nil
       refresh()
     end,
   })
@@ -211,14 +194,14 @@ local function build(container)
       return state.faction
     end,
     set = function(v)
-      state.faction = v
+      state.faction, state.npc = v, nil
       refresh()
     end,
   })
   function filters:fgGridLayout(width)
     return K.StackLayout(filters, { classButtons, factionButtons }, width, 12)
   end
-  s:Add(filters, { gap = 8 })
+  s:Add(filters, { gap = Theme.space.sm })
 
   -- Search by name or place, like the profession trainers (Modules/TrainerSearchLogic.lua).
   local searchBox = CreateFrame("Frame", nil, view.content)
@@ -228,14 +211,14 @@ local function build(container)
     placeholder = "trainers.searchPh",
     clear = true,
     onChange = function(text)
-      state.query = text
+      state.query, state.npc = text, nil
       refresh()
     end,
   })
   search:SetPoint("TOPLEFT", 0, -18)
   search:SetWidth(FIELD_W)
-  s:Add(searchBox, { height = FIELD_H, width = FIELD_W, gap = 4 })
-  local counter = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 10 })
+  s:Add(searchBox, { height = FIELD_H, width = FIELD_W, gap = Theme.space.xs })
+  local counter = ns.AddParagraph(view, nil, { role = "small", gap = Theme.space.md })
   K.Anchor("FG.Trainers.Count", counter)
 
   -- Small link line: the abilities per level are on the level overview page.
@@ -266,10 +249,10 @@ local function build(container)
     levelsLink:SetHeight(h)
     return h
   end
-  s:Add(levelsLink, { gap = 10 })
+  s:Add(levelsLink, { gap = Theme.space.md })
 
   -- Shown while pet trainers are in the list: in the list view they are told apart by the sub line only.
-  local petHint = ns.AddParagraph(view, nil, { role = "micro", color = "textSecondary", gap = 10 })
+  local petHint = ns.AddParagraph(view, nil, { role = "micro", color = "textSecondary", gap = Theme.space.md })
   K.Anchor("FG.Trainers.PetHint", petHint)
 
   local viewToggle = K.ViewToggle(view.content, {
@@ -283,23 +266,28 @@ local function build(container)
     end,
   })
   K.Anchor("FG.Trainers.ViewToggle", viewToggle)
-  s:Add(viewToggle, { height = 22, gap = 10 })
+  s:Add(viewToggle, { height = 22, gap = Theme.space.md })
 
-  local function bindTrainerRow(row, t)
+  -- Boxed row: class-colored bar and class icon, name, zone line and the confidence word; the map, waypoint
+  -- and share icons are the trailing widget of the row.
+  local function bindTrainerRow(t)
     local tx = trainerTexts(t)
-    paintClassIcon(row.icon, state.class)
-    local hasPos = t.x ~= nil and t.y ~= nil
-    row.actions:SetPlace(hasPos and trainerPlace(t) or nil)
-    row.title:ClearAllPoints()
-    row.title:SetPoint("TOPLEFT", 36, -5)
-    if hasPos then
-      row.title:SetPoint("RIGHT", row.actions, "LEFT", -8, 0)
-    else
-      row.title:SetPoint("RIGHT", -8, 0)
+    return {
+      title = tx.title,
+      sub = tx.sub,
+      meta = L["kit.conf." .. tostring(t.cf or 2)],
+      leftBar = classBar(state.class),
+      iconFrame = { spec = K.ClassIconSpec(state.class) },
+    }
+  end
+
+  local function wireTrainerRow(row, t)
+    if not row.bar then
+      row.bar = W.MapActionButtons(row, { mapTip = "trainers.mapTip", markerTip = "trainers.markerTip", share = true })
     end
-    row.title:SetText(tx.title)
-    row.sub:SetText(tx.sub)
-    row.conf:SetText(L["kit.conf." .. tostring(t.cf or 2)])
+    row.bar:SetPlace(t.x ~= nil and t.y ~= nil and trainerPlace(t) or nil)
+    row.bar:SetShare(t.npc and ("trainers/" .. state.class .. "/" .. t.npc) or nil)
+    row.trailing = row.bar
   end
 
   local function paintTrainerCard(card, t)
@@ -321,7 +309,7 @@ local function build(container)
     card.title:SetPoint("RIGHT", -24, 0)
     card.badge = W.Badge(card, "trainers.kind.town", "textMuted")
     card.badge:SetPoint("TOPLEFT", card.icon, "BOTTOMLEFT", 0, -12)
-    card.sub = W.Text(card, { role = "micro", color = "textSecondary", wrap = true })
+    card.sub = W.Meta(card, { wrap = true })
     card.sub:SetPoint("TOPLEFT", card.badge, "BOTTOMLEFT", 0, -6)
     card.sub:SetPoint("RIGHT", -12, 0)
     card.note = W.Text(card, { role = "micro", color = "textMuted", wrap = true })
@@ -363,9 +351,11 @@ local function build(container)
   end
 
   -- One panel per faction group: a heading (only when both factions show), the
-  -- list and card views, and the empty-state card. Panel 2 is only used for "both".
+  -- list and card views, and the empty-state card. Panel 2 is only used for "both", panel 3 for the
+  -- hunter's stable masters.
   local panels = {}
   local MIN_ROWS = 3
+  local MAX_STABLE_ROWS = 5
 
   -- The lists share the page height left below the header items; the page
   -- itself only scrolls when even MIN_ROWS rows do not fit.
@@ -379,39 +369,49 @@ local function build(container)
         y = y + entry.item:GetHeight() + (entry.opts.gap or 10)
       end
     end
-    local shown, overhead = 0, 14
+    local shown, overhead, fixed = 0, 14, 0
     for _, p in ipairs(panels) do
       if p.list:IsShown() then
-        shown = shown + 1
-        if p.heading:IsShown() then
-          overhead = 14 + p.heading:GetHeight() + 6
+        if p.rows then
+          -- The stable masters keep a short list of their own; the trainers share the rest.
+          fixed = fixed + p.rows * K.scaledHeight(ROW_HEIGHT) + 14 + p.heading:GetHeight() + 6
+        else
+          shown = shown + 1
+          if p.heading:IsShown() then
+            overhead = 14 + p.heading:GetHeight() + 6
+          end
         end
       end
     end
     shown = math.max(shown, 1)
-    local free = view.area:GetHeight() - y - s.pad - shown * overhead
+    local free = view.area:GetHeight() - y - s.pad - fixed - shown * overhead
     return math.max(K.scaledHeight(ROW_HEIGHT) * MIN_ROWS, math.floor(free / shown))
   end
 
-  for i = 1, 2 do
+  for i = 1, 3 do
     local p = {}
-    p.heading = W.Text(view.content, { role = "h3", family = "heading", color = "accent2" })
-    s:Add(p.heading, { gap = 6 })
-    p.list = W.ScrollList(view.content, {
-      rowHeight = K.scaledHeight(ROW_HEIGHT),
-      createRow = createTrainerRow,
-      bindRow = bindTrainerRow,
+    p.heading = K.GroupHeader(view.content, {
+      onToggle = function()
+        refresh()
+      end,
+    })
+    s:Add(p.heading, { gap = Theme.space.sm })
+    p.list = K.NewList(view.content, {
+      look = "boxed",
+      rowHeight = ROW_HEIGHT,
+      bind = bindTrainerRow,
+      onBindRow = wireTrainerRow,
     })
     function p.list:fgGridLayout()
-      local h = listHeight()
+      local h = p.rows and p.rows * K.scaledHeight(ROW_HEIGHT) or listHeight()
       self:SetHeight(h)
       return h
     end
-    s:Add(p.list, { gap = 14 })
+    s:Add(p.list, { gap = Theme.space.lg })
     p.grid = K.GridPool(view.content, 136, makeTrainerCard)
-    s:Add(p.grid, { gap = 14 })
+    s:Add(p.grid, { gap = Theme.space.lg })
     p.empty = makeEmptyCard(view.content)
-    s:Add(p.empty, { gap = 14 })
+    s:Add(p.empty, { gap = Theme.space.lg })
     K.Anchor("FG.Trainers.Empty" .. i, p.empty)
     panels[i] = p
   end
@@ -426,12 +426,22 @@ local function build(container)
     local asList = state.view == "list"
     for i, p in ipairs(panels) do
       local g = groups[i]
-      p.heading:SetShown(g ~= nil and headings == true)
-      p.list:SetShown(g ~= nil and not g.empty and asList)
-      p.grid:SetShown(g ~= nil and not g.empty and not asList)
+      p.rows = g and g.stable and math.min(#g.trainers, MAX_STABLE_ROWS) or nil
+      p.heading:SetShown(g ~= nil and (headings == true or g.stable == true))
+      if g then
+        p.heading:Set({
+          id = "trainers." .. tostring(g.faction),
+          title = g.stable and L["trainers.stable"] or L["kit.faction." .. g.faction],
+          counter = not g.empty and string.format(L["trainers.groupCount"], #g.trainers) or nil,
+          onToggle = p.heading.onToggle,
+        })
+      end
+      -- A closed group header hides its rows; without a header the rows always show.
+      local open = not p.heading:IsShown() or p.heading:IsOpen()
+      p.list:SetShown(g ~= nil and not g.empty and asList and open)
+      p.grid:SetShown(g ~= nil and not g.empty and not asList and open)
       p.empty:SetShown(g ~= nil and g.empty)
       if g then
-        p.heading:SetText(L["kit.faction." .. g.faction])
         p.list:SetData(g.trainers)
         p.grid:Sync(g.trainers, paintTrainerCard)
         if g.empty then
@@ -487,6 +497,16 @@ local function build(container)
     for _, g in ipairs(groups) do
       matched = matched + (g.empty and 0 or #g.trainers)
     end
+    -- Stable masters of the hunter get their own group after the faction groups. They are not part
+    -- of the trainer count.
+    local stable
+    if state.class == "HUNTER" then
+      local list = ns.TrainerSearchLogic.FilterTrainers(R.StableMasters(faction), state.query)
+      if #list > 0 then
+        stable = { faction = "S", stable = true, empty = false, trainers = list, pets = {}, gaps = {}, races = {} }
+        groups[#groups + 1] = stable
+      end
+    end
     paintPanels(groups, headings)
     local hasPets = false
     for _, g in ipairs(groups) do
@@ -496,7 +516,7 @@ local function build(container)
     petHint:SetShown(hasPets)
     counter:SetText(string.format(L["trainers.count"], matched, total))
     counter:SetShown(total > 0)
-    if total > 0 and matched == 0 then
+    if total > 0 and matched == 0 and not stable then
       note:SetText(L["trainers.searchEmpty"])
       note:Show()
     else
@@ -508,10 +528,28 @@ local function build(container)
     view:Layout()
   end
 
+  -- Page link: the class.
+  function view:ShareState()
+    return { state.class, state.npc and tostring(state.npc) or nil }
+  end
+
+  -- params: class, then the NPC id of one trainer (the list is searched for his name).
   function view:Show(params)
     local class = params and params[1]
     if class and R.className(class) ~= class then
       state.class = class
+    end
+    local npc = params and tonumber(params[2])
+    state.npc = nil
+    if npc then
+      for _, t in ipairs(ns.Data.Trainers.trainers or {}) do
+        if t.npc == npc and t.c == state.class then
+          state.faction, state.query = "all", ns.T(t.n) or ""
+          search.edit:SetText(state.query)
+          state.npc = npc
+          break
+        end
+      end
     end
     refresh()
   end

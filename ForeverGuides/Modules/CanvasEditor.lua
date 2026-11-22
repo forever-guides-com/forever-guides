@@ -142,7 +142,7 @@ local POINT_TEXT = {
 ns.AddLocale("enUS", {
   ["canvas.title"] = "Layout editor",
   ["canvas.grip"] = "Resize",
-  ["canvas.gripTip"] = "Drag to change the size of the window. Double-click or press Enter for the default size.",
+  ["canvas.gripTip"] = "Drag to change the size of the window. Double-click or press Enter to reset the size.",
   ["canvas.preset"] = "Template",
   ["canvas.presetPick"] = "Choose...",
   ["canvas.reset"] = "Reset to template",
@@ -178,7 +178,7 @@ ns.AddLocale("enUS", {
   ["canvas.removeRowTip"] = "Removes this element. Ctrl+Z brings it back.",
   ["canvas.dupElementTip"] = "Copies this element a little offset and selects the copy. Ctrl+D does the same, Ctrl+Z removes the copy.",
   ["canvas.renameElementTip"] = "Gives this element another name. F2 does the same for the selected element.",
-  ["canvas.nameTip"] = "The name shown in the list. Leave it empty for the default name.",
+  ["canvas.nameTip"] = "Sets the name shown in the list. Empty uses the default name.",
   ["canvas.msg.removed"] = "Element removed. Ctrl+Z undoes it.",
   ["canvas.name"] = "Name",
   ["canvas.anchor"] = "Anchor",
@@ -230,7 +230,7 @@ ns.AddLocale("enUS", {
   ["canvas.usage.account"] = "account default",
   ["canvas.newTip"] = "Creates a new, empty layout. Where a display has no empty start, it is a copy of the one you are editing.",
   ["canvas.dupHeadTip"] = "Makes a copy of the layout you are editing under a new name and switches to it.",
-  ["canvas.layoutOpenTip"] = "Click to switch to this layout. Unsaved changes are asked about first.",
+  ["canvas.layoutOpenTip"] = "Click to switch to this layout. The addon asks first if there are unsaved changes.",
   ["canvas.layoutCurrentTip"] = "This layout is open.",
   ["canvas.layoutDirtyTip"] = "This layout is open and has unsaved changes.",
   ["canvas.saveTip"] = "Saves the layout under its name.",
@@ -305,11 +305,11 @@ ns.AddLocale("enUS", {
   ["canvas.group.none"] = "None (on the canvas)",
   ["canvas.wrap"] = "Group around selection",
   ["canvas.wrapTip"] = "Puts the selected element into a new group. Ctrl+G does the same.",
-  ["canvas.fold"] = "Show or hide the children",
-  ["canvas.foldOpen"] = "%s, children shown",
-  ["canvas.foldClosed"] = "%s, children hidden",
+  ["canvas.fold"] = "Show or hide child elements",
+  ["canvas.foldOpen"] = "%s, child elements shown",
+  ["canvas.foldClosed"] = "%s, child elements hidden",
   ["canvas.forwardTip"] = "Moves this element one step up in the list. In a group it takes the place before.",
-  ["canvas.backwardTip"] = "Moves this element one step down in the list. In a group it takes the place after.",
+  ["canvas.backwardTip"] = "Moves this element one step down in the list. In a group it moves back one place.",
   ["canvas.group.limit"] = "A group holds at most %d elements.",
   ["canvas.group.level"] = "A group cannot go into another group.",
   ["canvas.group.self"] = "A group cannot be moved into itself.",
@@ -331,7 +331,7 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["canvas.title"] = "Layout-Editor",
   ["canvas.grip"] = "Größe ändern",
-  ["canvas.gripTip"] = "Ziehen ändert die Größe des Fensters. Doppelklick oder Enter stellt die Standardgröße wieder her.",
+  ["canvas.gripTip"] = "Ziehen ändert die Größe des Fensters. Doppelklick oder Enter setzt die Größe zurück.",
   ["canvas.preset"] = "Vorlage",
   ["canvas.presetPick"] = "Wählen...",
   ["canvas.reset"] = "Auf Vorlage zurücksetzen",
@@ -339,25 +339,25 @@ ns.AddLocale("deDE", {
   ["canvas.add"] = "Element hinzufügen",
   ["canvas.addPick"] = "Hinzufügen...",
   ["canvas.addShort"] = "Hinzufügen",
-  ["canvas.elementsEmpty"] = "Mit Hinzufügen das erste Element platzieren.",
+  ["canvas.elementsEmpty"] = "Klicke auf Hinzufügen, um das erste Element zu platzieren.",
   ["canvas.addMax"] = "Dieses Element lässt sich nur einmal hinzufügen.",
   ["canvas.addLimit"] = "Ein Layout enthält höchstens %d Elemente.",
   ["canvas.zoom"] = "Zoom",
   ["canvas.snap"] = "Fangen",
   ["canvas.snapOff"] = "Aus",
   ["canvas.snapPx"] = "%d px",
-  ["canvas.grid"] = "Raster zeigen",
+  ["canvas.grid"] = "Raster anzeigen",
   ["canvas.real"] = "Echte Werte",
   ["canvas.realTip"] = "Zeigt in der Vorschau deine echten Werte statt der Beispielwerte.",
   ["canvas.live"] = "Live",
   ["canvas.liveTip"] = "Jede Änderung erscheint sofort im echten Fenster. Übernehmen behält sie, Verwerfen nimmt sie zurück.",
   ["canvas.discard"] = "Verwerfen",
   ["canvas.close"] = "Schließen",
-  ["canvas.discardTip"] = "Schließt den Editor ohne die Änderungen zu übernehmen.",
+  ["canvas.discardTip"] = "Schließt den Editor, ohne die Änderungen zu übernehmen.",
   ["canvas.discardTitle"] = "Änderungen verwerfen",
   ["canvas.discardAsk"] = "Alle Änderungen seit dem letzten Übernehmen verwerfen?",
   ["canvas.elements"] = "Elemente",
-  ["canvas.visible"] = "Dieses Element zeigen oder verbergen",
+  ["canvas.visible"] = "Dieses Element anzeigen oder ausblenden",
   ["canvas.forward"] = "Nach vorne",
   ["canvas.backward"] = "Nach hinten",
   ["canvas.selected"] = "Gewähltes Element",
@@ -367,7 +367,7 @@ ns.AddLocale("deDE", {
   ["canvas.removeRowTip"] = "Entfernt dieses Element. Strg+Z holt es zurück.",
   ["canvas.dupElementTip"] = "Kopiert dieses Element leicht versetzt und wählt die Kopie. Strg+D macht dasselbe, Strg+Z entfernt die Kopie.",
   ["canvas.renameElementTip"] = "Gibt diesem Element einen anderen Namen. F2 macht das Gleiche für das gewählte Element.",
-  ["canvas.nameTip"] = "Der Name in der Liste. Leer lassen für den Standardnamen.",
+  ["canvas.nameTip"] = "Legt den Namen in der Liste fest. Ohne Eintrag gilt der Standardname.",
   ["canvas.msg.removed"] = "Element entfernt. Strg+Z macht es rückgängig.",
   ["canvas.name"] = "Name",
   ["canvas.anchor"] = "Anker",
@@ -404,7 +404,7 @@ ns.AddLocale("deDE", {
   ["canvas.hotY"] = "Fokus Y",
   ["canvas.hotTip"] = "Der Punkt der Leinwand, der auf dem Mauszeiger liegt, in Prozent der Leinwand. 50 ist die Mitte.",
   ["canvas.symmetric"] = "Symmetrisch um den Fokus",
-  ["canvas.symmetricTip"] = "Hält den Fokus in der Mitte. Ändert man die Größe der Leinwand, wandern beide Ränder, die Mitte bleibt also stehen.",
+  ["canvas.symmetricTip"] = "Hält den Fokus in der Mitte. Wenn du die Größe der Leinwand änderst, wandern beide Ränder, die Mitte bleibt also stehen.",
   ["canvas.backdrop"] = "Hintergrund",
   ["canvas.backdrop.dark"] = "Dunkel",
   ["canvas.backdrop.mid"] = "Mittel",
@@ -419,7 +419,7 @@ ns.AddLocale("deDE", {
   ["canvas.usage.account"] = "Konto-Standard",
   ["canvas.newTip"] = "Legt ein neues, leeres Layout an. Wo eine Anzeige keinen leeren Start hat, ist es eine Kopie des Layouts, das du gerade bearbeitest.",
   ["canvas.dupHeadTip"] = "Macht eine Kopie des Layouts, das du gerade bearbeitest, unter einem neuen Namen und wechselt dorthin.",
-  ["canvas.layoutOpenTip"] = "Klicken wechselt zu diesem Layout. Bei ungespeicherten Änderungen wird vorher gefragt.",
+  ["canvas.layoutOpenTip"] = "Klicken wechselt zu diesem Layout. Bei ungespeicherten Änderungen fragt das Addon vorher nach.",
   ["canvas.layoutCurrentTip"] = "Dieses Layout ist geöffnet.",
   ["canvas.layoutDirtyTip"] = "Dieses Layout ist geöffnet und hat ungespeicherte Änderungen.",
   ["canvas.saveTip"] = "Speichert das Layout unter seinem Namen.",
@@ -481,12 +481,12 @@ ns.AddLocale("deDE", {
   ["canvas.import.okGroup"] = "Gruppe %s mit %d Unterelement(en) gefunden.",
   ["canvas.import.insertHere"] = "Einfügen fügt es in das geöffnete Layout ein.",
   ["canvas.import.insertNew"] = "Einfügen legt es als neues Layout an.",
-  ["canvas.import.skipped"] = "%d Element(e) gibt es in dieser Anzeige nicht und bleiben weg.",
+  ["canvas.import.skipped"] = "%d Element(e) gibt es in dieser Anzeige nicht und entfallen.",
   ["canvas.import.err.elements"] = "Das ist ein einzelnes Element oder eine Gruppe, kein ganzes Layout.",
   ["canvas.import.err.layout"] = "Das ist ein ganzes Layout, kein einzelnes Element.",
   ["canvas.import.err.hostElements"] = "Diese Elemente gehören zu einer anderen Anzeige.",
   ["canvas.msg.pasted"] = "%d Element(e) eingefügt. Strg+Z macht es rückgängig.",
-  ["canvas.msg.pastedSkipped"] = "%d Element(e) eingefügt, %d bleiben weg (nicht in dieser Anzeige).",
+  ["canvas.msg.pastedSkipped"] = "%d Element(e) eingefügt, %d entfallen (nicht in dieser Anzeige).",
   ["canvas.msg.pasteLimit"] = "Im Layout ist noch Platz für %d Element(e), der Text enthält %d.",
   ["canvas.msg.pasteType"] = "Diese Anzeige kennt diesen Elementtyp nicht.",
   ["canvas.group"] = "Gruppe",
@@ -494,9 +494,9 @@ ns.AddLocale("deDE", {
   ["canvas.group.none"] = "Keine (auf der Leinwand)",
   ["canvas.wrap"] = "Gruppe um Auswahl",
   ["canvas.wrapTip"] = "Steckt das gewählte Element in eine neue Gruppe. Strg+G macht dasselbe.",
-  ["canvas.fold"] = "Kinder zeigen oder verbergen",
-  ["canvas.foldOpen"] = "%s, Kinder sichtbar",
-  ["canvas.foldClosed"] = "%s, Kinder verborgen",
+  ["canvas.fold"] = "Unterelemente anzeigen oder ausblenden",
+  ["canvas.foldOpen"] = "%s, Unterelemente sichtbar",
+  ["canvas.foldClosed"] = "%s, Unterelemente ausgeblendet",
   ["canvas.forwardTip"] = "Schiebt dieses Element in der Liste einen Schritt nach oben. In einer Gruppe rückt es einen Platz vor.",
   ["canvas.backwardTip"] = "Schiebt dieses Element in der Liste einen Schritt nach unten. In einer Gruppe rückt es einen Platz zurück.",
   ["canvas.group.limit"] = "Eine Gruppe fasst höchstens %d Elemente.",
@@ -3069,7 +3069,7 @@ local function applyWidths()
   ui.remove:SetSize(G.removeW, 24)
   ui.dup:SetSize(G.dupW, 24)
   ui.copyEl:SetSize(G.removeW, 24)
-  ui.shareEl:SetSize(G.dupW, 24)
+  ui.shareEl:SetSize(24, 24)
   ui.groupDd:SetWidth(c)
   ui.outdent:SetSize(G.halfW, 24)
   ui.indent:SetSize(G.halfW, 24)
@@ -3475,12 +3475,12 @@ local function placeBand()
     -- One row: the picker takes what the buttons leave. The buttons show text and icon while the picker keeps
     -- LAYOUT_PICK_MIN, else the icon only.
     local gap = 4
-    -- Share gives up its text first, then Copy, then New and Manage.
+    -- Copy gives up its text first, then New and Manage; Share is an icon.
     local function widths(stage)
       local wNew = canNew and ui.layoutNew:Fit(stage >= 3 and 0 or 90) or 0
       local wDup = canDup and ui.layoutDup:Fit(stage >= 2 and 0 or 120) or 0
       local wManage = ui.layoutManage:Fit(stage >= 3 and 0 or 130)
-      local wShare = ui.layoutShare:Fit(stage >= 1 and 0 or 140)
+      local wShare = LAYOUT_ROW_H
       return wNew, wDup, wManage, wShare
     end
     local function total(wNew, wDup, wManage, wShare)
@@ -3732,7 +3732,7 @@ local function buildView(f)
     handle.rim = handle:CreateTexture(nil, "OVERLAY")
     handle.rim:SetSize(HANDLE_SIZE + 4, HANDLE_SIZE + 4)
     handle.rim:SetPoint("CENTER")
-    handle.rim:SetColorTexture(0, 0, 0, 1)
+    handle.rim:SetColorTexture(ns.Theme.scrim(1))
     handle.square = handle:CreateTexture(nil, "OVERLAY")
     handle.square:SetDrawLayer("OVERLAY", 1)
     handle.square:SetSize(HANDLE_SIZE + 2, HANDLE_SIZE + 2)
@@ -3883,8 +3883,7 @@ local function createRow(parent)
     end,
   })
   row.copy:SetPoint("RIGHT", row.ren, "LEFT", -2, 0)
-  row.share = W.Action(row, {
-    icon = "share",
+  row.share = ns.PageShare.Button(row, {
     size = 22,
     tooltip = "layoutshare.btn",
     tooltipText = "layoutshare.tip.element",
@@ -4094,13 +4093,10 @@ local function buildSide(f)
       act.manage()
     end,
   })
-  ui.layoutShare = W.Action(f, {
-    label = "layoutshare.btn",
-    icon = "share",
+  ui.layoutShare = ns.PageShare.Button(f, {
+    size = LAYOUT_ROW_H,
     tooltip = "layoutshare.btn",
     tooltipText = "layoutshare.tip.layout",
-    height = LAYOUT_ROW_H,
-    width = 140,
     onClick = function()
       act.shareLayout()
     end,
@@ -4225,14 +4221,10 @@ local function buildSide(f)
     end,
   })
 
-  ui.shareEl = W.Action(c, {
-    key = "layoutshare.btn",
-    icon = "share",
+  ui.shareEl = ns.PageShare.Button(c, {
+    size = 24,
     tooltip = "layoutshare.btn",
     tooltipText = "layoutshare.tip.element",
-    height = 24,
-    width = G.dupW,
-    wrap = "canvas-share",
     onClick = function()
       act.shareElement()
     end,
@@ -4887,6 +4879,10 @@ local function create()
     end
     local _, handled = ns.Safe("canvas-key", handleKey, key)
     ns.PropagateKeys(self, not handled)
+  end)
+  -- A handled key leaves propagation off, which cannot change in combat: reset it on the way in.
+  ns.On("PLAYER_REGEN_DISABLED", function()
+    ns.PropagateKeys(f, true)
   end)
   ns.WindowShell.RegisterEsc(f, function()
     if S and isDirty() then

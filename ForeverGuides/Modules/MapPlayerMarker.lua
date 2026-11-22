@@ -20,13 +20,13 @@ local LEVEL = 100
 
 ns.AddLocale("enUS", {
   ["map.player"] = "Show my position",
-  ["map.player.tip"] = "Shows an arrow at your position on the map. It points the way you face and appears in your zone and on the world view, never in instances.",
+  ["map.player.tip"] = "Shows your position as an arrow on the map. It points the way you face and appears in your zone and on the world view, never in instances.",
   ["map.player.here"] = "You are here",
 })
 
 ns.AddLocale("deDE", {
-  ["map.player"] = "Meine Position zeigen",
-  ["map.player.tip"] = "Zeigt einen Pfeil an deiner Position auf der Karte. Er zeigt in deine Blickrichtung und erscheint in deinem Gebiet und auf der Weltansicht, nicht in Instanzen.",
+  ["map.player"] = "Meine Position anzeigen",
+  ["map.player.tip"] = "Zeigt deine Position als Pfeil auf der Karte. Er zeigt in deine Blickrichtung und erscheint in deiner Zone und auf der Weltansicht, nicht in Instanzen.",
   ["map.player.here"] = "Du bist hier",
 })
 

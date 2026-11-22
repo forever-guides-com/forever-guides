@@ -27,7 +27,7 @@ local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 ns.AddLocale("enUS", {
   ["map.zoom.world"] = "World",
   ["map.zoom.back"] = "Back",
-  ["map.zoom.backTip"] = "Back to the world map.\nRight click, Backspace or Esc works too.",
+  ["map.zoom.backTip"] = "Back to the world view.\nRight click, Backspace or Esc works too.",
   ["map.zoom.open"] = "Click to open the map of this area.",
   ["map.zoom.levels"] = "Levels %d-%d",
   ["map.zoom.near"] = "Nearby areas",
@@ -37,7 +37,7 @@ ns.AddLocale("enUS", {
   ["map.zoom.markers"] = "Markers: %d",
   ["map.zoom.estimated"] = "Estimated position",
   ["map.zoom.noArt"] = "No map image for this zone",
-  ["map.zoom.noArtHint"] = "No image for this zone, places and markers still work.",
+  ["map.zoom.noArtHint"] = "No image for this zone. Places and markers still work.",
   ["map.focus.default"] = "Focus point",
   ["map.focus.hint"] = "Click to set a waypoint here.",
 })
@@ -45,7 +45,7 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["map.zoom.world"] = "Welt",
   ["map.zoom.back"] = "Zurück",
-  ["map.zoom.backTip"] = "Zurück zur Weltkarte.\nRechtsklick, Backspace oder Esc geht auch.",
+  ["map.zoom.backTip"] = "Zurück zur Weltansicht.\nRechtsklick, Backspace oder Esc geht auch.",
   ["map.zoom.open"] = "Klicke, um die Karte dieses Gebiets zu öffnen.",
   ["map.zoom.levels"] = "Stufen %d-%d",
   ["map.zoom.near"] = "Nachbargebiete",
@@ -55,7 +55,7 @@ ns.AddLocale("deDE", {
   ["map.zoom.markers"] = "Marker: %d",
   ["map.zoom.estimated"] = "Geschätzte Position",
   ["map.zoom.noArt"] = "Kein Kartenbild für diese Zone",
-  ["map.zoom.noArtHint"] = "Kein Bild für diese Zone, Orte und Marker gehen trotzdem.",
+  ["map.zoom.noArtHint"] = "Kein Bild für diese Zone. Orte und Marker funktionieren trotzdem.",
   ["map.focus.default"] = "Fokuspunkt",
   ["map.focus.hint"] = "Klicke, um hier einen Wegpunkt zu setzen.",
 })

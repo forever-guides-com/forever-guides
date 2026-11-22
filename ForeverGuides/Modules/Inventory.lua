@@ -245,7 +245,31 @@ function Inv.CaptureBags()
   end
   state.dirty = false
   local areas = { bags = scanContainers((bagIds())), equip = scanEquipment() }
-  return next(areas) ~= nil and write(areas)
+  local wrote = next(areas) ~= nil and write(areas)
+  -- What the last read could use, for /fg inventory: an unreadable area keeps its old snapshot.
+  Inv.last = { bags = areas.bags ~= nil, equip = areas.equip ~= nil, wrote = wrote == true }
+  return wrote
+end
+
+-- Live count of an item for the current character, read from the game: bags without the worn
+-- copies, bank and worn items. nil when the client gives no count (the snapshot is the fallback).
+function Inv.Live(itemId)
+  local count = globalFn("GetItemCount")
+  if not (count and Logic.ItemId(itemId)) then
+    return nil
+  end
+  local okBags, inBags = pcall(count, itemId)
+  local okAll, withBank = pcall(count, itemId, true)
+  if not (okBags and okAll and I.readable(inBags) and I.readable(withBank)) then
+    return nil
+  end
+  local worn = scanEquipment()
+  worn = worn and worn[itemId] or 0
+  return {
+    bags = math.max(0, inBags - worn),
+    bank = math.max(0, withBank - inBags),
+    equip = worn,
+  }
 end
 
 -- Only while the bank is open: a closed bank reads as empty. A bank without any slot counts
@@ -313,15 +337,7 @@ function Inv.GuildKey()
     return nil
   end
   if not (type(realm) == "string" and realm ~= "" and I.accessible(realm)) then
-    realm = nil
-    for _, fn in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-      local get = globalFn(fn)
-      local read, value = pcall(get or function() end)
-      if read and type(value) == "string" and value ~= "" and I.accessible(value) then
-        realm = value
-        break
-      end
-    end
+    realm = ns.Realm.Get()
   end
   local key = Logic.GuildKey(name, realm)
   return key, key and name or nil

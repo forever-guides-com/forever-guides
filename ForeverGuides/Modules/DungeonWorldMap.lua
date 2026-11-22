@@ -13,7 +13,7 @@
 -- with the next dungeon visit.
 --
 -- Nothing is written into Blizzard tables: HookScript on the map, our own frames as children of it. The
--- panel is built out of combat only. Every entry point runs protected; an error removes the panel, the
+-- panel is built in combat too while the client leaves the map alone (ns.ProtectedAllowed). Every entry point runs protected; an error removes the panel, the
 -- world map stays as it is and the error is reported once.
 local _, ns = ...
 local W, L, A, DMV, FL = ns.W, ns.L, ns.DungeonAreaLogic, ns.DungeonMapView, ns.FlowLayout
@@ -29,27 +29,27 @@ ns.AddLocale("enUS", {
   ["dwm.area.none"] = "Area: between two areas, the map stays",
   ["dwm.learned"] = "Learned: %s belongs to floor %d.",
   ["dwm.marker.title"] = "You are roughly here",
-  ["dwm.marker.text"] = "Rough centre of the area %s. The game gives no position inside dungeons, this is not your location.",
-  ["dwm.marker.status"] = "The marker shows the rough centre of the area, not your position.",
+  ["dwm.marker.text"] = "Rough center of the area %s. The game gives no position inside dungeons. This is not your location.",
+  ["dwm.marker.status"] = "The marker shows the rough center of the area, not your position.",
   ["dwm.here"] = "I am here",
   ["dwm.here.cancel"] = "Cancel",
-  ["dwm.here.tip"] = "Marks the rough centre of your current area on the map and remembers the floor. Needs a named area and a map with a click on it.",
+  ["dwm.here.tip"] = "Marks the rough center of your current area on the map and remembers the floor. Needs a named area and a click on the map.",
   ["dwm.here.hint"] = "Click the map where you are. The marker is only roughly right.",
   ["dwm.export"] = "Learned areas",
-  ["dwm.export.tip"] = "Shows everything learned about the areas as text you can copy.",
+  ["dwm.export.tip"] = "Shows everything the addon has learned about the areas as text you can copy.",
   ["dwm.export.title"] = "Learned dungeon areas",
-  ["dwm.export.hint"] = "One line per area: ID | dungeon | area | floor | x | y. Copy it for the data upkeep.",
+  ["dwm.export.hint"] = "One line per area: ID | dungeon | area | floor | x | y. Copy it for data maintenance.",
   ["dwm.export.none"] = "Nothing learned yet.",
   ["dwm.reset"] = "Reset",
   ["dwm.reset.tip"] = "Forgets what was learned about the areas of this dungeon.",
   ["dwm.reset.title"] = "Reset learned areas",
   ["dwm.reset.text"] = "Delete everything the addon learned about the areas of this dungeon?",
-  ["dwm.error"] = "The dungeon map was switched off after an error. The world map works as usual.",
-  ["dwm.set"] = "Dungeon map in the world map inside dungeons",
+  ["dwm.error"] = "The dungeon map switched itself off after an error. The world map works as usual.",
+  ["dwm.set"] = "Show dungeon map in the world map inside dungeons",
   ["dwm.tab.map"] = "Map",
   ["dwm.tab.bosses"] = "Bosses",
   ["dwm.bosses.reset"] = "Reset boss progress",
-  ["dwm.bosses.resetTip"] = "Forgets the saved boss progress of this instance, a new run starts without defeated bosses. Not possible while a lockout of the game lists defeated bosses.",
+  ["dwm.bosses.resetTip"] = "Forgets the saved boss progress of this instance, so a new run starts without defeated bosses. Not possible while a game lockout lists defeated bosses.",
 })
 ns.AddLocale("deDE", {
   ["dwm.btn.world"] = "Weltkarte",
@@ -61,27 +61,27 @@ ns.AddLocale("deDE", {
   ["dwm.area.none"] = "Gebiet: zwischen zwei Gebieten, die Karte bleibt",
   ["dwm.learned"] = "Gelernt: %s gehört zu Ebene %d.",
   ["dwm.marker.title"] = "Du bist ungefähr hier",
-  ["dwm.marker.text"] = "Ungefähre Mitte des Gebiets %s. Das Spiel liefert in Dungeons keine Position, das ist nicht dein Standort.",
+  ["dwm.marker.text"] = "Ungefähre Mitte des Gebiets %s. Das Spiel liefert in Dungeons keine Position. Das ist nicht dein Standort.",
   ["dwm.marker.status"] = "Der Marker zeigt die ungefähre Mitte des Gebiets, nicht deine Position.",
   ["dwm.here"] = "Ich bin hier",
   ["dwm.here.cancel"] = "Abbrechen",
   ["dwm.here.tip"] = "Markiert die ungefähre Mitte deines aktuellen Gebiets auf der Karte und merkt sich die Ebene. Braucht ein benanntes Gebiet und einen Klick auf die Karte.",
   ["dwm.here.hint"] = "Klicke auf die Karte, wo du bist. Der Marker stimmt nur ungefähr.",
   ["dwm.export"] = "Gelernte Gebiete",
-  ["dwm.export.tip"] = "Zeigt alles, was über die Gebiete gelernt wurde, als Text zum Kopieren.",
+  ["dwm.export.tip"] = "Zeigt alles, was das Addon über die Gebiete gelernt hat, als kopierbaren Text.",
   ["dwm.export.title"] = "Gelernte Dungeon-Gebiete",
-  ["dwm.export.hint"] = "Eine Zeile je Gebiet: ID | Dungeon | Gebiet | Ebene | x | y. Kopiere sie für die Daten-Pflege.",
+  ["dwm.export.hint"] = "Eine Zeile je Gebiet: ID | Dungeon | Gebiet | Ebene | x | y. Kopiere sie für die Datenpflege.",
   ["dwm.export.none"] = "Noch nichts gelernt.",
   ["dwm.reset"] = "Zurücksetzen",
-  ["dwm.reset.tip"] = "Vergisst, was über die Gebiete dieses Dungeons gelernt wurde.",
+  ["dwm.reset.tip"] = "Vergisst, was das Addon über die Gebiete dieses Dungeons gelernt hat.",
   ["dwm.reset.title"] = "Gelernte Gebiete zurücksetzen",
   ["dwm.reset.text"] = "Alles löschen, was das Addon über die Gebiete dieses Dungeons gelernt hat?",
-  ["dwm.error"] = "Die Dungeonkarte wurde nach einem Fehler abgeschaltet. Die Weltkarte funktioniert wie gewohnt.",
-  ["dwm.set"] = "Dungeonkarte in der Weltkarte innerhalb von Dungeons",
+  ["dwm.error"] = "Die Dungeonkarte hat sich nach einem Fehler abgeschaltet. Die Weltkarte funktioniert wie gewohnt.",
+  ["dwm.set"] = "Dungeonkarte in der Weltkarte in Dungeons anzeigen",
   ["dwm.tab.map"] = "Karte",
   ["dwm.tab.bosses"] = "Bosse",
   ["dwm.bosses.reset"] = "Boss-Fortschritt zurücksetzen",
-  ["dwm.bosses.resetTip"] = "Vergisst den gespeicherten Boss-Fortschritt dieser Instanz, ein neuer Durchlauf beginnt ohne besiegte Bosse. Nicht möglich, solange eine Sperre des Spiels besiegte Bosse führt.",
+  ["dwm.bosses.resetTip"] = "Vergisst den gespeicherten Boss-Fortschritt dieser Instanz, damit ein neuer Durchlauf ohne besiegte Bosse beginnt. Nicht möglich, solange eine Sperre des Spiels besiegte Bosse listet.",
 })
 
 local DWM = {}
@@ -643,8 +643,10 @@ function DWM.Run(context, fn, ...)
 end
 
 local function present()
-  -- Our frames hang on the map: while the client protects it, Show/Hide/SetPoint on them is blocked.
+  -- Our frames hang on the map: while the client protects it (in combat), Show/Hide/SetPoint on them is blocked
+  -- and the panel waits for PLAYER_REGEN_ENABLED. A map the client leaves alone gets its panel in combat too.
   if map and not ns.ProtectedAllowed(map) then
+    S.waiting = true
     return
   end
   if not (enabled() and attached and not S.broken) then
@@ -657,11 +659,6 @@ local function present()
     return
   end
   if not S.panel then
-    -- Parenting new frames to the map is left for after the fight.
-    if InCombatLockdown() then
-      S.waiting = true
-      return
-    end
     build()
   end
   if S.instId ~= id or not S.inst then

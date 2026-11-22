@@ -28,16 +28,7 @@ local function rowHeight()
 end
 
 local function homeRealm()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local fn = rawget(_G, name)
-    if type(fn) == "function" then
-      local ok, realm = pcall(fn)
-      if ok and type(realm) == "string" and realm ~= "" then
-        return realm
-      end
-    end
-  end
-  return ""
+  return FG.Realm.Get() or ""
 end
 
 local function now()

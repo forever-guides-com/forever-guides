@@ -15,16 +15,16 @@ ns.AddLocale("enUS", {
   ["instdisp.set.heading"] = "Instances: display",
   ["instdisp.set.hint"] = "The star on an instance card marks a favorite. The pin size applies to the dungeon map on the instances page and in the world map.",
   ["instdisp.set.pinScale"] = "Pin size on the dungeon map",
-  ["instdisp.set.pinScaleTip"] = "Size of the boss, entrance and own pins on the dungeon map in percent of the normal size.",
+  ["instdisp.set.pinScaleTip"] = "Sets the size of the boss, entrance and own pins on the dungeon map as a percent of the normal size.",
   ["instdisp.set.clear"] = "Clear favorites",
   ["instdisp.set.clearTip"] = "Removes every favorite mark from the instance cards. Nothing else changes.",
 })
 ns.AddLocale("deDE", {
   ["instdisp.set.heading"] = "Instanzen: Darstellung",
-  ["instdisp.set.hint"] = "Der Stern auf einer Instanzkarte markiert einen Favoriten. Die Pin-Größe gilt für die Dungeonkarte auf der Instanzen-Seite und in der Weltkarte.",
-  ["instdisp.set.pinScale"] = "Pin-Größe auf der Dungeonkarte",
-  ["instdisp.set.pinScaleTip"] = "Größe der Boss-, Eingangs- und eigenen Pins auf der Dungeonkarte in Prozent der normalen Größe.",
-  ["instdisp.set.clear"] = "Favoriten entfernen",
+  ["instdisp.set.hint"] = "Der Stern auf einer Instanzkarte markiert einen Favoriten. Die Pingröße gilt für die Dungeonkarte auf der Instanzen-Seite und auf der Weltkarte.",
+  ["instdisp.set.pinScale"] = "Pingröße auf der Dungeonkarte",
+  ["instdisp.set.pinScaleTip"] = "Legt die Größe der Boss-, Eingangs- und eigenen Pins auf der Dungeonkarte in Prozent der normalen Größe fest.",
+  ["instdisp.set.clear"] = "Favoriten leeren",
   ["instdisp.set.clearTip"] = "Entfernt jede Favoritenmarkierung von den Instanzkarten. Sonst ändert sich nichts.",
 })
 

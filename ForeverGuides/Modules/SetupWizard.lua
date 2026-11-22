@@ -1,5 +1,6 @@
 -- Setup wizard window: one step at a time, every control writes to the Store at once.
--- Opens by itself on a fresh install (5 s after entering the world, never in combat), by
+-- Opens by itself on a fresh install (5 s after entering the world, in combat too; the
+-- keyboard waits for the end of combat, see setupKeys), by
 -- /fg setup and by the buttons in Settings and Help. The window sits in the highest strata and a
 -- guard keeps it there, /fg setup close and /fg setup skip close it without the mouse.
 -- A button that opens a window of the add-on (settings, help, tutorials) leaves the wizard open and visible: UI.Reveal
@@ -322,7 +323,7 @@ function addConsent(view, c)
     row:SetHeight(h)
     return h
   end
-  view.stack:Add(row, { gap = 8 })
+  view.stack:Add(row, { gap = 6 })
   return row
 end
 
@@ -436,6 +437,12 @@ local BLOCKS = {
     addRow(view, { key = "setup.sharing.privacy" }, "setup.sharing.more", function()
       ns.Dialogs.Copy("consent.privacy", ns.ConsentSettings.PrivacyText(), "consent.privacy.hint")
     end, "consent.privacy", { width = 120, opens = true })
+  end,
+  -- The map table of a step that names it (step.mapShare(view), see Modules/SetupWizardSteps.lua).
+  mapshare = function(view, step)
+    if step.mapShare then
+      step.mapShare(view)
+    end
   end,
   -- Send and receive of all functions of the step at once, over the switch columns.
   bulk = addBulk,
@@ -860,6 +867,8 @@ local function moveTo(f, left, rect)
   f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left / scale, rect.t / scale)
 end
 
+UI.ScreenRect, UI.MoveTo = screenRect, moveTo
+
 local function setStrata(f, strata)
   if f:GetFrameStrata() ~= strata then
     f:SetFrameStrata(strata)
@@ -1131,6 +1140,10 @@ local function setupKeys()
     local _, handled = ns.Safe("setup-key", handleKey, key)
     ns.PropagateKeys(self, not handled)
   end)
+  -- A handled key leaves propagation off, which cannot change in combat: reset it on the way in.
+  ns.On("PLAYER_REGEN_DISABLED", function()
+    ns.PropagateKeys(frame, true)
+  end)
 end
 
 -- Guard ----------------------------------------------------------------------------------------
@@ -1169,7 +1182,7 @@ end
 -- Puts back what the game or another add-on changed (strata, level, mouse, alpha) and counts it.
 -- raise: also bring the window to the front (opening, events); the ticker only corrects.
 function UI.Front(raise)
-  if not frame or not frame:IsShown() or inCombat() then
+  if not frame or not frame:IsShown() or ns.CombatLocked() then
     return
   end
   local fixes, hidden = SW.GuardCheck({
@@ -1482,19 +1495,19 @@ ns.On("FG_CONSENT_WITHDRAWN", onConsentChanged)
 
 -- Automatic start ------------------------------------------------------------------------------
 
-local inWorld, waiting, scheduled, handled = false, false, false, false
+local inWorld, scheduled, handled = false, false, false
 
 local function run()
   scheduled = false
   if handled or not ns.db then
     return
   end
-  -- Loading screen or combat: the next entering-world or combat-end event tries again.
-  if not inWorld or inCombat() then
-    waiting = true
+  -- Loading screen: the next entering-world event tries again. Combat does not matter: the window is made of
+  -- plain frames and takes no keyboard in a fight (setupKeys).
+  if not inWorld then
     return
   end
-  waiting, handled = false, true
+  handled = true
   SW.Baseline()
   if SW.ShouldAutoOpen() then
     if UI.Open({ auto = true }) then
@@ -1525,9 +1538,4 @@ end)
 ns.On("PLAYER_LEAVING_WORLD", function()
   inWorld = false
 end)
-ns.On("PLAYER_REGEN_ENABLED", function()
-  setupKeys()
-  if waiting then
-    schedule()
-  end
-end)
+ns.On("PLAYER_REGEN_ENABLED", setupKeys)

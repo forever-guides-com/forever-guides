@@ -7,6 +7,7 @@
 --   J<rec>;<rec>...               join dates:  <name>,<minDay>,<maxDay>,<source letter>
 --   M<rec>;...                    marks:       <name>,<flags> (r returned, i inactive)
 --   N<rec>;...                    notes:       <name>,<text>
+--   B<rec>;...                    bans:        <name>,<day>,<reason>,<by>,<a|d> (a add, d remove: a suggestion)
 --   (empty)                       goodbye, the sender withdrew
 -- Names and texts are percent-escaped: only letters, digits, "-", "%", "," and ";" occur, so a payload
 -- is plain ASCII whatever the player names contain. The envelope and the cut into blocks are CommLogic's.
@@ -15,13 +16,13 @@ if not gm.ext then
   return
 end
 local PN = gm.FG.PlayerName
-local DL, ML = gm.DatesLogic, gm.MembersLogic
+local DL, ML, BL = gm.DatesLogic, gm.MembersLogic, gm.BansLogic
 
 local SH = {}
 gm.ShareLogic = SH
 
 SH.FN = "gmShare"
-SH.CATEGORIES = { "J", "M", "N" }
+SH.CATEGORIES = { "J", "M", "N", "B" }
 SH.LIMITS = {
   -- One data message: characters (three blocks of CommLogic) and records.
   MAX_PAYLOAD = 660,
@@ -29,6 +30,8 @@ SH.LIMITS = {
   MAX_NAME = 64,
   -- Longest escaped note a record may carry.
   MAX_NOTE_CODE = 500,
+  -- Longest escaped ban reason or adder name.
+  MAX_BAN_CODE = 240,
   MAX_INBOX = 200,
   MAX_PER_SENDER = 80,
   MAX_SENT = 3000,
@@ -46,7 +49,9 @@ SH.LIMITS = {
 }
 local LIM = SH.LIMITS
 
-local CAT_SET = { J = true, M = true, N = true }
+local CAT_SET = { J = true, M = true, N = true, B = true }
+local BAN_OP = { a = "add", d = "remove" }
+local BAN_CODE = { add = "a", remove = "d" }
 local SRC_CODE =
   { manual = "m", note = "n", log = "l", chat = "c", diff = "d", roster = "r", baseline = "b", shared = "s" }
 local CODE_SRC = {}
@@ -182,6 +187,34 @@ function readers.N(fields)
   return { name = name, key = key, text = text }
 end
 
+-- Reason or adder of a ban: "" or escaped text that reads back as one clean line.
+local function readLine(field, limit)
+  if field == "" then
+    return ""
+  end
+  local raw = #field <= LIM.MAX_BAN_CODE and unescape(field, limit * 4)
+  local text = raw and BL.Line(raw, limit)
+  if not text or text ~= raw then
+    return nil
+  end
+  return text
+end
+
+function readers.B(fields, today)
+  if #fields ~= 5 then
+    return nil
+  end
+  local name, key = readName(fields[1])
+  local op = BAN_OP[fields[5]]
+  local day, okDay = readDay(fields[2], today)
+  local reason = readLine(fields[3], BL.MAX_REASON)
+  local by = readLine(fields[4], BL.MAX_BY)
+  if not (name and op and okDay and reason and by) or (op == "add" and not day) then
+    return nil
+  end
+  return { name = name, key = key, day = day, reason = reason, by = by, op = op }
+end
+
 -- One payload (any type) as { kind = "hello", cats }, { kind = "bye" } or { kind = "data", cat, rows };
 -- nil for everything that is not exactly what an encoder makes. today: the day number of today. A single
 -- bad record refuses the whole message. Never raises.
@@ -273,6 +306,58 @@ local function build(cat, e)
   return code, name .. "," .. code
 end
 
+local function checksum(text)
+  local h = 5381
+  for i = 1, #text do
+    h = (h * 33 + text:byte(i)) % 2147483647
+  end
+  return h
+end
+
+local function fit(text)
+  while #escape(text) > LIM.MAX_BAN_CODE do
+    local chars = 0
+    for i = 1, #text do
+      local b = text:byte(i)
+      chars = chars + ((b < 0x80 or b >= 0xC0) and 1 or 0)
+    end
+    text = PN.Cut(text, chars - 1)
+  end
+  return text
+end
+
+-- The ban records: every own ban that differs from what went out (a ban taken over from others never goes
+-- on) and a removal for every ban that went out and is gone now. Appended to out, sorted by key.
+function SH.CollectBans(guild, sent, out)
+  local keys = {}
+  for key, e in pairs(guild.bans) do
+    if e.src ~= "shared" then
+      keys[#keys + 1] = key
+    end
+  end
+  for k, v in pairs(sent) do
+    if k:sub(1, 1) == "B" and v ~= "-" and not guild.bans[k:sub(2)] then
+      keys[#keys + 1] = k:sub(2)
+    end
+  end
+  table.sort(keys)
+  for _, key in ipairs(keys) do
+    local e = guild.bans[key]
+    local sig, text
+    if e then
+      -- Cut at whole characters until the escaped text fits what the decoder accepts.
+      local reason, by = fit(e.reason), fit(e.by)
+      sig = string.format("%d,%d", e.day, checksum(reason .. "|" .. by))
+      text = string.format("%s,%d,%s,%s,a", escape(e.name), e.day, escape(reason), escape(by))
+    else
+      sig, text = "-", escape(key) .. ",,,,d"
+    end
+    if sent["B" .. key] ~= sig and #text <= LIM.MAX_PAYLOAD - 2 then
+      out[#out + 1] = { cat = "B", key = key, sig = sig, text = text }
+    end
+  end
+end
+
 -- What this client may say: the records of the members on the roster (`roster` is a set of keys) in the
 -- chosen categories (`cats` = { J = true ... }) that differ from what `sent` ([cat .. key] = signature)
 -- says went out before. Sorted, stable. Own received data never goes on: a date with the source
@@ -281,6 +366,9 @@ function SH.Collect(guild, roster, cats, sent)
   local out = {}
   sent = type(sent) == "table" and sent or {}
   local keys = {}
+  if cats.B then
+    SH.CollectBans(guild, sent, out)
+  end
   for key in pairs(guild.members) do
     if roster[key] then
       keys[#keys + 1] = key
@@ -288,7 +376,7 @@ function SH.Collect(guild, roster, cats, sent)
   end
   table.sort(keys)
   for _, cat in ipairs(SH.CATEGORIES) do
-    if cats[cat] then
+    if cats[cat] and cat ~= "B" then
       for _, key in ipairs(keys) do
         local sig, text = build(cat, guild.members[key])
         if sig and sent[cat .. key] ~= sig then
@@ -368,6 +456,10 @@ end
 -- What an offer would change: true when adopting it adds something to the record. Hand input is never
 -- touched, so a note that exists already (other text) and a manual date make an offer worthless.
 local function adds(guild, row, cat, today)
+  if cat == "B" then
+    -- Never overwrites a ban of this guild: an offer to add needs a name that is not banned yet.
+    return (guild.bans[row.key] == nil) == (row.op == "add")
+  end
   local e = guild.members[row.key]
   if cat == "J" then
     local own = e and DL.Clean(e.joined)
@@ -389,7 +481,9 @@ local function sameValue(a, b)
   if a.cat ~= b.cat or a.key ~= b.key then
     return false
   end
-  if a.cat == "J" then
+  if a.cat == "B" then
+    return a.op == b.op and a.day == b.day and a.reason == b.reason
+  elseif a.cat == "J" then
     return a.minDay == b.minDay and a.maxDay == b.maxDay
   elseif a.cat == "M" then
     return table.concat(a.tags, ",") == table.concat(b.tags, ",")
@@ -444,6 +538,10 @@ function SH.Accept(guild, cat, rows, from, ctx)
       src = row.src,
       tags = row.tags,
       text = row.text,
+      day = row.day,
+      reason = row.reason,
+      by = row.by,
+      op = row.op,
     }
     local dup
     for i = #inbox, 1, -1 do
@@ -456,7 +554,8 @@ function SH.Accept(guild, cat, rows, from, ctx)
         end
       end
     end
-    if not ctx.roster[row.key] or not adds(guild, row, cat, ctx.today) then
+    -- A ban is about a name, not about a member of the roster.
+    if (cat ~= "B" and not ctx.roster[row.key]) or not adds(guild, row, cat, ctx.today) then
       skipped = skipped + 1
     elseif dup then
       dup.also = (dup.also or 0) + 1
@@ -502,7 +601,27 @@ function SH.Adopt(guild, offer, today)
   end
   table.remove(guild.inbox, at)
   local members, member = guild.members, { key = offer.key, name = offer.name }
-  if offer.cat == "J" then
+  if offer.cat == "B" then
+    if offer.op == "remove" then
+      if not BL.Remove(guild.bans, offer.key) then
+        return false, "same"
+      end
+      return true
+    elseif guild.bans[offer.key] then
+      return false, "same"
+    end
+    local ok = BL.Set(guild.bans, {
+      name = offer.name,
+      reason = offer.reason,
+      by = offer.by ~= "" and offer.by or offer.from,
+      day = offer.day,
+      src = "shared",
+    }, today)
+    if not ok then
+      return false, "limit"
+    end
+    return true
+  elseif offer.cat == "J" then
     local e = members[offer.key]
     local own = e and DL.Clean(e.joined)
     local info = DL.Info(offer.minDay, offer.maxDay, "shared", today)
@@ -571,7 +690,12 @@ end
 
 -- Text of what an offer says, "Join date: ..." and so on; L is the locale table, format a date format.
 function SH.What(offer, L, format)
-  if offer.cat == "J" then
+  if offer.cat == "B" then
+    if offer.op == "remove" then
+      return L["gm.share.what.Bremove"]
+    end
+    return string.format(L["gm.share.what.B"], offer.reason ~= "" and offer.reason or L["gm.ban.noReason"])
+  elseif offer.cat == "J" then
     return string.format(L["gm.share.what.J"], DL.Text(DL.Info(offer.minDay, offer.maxDay, "shared"), L, format))
   elseif offer.cat == "M" then
     local names = {}
@@ -603,7 +727,14 @@ local function cleanOffer(o)
     name = type(o.name) == "string" and o.name ~= "" and PN.Cut(PN.Clean(o.name), LIM.MAX_NAME) or o.key,
     also = whole(o.also),
   }
-  if o.cat == "J" then
+  if o.cat == "B" then
+    if not BAN_CODE[o.op] or (o.op == "add" and not whole(o.day)) then
+      return nil
+    end
+    out.op, out.day = o.op, whole(o.day) or 0
+    out.reason = type(o.reason) == "string" and BL.Line(o.reason, BL.MAX_REASON) or ""
+    out.by = type(o.by) == "string" and BL.Line(o.by, BL.MAX_BY) or ""
+  elseif o.cat == "J" then
     local info = DL.Info(o.minDay, o.maxDay, o.src)
     if not info or not SRC_CODE[info.src] then
       return nil

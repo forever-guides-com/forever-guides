@@ -99,8 +99,8 @@ add("gm.rules.miss.badValue", "A condition has no value", "Eine Bedingung hat ke
 add("gm.rules.editorTitle", "Edit rule", "Regel bearbeiten")
 add(
   "gm.rules.editorTitle.help",
-  "All conditions must be true (AND).\nFor OR make a second rule.\nValues are clamped when you save.\nA rule with an open issue stays off.",
-  "Alle Bedingungen müssen stimmen (UND).\nFür ODER eine zweite Regel anlegen.\nWerte werden beim Speichern begrenzt.\nEine Regel mit offenem Problem bleibt aus."
+  "All conditions must be true (AND).\nFor OR make a second rule.\nThe addon limits values when you save.\nA rule with an open issue stays off.",
+  "Alle Bedingungen müssen stimmen (UND).\nFür ODER eine zweite Regel anlegen.\nBeim Speichern begrenzt das Addon die Werte.\nEine Regel mit offenem Problem bleibt aus."
 )
 add("gm.rules.name", "Name", "Name")
 add("gm.rules.namePlaceholder", "Name of the rule", "Name der Regel")
@@ -122,7 +122,7 @@ add(
   "at least: this value or more.\nless than: below this value.",
   "mindestens: dieser Wert oder mehr.\nweniger als: unter diesem Wert."
 )
-add("gm.rules.addCond", "Add condition", "Bedingung")
+add("gm.rules.addCond", "Add condition", "Bedingung hinzufügen")
 add("gm.rules.removeCond", "Remove", "Entfernen")
 add("gm.rules.actionLabel", "Then", "Dann")
 add("gm.rules.targetLabel", "Choose target rank", "Zielrang wählen")
@@ -130,8 +130,8 @@ add("gm.rules.protectLabel", "Protection", "Schutz")
 add("gm.rules.useGlobal", "Use the global protection", "Globalen Schutz nutzen")
 add(
   "gm.rules.useGlobal.tip",
-  "The protection list from the options applies here too:\nprotected ranks and members are never touched.",
-  "Die Schutzliste aus den Optionen gilt auch hier:\nGeschützte Ränge und Mitglieder bleiben unberührt."
+  "The protection list from the settings applies here too:\nprotected ranks and members are never touched.",
+  "Die Schutzliste aus den Einstellungen gilt auch hier:\nGeschützte Ränge und Mitglieder bleiben unberührt."
 )
 add("gm.rules.extraRanks", "Also protect these ranks", "Diese Ränge zusätzlich schützen")
 add(
@@ -228,6 +228,8 @@ for _, op in ipairs({
   { "bounded", "known at least", "mindestens bekannt" },
   { "is", "is", "ist" },
   { "isNot", "is not", "ist nicht" },
+  { "awayAtLeast", "after at least", "nach mindestens" },
+  { "within", "within the last", "in den letzten" },
 }) do
   add("gm.op." .. op[1], op[2], op[3])
 end
@@ -242,6 +244,9 @@ for _, f in ipairs({
   { "publicNote", "guild note", "Gildennotiz" },
   { "officerNote", "officer note (no right to read)", "Offiziersnotiz (kein Leserecht)" },
   { "online", "online state", "Online-Status" },
+  { "bans", "ban list", "Banliste" },
+  { "returned", "return seen by the addon", "vom Addon gesehene Rückkehr" },
+  { "returnedAfter", "days away before the return", "Tage vor der Rückkehr offline" },
 }) do
   add("gm.data." .. f[1], f[2], f[3])
 end
@@ -360,6 +365,32 @@ add("gm.cond.online.help", "Uses the state of the guild list.", "Nutzt den Stand
 add("gm.cond.online.yes", "Online state: {op}. Fits", "Online-Status: {op}. Passt")
 add("gm.cond.online.no", "Online state: {op}. Does not fit", "Online-Status: {op}. Passt nicht")
 add("gm.cond.online.unknown", "Online state unknown", "Online-Status unbekannt")
+add("gm.cond.banned", "On the ban list", "Auf der Banliste")
+add(
+  "gm.cond.banned.help",
+  "Counts the member, its main and every alt of the group.",
+  "Zählt das Mitglied, seinen Main und jeden Alt der Gruppe."
+)
+add("gm.cond.banned.yes", "Ban list: {op}. Fits", "Banliste: {op}. Passt")
+add("gm.cond.banned.no", "Ban list: {op}. Does not fit", "Banliste: {op}. Passt nicht")
+add("gm.cond.banned.unknown", "Ban list not known", "Banliste nicht bekannt")
+add("gm.cond.returned", "Returned", "Zurückgekehrt")
+add(
+  "gm.cond.returned.help",
+  "Needs a return the addon saw.\nAfter: days away before. Within: days since.",
+  "Braucht eine Rückkehr, die das Addon sah.\nNach: Tage vorher weg. In: Tage seit der Rückkehr."
+)
+add(
+  "gm.cond.returned.yes",
+  "Returned {op} {need} days. Fits",
+  "Zurückgekehrt {op} {need} Tagen. Passt"
+)
+add(
+  "gm.cond.returned.no",
+  "Returned {op} {need} days. Does not fit",
+  "Zurückgekehrt {op} {need} Tagen. Passt nicht"
+)
+add("gm.cond.returned.unknown", "No return data yet", "Noch keine Daten zur Rückkehr")
 
 -- Why an entry is not ready -----------------------------------------------------------------------------------
 add("gm.why.staleRoster", "Guild list is old, refresh first", "Gildenliste ist alt, erst aktualisieren")
@@ -386,7 +417,7 @@ add("gm.rules.pvTitle", "1. Check", "1. Prüfen")
 add(
   "gm.rules.pvTitle.help",
   "Built fresh from the guild list.\nOnly ticked entries run.\nRemovals are never ticked in advance.\nGrey entries show why they cannot run.",
-  "Frisch aus der Gildenliste gebaut.\nNur angehakte Einträge laufen.\nEntfernen ist nie vorangehakt.\nGraue Einträge nennen den Grund."
+  "Frisch aus der Gildenliste erstellt.\nNur angehakte Einträge laufen.\nEntfernen ist nie vorangehakt.\nGraue Einträge nennen den Grund."
 )
 add(
   "gm.rules.pvHint",
@@ -455,11 +486,16 @@ add("gm.rules.choice.macro", "secure button", "sicherer Knopf")
 add("gm.rules.choice.copy", "copy command", "Befehl kopieren")
 add("gm.rules.choice.direct", "direct call", "direkter Aufruf")
 add("gm.rules.way.macro", "one click per step on a secure button", "ein Klick pro Schritt auf einem sicheren Knopf")
+add(
+  "gm.rules.way.batch",
+  "several commands per click on a secure button",
+  "mehrere Befehle pro Klick auf einem sicheren Knopf"
+)
 add("gm.rules.way.copy", "command to paste into the chat", "Befehl zum Einfügen in den Chat")
 add("gm.rules.way.direct", "direct call, the game decides", "direkter Aufruf, das Spiel entscheidet")
 add(
   "gm.rules.way.locked",
-  "Way: copy. The game does not allow guild changes from add-ons here,\nyou type each command yourself (Ctrl+C, Enter, Ctrl+V, Enter).",
+  "Way: copy. The game does not allow guild changes from addons here,\nyou type each command yourself (Ctrl+C, Enter, Ctrl+V, Enter).",
   "Weg: Kopieren. Das Spiel lässt Addons hier keine Gildenänderung zu,\ndu tippst jeden Befehl selbst (Strg+C, Enter, Strg+V, Enter)."
 )
 
@@ -489,8 +525,8 @@ add(
 add("gm.rules.data.notes", "Read from notes", "Aus Notizen lesen")
 add(
   "gm.rules.data.notes.tip",
-  "Reads markers such as 'since 2026-01-15'\nfrom guild and officer notes.",
-  "Liest Marker wie 'seit 15.01.2026'\naus Gilden- und Offiziersnotiz."
+  "Reads entries such as \"since 2026-01-15\"\nfrom guild and officer notes.",
+  "Liest Angaben wie „seit 15.01.2026“\naus Gilden- und Offiziersnotiz."
 )
 add("gm.rules.data.notesDone", "%d join dates read from notes", "%d Beitrittsdaten aus Notizen gelesen")
 add("gm.rules.data.notesNone", "Nothing new in the notes.", "In den Notizen nichts Neues.")
@@ -547,6 +583,9 @@ add(
 )
 add("gm.rules.confirmRun", "Confirm run", "Lauf bestätigen")
 add("gm.rules.next", "Next step", "Nächster Schritt")
+add("gm.rules.exec", "Run step", "Schritt ausführen")
+add("gm.rules.drop", "Drop this step", "Schritt verwerfen")
+add("gm.rules.batchNote", "One click runs %d commands.", "Ein Klick führt %d Befehle aus.")
 add("gm.rules.skip", "Skip this step", "Schritt überspringen")
 add("gm.rules.again", "Show command again", "Befehl erneut zeigen")
 add("gm.rules.startSeries", "Start series", "Serie starten")
@@ -564,6 +603,8 @@ add("gm.rules.res.copy", "command copied", "Befehl kopiert")
 add("gm.rules.res.open", "open, the list showed no change", "offen, die Liste zeigte keine Änderung")
 add("gm.rules.res.skipped", "skipped", "übersprungen")
 add("gm.rules.res.failed", "failed", "fehlgeschlagen")
+add("gm.rules.res.refused", "refused by the game", "vom Spiel abgelehnt")
+add("gm.rules.runRefused", "Refused by the game: %d.", "Vom Spiel abgelehnt: %d.")
 add("gm.rules.wait.wait", "Pause between steps", "Pause zwischen den Schritten")
 add("gm.rules.wait.gap", "Pause between steps", "Pause zwischen den Schritten")
 add("gm.rules.wait.combat", "Waiting: combat", "Wartet: Kampf")
@@ -646,7 +687,7 @@ tpl(
   "promoteByLevel",
   "Promote by level",
   "Aufstieg nach Stufe",
-  "Promotes one rank at a level.",
+  "Promotes one rank once a member reaches a level.",
   "Befördert ab einer Stufe einen Rang.",
   nil,
   nil,
@@ -718,9 +759,33 @@ tpl(
   "Rückkehrer prüfen",
   "Marks members who came back within N days.",
   "Markiert Mitglieder, die innerhalb von N Tagen zurückkamen.",
-  "Needs a return seen by the add-on.",
+  "Needs a return seen by the addon.",
   "Braucht eine vom Addon gesehene Rückkehr.",
   { RANKS, DAYS }
+)
+tpl(
+  "removeBanned",
+  "Remove banned members",
+  "Gebannte entfernen",
+  "Removes members who are on the ban list, or whose main or alt is.",
+  "Entfernt Mitglieder von der Banliste oder mit gebanntem Main oder Alt.",
+  "Removal cannot be undone. The protect lists stay on.",
+  "Entfernen ist endgültig. Die Schutzlisten bleiben aktiv.",
+  { RANKS }
+)
+tpl(
+  "markReturned",
+  "Mark returners",
+  "Rückkehrer markieren",
+  "Marks members who came back within N days after a long absence.",
+  "Markiert Mitglieder, die nach langer Abwesenheit innerhalb von N Tagen zurückkamen.",
+  "Needs a return seen by the addon.",
+  "Braucht eine vom Addon gesehene Rückkehr.",
+  {
+    RANKS,
+    { "awayDays", "Away at least (days)", "Mindestens weg (Tage)" },
+    { "days", "Back within (days)", "Zurück innerhalb (Tage)" },
+  }
 )
 tpl(
   "writeJoinDate",

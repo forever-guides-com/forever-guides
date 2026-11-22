@@ -15,6 +15,8 @@
 --   shell.titleText   its title FontString, anchored LEFT 8 / RIGHT -4: windows with buttons
 --                     anchor RIGHT to their leftmost button
 --   shell.barFill     the strip's fill texture, shell.bars = { barFill } for parts.bars
+--   Shell.Also(frame, textures)   extra flat fills a window lets the stone replace (the sidebar and footer of the
+--                            main window): hidden while the stone shows, like the window's own fill
 --   shell.edge        the overlay frame of the edge, shell.divider the line under the strip
 --   shell.band        the metal bar the strip sits in (Skins.BandRect), nil while it sits in the window
 --   shell.bandFill    texture of the window frame behind the bar (the dark of the metal, metrics.bar.backdrop), built
@@ -158,7 +160,7 @@ local function buildShadow(frame, scale)
     local near, far = (ring - 1) * step, ring * step
     local function strip(p1, x1, y1, p2, x2, y2)
       local t = holder:CreateTexture(nil, "BACKGROUND")
-      t:SetColorTexture(0, 0, 0, alpha * scale)
+      t:SetColorTexture(ns.Theme.scrim(alpha * scale))
       t:SetPoint("TOPLEFT", frame, p1, x1, y1)
       t:SetPoint("BOTTOMRIGHT", frame, p2, x2, y2)
     end
@@ -210,12 +212,24 @@ local function restyleBack(shell)
   for _, tex in ipairs(shell.flat or { frame.fgBack }) do
     tex:SetShown(rock == nil)
   end
+  -- Fills of parts of the window that share the stone (shell.also: the sidebar and footer of the main window).
+  for _, tex in ipairs(shell.also or {}) do
+    tex:SetShown(rock == nil)
+  end
   if rock then
     if shell.fade == "main" then
       W.FadeWithWindow(rock)
     else
       rock:SetAlpha(style and style.alpha or 1)
     end
+  end
+end
+
+function Shell.Also(frame, textures)
+  local shell = shells[frame]
+  if shell then
+    shell.also = textures
+    restyleBack(shell)
   end
 end
 
@@ -512,9 +526,6 @@ end
 
 local Esc = { list = {} }
 ns.EscStack = Esc
-ns.On("PLAYER_REGEN_ENABLED", function()
-  ns.FlushDeferredHides()
-end)
 
 -- frame -> onEscape(frame) of RegisterEsc: may take the key instead of the close.
 local escHandlers = setmetatable({}, { __mode = "k" })
@@ -655,6 +666,21 @@ function Shell.SetEsc(frame, on)
   pcall(frame.EnableKeyboard, frame, passes == true)
   Esc.Push(frame)
 end
+
+-- A window first shown in combat could not switch its key propagation and kept the keyboard off: it takes
+-- part again as soon as the client allows the change.
+ns.On("PLAYER_REGEN_ENABLED", function()
+  ns.FlushDeferredHides()
+  local open = {}
+  for i, frame in ipairs(Esc.list) do
+    open[i] = frame
+  end
+  for _, frame in ipairs(open) do
+    if frame:IsShown() and not escOff[frame] then
+      Shell.SetEsc(frame, true)
+    end
+  end
+end)
 
 -- A window that closes on Esc while it is shown. onEscape(frame) is optional: it may take the key
 -- instead of the close (return true).

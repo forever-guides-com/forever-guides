@@ -12,20 +12,33 @@ Theme.colors = {
   surface2 = "#1a1a1a",
   surface3 = "#222222",
   text = "#f3eee2",
-  textSecondary = "#c7d3dd",
-  textMuted = "#9db3c4",
+  textSecondary = "#ddd2bb",
+  textMuted = "#b8aa8f",
+  -- Headings: Blizzard gold. accent2 stays the color of interaction and selection.
+  heading = "#ffd100",
+  -- Tint of hover, selection (gold) and divider fills; the alpha of each is in Theme.fillAlpha.
+  hover = "#fff4dc",
+  selected = "#e0a830",
+  line = "#efe3c8",
+  lineStrong = "#efe3c8",
   accent = "#e2c2ab",
   accent2 = "#c9a670",
   accentDim = "#8a6d40",
   action = "#0f6064",
   actionHi = "#5fd3d8",
   success = "#6fae7c",
+  -- Value above and below a baseline (stat modifiers, have/need). statDown is a lighter red than
+  -- danger: danger on surface3 stays under 4.5:1. Both always come with a sign or a mark.
+  statUp = "#6fae7c",
+  statDown = "#ee7a6a",
   -- Fill of the main button that confirms a request: white text passes AA on both (5.4:1 and 7.2:1).
   confirm = "#1f6f3a",
   confirmHover = "#175c30",
   warning = "#e0954a",
   danger = "#e05c4a",
   info = "#4a8fe0",
+  -- Info as text: lighter than info, which falls under 4.5:1 on the blue theme.
+  infoText = "#6aa6ec",
   alliance = "#4a8fe0",
   horde = "#e05c4a",
   -- The fixed purple of the author's channel link (title bar, start page): the same in every theme, white text
@@ -50,6 +63,28 @@ Theme.colors = {
 Theme.colorblindColors = {
   sectionAvailable = "#6fb4f0",
   sectionLocked = "#f0b24f",
+  statUp = "#6fb4f0",
+  statDown = "#f0b24f",
+}
+
+-- Semantic state names for dots, tags and legends: token names, resolved with Theme.rgb. "bad" uses
+-- statDown and "info" infoText, the shades that read on every surface.
+Theme.status = {
+  ok = "success",
+  warn = "warning",
+  bad = "statDown",
+  todo = "textMuted",
+  info = "infoText",
+  done = "accent2",
+}
+
+-- Skill bands of the recipe lists (orange, yellow, green, gray) as "#rrggbb", each readable on the dark
+-- surfaces. Always shown with a word or number as well.
+Theme.difficulty = {
+  orange = "#ff8040",
+  yellow = "#ffd100",
+  green = "#40bf40",
+  gray = "#999999",
 }
 
 -- Overrides when high contrast is on.
@@ -61,6 +96,10 @@ Theme.contrast = {
   text = "#ffffff",
   textSecondary = "#ffffff",
   textMuted = "#e0e0e0",
+  hover = "#ffffff",
+  selected = "#ffffff",
+  line = "#ffffff",
+  lineStrong = "#ffffff",
   parchmentText = "#000000",
   parchmentTextSecondary = "#000000",
   parchmentAccent = "#000000",
@@ -131,8 +170,20 @@ Theme.rarity = {
   legendary = "#ff8000",
 }
 
-Theme.space = { xs = 4, sm = 8, md = 12, lg = 16, xl = 24 }
-Theme.size = { titleBar = 40, footer = 22, contentHeader = 44, row = 28, rowCompact = 22, icon = 20 }
+Theme.size = {
+  titleBar = 40,
+  footer = 22,
+  contentHeader = 52,
+  control = 46,
+  row = 28,
+  rowCompact = 22,
+  icon = 20,
+  -- Framed icons (K.IconFrame), two-line boxed row, header band of a section card, tag height.
+  iconFrame = { sm = 24, md = 28, lg = 40, hero = 64 },
+  rowBoxed = 44,
+  sectionHeader = 26,
+  tag = 20,
+}
 
 -- Web font sizes: micro 11, ui 12, text 13, h3 15, h2 18, title 22. display is the
 -- heading size of WoW's own book pages. small and body are the roles of the typography
@@ -166,6 +217,33 @@ Theme.fontFiles = {
 local function settings()
   return (ns.db and ns.db.settings) or {}
 end
+
+-- Spacing scale. Layout code reads Theme.space.<token> at the moment it lays out, never into a file-level
+-- constant: the density setting (settings.density, Settings > Look) scales every token. Fill and gap
+-- values that are no token are literal pixels (hairlines, icon offsets).
+-- stack is the default gap between the items of a page stack (W.Stack).
+-- inset is the inner padding of every boxed container (card, help strip, panel) on all four sides, the width
+-- of the corner of the card art, so content never meets the drawn rim. It keeps 14 px in the compact density.
+Theme.spaceBase = { xs = 4, sm = 8, md = 12, lg = 16, xl = 24, stack = 10, inset = 16 }
+Theme.spaceMin = { inset = 14 }
+Theme.DENSITY_ORDER = { "normal", "compact" }
+Theme.DENSITY = { normal = 1, compact = 0.75 }
+Theme.DENSITY_DEFAULT = "normal"
+
+function Theme.density()
+  local id = settings().density
+  return Theme.DENSITY[id] and id or Theme.DENSITY_DEFAULT
+end
+
+Theme.space = setmetatable({}, {
+  __index = function(_, token)
+    local base = Theme.spaceBase[token]
+    if not base then
+      return nil
+    end
+    return math.max(U.round(base * Theme.DENSITY[Theme.density()]), Theme.spaceMin[token] or 0)
+  end,
+})
 
 -- Saved window scale for secondary frames; damaged SavedVariables (the client's SetScale
 -- raises on a non-number) fall back to 1.
@@ -358,8 +436,34 @@ function Theme.hexText(name, text)
   return string.format("|cff%02x%02x%02x%s|r", r * 255, g * 255, b * 255, text)
 end
 
+-- One alpha per state of the fill tokens hover, selected, line and lineStrong.
+-- rowRest and selectedStrong are alphas of boxed rows (surface2 at rest, gold when selected) and have no token of their own.
+Theme.fillAlpha = { hover = 0.08, selected = 0.14, line = 0.1, lineStrong = 0.3, rowRest = 0.5, selectedStrong = 0.2 }
+
+-- Fill kinds whose color is another token.
+local FILL_TOKEN = { rowRest = "surface2", selectedStrong = "selected" }
+
 function Theme.lineAlpha()
-  return Theme.highContrast() and 0.3 or 0.1
+  return Theme.highContrast() and 0.3 or Theme.fillAlpha.line
+end
+
+-- r, g, b, a of a fill token for SetColorTexture; nil (or an unknown kind) is fully transparent.
+function Theme.fillColor(kind)
+  local a = kind and Theme.fillAlpha[kind]
+  if not a then
+    return 1, 1, 1, 0
+  end
+  if kind == "line" then
+    a = Theme.lineAlpha()
+  end
+  local r, g, b = Theme.rgb(FILL_TOKEN[kind] or kind)
+  return r, g, b, a
+end
+
+-- r, g, b, a of a black shade (shadow, dimmer, chip behind an icon) for SetColorTexture. Black stays black in
+-- every skin, so only the opacity varies.
+function Theme.scrim(alpha)
+  return 0, 0, 0, alpha
 end
 
 -- A saved factor: damaged values (not a number, NaN, infinite) count as 1, the rest is clamped.

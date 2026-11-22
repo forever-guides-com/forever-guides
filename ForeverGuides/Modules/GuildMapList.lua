@@ -4,8 +4,8 @@
 -- settings), a click on a header sorts. Per row: set a waypoint, whisper, invite (not in combat). It is the
 -- keyboard route to what the map shows: arrows move over rows and buttons, Enter runs, Tab searches,
 -- Esc closes. While receiving is off the hint with its button stands in place of the rows. Rows, search,
--- sort and keys are GuildMapListLogic; no frame is built in combat. Opened by /fg gildenkarte and by
--- GuildMapList.Open() (buttons of other pages).
+-- sort and keys are GuildMapListLogic; it opens and paints in combat too (own frames only). Opened by
+-- /fg gildenkarte and by GuildMapList.Open() (buttons of other pages).
 local _, ns = ...
 local W, L, Theme, U, K = ns.W, ns.L, ns.Theme, ns.U, ns.PageKit
 local GML, GLG, Store, Consent = ns.GuildMapListLogic, ns.WorldMapGuildLogic, ns.GuildMapStore, ns.Consent
@@ -33,12 +33,11 @@ ns.AddLocale("enUS", {
   ["gml.empty.noGuild"] = "You are not in a guild.",
   ["gml.empty.none"] = "No positions yet. Members show up when they share.",
   ["gml.empty.filtered"] = "No member matches search and filters.",
-  ["gml.combat"] = "Open the list after combat.",
 })
 ns.AddLocale("deDE", {
   ["gml.title"] = "Gildenmitglieder auf der Karte",
   ["gml.close"] = "Liste schließen",
-  ["gml.grip"] = "Zum Ändern der Größe ziehen",
+  ["gml.grip"] = "Ziehen, um die Größe zu ändern",
   ["gml.search"] = "Name, Klasse, Rang, Zone suchen",
   ["gml.col.name"] = "Name",
   ["gml.col.class"] = "Klasse",
@@ -55,7 +54,6 @@ ns.AddLocale("deDE", {
   ["gml.empty.noGuild"] = "Du bist in keiner Gilde.",
   ["gml.empty.none"] = "Noch keine Positionen. Mitglieder erscheinen, sobald sie teilen.",
   ["gml.empty.filtered"] = "Kein Mitglied passt zu Suche und Filtern.",
-  ["gml.combat"] = "Öffne die Liste nach dem Kampf.",
 })
 
 local HEAD_H, PAD, GAP = 22, 8, 6
@@ -64,14 +62,14 @@ local DEFAULT_W, DEFAULT_H = 700, 420
 local ACTION, ACTION_GAP, LIST_RESERVE = 22, 4, 12
 local ACTIONS_W = #GML.ACTIONS * ACTION + (#GML.ACTIONS - 1) * ACTION_GAP + GAP
 local ONLINE_W, RANK_W, SEARCH_MIN = 130, 150, 120
-local ICON = { waypoint = "marker", whisper = "share", invite = "plus" }
+local ICON = { waypoint = "marker", whisper = "open", invite = "plus" }
 -- The list is redrawn this often while it shows (a report ages without an event).
 GL.TICK = 5
 GL.MIN_W, GL.MIN_H, GL.MAX_W, GL.MAX_H = MIN_W, MIN_H, MAX_W, MAX_H
 GL.ACTIONS_W = ACTIONS_W
 
 local frame
-local state = { sort = "name", desc = false, text = "", built = 0, pending = false, rows = {} }
+local state = { sort = "name", desc = false, text = "", rows = {} }
 local ticking, depth = false, 0
 
 local function g(name)
@@ -109,7 +107,7 @@ end
 -- rows (searched and sorted), entries (all received positions), inGuild.
 function GL.Collect()
   local snap = ns.GuildData.Get()
-  local entries = Store.All()
+  local entries = Store.All("guild")
   local rows = GML.Rows(entries, snap and snap.members, GLG.Current(), {
     me = ns.PlayerName.Self(),
     className = ns.GuildKit.ClassName,
@@ -187,8 +185,7 @@ end
 
 local function newRow(parent)
   local row = CreateFrame("Button", nil, parent)
-  state.built = state.built + 1
-  state.rows[state.built] = row
+  state.rows[#state.rows + 1] = row
   row.bg = row:CreateTexture(nil, "BACKGROUND")
   row.bg:SetAllPoints()
   row.cells = {}
@@ -236,7 +233,7 @@ local function newRow(parent)
     showRowTip(self)
   end)
   row:SetScript("OnLeave", function(self)
-    self.bg:SetColorTexture(0, 0, 0, 0)
+    self.bg:SetColorTexture(ns.Theme.fillColor())
     ns.HideTooltip()
   end)
   row:SetScript("OnClick", function(self)
@@ -259,7 +256,7 @@ local function paintRow(row, data)
   for i, a in ipairs(GML.ActionState(data, block)) do
     row.buttons[i]:SetEnabled(a.enabled)
   end
-  row.bg:SetColorTexture(0, 0, 0, 0)
+  row.bg:SetColorTexture(ns.Theme.fillColor())
   row:SetAlpha(data.state == "current" and 1 or 0.75)
 end
 
@@ -454,8 +451,7 @@ local function layout(f)
   f.stack:Layout()
 end
 
--- The rows for the data now. In combat only the rows that exist are drawn (no frame is built); the rest
--- follows after the fight.
+-- The rows for the data now (own frames only, also in combat).
 function GL.Refresh()
   local f = frame
   if not (f and f:IsShown()) then
@@ -463,12 +459,6 @@ function GL.Refresh()
   end
   local rows, total, inGuild = GL.Collect()
   local recv = receiving()
-  if ns.InCombat() and #rows > state.built then
-    for i = #rows, state.built + 1, -1 do
-      rows[i] = nil
-    end
-    state.pending = true
-  end
   f.shownRows = #rows
   f.pool:Sync(rows, paintRow)
   local reason = GML.EmptyReason(recv, inGuild, total, #rows)
@@ -688,18 +678,12 @@ function GL.Frame()
   return frame
 end
 
--- Opens the list (builds it once, not in combat) and brings it to the front.
+-- Opens the list (builds it once) and brings it to the front.
 function GL.Open()
   if not ns.db then
     return false
   end
-  if not frame then
-    if ns.InCombat() then
-      ns.Notify(L["gml.combat"], "warning")
-      return false
-    end
-    frame = create()
-  end
+  frame = frame or create()
   place(frame)
   if frame:IsShown() then
     GL.Refresh()
@@ -756,12 +740,9 @@ ns.On("FG_CONSENT_WITHDRAWN", function(_, fn)
     follow()
   end
 end)
-ns.On("PLAYER_REGEN_ENABLED", function()
-  if state.pending then
-    state.pending = false
-    follow()
-  end
-end)
+-- The buttons that depend on the combat state (invite, ask) follow it.
+ns.On("PLAYER_REGEN_DISABLED", follow)
+ns.On("PLAYER_REGEN_ENABLED", follow)
 ns.On("PLAYER_LOGOUT", function()
   if frame and frame:IsShown() then
     save(frame)

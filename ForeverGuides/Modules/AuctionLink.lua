@@ -31,10 +31,10 @@ ns.AddLocale("enUS", {
   ["auctionlink.tabShop"] = "Shopping list",
   ["auctionlink.tabShop.tip"] = "The shopping list of your profession route.",
   ["auctionlink.tabSettings"] = "Settings",
-  ["auctionlink.tabSettings.tip"] = "Price data, full scan and options.",
+  ["auctionlink.tabSettings.tip"] = "Price data, full scan and settings.",
   ["auctionlink.pick"] = "Pick a profession route first",
   ["auctionlink.open"] = "Open profession route",
-  ["auctionlink.noApi"] = "No list add-on found.",
+  ["auctionlink.noApi"] = "No list addon found.",
   ["auctionlink.details"] = "Details",
   ["auctionlink.detailsTip"] = "Opens the shopping list window.",
 })
@@ -45,7 +45,7 @@ ns.AddLocale("deDE", {
   ["auctionlink.tabShop"] = "Einkaufsliste",
   ["auctionlink.tabShop.tip"] = "Die Einkaufsliste deiner Berufsroute.",
   ["auctionlink.tabSettings"] = "Einstellungen",
-  ["auctionlink.tabSettings.tip"] = "Preisdaten, kompletter Scan und Optionen.",
+  ["auctionlink.tabSettings.tip"] = "Preisdaten, kompletter Scan und Einstellungen.",
   ["auctionlink.pick"] = "Wähle zuerst eine Berufsroute",
   ["auctionlink.open"] = "Berufsroute öffnen",
   ["auctionlink.noApi"] = "Kein Listen-Addon gefunden.",
@@ -103,7 +103,7 @@ local function newRow(parent)
   row:SetHeight(ROW_H)
   row.hover = row:CreateTexture(nil, "BACKGROUND")
   row.hover:SetAllPoints()
-  row.hover:SetColorTexture(1, 1, 1, 0)
+  row.hover:SetColorTexture(ns.Theme.fillColor())
   -- Section header of the by reason view.
   SW.NewSeparator(row, SEP_GAP, PAD)
   row.headBg = W.Fill(row, "surface2", 0.9)
@@ -132,7 +132,7 @@ local function newRow(parent)
   row.craft:SetPoint("RIGHT", row.prog, "LEFT", -4, 0)
   row.craft.hl = row.craft:CreateTexture(nil, "BACKGROUND")
   row.craft.hl:SetAllPoints()
-  row.craft.hl:SetColorTexture(1, 1, 1, 0)
+  row.craft.hl:SetColorTexture(ns.Theme.fillColor())
   W.Border(row.craft, "accent2", 0.5)
   row.craft.text = W.Text(row.craft, { role = "micro", color = "accent2", justify = "CENTER" })
   row.craft.text:SetPoint("CENTER")
@@ -147,14 +147,14 @@ local function newRow(parent)
   -- The box ticks, the rest of the row searches (left), copies the name (right) or links it (Shift).
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row:SetScript("OnEnter", function(self)
-    self.hover:SetColorTexture(1, 1, 1, 0.1)
+    self.hover:SetColorTexture(ns.Theme.fillColor("hover"))
     if self.line then
       self.mag:SetColorToken("accent2")
       S.RowTooltip(self, self.line)
     end
   end)
   row:SetScript("OnLeave", function(self)
-    self.hover:SetColorTexture(1, 1, 1, 0)
+    self.hover:SetColorTexture(ns.Theme.fillColor())
     self.mag:SetColorToken("textMuted")
     ns.HideTooltip()
   end)
@@ -181,13 +181,13 @@ local function newRow(parent)
     end)
   )
   row.craft:SetScript("OnEnter", function(self)
-    self.hl:SetColorTexture(1, 1, 1, 0.12)
+    self.hl:SetColorTexture(ns.Theme.fillColor("hover"))
     if row.line then
       SW.CraftTooltip(self, row.line)
     end
   end)
   row.craft:SetScript("OnLeave", function(self)
-    self.hl:SetColorTexture(1, 1, 1, 0)
+    self.hl:SetColorTexture(ns.Theme.fillColor())
     ns.HideTooltip()
   end)
   function row:fgLayout()
@@ -261,9 +261,7 @@ local function placeButtons(panel, withSend)
   local full = PANEL_W - 2 * PAD
   panel.copy:ClearAllPoints()
   if withSend then
-    local half = math.floor((full - 6) / 2)
-    panel.send:SetWidth(half)
-    panel.copy:SetWidth(half)
+    panel.copy:SetWidth(full - 28 - 6)
     panel.copy:SetPoint("BOTTOMRIGHT", -PAD, PAD)
   else
     panel.copy:SetWidth(full)
@@ -609,9 +607,8 @@ local function buildPanel(host, level)
   panel.banner:SetPoint("TOPRIGHT", -PAD, -4)
   panel.banner:Fit(PANEL_W - 2 * PAD)
 
-  panel.send = W.Action(page, {
-    label = "act.send",
-    icon = "share",
+  panel.send = ns.PageShare.Button(page, {
+    size = 28,
     tooltip = "profshop.send",
     tooltipText = "profshop.sendTip",
     onClick = function()

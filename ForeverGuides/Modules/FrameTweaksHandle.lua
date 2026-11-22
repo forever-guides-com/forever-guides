@@ -23,19 +23,19 @@ Handle.LEVEL = Bar.LEVEL
 Handle.PAD, Handle.PANEL_WIDTH, Handle.ROW = 10, 260, 18
 
 ns.AddLocale("enUS", {
-  ["bar.handle"] = "Window options",
-  ["bar.handleTip"] = "Click: options\nDrag: zoom",
+  ["bar.handle"] = "Window settings",
+  ["bar.handleTip"] = "Click: settings\nDrag: zoom",
   ["bar.reset"] = "Reset",
   ["bar.resetTip"] = "Zoom and opacity to 100 %",
-  ["bar.more"] = "Windows settings",
+  ["bar.more"] = "Window settings",
   ["bar.moreTip"] = "Opens the settings page",
 })
 ns.AddLocale("deDE", {
-  ["bar.handle"] = "Fensteroptionen",
-  ["bar.handleTip"] = "Klick: Optionen\nZiehen: Zoom",
+  ["bar.handle"] = "Fenstereinstellungen",
+  ["bar.handleTip"] = "Klick: Einstellungen\nZiehen: Zoom",
   ["bar.reset"] = "Zurücksetzen",
   ["bar.resetTip"] = "Zoom und Deckkraft auf 100 %",
-  ["bar.more"] = "Fenster-Einstellungen",
+  ["bar.more"] = "Fenstereinstellungen",
   ["bar.moreTip"] = "Öffnet die Einstellungsseite",
 })
 

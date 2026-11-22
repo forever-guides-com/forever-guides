@@ -235,6 +235,7 @@ end
 function Kit.FindingList(parent, o)
   local Lines = ns.MacroLines
   local list = K.NewList(parent, {
+    look = "flat", -- shared dense picker of the macro tools
     rowHeight = 52,
     onClick = function(item)
       if item.finding and o.onPick then
@@ -286,7 +287,7 @@ function Kit.TabBar(parent, opts)
   line:SetPoint("BOTTOMRIGHT")
   line:SetHeight(1)
   ns.Bind(line, function(t)
-    t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    t:SetColorTexture(Theme.fillColor("line"))
   end)
   for _, tab in ipairs(opts.tabs) do
     local b = CreateFrame("Button", nil, f)
@@ -457,7 +458,7 @@ function Kit.SimpleList(parent, o)
     row.sel = row:CreateTexture(nil, "BACKGROUND")
     row.sel:SetAllPoints()
     ns.Bind(row, function()
-      hl:SetColorTexture(1, 1, 1, 0.08)
+      hl:SetColorTexture(Theme.fillColor("hover"))
       row.sel:SetColorTexture(Theme.color("action", 0.5))
     end)
     row.icon = row:CreateTexture(nil, "ARTWORK")

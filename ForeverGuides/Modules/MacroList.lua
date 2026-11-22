@@ -194,6 +194,7 @@ function List.Build(P)
   buttons:SetHeight(Kit.scaled(28) * 2 + 6)
 
   libList = K.NewList(left, {
+    look = "flat", -- narrow library rail
     rowHeight = 44,
     onClick = function(item)
       if item.empty then

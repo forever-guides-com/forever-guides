@@ -4,8 +4,10 @@
 -- per house: { v = 1, lastRequest = server time of the last full list request (one for the whole
 -- account, the game limits it per account), houses = { [houseKey] = { items = { [itemId] = { mn, tn,
 -- md, mx, ts } }, scan = { at, items, rows, skipped, secs } } } }, see PriceDbLogic for the fields.
--- There are three houses per realm: Horde, Alliance and Neutral (the houses shared by both factions).
--- Nothing here sends a query of its own except the one full list request of StartScan.
+-- Houses per realm: alliance, horde, one per neutral house and the legacy houses of older versions
+-- (PriceDbLogic.lua, "Houses").
+-- Nothing here sends a query of its own except the full list request of StartScan and the exact-name
+-- query of the sell slot (live capture).
 local _, ns = ...
 local PL, L = ns.PriceDbLogic, ns.L
 local readable = ns.ItemInfo.readable
@@ -22,11 +24,18 @@ ns.AddLocale("enUS", {
   ["prices.reason.busy"] = "A scan is already running.",
   ["prices.reason.closed"] = "Open the auction house first.",
   ["prices.reason.combat"] = "Not possible in combat.",
-  ["prices.reason.house"] = "Stand directly at the auctioneer so the auction house can be told (faction or neutral).",
+  ["prices.reason.house"] = "Stand directly at the auctioneer so the addon can identify the auction house (faction or neutral).",
   ["prices.reason.cooldown"] = "The game allows one full scan every 15 minutes. Next scan possible in %d:%02d.",
   ["prices.reason.timeout"] = "The auction house did not answer (cooldown or busy). Try again later.",
   ["prices.reason.cancelled"] = "Scan cancelled.",
   ["prices.reason.error"] = "The scan stopped because of an error.",
+  ["prices.house.alliance"] = "Alliance",
+  ["prices.house.horde"] = "Horde",
+  ["prices.house.neutral"] = "Neutral",
+  ["prices.house.neutral:gadgetzan"] = "Gadgetzan",
+  ["prices.house.neutral:booty"] = "Booty Bay",
+  ["prices.house.neutral:everlook"] = "Everlook",
+  ["prices.house.legacy"] = "Older scan",
 })
 ns.AddLocale("deDE", {
   ["prices.reason.disabled"] = "Die Preiserfassung ist ausgeschaltet.",
@@ -34,11 +43,18 @@ ns.AddLocale("deDE", {
   ["prices.reason.busy"] = "Ein Scan läuft bereits.",
   ["prices.reason.closed"] = "Öffne zuerst das Auktionshaus.",
   ["prices.reason.combat"] = "Im Kampf nicht möglich.",
-  ["prices.reason.house"] = "Stelle dich direkt zum Auktionator, damit das Auktionshaus erkannt wird (Fraktion oder neutral).",
+  ["prices.reason.house"] = "Stell dich direkt an den Auktionator, damit das Addon das Auktionshaus erkennt (Fraktion oder neutral).",
   ["prices.reason.cooldown"] = "Das Spiel erlaubt einen kompletten Scan alle 15 Minuten. Nächster Scan möglich in %d:%02d.",
   ["prices.reason.timeout"] = "Das Auktionshaus hat nicht geantwortet (Wartezeit oder ausgelastet). Versuche es später erneut.",
   ["prices.reason.cancelled"] = "Scan abgebrochen.",
   ["prices.reason.error"] = "Der Scan wurde wegen eines Fehlers beendet.",
+  ["prices.house.alliance"] = "Allianz",
+  ["prices.house.horde"] = "Horde",
+  ["prices.house.neutral"] = "Neutral",
+  ["prices.house.neutral:gadgetzan"] = "Gadgetzan",
+  ["prices.house.neutral:booty"] = "Beutebucht",
+  ["prices.house.neutral:everlook"] = "Ewige Warte",
+  ["prices.house.legacy"] = "Älterer Scan",
 })
 
 -- open: the auction house window is open. house: the house of the auctioneer of this visit (decided
@@ -122,7 +138,7 @@ end
 
 -- The saved house, nil when there is none yet.
 local function peek(key)
-  local d = root()
+  local d = key and root()
   local h = d and d.houses[key]
   if type(h) == "table" and type(h.items) == "table" then
     return h
@@ -157,12 +173,7 @@ end
 -- House ------------------------------------------------------------------------------------------------
 
 local function realmName()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local realm = call(rawget(_G, name))
-    if type(realm) == "string" and ns.ItemInfo.accessible(realm) and realm ~= "" then
-      return realm
-    end
-  end
+  return ns.Realm.Get()
 end
 
 -- true, group of a unit (nil for a unit without a faction); false when the answer cannot be read.
@@ -178,30 +189,84 @@ local function groupOf(unit)
   return true, group
 end
 
--- The house the player belongs to: Horde or Alliance ("Neutral" for a player without a faction).
+-- The house the player belongs to: "alliance" or "horde", nil for a player without a faction.
 function P.OwnHouse()
   local _, group = groupOf("player")
-  return PL.House(group)
+  return PL.FactionKey(group)
 end
 
--- The house of the auctioneer the player interacts with, nil when it cannot be told. The first
--- readable unit of npc, target and questnpc that exists and is no player decides: a faction group
--- Horde or Alliance is that house, no faction, "Neutral" or any other group is the Neutral house.
-local function auctioneerHouse()
+-- The house of the other faction, nil without an own faction.
+function P.OtherHouse()
+  return PL.OtherFaction(P.OwnHouse())
+end
+
+-- The keys of the neutral houses (PriceDbLogic.NEUTRAL_HOUSES).
+function P.NeutralHouses()
+  return PL.NeutralKeys()
+end
+
+-- The legacy house that stands in for a house (data of older versions, see PL.MigrateHouses).
+function P.LegacyHouse(house)
+  return PL.LegacyKey(house)
+end
+
+-- The first readable unit of npc, target and questnpc that exists and is no player is the auctioneer.
+-- Returns true, faction group (nil = none) or false when no unit can be read.
+local function auctioneerGroup()
   for _, unit in ipairs({ "npc", "target", "questnpc" }) do
     if call(rawget(_G, "UnitExists"), unit) == true and call(rawget(_G, "UnitIsPlayer"), unit) ~= true then
       local ok, group = groupOf(unit)
       if ok then
-        return PL.House(group)
+        return true, group
       end
     end
   end
+  return false
+end
+
+-- uiMapId of the player and of its parent maps (a sub map of a city leads to the zone).
+local function mapChain()
+  local ids, api = {}, rawget(_G, "C_Map")
+  if type(api) ~= "table" then
+    return ids
+  end
+  local id = call(api.GetBestMapForUnit, "player")
+  for _ = 1, 6 do
+    if not (readable(id) and id > 0) then
+      break
+    end
+    ids[#ids + 1] = id
+    local info = call(api.GetMapInfo, id)
+    id = type(info) == "table" and info.parentMapID or nil
+  end
+  return ids
+end
+
+local function zoneTexts()
+  local texts = {}
+  for _, name in ipairs({ "GetSubZoneText", "GetZoneText", "GetRealZoneText" }) do
+    local text = call(rawget(_G, name))
+    if type(text) == "string" and ns.ItemInfo.accessible(text) then
+      texts[#texts + 1] = text
+    end
+  end
+  return texts
+end
+
+-- The house of the auctioneer the player interacts with, read now: key and how it was decided
+-- ("faction" = faction of the auctioneer, "map", "text" = neutral by zone). nil when it cannot be told.
+function P.Detect()
+  local ok, group = auctioneerGroup()
+  if not ok then
+    return nil
+  end
+  return PL.ChooseKey(group, mapChain(), zoneTexts())
 end
 
 -- The house of the open window. Decided once per visit; while it cannot be told it is tried again.
 local function windowHouse()
   if state.house == nil then
-    state.house = auctioneerHouse()
+    state.house = P.Detect()
   end
   return state.house
 end
@@ -220,13 +285,21 @@ local function recordKey()
 end
 
 local function keyOf(house)
-  return PL.HouseKey(realmName(), house or P.OwnHouse())
+  house = house or P.OwnHouse()
+  return house and PL.HouseKey(realmName(), house) or nil
 end
 
 -- The key of the house the data belongs to: normalized realm and house. The house of the open
 -- window while there is one that can be told, otherwise the house of the player's faction.
 function P.HouseKey()
   return keyOf(P.House())
+end
+
+-- Name of a house in the language of the add-on (legacy houses all read "older scan").
+function P.HouseName(key)
+  local id = PL.IsLegacy(key) and "legacy" or tostring(key)
+  local text = L["prices.house." .. id]
+  return text ~= "prices.house." .. id and text or tostring(key)
 end
 
 -- Reading ----------------------------------------------------------------------------------------------
@@ -246,22 +319,11 @@ local function valuesOf(h, itemId)
   }
 end
 
--- The saved values of an item in a house ("Horde", "Alliance" or "Neutral", default the house of the
--- player's faction): { min, minAt, median, max, scanAt } in copper and server time. median, max and
+-- The saved values of an item in a house (a house key, default the house of the player's faction):
+-- { min, minAt, median, max, scanAt } in copper and server time. median, max and
 -- scanAt are nil when the item was only seen passively. nil when unknown.
 function P.Get(itemId, house)
   return valuesOf(peek(keyOf(house)), itemId)
-end
-
--- { own, neutral, house }: the values of the item in the house of the player's faction and in the
--- Neutral house (each nil when unknown), house = name of the own house.
-function P.GetAll(itemId)
-  local own = P.OwnHouse()
-  return {
-    house = own,
-    own = P.Get(itemId, own),
-    neutral = own ~= "Neutral" and P.Get(itemId, "Neutral") or nil,
-  }
 end
 
 -- The lowest unit price in copper, nil when unknown.
@@ -720,6 +782,233 @@ local function onItemSearch(_, itemKey)
   end
 end
 
+-- Live capture (classic list API) -------------------------------------------------------------------------
+-- Every list result the client holds is read when AUCTION_ITEM_LIST_UPDATE fires (the player's own
+-- searches, other add-ons' searches) unless our full scan runs. One page of many is a partial
+-- snapshot (PL.MergePartial); a list whose rows all fit on one page is complete and replaces the
+-- values (PL.ApplyScan). A giant list (a full dump by someone else) is skipped, it would not fit a frame.
+-- Putting an item into the sell slot sends one exact-name query of ours, all pages, then a complete
+-- write. The query is dropped as soon as anyone else searches (post-hook on QueryAuctionItems, no
+-- replacement of the game function).
+local SELL_RETRY, SELL_RETRIES, SELL_TIMEOUT, SELL_REPEAT, FOREIGN_QUIET, POST_WINDOW = 0.5, 20, 8, 30, 1.5, 10
+
+local live = { sell = nil, sending = false, foreignAt = -1000, lastName = nil, lastAt = -1000, slot = nil }
+local hooked = false
+
+function P.LiveEnabled()
+  local s = type(ns.db) == "table" and type(ns.db.settings) == "table" and ns.db.settings.priceDb
+  return P.Enabled() and not (type(s) == "table" and s.live == false)
+end
+
+-- Rows of the current "list" as { itemId, buyout, count }, the number of rows, the total of the query and
+-- whether the owner names of all rows are loaded (they arrive with later events).
+local function readList()
+  local numFn, infoFn = rawget(_G, "GetNumAuctionItems"), rawget(_G, "GetAuctionItemInfo")
+  if type(numFn) ~= "function" or type(infoFn) ~= "function" then
+    return nil
+  end
+  local okNum, batch, total = pcall(numFn, "list")
+  if not (okNum and readable(batch) and readable(total)) or batch > PL.MAX_PASSIVE_ROWS then
+    return nil
+  end
+  local rows, loaded = {}, true
+  for i = 1, batch do
+    -- count (3), buyoutPrice (10), owner (14), itemId (17)
+    local ok, _, _, count, _, _, _, _, _, _, buyout, _, _, _, owner, _, _, itemId = pcall(infoFn, "list", i)
+    if ok then
+      rows[#rows + 1] = { itemId = itemId, buyout = buyout, count = count }
+      if owner == nil then
+        loaded = false
+      end
+    end
+  end
+  return rows, batch, total, loaded
+end
+
+local function bucketRows(buckets, rows)
+  for _, r in ipairs(rows) do
+    if readable(r.itemId) and readable(r.buyout) and readable(r.count) then
+      PL.Bucket(buckets, r.itemId, r.buyout, r.count)
+    else
+      buckets.skipped = buckets.skipped + 1
+    end
+  end
+end
+
+local function writeBuckets(buckets, complete)
+  local key = recordKey()
+  local h = key and houseData(key)
+  if h and PL.Capture(h.items, buckets, complete, now()) > 0 then
+    trimIfFull(h)
+    touched()
+  end
+end
+
+local function dropSell()
+  live.sell = nil
+end
+
+local function finishSell(s, complete)
+  local buckets = PL.NewBuckets()
+  for _, rows in pairs(s.pages) do
+    bucketRows(buckets, rows)
+  end
+  dropSell()
+  writeBuckets(buckets, complete)
+end
+
+local trySend
+
+-- Sends the query of the page, or tries again shortly while the game does not allow one yet.
+function trySend(s)
+  if s ~= live.sell then
+    return
+  end
+  local sendFn, canFn = rawget(_G, "QueryAuctionItems"), rawget(_G, "CanSendAuctionQuery")
+  if type(sendFn) ~= "function" or type(canFn) ~= "function" or inCombat() or not state.open or active() then
+    return dropSell()
+  end
+  local quiet = clock() - live.foreignAt >= FOREIGN_QUIET
+  local okCan, can = pcall(canFn)
+  if not (quiet and okCan and can == true) then
+    s.tries = s.tries + 1
+    if s.tries > SELL_RETRIES or not after(SELL_RETRY, function()
+      trySend(s)
+    end) then
+      dropSell()
+    end
+    return
+  end
+  live.sending = true
+  -- text, minLevel, maxLevel, page, usable, rarity, getAll, exactMatch
+  local sent = pcall(sendFn, s.name, nil, nil, s.page, nil, nil, false, true)
+  live.sending = false
+  if not sent then
+    return dropSell()
+  end
+  s.waiting, s.seq = true, s.seq + 1
+  local seq = s.seq
+  after(SELL_TIMEOUT, function()
+    if s == live.sell and s.waiting and s.seq == seq then
+      dropSell()
+    end
+  end)
+end
+
+local function onSellPage(s)
+  local rows, _, total, loaded = readList()
+  if not rows then
+    return dropSell()
+  end
+  if not loaded then
+    return
+  end
+  s.pages[s.page] = rows
+  local pages = math.ceil(total / PL.PAGE_SIZE)
+  if pages > PL.MAX_QUERY_PAGES then
+    return finishSell(s, false)
+  end
+  if s.page + 1 < pages then
+    s.page, s.tries, s.waiting = s.page + 1, 0, false
+    return trySend(s)
+  end
+  finishSell(s, true)
+end
+
+local function onListUpdate()
+  if not P.LiveEnabled() or active() or not recordKey() then
+    return
+  end
+  local s = live.sell
+  if s and s.waiting then
+    return onSellPage(s)
+  end
+  local rows, batch, total = readList()
+  if not rows or batch < 1 then
+    return
+  end
+  local buckets = PL.NewBuckets()
+  bucketRows(buckets, rows)
+  writeBuckets(buckets, total <= batch)
+end
+
+local function sellItem()
+  local f = rawget(_G, "GetAuctionSellItemInfo")
+  if type(f) ~= "function" then
+    return nil
+  end
+  local ok, name, _, _, _, _, _, _, _, _, itemId = pcall(f)
+  if ok and type(name) == "string" and ns.ItemInfo.accessible(name) and name ~= "" then
+    return name, readable(itemId) and itemId or nil
+  end
+end
+
+local function onSellSlot()
+  local name, id = sellItem()
+  live.slot = name and { name = name, id = id } or nil
+  if not name then
+    return dropSell()
+  end
+  if not (P.LiveEnabled() and state.open) or active() or inCombat() or not recordKey() then
+    return
+  end
+  if live.sell and live.sell.name == name then
+    return
+  end
+  if live.lastName == name and clock() - live.lastAt < SELL_REPEAT then
+    return
+  end
+  live.lastName, live.lastAt = name, clock()
+  live.sell = { name = name, page = 0, tries = 0, seq = 0, pages = {}, waiting = false }
+  trySend(live.sell)
+end
+
+-- A started post: the price of one piece of the posted stack (the game takes the buyout per stack).
+local function onPostStarted(_, buyout, _, stackSize)
+  local slot = live.slot
+  local unit = slot and slot.id and readable(buyout) and readable(stackSize) and PL.UnitPrice(buyout, stackSize)
+  live.posting = unit and { id = slot.id, unit = unit, at = clock() } or nil
+end
+
+-- A confirmed post: nobody was seen below the posted unit price in the query, so it is the new lowest
+-- (PL.MergePartial keeps a lower known price).
+local function onInfoMessage(_, _, message)
+  local p = live.posting
+  if not p or message ~= rawget(_G, "ERR_AUCTION_STARTED") then
+    return
+  end
+  live.posting = nil
+  local key = P.LiveEnabled() and clock() - p.at <= POST_WINDOW and recordKey()
+  local h = key and houseData(key)
+  if h then
+    PL.MergePartial(h.items, p.id, p.unit, nil, now())
+    trimIfFull(h)
+    touched()
+  end
+end
+
+-- Post-hooks only (they run after the game function and cannot taint it), installed once.
+local function installHooks()
+  local hook = rawget(_G, "hooksecurefunc")
+  if hooked or type(hook) ~= "function" then
+    return
+  end
+  hooked = true
+  if type(rawget(_G, "QueryAuctionItems")) == "function" then
+    pcall(hook, "QueryAuctionItems", function()
+      if not live.sending then
+        live.foreignAt = clock()
+        dropSell()
+      end
+    end)
+  end
+  if type(rawget(_G, "StartAuction")) == "function" then
+    pcall(hook, "StartAuction", function(...)
+      ns.Safe("prices post", onPostStarted, ...)
+    end)
+  end
+end
+
 -- Events ----------------------------------------------------------------------------------------------------
 
 local function auctioneerType()
@@ -729,6 +1018,7 @@ end
 
 -- The window open signal comes twice (own event and interaction manager).
 local function opened()
+  installHooks()
   if not state.open then
     state.open, state.house = true, nil
   end
@@ -737,6 +1027,7 @@ end
 
 local function closed()
   state.open, state.house = false, nil
+  dropSell()
   if active() then
     fail(state.scan, "closed")
   end
@@ -764,6 +1055,9 @@ ns.On("AUCTION_HOUSE_BROWSE_RESULTS_UPDATED", onBrowse)
 ns.On("AUCTION_HOUSE_BROWSE_RESULTS_ADDED", onBrowse)
 ns.On("COMMODITY_SEARCH_RESULTS_UPDATED", onCommodity)
 ns.On("ITEM_SEARCH_RESULTS_UPDATED", onItemSearch)
+ns.On("AUCTION_ITEM_LIST_UPDATE", onListUpdate)
+ns.On("NEW_AUCTION_UPDATE", onSellSlot)
+ns.On("UI_INFO_MESSAGE", onInfoMessage)
 
 -- Old and damaged entries go at login, a house without items goes too.
 ns.On("PLAYER_LOGIN", function()
@@ -815,7 +1109,7 @@ function P.DiagLine()
   return string.format(
     "prices: enabled=%s own=%s window=%s %s size~%.0f KB",
     tostring(P.Enabled()),
-    P.OwnHouse(),
+    P.OwnHouse() or "none",
     P.House() or "none",
     #parts > 0 and table.concat(parts, "; ") or "no data",
     total * PL.BYTES_PER_ITEM / 1024

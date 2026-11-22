@@ -8,13 +8,13 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["talents.intro"] = "Build planen, Charakter-Talente laden oder Build anwenden",
+  ["talents.intro"] = "Skillung planen, Talente des Charakters laden oder Skillung anwenden",
 })
 
 local function build(container)
   local view = ns.NewPageView(container)
 
-  ns.AddParagraph(view, "talents.intro", { color = "text" })
+  ns.AddIntro(view, "talents.intro")
 
   local editor = ns.TalentEditor.Build(view)
 

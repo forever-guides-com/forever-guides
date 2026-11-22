@@ -6,10 +6,20 @@
 --
 -- ns.db.profRoute = {
 --   v = 2,
---   opts = { slug, target, from, surcharge, stock, all, view, autoOpen },
---   craft = { [itemId] = "craft" | "auction" },   -- how a craftable item is got, shared by all lists
---   checked = { [characterKey] = { [slug] = { [itemId] = true } } },
---   list = { [characterKey] = { ... } },   -- own positions and edits, see ProfessionListLogic.lua
+--   opts = { surcharge, view, autoOpen },        -- the account-wide preferences
+--   opts.slug/target/from/stock/all, craft, recipes -- legacy account-wide choices, taken over once (S.MigrateChar)
+--   checked / list = { [characterKey] = ... },   -- legacy account-wide storage, read only once by the migration
+--   optsTaken = true,                            -- the first character took the legacy choices
+-- }
+-- ns.charDB.profList = {                         -- the shopping list of this character
+--   chr = { ... },                               -- own positions and edits, see ProfessionListLogic.lua
+--   checked = { [slug] = { [itemId] = true } },
+--   opts = { slug, target, from, stock, all },   -- the route choices of this character
+--   craft = { [itemId] = "craft" | "auction" },  -- how a craftable item is got, shared by the lists of this character
+--   recipes = { slug, skill, sel },              -- what the professions page showed last
+--   optsDone = true,                             -- the legacy choices were handled for this character
+--   migrated = true,                             -- the legacy entries were taken over (see S.MigrateChar)
+--   notice = true,                               -- the one-time notice is still to be shown
 -- }
 local _, ns = ...
 local R = ns.ProfessionRouteLogic
@@ -20,9 +30,10 @@ local S = {}
 ns.ProfessionShop = S
 
 ns.AddLocale("enUS", {
+  ["profshop.perChar"] = "Each character now has its own shopping list",
   ["profshop.sent"] = "Shopping list created: %d items",
-  ["profshop.noApi"] = "No shopping list connection, text opens.",
-  ["profshop.failed"] = "Shopping list failed, text opens.",
+  ["profshop.noApi"] = "No shopping list connection. The text opens.",
+  ["profshop.failed"] = "Shopping list failed. The text opens instead.",
   ["profshop.nothing"] = "Nothing to send.",
   ["profshop.group.vendor"] = "Vendor",
   ["profshop.group.auction"] = "Auction house",
@@ -30,10 +41,11 @@ ns.AddLocale("enUS", {
   ["profshop.group.craft"] = "Craft yourself",
   ["profshop.openAuction"] = "Open the auction house: %s",
   ["profshop.searchFailed"] = "Search not possible: %s",
+  ["profshop.offerShort"] = "Only %d of %d on offer",
   ["profshop.rowSearch"] = "Click: search in auction house",
   ["profshop.rowMore"] = "Right click: copy name, Shift click: link",
   ["profshop.nameTitle"] = "Item name",
-  ["profshop.hint"] = "Click an item to search it in the Auction House.",
+  ["profshop.hint"] = "Click an item to search for it in the auction house.",
   ["profshop.rowHave"] = "Have %d of %d, still to buy: %d",
   ["profshop.rowBuy"] = "Still to buy: %d",
   ["profshop.rowHaveOf"] = "Have %d of %d",
@@ -42,7 +54,7 @@ ns.AddLocale("enUS", {
   ["price.header"] = "Price:",
   ["item.craftCost"] = "Crafting cost",
   ["item.craftCostPart"] = "%s (%d without price)",
-  ["item.vendorSell"] = "Sells to a vendor for",
+  ["item.vendorSell"] = "Vendor",
   ["price.min"] = "Lowest",
   ["price.median"] = "Median",
   ["price.max"] = "Highest",
@@ -50,16 +62,22 @@ ns.AddLocale("enUS", {
   ["price.asOf"] = "(as of %s)",
   ["price.dateFormat"] = "%Y-%m-%d",
   ["price.hint"] = "Median and highest come from a full scan.",
-  ["price.addon"] = "Price add-on: %s",
-  ["price.old"] = "Old data: %d days old",
-  ["price.stack"] = "Stack of %d: %s",
-  ["price.neutral"] = "Neutral auction house",
+  ["price.addon"] = "Price addon: %s",
+  ["price.old"] = "Old data: %d days",
+  ["price.stack"] = "AH stack value (%d items): %s",
+  ["price.one"] = "AH: %s",
+  ["price.other"] = "Other auction houses",
+  ["price.otherLine"] = "%s %s",
+  ["price.ageToday"] = "today",
+  ["price.ageDays"] = "%dd",
   ["price.neutralOnly"] = "Only neutral auction house data",
+  ["price.legacyOnly"] = "Older scan",
 })
 ns.AddLocale("deDE", {
-  ["profshop.sent"] = "Einkaufsliste erstellt: %d Artikel",
-  ["profshop.noApi"] = "Keine Einkaufslisten-Anbindung, Text wird gezeigt.",
-  ["profshop.failed"] = "Einkaufsliste fehlgeschlagen, Text wird gezeigt.",
+  ["profshop.perChar"] = "Jeder Charakter hat jetzt eine eigene Einkaufsliste",
+  ["profshop.sent"] = "Einkaufsliste erstellt: %d Items",
+  ["profshop.noApi"] = "Keine Einkaufslisten-Anbindung. Der Text öffnet sich.",
+  ["profshop.failed"] = "Einkaufsliste fehlgeschlagen. Der Text öffnet sich.",
   ["profshop.nothing"] = "Nichts zu senden.",
   ["profshop.group.vendor"] = "Händler",
   ["profshop.group.auction"] = "Auktionshaus",
@@ -67,10 +85,11 @@ ns.AddLocale("deDE", {
   ["profshop.group.craft"] = "Selbst herstellen",
   ["profshop.openAuction"] = "Öffne das Auktionshaus: %s",
   ["profshop.searchFailed"] = "Suche nicht möglich: %s",
+  ["profshop.offerShort"] = "Nur %d von %d im Angebot",
   ["profshop.rowSearch"] = "Klick: im Auktionshaus suchen",
   ["profshop.rowMore"] = "Rechtsklick: Name kopieren, Umschalt-Klick: Link",
-  ["profshop.nameTitle"] = "Item-Name",
-  ["profshop.hint"] = "Klicke ein Item, um es im Auktionshaus zu suchen.",
+  ["profshop.nameTitle"] = "Itemname",
+  ["profshop.hint"] = "Klicke ein Item an, um es im Auktionshaus zu suchen.",
   ["profshop.rowHave"] = "Vorhanden %d von %d, noch zu kaufen: %d",
   ["profshop.rowBuy"] = "Noch zu kaufen: %d",
   ["profshop.rowHaveOf"] = "Vorhanden %d von %d",
@@ -79,7 +98,7 @@ ns.AddLocale("deDE", {
   ["price.header"] = "Preis:",
   ["item.craftCost"] = "Herstellungskosten",
   ["item.craftCostPart"] = "%s (%d ohne Preis)",
-  ["item.vendorSell"] = "Verkauf beim Händler",
+  ["item.vendorSell"] = "Händler",
   ["price.min"] = "Niedrigster",
   ["price.median"] = "Median",
   ["price.max"] = "Höchster",
@@ -87,11 +106,16 @@ ns.AddLocale("deDE", {
   ["price.asOf"] = "(Stand: %s)",
   ["price.dateFormat"] = "%d.%m.%Y",
   ["price.hint"] = "Median und Höchster kommen aus einem vollständigen Scan.",
-  ["price.addon"] = "Preis-Addon: %s",
-  ["price.old"] = "Alte Daten: %d Tage alt",
-  ["price.stack"] = "Stapel (%d): %s",
-  ["price.neutral"] = "Neutrales Auktionshaus",
+  ["price.addon"] = "Preisaddon: %s",
+  ["price.old"] = "Alte Daten: %d Tage",
+  ["price.stack"] = "Stapelwert im AH (%d Stück): %s",
+  ["price.one"] = "AH: %s",
+  ["price.other"] = "Andere Auktionshäuser",
+  ["price.otherLine"] = "%s %s",
+  ["price.ageToday"] = "heute",
+  ["price.ageDays"] = "%d T.",
   ["price.neutralOnly"] = "Nur Daten des neutralen Auktionshauses",
+  ["price.legacyOnly"] = "Älterer Scan",
 })
 
 local DEFAULTS = { stock = true, all = false, autoOpen = true }
@@ -100,12 +124,15 @@ local VIEWS = { combined = true, reason = true }
 -- Saved state ---------------------------------------------------------------------------------
 
 local scratch = { opts = {}, checked = {} }
+local charScratch = { checked = {}, opts = {}, craft = {} }
 
 -- A skill value above 0, nil for empty or invalid input (= automatic).
 local function skillValue(v)
   local n = R.Whole(v)
   return n and n > 0 and n or nil
 end
+
+local charStore
 
 local function store()
   local t = scratch
@@ -138,7 +165,7 @@ local SPELL_MAX = 2147483647
 -- The profession, skill and selected recipe (spell id) the professions page showed last, so it opens
 -- there again: { slug, skill, selected }, each nil when unknown or not set.
 function S.RecipeView()
-  local v = store().recipes
+  local v = charStore().recipes
   if type(v) ~= "table" then
     return {}
   end
@@ -146,14 +173,20 @@ function S.RecipeView()
 end
 
 function S.SetRecipeView(slug, skill, selected)
-  store().recipes = { slug = R.PROFESSIONS[slug] and slug or nil, skill = R.Whole(skill), sel = R.Whole(selected, SPELL_MAX) }
+  charStore().recipes = { slug = R.PROFESSIONS[slug] and slug or nil, skill = R.Whole(skill), sel = R.Whole(selected, SPELL_MAX) }
 end
 
--- key: slug (a known slug), target and from (whole skill, nil = automatic), surcharge (percent),
--- stock (take the stock off), all (stock of all characters), view ("combined" | "reason", one choice
+-- Per character: slug (a known slug), target and from (whole skill, nil = automatic), stock (take the
+-- stock off), all (stock of all characters). Account-wide preferences: surcharge (percent), view ("combined" | "reason", one choice
 -- for every list window), autoOpen (the list opens by itself at the auction house).
+local CHAR_OPTS = { slug = true, target = true, from = true, stock = true, all = true }
+
+local function optsOf(key)
+  return CHAR_OPTS[key] and charStore().opts or store().opts
+end
+
 function S.Option(key)
-  local v = store().opts[key]
+  local v = optsOf(key)[key]
   if key == "slug" then
     return R.PROFESSIONS[v] and v or nil
   elseif key == "target" or key == "from" then
@@ -171,7 +204,7 @@ end
 
 -- Validates and stores; nil (or "") clears target and from. Returns the stored value.
 function S.SetOption(key, value)
-  local opts = store().opts
+  local opts = optsOf(key)
   if key == "slug" then
     opts.slug = R.PROFESSIONS[value] and value or nil
   elseif key == "target" or key == "from" then
@@ -194,18 +227,125 @@ local function characterKey()
   return roster and roster.CurrentKey() or "?"
 end
 
+-- The shopping list store of the current character (ns.charDB.profList), scratch without a database. The
+-- legacy account-wide entries are taken over first.
+function charStore()
+  local cdb = ns.charDB
+  if type(cdb) ~= "table" then
+    return charScratch
+  end
+  if type(cdb.profList) ~= "table" then
+    cdb.profList = {}
+  end
+  local t = cdb.profList
+  if type(t.checked) ~= "table" then
+    t.checked = {}
+  end
+  if type(t.opts) ~= "table" then
+    t.opts = {}
+  end
+  if type(t.craft) ~= "table" then
+    t.craft = {}
+  end
+  if not t.migrated or not t.optsDone then
+    S.MigrateChar()
+  end
+  return t
+end
+S.CharRoot = charStore
+
+-- One-time takeover of the account-wide lists (before: ns.db.profRoute.list and .checked per character
+-- key). The current character takes the entries under its own key; the "?" entry, written while the key was
+-- unknown, goes to the first character that logs in. Taken entries are removed from the account store;
+-- the entries of other characters stay there until they log in themselves.
+function S.MigrateChar()
+  local cdb = ns.charDB
+  local key = characterKey()
+  if type(cdb) ~= "table" or key == "?" then
+    return
+  end
+  if type(cdb.profList) ~= "table" then
+    cdb.profList = {}
+  end
+  local t = cdb.profList
+  if type(t.checked) ~= "table" then
+    t.checked = {}
+  end
+  if type(t.opts) ~= "table" then
+    t.opts = {}
+  end
+  if type(t.craft) ~= "table" then
+    t.craft = {}
+  end
+  local root = store()
+  local moved = false
+  if not t.migrated then
+    t.migrated = true
+    for _, from in ipairs({ key, "?" }) do
+      local entry = root.list[from]
+      if entry ~= nil and type(t.chr) ~= "table" then
+        t.chr = entry
+        root.list[from] = nil
+        moved = true
+      end
+      local ticks = root.checked[from]
+      if type(ticks) == "table" and next(t.checked) == nil then
+        t.checked = ticks
+        root.checked[from] = nil
+        moved = moved or next(ticks) ~= nil
+      end
+    end
+  end
+  -- The route choices and craft choices: the first character to log in takes the account-wide ones,
+  -- every other character starts empty (profession = its first own one, skill = its current one).
+  if not t.optsDone then
+    t.optsDone = true
+    if not root.optsTaken then
+      root.optsTaken = true
+      for k in pairs(CHAR_OPTS) do
+        if root.opts[k] ~= nil then
+          t.opts[k] = root.opts[k]
+          root.opts[k] = nil
+          moved = true
+        end
+      end
+      if next(root.craft) ~= nil then
+        t.craft = root.craft
+        root.craft = {}
+        moved = true
+      end
+      if type(root.recipes) == "table" then
+        t.recipes = root.recipes
+        root.recipes = nil
+      end
+    end
+  end
+  if moved then
+    t.notice = true
+  end
+end
+
+-- Shows the one-time notice after the migration took lists over.
+function S.ShowMigrationNotice()
+  local t = type(ns.charDB) == "table" and ns.charDB.profList
+  if type(t) == "table" and t.notice then
+    t.notice = nil
+    ns.Notify(ns.L["profshop.perChar"], "info")
+  end
+end
+ns.On("PLAYER_LOGIN", function()
+  charStore()
+  S.ShowMigrationNotice()
+end)
+
 -- The ticks of the current character for one profession, { [itemId] = true }; changes to the table
 -- are saved.
 function S.Checked(slug)
-  local byChar = store().checked
-  local key = characterKey()
-  if type(byChar[key]) ~= "table" then
-    byChar[key] = {}
+  local byslug = charStore().checked
+  if type(byslug[slug]) ~= "table" then
+    byslug[slug] = {}
   end
-  if type(byChar[key][slug]) ~= "table" then
-    byChar[key][slug] = {}
-  end
-  return byChar[key][slug]
+  return byslug[slug]
 end
 
 function S.SetChecked(slug, itemId, on)
@@ -214,11 +354,7 @@ function S.SetChecked(slug, itemId, on)
 end
 
 function S.ClearChecked(slug)
-  local byChar = store().checked
-  local key = characterKey()
-  if type(byChar[key]) == "table" then
-    byChar[key][slug] = nil
-  end
+  charStore().checked[slug] = nil
   ns.Emit("FG_PROFROUTE_CHANGED", "checked")
 end
 
@@ -229,12 +365,12 @@ local MAX_CHOICES = 500
 -- How a craftable item is got: "craft" (its materials are on the list instead of the item, the
 -- default) or "auction" (the item itself is bought). One choice per item for every list window.
 function S.CraftChoice(id)
-  return store().craft[id] == "auction" and "auction" or "craft"
+  return charStore().craft[id] == "auction" and "auction" or "craft"
 end
 
 function S.SetCraftChoice(id, choice)
   id = PL.Id(id)
-  local craft = store().craft
+  local craft = charStore().craft
   if not id then
     return nil
   end
@@ -333,47 +469,72 @@ local function now()
   return ok and type(t) == "number" and t or 0
 end
 
--- An own price entry (the price database) of a house ("Neutral", nil = the house of the player's
+local function priceDb(name, ...)
+  local db = ns.PriceDb
+  if type(db) ~= "table" or type(db[name]) ~= "function" then
+    return nil
+  end
+  local ok, value = pcall(db[name], ...)
+  return ok and value or nil
+end
+
+-- An own price entry (the price database) of a house (a house key, nil = the house of the player's
 -- faction), nil when the database is not loaded, switched off or has no usable minimum. Any error is
 -- the same as no entry.
 local function ownEntry(itemId, house)
-  local db = ns.PriceDb
-  if type(db) ~= "table" or type(db.Get) ~= "function" or type(db.Enabled) ~= "function" then
-    return nil
-  end
-  local ok, entry = pcall(function()
-    return db.Enabled() and db.Get(itemId, house) or nil
-  end)
-  if ok and type(entry) == "table" and type(entry.min) == "number" and entry.min > 0 then
+  local entry = priceDb("Enabled") and priceDb("Get", itemId, house) or nil
+  if type(entry) == "table" and type(entry.min) == "number" and entry.min > 0 then
     return entry
   end
 end
 
+-- The newest time of an entry.
+local function stampOf(e)
+  return math.max(tonumber(e.minAt) or 0, tonumber(e.scanAt) or 0)
+end
+
+-- key, entry of the neutral house with the freshest price of the item, nil without one.
+local function neutralEntry(itemId)
+  local bestKey, best
+  for _, key in ipairs(priceDb("NeutralHouses") or {}) do
+    local e = ownEntry(itemId, key)
+    if e and (not best or stampOf(e) > stampOf(best)) then
+      bestKey, best = key, e
+    end
+  end
+  return bestKey, best
+end
+
 -- Where the unit price of an item comes from: { unit (copper), source = "own" | "addon", house =
--- "faction" | "neutral" (own data: the neutral house only when the faction house has no price), age
+-- "faction" | "neutral" | "legacy" (own data: the faction house of the player, a neutral house only
+-- when the faction house has no price, the legacy data of older versions last), houseKey, age
 -- (whole days, own data only), old (own data older than the age limit), info (the own entry, nil for
--- the price add-on), neutral (the entry of the neutral house when there is one next to the faction
--- house) }, nil without any price. Fresh own data wins, then the price add-on, then old own data
--- (flagged old).
+-- the price add-on) }, nil without any price. Fresh own data wins, then the price add-on, then old own
+-- data (flagged old).
 function S.PriceInfo(itemId)
-  local faction, neutral = ownEntry(itemId), ownEntry(itemId, "Neutral")
-  local entry = faction or neutral
-  local house = faction and "faction" or "neutral"
+  local ownKey = priceDb("OwnHouse")
+  local houseKey, entry = ownKey, ownEntry(itemId, ownKey)
+  local house = "faction"
+  if not entry then
+    houseKey, entry = neutralEntry(itemId)
+    house = "neutral"
+  end
+  if not entry then
+    house = "legacy"
+    for _, key in ipairs({ priceDb("LegacyHouse", ownKey) or "", priceDb("LegacyHouse") or "" }) do
+      houseKey, entry = key, ownEntry(itemId, key)
+      if entry then
+        break
+      end
+    end
+  end
   local age
   if entry then
     local t = tonumber(entry.minAt)
     age = t and t > 0 and math.max(0, math.floor((now() - t) / DAY)) or nil
     local old = age ~= nil and age > maxAgeDays()
     if not old then
-      return {
-        unit = entry.min,
-        source = "own",
-        house = house,
-        age = age,
-        old = false,
-        info = entry,
-        neutral = faction and neutral or nil,
-      }
+      return { unit = entry.min, source = "own", house = house, houseKey = houseKey, age = age, old = false, info = entry }
     end
   end
   local unit = ns.PriceSourceAddon.Unit(itemId)
@@ -381,15 +542,7 @@ function S.PriceInfo(itemId)
     return { unit = unit, source = "addon", old = false }
   end
   if entry then
-    return {
-      unit = entry.min,
-      source = "own",
-      house = house,
-      age = age,
-      old = true,
-      info = entry,
-      neutral = faction and neutral or nil,
-    }
+    return { unit = entry.min, source = "own", house = house, houseKey = houseKey, age = age, old = true, info = entry }
   end
 end
 
@@ -410,9 +563,11 @@ local function money(copper)
   return ns.CostLogic.Format(copper) or ns.L["profshop.noPrice"]
 end
 
--- Marker behind a price that is old or comes from the price add-on (the tooltip says which).
+-- Marker behind a price that is old, comes from the price add-on, from another auction house than the
+-- own faction house or from an older scan (the tooltip says which).
 function S.PriceMark(info)
-  return info and (info.old or info.source == "addon") and " ~" or ""
+  return info and (info.old or info.source == "addon" or info.house == "neutral" or info.house == "legacy") and " ~"
+    or ""
 end
 
 -- Adds "Lowest" and, when the entry has them, "Median" and "Highest", each with its own date.
@@ -435,12 +590,47 @@ local function entryLines(lines, e, prefix)
   end
 end
 
+-- The age of an entry in the short form of the other-house lines: "today" or "3d".
+local function ageText(e)
+  local t = stampOf(e)
+  if t <= 0 then
+    return ""
+  end
+  local days = math.max(0, math.floor((now() - t) / DAY))
+  return days == 0 and ns.L["price.ageToday"] or string.format(ns.L["price.ageDays"], days)
+end
+
+-- The lines of the other auction houses (neutral houses, then the other faction) that have a price for the
+-- item, except the house the main block shows: { key, text, left, right } each, behind an "otherHeader"
+-- line. left (house) and right (price and age) go to one two column tooltip line, text is both in one line.
+local function otherLines(itemId, skipKey)
+  local keys = {}
+  for _, key in ipairs(priceDb("NeutralHouses") or {}) do
+    keys[#keys + 1] = key
+  end
+  keys[#keys + 1] = priceDb("OtherHouse")
+  local lines = {}
+  for _, key in ipairs(keys) do
+    local e = key ~= skipKey and ownEntry(itemId, key) or nil
+    if e then
+      local name = priceDb("HouseName", key) or key
+      local right = money(e.min) .. "  " .. ageText(e)
+      lines[#lines + 1] = { key = "other", text = name .. ": " .. right, left = name, right = right }
+    end
+  end
+  if #lines > 0 then
+    table.insert(lines, 1, { key = "otherHeader", text = ns.L["price.other"] })
+  end
+  return lines
+end
+
 -- The lines of the price block: { { key, text }, ... }, nil without a price. Keys: header, min, median,
 -- max, hint (median and highest need a full scan), old (age of old data), neutralOnly (the only data
--- is the neutral house), addon (price add-on), stack, then for a neutral house next to the faction
--- house neutralHeader, neutralmin, neutralmedian, neutralmax. The first line after the header is
--- always the lowest unit price. stack: the number of items in the stack of the tooltip (the price of
--- the stack is added for more than one).
+-- is a neutral house), legacyOnly (the only data is an older scan), addon (price add-on), stack, then
+-- with the option "other houses" otherHeader and one "other" line per house (see otherLines). The
+-- first line after the header is always the lowest unit price. stack: the number of items in the stack
+-- of the tooltip; the stack line is "AH: price" for one item and "AH (stack x N): price" for more (the
+-- unit price stands in the lines above).
 function S.PriceLines(itemId, stack)
   local info = S.PriceInfo(itemId)
   if not info then
@@ -461,20 +651,25 @@ function S.PriceLines(itemId, stack)
     end
     if info.house == "neutral" then
       lines[#lines + 1] = { key = "neutralOnly", text = L["price.neutralOnly"] }
+    elseif info.house == "legacy" then
+      lines[#lines + 1] = { key = "legacyOnly", text = L["price.legacyOnly"] }
     end
   end
-  if type(stack) == "number" and stack > 1 then
-    local total = math.floor(stack) * info.unit
-    lines[#lines + 1] = { key = "stack", text = string.format(L["price.stack"], math.floor(stack), money(total)) }
+  if type(stack) == "number" and stack >= 1 then
+    local count = math.floor(stack)
+    local text = count == 1 and string.format(L["price.one"], money(info.unit))
+      or string.format(L["price.stack"], count, money(count * info.unit))
+    lines[#lines + 1] = { key = "stack", text = text, total = count > 1 }
   end
-  if info.neutral then
-    lines[#lines + 1] = { key = "neutralHeader", text = L["price.neutral"] }
-    entryLines(lines, info.neutral, "neutral")
+  if priceSettings().showOther == true then
+    for _, line in ipairs(otherLines(itemId, info.houseKey)) do
+      lines[#lines + 1] = line
+    end
   end
   return lines
 end
 
-local MUTED_LINES = { hint = true, old = true, neutralOnly = true }
+local MUTED_LINES = { hint = true, old = true, neutralOnly = true, legacyOnly = true }
 
 -- Item tooltip helpers --------------------------------------------------------------------------------
 
@@ -586,8 +781,11 @@ function S.PriceTooltip(owner, line)
   local title = table.remove(lines, 1).text
   local out = {}
   for _, l in ipairs(lines) do
-    local color = MUTED_LINES[l.key] and "textMuted" or l.key == "neutralHeader" and "accent" or nil
+    local color = MUTED_LINES[l.key] and "textMuted" or l.key == "otherHeader" and "accent" or nil
     out[#out + 1] = { text = l.text, color = color }
+    if l.right then
+      out[#out].left, out[#out].right, out[#out].text = l.left, l.right, nil
+    end
   end
   return ns.W.Tooltip.Show(owner, { title = title, lines = out })
 end
@@ -608,10 +806,6 @@ S.ClientName = clientName
 -- Blizzard's buy button.
 
 local AUCTION_HOSTS = { "AuctionHouseFrame", "AuctionFrame" }
-
-local function inCombat()
-  return type(InCombatLockdown) == "function" and InCombatLockdown() == true
-end
 
 -- The shown auction house window, nil while it is closed or not loaded.
 local function shownAuctionHouse()
@@ -651,16 +845,171 @@ local function blizzardSearch(host, name)
   return ok
 end
 
+-- Direct open (standard window) ---------------------------------------------------------------------
+-- Selects the item of a row by its ID and, for a commodity, sets the open quantity once the offers are in.
+-- Only selects and fills a field: the buy button stays the player's.
+
+local COMMODITY_EVENT = "COMMODITY_SEARCH_RESULTS_UPDATED"
+local WAIT_SECONDS = 4
+local waiter -- { frame, id, qty, host } of the pending wait, nil when none
+
+local function stopWait()
+  if waiter then
+    pcall(waiter.frame.UnregisterEvent, waiter.frame, COMMODITY_EVENT)
+    waiter.frame:SetScript("OnEvent", nil)
+    waiter = nil
+  end
+end
+
+-- True for a commodity (sold by quantity). Unknown status falls back to the key info.
+local function isCommodity(ah, itemId, key)
+  if type(ah.GetItemCommodityStatus) == "function" then
+    local enum = rawget(_G, "Enum")
+    local states = type(enum) == "table" and enum.ItemCommodityStatus or nil
+    local commodity = type(states) == "table" and states.Commodity or 2
+    local unknown = type(states) == "table" and states.Unknown or 0
+    local status = ah.GetItemCommodityStatus(itemId)
+    if status ~= unknown then
+      return status == commodity
+    end
+  end
+  if type(ah.GetItemKeyInfo) == "function" then
+    local info = ah.GetItemKeyInfo(key)
+    return type(info) == "table" and info.isCommodity == true
+  end
+  return false
+end
+
+local function setQuantity(host, count)
+  local buy = host.CommoditiesBuyFrame
+  local display = type(buy) == "table" and buy.BuyDisplay or nil
+  local input = type(display) == "table" and display.QuantityInput or nil
+  if type(input) ~= "table" then
+    return false
+  end
+  local function current()
+    return type(input.GetQuantity) == "function" and input:GetQuantity() or nil
+  end
+  local function write()
+    if type(input.SetQuantity) == "function" then
+      input:SetQuantity(count)
+    elseif type(input.InputBox) == "table" and type(input.InputBox.SetNumber) == "function" then
+      input.InputBox:SetNumber(count)
+    else
+      return false
+    end
+    return true
+  end
+  local ok, written = pcall(write)
+  if not (ok and written) then
+    return false
+  end
+  -- The buy view may reset the field while it builds: one more write on the next frame, no loop.
+  if type(C_Timer) == "table" and C_Timer.After then
+    C_Timer.After(0, function()
+      local read, value = pcall(current)
+      if read and value ~= nil and value ~= count then
+        pcall(write)
+      end
+    end)
+  end
+  return true
+end
+
+local function applyQuantity(host, itemId, wanted)
+  local ah = rawget(_G, "C_AuctionHouse")
+  local ok, offered = pcall(function()
+    return ah.GetCommoditySearchResultsQuantity(itemId)
+  end)
+  if not (ok and type(offered) == "number") then
+    return
+  end
+  if offered < wanted then
+    ns.Notify(string.format(ns.L["profshop.offerShort"], offered, wanted), "info")
+  end
+  local count = math.min(wanted, offered)
+  if count >= 1 then
+    setQuantity(host, count)
+  end
+end
+
+local function waitForOffers(host, itemId, wanted)
+  stopWait()
+  if type(C_Timer) ~= "table" or not C_Timer.After then
+    return
+  end
+  local frame = CreateFrame("Frame")
+  local token = { frame = frame, id = itemId }
+  waiter = token
+  frame:RegisterEvent(COMMODITY_EVENT)
+  frame:SetScript("OnEvent", function(_, _, id)
+    if waiter ~= token or id ~= itemId then
+      return
+    end
+    stopWait()
+    pcall(applyQuantity, host, itemId, wanted)
+  end)
+  C_Timer.After(WAIT_SECONDS, function()
+    if waiter == token then
+      stopWait()
+    end
+  end)
+end
+
+-- Opens the item in the standard window. False when the calls are not there or raise, the caller then
+-- runs the name search.
+local function openDirect(host, itemId, quantity)
+  local ah = rawget(_G, "C_AuctionHouse")
+  if
+    type(ah) ~= "table"
+    or type(ah.MakeItemKey) ~= "function"
+    or type(host.SelectBrowseResult) ~= "function"
+    or type(itemId) ~= "number"
+  then
+    return false
+  end
+  local ok, commodity = pcall(function()
+    local key = ah.MakeItemKey(itemId)
+    if type(key) ~= "table" then
+      error("no item key")
+    end
+    host:SelectBrowseResult({ itemKey = key })
+    return isCommodity(ah, itemId, key)
+  end)
+  if not ok then
+    return false
+  end
+  if commodity and type(ah.GetCommoditySearchResultsQuantity) == "function" then
+    waitForOffers(host, itemId, quantity)
+  end
+  return true
+end
+
 -- Searches an item name in the open auction house: through the connected addon when its search call
 -- is there, else the search box of the standard window. Returns "addon", "blizzard", "closed" (window not
--- open), "combat" (nothing happens) or "failed" (no way to search).
-function S.SearchAuction(name)
-  if inCombat() then
+-- open), "combat" (nothing happens) or "failed" (no way to search). With an item ID and the open quantity
+-- (item = { id, qty }) the item is opened directly first ("addon" or "direct"), every failure ends in the name search.
+function S.SearchAuction(name, item)
+  if ns.CombatLocked() then
     return "combat"
   end
   local host = shownAuctionHouse()
   if not host then
     return "closed"
+  end
+  if type(item) == "table" and type(item.id) == "number" then
+    local quantity = math.max(1, math.floor(tonumber(item.qty) or 1))
+    local mode = host.displayMode
+    local found = ns.PriceSourceAddon.SearchItem(name, quantity)
+    if found == "ok" then
+      -- The connected addon may reset the mode of the window while it opens its view.
+      if host.displayMode == nil and mode ~= nil then
+        host.displayMode = mode
+      end
+      return "addon"
+    elseif openDirect(host, item.id, quantity) then
+      return "direct"
+    end
   end
   local state, err = ns.PriceSourceAddon.Search(name)
   if state == "ok" then
@@ -680,7 +1029,8 @@ local function itemLink(line, name)
       return link
     end
   end
-  return string.format("|Hitem:%d|h[%s]|h", line.id, name)
+  -- Plain name while the client has no link (a self-built link is refused in the chat).
+  return "[" .. name .. "]"
 end
 
 -- Into the open chat edit box, else opens the chat with the link in it.
@@ -698,7 +1048,7 @@ local function insertChatLink(link)
   end
 end
 
--- A click on a list row: left = search, right = copy the name, Shift + left = link in the chat.
+-- A click on a list row: left = search, right = copy the name, Shift + left = link in the chat, Ctrl + left = preview.
 -- Returns what happened ("copy", "link" or the result of SearchAuction), nil without a line.
 function S.RowClick(line, button)
   if type(line) ~= "table" then
@@ -712,13 +1062,16 @@ function S.RowClick(line, button)
     insertChatLink(itemLink(line, name))
     return "link"
   end
+  if ns.ItemActions.Click(line.id, button) then
+    return "preview"
+  end
   -- An item only a vendor sells is not at the auction house: the click walks to the nearest vendor.
   local best = line.source == "vendor" and ns.VendorSource and ns.VendorSource.Best(line.id) or nil
   if best then
     ns.VendorSource.SetWaypoint(best.place)
     return "waypoint"
   end
-  local result = S.SearchAuction(name)
+  local result = S.SearchAuction(name, { id = line.id, qty = line.qty })
   if result == "closed" then
     ns.Notify(string.format(ns.L["profshop.openAuction"], name), "info")
   elseif result == "failed" then
@@ -927,7 +1280,7 @@ function S.SetCraftAll(choice)
   for _, line in ipairs(plan.all or {}) do
     if line.craftable and line.choice ~= choice then
       n = n + 1
-      local craft = store().craft
+      local craft = charStore().craft
       craft[line.id] = choice == "auction" and "auction" or nil
     end
   end
@@ -975,8 +1328,9 @@ function S.PlainText(plan)
 end
 
 -- Creates the list in the connected addon. Returns "sent" and the count, "nothing", "noApi" (the
--- addon or its list API is not there) or "failed" (the call raised an error).
-function S.Send(plan)
+-- addon or its list API is not there) or "failed" (the call raised an error). mode "append" adds the
+-- searches to the list of that name instead of replacing it.
+function S.Send(plan, mode)
   if not S.ListApiReady() then
     return "noApi"
   end
@@ -984,7 +1338,13 @@ function S.Send(plan)
   if #searches == 0 then
     return "nothing"
   end
-  local state, err = ns.PriceSourceAddon.CreateList(plan.listName, searches)
+  local P = ns.PriceSourceAddon
+  local state, err
+  if mode == "append" then
+    state, err = P.AppendToList(plan.listName, searches)
+  else
+    state, err = P.CreateList(plan.listName, searches)
+  end
   if state ~= "ok" then
     ns.Log.warn("list creation failed: %s", tostring(err))
     return "failed"

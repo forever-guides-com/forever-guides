@@ -3,8 +3,10 @@
 -- "window", a small window at the top with the name, the text and two buttons, and "bar", one line.
 -- Both end in the same click handler: invoke(row) calls handlers.invite. When the game blocks that
 -- call, the normal button hides and the secure button below it (a macro with /ginvite, run by the game
--- itself) takes the next click. Buttons are made and armed out of combat only; a request that arrives in
--- combat waits and is shown when the combat ends. A copy button shows the command as the last fallback.
+-- itself) takes the next click. The rows are plain frames: a request shows, reflows and closes at once, also in
+-- combat. The secure button is a separate overlay on UIParent (Core/SecureOverlay.lua) laid over the visible
+-- button of the row; it is made, armed and placed out of combat only, so in a fight the click of the normal
+-- button answers "in combat" and the copy button shows the command as the last fallback.
 -- Demo rows (P.ShowDemo, the settings preview and the developer preview) look the same and call nothing.
 local _, ns = ...
 local W, L, Theme = ns.W, ns.L, ns.Theme
@@ -36,7 +38,7 @@ ns.AddLocale("deDE", {
   ["invite.prompt.windowText"] = "möchte in die Gilde (ginv)",
   ["invite.prompt.button"] = "In die Gilde einladen",
   ["invite.prompt.copy"] = "Befehl kopieren",
-  ["invite.prompt.copyTitle"] = "Gilden-Einladungsbefehl",
+  ["invite.prompt.copyTitle"] = "Befehl zur Gildeneinladung",
   ["invite.prompt.copyHint"] = "Drücke Strg+C, öffne den Chat mit Enter, füge mit Strg+V ein und drücke Enter. Das Spiel nimmt diese Einladung nur an, wenn du den Befehl selbst eingibst.",
   ["invite.prompt.detail"] = "Stufe %d %s",
   ["invite.prompt.detailLevel"] = "Stufe %d",
@@ -78,16 +80,11 @@ local hintLabel, hintRow = nil, nil
 -- Set while "close all" empties the line, so no waiting request moves up in between.
 local closingAll = false
 local pump
--- Rows that were released in combat; their attributes are cleared when the combat ends.
-local stale = {}
 local secureFailed = false
 local driver, sinceTick = nil, 0
 local nextId = 0
-local needReflow = false
-
-local function inCombat()
-  return ns.InCombat()
-end
+-- Arms the secure overlay of a row and lays it over the button (assigned below).
+local syncSecure
 
 local function clock()
   local fn = rawget(_G, "GetTime")
@@ -237,9 +234,7 @@ local function updateFooters()
   for _, row in ipairs(rows) do
     local want = not row.free and not row.demo and row == bottom and crowded
     local moreText = want and text or ""
-    if inCombat() then
-      row.more:SetText(moreText)
-    elseif want ~= (row.footer == true) or (want and row.layoutStyle == "bar" and moreText ~= row.moreText) then
+    if want ~= (row.footer == true) or (want and row.layoutStyle == "bar" and moreText ~= row.moreText) then
       row.footer, row.moreText = want, moreText
       row.more:SetText(moreText)
       if not row.free then
@@ -252,13 +247,8 @@ local function updateFooters()
   end
 end
 
--- The shown rows one below the other from the top middle of the screen. Not in combat (a protected child).
+-- The shown rows one below the other from the top middle of the screen.
 local function reflow()
-  if ns.InCombat() then
-    needReflow = true
-    return
-  end
-  needReflow = false
   updateFooters()
   local any = false
   for _, row in ipairs(rows) do
@@ -277,6 +267,7 @@ end
 
 -- The key hint of every row (only the row that carries the key shows one).
 local function updateHints()
+  local needReflow = false
   for _, row in ipairs(rows) do
     local text = hintTextFor(row)
     if text ~= (row.hintWant or "") then
@@ -284,17 +275,13 @@ local function updateHints()
       row.hintShort = hintLabel and text ~= "" and string.format(L["invite.prompt.hint"], hintLabel) or nil
       row.hint:SetText(text)
       -- A longer hint can wrap onto a second line of the window or widen the bar.
-      if
-        not row.free
-        and not inCombat()
-        and (row.layoutStyle == "bar" or row.hintLines ~= math.ceil(row.hint:GetStringHeight() or 0))
-      then
+      if not row.free and (row.layoutStyle == "bar" or row.hintLines ~= math.ceil(row.hint:GetStringHeight() or 0)) then
         layout(row, row.layoutStyle)
         needReflow = true
       end
     end
   end
-  if needReflow and not inCombat() then
+  if needReflow then
     reflow()
   end
 end
@@ -452,7 +439,7 @@ local function layoutBar(row)
   row.width = width
 end
 
--- Arranges the parts of a row for a look. Out of combat only (it sizes the secure button).
+-- Arranges the parts of a row for a look.
 function layout(row, style)
   row.layoutStyle = style
   local window = style == "window"
@@ -498,13 +485,10 @@ end
 -- Rows -----------------------------------------------------------------------------------------
 
 local function disarm(row)
-  row.button:SetAttribute("type", nil)
-  row.button:SetAttribute("macrotext", nil)
   row.name, row.key, row.expires, row.handlers, row.info, row.demo, row.id = nil, nil, nil, nil, nil, nil, nil
   row.direct:Show()
   row.hint:SetText("")
   row.hintWant, row.hintShort, row.footer, row.moreText = nil, nil, nil, nil
-  stale[row] = nil
   row.free = true
 end
 
@@ -515,13 +499,9 @@ local function release(row)
   row.closing = true
   row.frame:Hide()
   row.closing = nil
-  if ns.InCombat() then
-    stale[row] = true
-    row.free = true
-    row.pendingClear = true
-  else
-    disarm(row)
-  end
+  disarm(row)
+  -- In combat the overlay stays as it is (the state driver hides it) and is taken off after the combat.
+  syncSecure(row)
   -- The next waiting request moves up: it shows, it never invites.
   pump()
   reflow()
@@ -583,7 +563,7 @@ local function buildWindowDeco(frame)
   local deco = CreateFrame("Frame", nil, frame)
   deco:SetAllPoints(frame)
   W.FadeWithWindow(W.Fill(deco, "bg", 0.97))
-  -- esc = false: the prompt frame is protected and closes over UISpecialFrames (client side, also in combat).
+  -- esc = false: the prompt frame closes over UISpecialFrames (client side, also in combat).
   local shell = ns.WindowShell.Attach(deco, { role = "h3", titleHeight = 30, band = false, fade = "main", esc = false })
   shell.titleBar:RegisterForDrag()
   shell.titleBar:SetScript("OnDragStart", nil)
@@ -592,8 +572,9 @@ local function buildWindowDeco(frame)
   return deco, shell
 end
 
--- The secure button wears the look of the "confirm" variant of the normal button above it, so the one that
--- takes over when the game blocks the normal call is the same button to the eye. Theme tokens only.
+-- The button under the secure overlay wears the look of the "confirm" variant of the normal button above it, so
+-- the one that takes over when the game blocks the normal call is the same button to the eye. Theme tokens only.
+-- button.fgSetHover(on) is the hover state: the overlay takes the mouse, so it forwards enter and leave.
 local function paintSecure(button)
   local v = W.ACTION_VARIANTS.confirm
   button.fgBg = button.fgBg or button:CreateTexture(nil, "BACKGROUND")
@@ -606,13 +587,15 @@ local function paintSecure(button)
     button.fgRing.show(Theme.accessibleMode())
   end
   ns.Bind(button, paint)
-  button:HookScript("OnEnter", function()
-    button.fgHover = true
+  button.fgSetHover = function(on)
+    button.fgHover = on
     paint()
+  end
+  button:HookScript("OnEnter", function()
+    button.fgSetHover(true)
   end)
   button:HookScript("OnLeave", function()
-    button.fgHover = false
-    paint()
+    button.fgSetHover(false)
   end)
 end
 
@@ -647,12 +630,7 @@ local function newRow()
     c:SetFrameLevel(row.winDeco:GetFrameLevel() + (ns.WindowShell.EDGE_LEVEL or 100) + 10)
   end
   row.content = c
-  local okB, button =
-    pcall(CreateFrame, "Button", "ForeverGuidesInviteSecure" .. index, c, "SecureActionButtonTemplate")
-  if not (okB and type(button) == "table") then
-    secureFailed = true
-    return nil
-  end
+  local button = CreateFrame("Button", nil, c)
   row.button = button
   specialFrame("ForeverGuidesInvite" .. index)
   -- Escape hides the frame; the request ends with it.
@@ -704,7 +682,6 @@ local function newRow()
   )
   row.close = row.barClose
   button:SetSize(BTN_MIN_W, 24)
-  button:RegisterForClicks("AnyUp", "AnyDown")
   paintSecure(button)
   row.buttonText = W.Text(button, { key = "invite.prompt.button", role = "ui", color = "text", justify = "CENTER" })
   row.buttonText:SetPoint("CENTER")
@@ -717,7 +694,7 @@ local function newRow()
       P.OpenCopy(row.name)
     end,
   })
-  -- The normal button sits on top of the secure one and hides itself when the game blocks its call.
+  -- The normal button sits on top of the secure overlay and hides itself when the game blocks its call.
   row.direct = W.Button(c, {
     key = "invite.prompt.button",
     variant = "confirm",
@@ -727,6 +704,7 @@ local function newRow()
       invoke(row)
     end,
   })
+  -- The overlay lies two levels over the button: the normal button is above it.
   if row.direct.SetFrameLevel and button.GetFrameLevel then
     row.direct:SetFrameLevel(button:GetFrameLevel() + 5)
   end
@@ -745,18 +723,6 @@ local function newRow()
     )
     row.proxy = proxy
   end
-  -- Our code runs after the secure click and never changes what the click does.
-  button:HookScript("PostClick", function()
-    -- The macro stops itself in combat: nothing was sent, the button stays armed for another click.
-    if ns.InCombat() or row.free or row.demo then
-      return
-    end
-    local h, name = row.handlers, row.name
-    release(row)
-    if h and h.sent then
-      h.sent(name)
-    end
-  end)
   frame:Hide()
   rows[#rows + 1] = row
   return row
@@ -764,7 +730,7 @@ end
 
 local function takeRow()
   for _, row in ipairs(rows) do
-    if row.free and not row.pendingClear then
+    if row.free then
       return row
     end
   end
@@ -779,6 +745,45 @@ local function find(key)
       return row
     end
   end
+end
+
+-- The secure button of a row: made on first use, armed with the macro of the request and laid over the visible
+-- button, or taken off when the row is free or a demo. Out of combat only: a row opened, moved or released in
+-- combat is synced when the combat ends (and on every tick).
+syncSecure = function(row)
+  if ns.InCombat() then
+    return
+  end
+  if not row.overlay then
+    if row.free or row.demo then
+      return
+    end
+    local overlay = ns.SecureOverlay.New("ForeverGuidesInviteSecure" .. row.index)
+    if not overlay then
+      return
+    end
+    row.overlay = overlay
+    local f = overlay.frame
+    -- Our code runs after the secure click and never changes what the click does.
+    f:HookScript("PostClick", function()
+      -- The macro stops itself in combat: nothing was sent, the button stays armed for another click.
+      if ns.InCombat() or row.free or row.demo then
+        return
+      end
+      local h, name = row.handlers, row.name
+      release(row)
+      if h and h.sent then
+        h.sent(name)
+      end
+    end)
+    for _, script in ipairs({ "OnEnter", "OnLeave" }) do
+      f:HookScript(script, function()
+        row.button.fgSetHover(script == "OnEnter")
+      end)
+    end
+  end
+  local macro = not row.free and not row.demo and P.MacroText(row.name) or nil
+  row.overlay:Sync(row.button, macro)
 end
 
 -- Driver ------------------------------------------------------------------------------------------
@@ -798,29 +803,22 @@ local function refreshDriver()
 end
 
 -- Over a window pinned to the top strata (the main window raised over a Blizzard view) the request goes to
--- that strata too, so the demo of the settings is never hidden behind its own window. Out of combat only.
+-- that strata too, so the demo of the settings is never hidden behind its own window.
 local function lift(row)
   local f = row.frame
   f:SetFrameStrata(ns.TopLayer.Active() and "TOOLTIP" or "DIALOG")
   ns.TopLayer.Over(f, ns.TopLayer.DIALOG)
 end
 
--- Shows a request now. Out of combat only. spec: name, handlers, info, style, demo.
+-- Shows a request now. spec: name, handlers, info, style, demo.
 local function open(row, spec)
   nextId = nextId + 1
-  row.free, row.pendingClear = false, nil
+  row.free = false
   row.id, row.name, row.handlers, row.info = nextId, spec.name, spec.handlers, spec.info or {}
   row.demo = spec.demo == true or nil
   row.key = row.demo and ("demo:" .. nextId) or PN.Key(spec.name)
   row.lifetime = row.demo and DEMO_LIFETIME or P.LIFETIME
   row.expires = clock() + row.lifetime
-  if row.demo then
-    row.button:SetAttribute("type", nil)
-    row.button:SetAttribute("macrotext", nil)
-  else
-    row.button:SetAttribute("type", "macro")
-    row.button:SetAttribute("macrotext", P.MacroText(spec.name))
-  end
   row.direct:Show()
   row.layoutStyle = spec.style
   paintTexts(row)
@@ -828,6 +826,7 @@ local function open(row, spec)
   reflow()
   lift(row)
   row.frame:Show()
+  syncSecure(row)
   paintBar(row, clock())
   refreshDriver()
   ns.Emit("FG_INVITE_ROWS")
@@ -846,17 +845,13 @@ local function enqueue(name, key, handlers, info)
     end
   end
   waiting[#waiting + 1] = { name = name, key = key, handlers = handlers, info = info }
-  if inCombat() then
-    needReflow = true
-  else
-    reflow()
-  end
+  reflow()
   updateHints()
 end
 
--- A waiting request that has room now takes a row. Out of combat only.
+-- A waiting request that has room now takes a row.
 pump = function()
-  if inCombat() or closingAll then
+  if closingAll then
     return
   end
   while #waiting > 0 and openCount(false) < P.MAX_ROWS do
@@ -895,7 +890,7 @@ local function arm(name, key, handlers, info)
   return "queued"
 end
 
--- Asks the player to invite `name` to the guild. Answers "ready" (shown), "waiting" (combat, shown when it ends),
+-- Asks the player to invite `name` to the guild. Answers "ready" (shown, in combat too),
 -- "queued" (all rows are taken, it waits its turn) or false and "no-api" / "unsafe-name". handlers: invite(name)
 -- -> "sent" | "blocked" | false (the click of the normal button), combat(name) (a click in combat), sent(name)
 -- (after the click of the secure button), closed(name) (declined or closed). info (optional): class (token),
@@ -904,24 +899,10 @@ function P.Request(name, handlers, info)
   if not safeName(name) then
     return false, "unsafe-name"
   end
-  local key = PN.Key(name)
-  if inCombat() then
-    local existing = find(key)
-    if existing then
-      return "ready"
-    end
-    for _, q in ipairs(waiting) do
-      if q.key == key then
-        return "waiting"
-      end
-    end
-    enqueue(name, key, handlers, info)
-    return "waiting"
-  end
-  return arm(name, key, handlers, info)
+  return arm(name, PN.Key(name), handlers, info)
 end
 
--- Drops requests that waited too long. Out of combat only for the attributes, the frame hides at once.
+-- Drops requests that waited too long (the frame hides at once) and keeps the secure overlays on their buttons.
 function P.Tick()
   local now = clock()
   for _, row in ipairs(rows) do
@@ -930,6 +911,7 @@ function P.Tick()
         release(row)
       else
         paintBar(row, now)
+        syncSecure(row)
       end
     end
   end
@@ -949,7 +931,7 @@ function P.Rows()
   return out
 end
 
--- Requests that wait for a free row (or for the end of the combat).
+-- Requests that wait for a free row.
 function P.Waiting()
   return #waiting
 end
@@ -984,10 +966,10 @@ end
 -- Name of the button a key press clicks for this row: the normal button, the secure one when the game
 -- blocked the normal call.
 function P.KeyTarget(row)
-  if row.direct:IsShown() and row.proxy then
-    return row.proxy:GetName()
+  if row.direct:IsShown() or not row.overlay then
+    return row.proxy and row.proxy:GetName()
   end
-  return row.button:GetName()
+  return row.overlay.frame:GetName()
 end
 
 -- Shows "Key Y" on one row (nil label or row clears every hint).
@@ -1002,9 +984,6 @@ end
 -- click only says so, and the demo closes by itself after DEMO_LIFETIME seconds.
 function P.ShowDemo(styles)
   P.HideDemo()
-  if inCombat() then
-    return false, "combat"
-  end
   local shown = 0
   for _, style in ipairs(styles) do
     local row = openCount(true) < DEMO_ROWS and takeRow()
@@ -1051,12 +1030,8 @@ ns.On("FG_UI_REFRESHED", function()
 end)
 
 ns.On("PLAYER_REGEN_ENABLED", function()
-  for row in pairs(stale) do
-    disarm(row)
-    row.pendingClear = nil
-  end
-  if needReflow then
-    reflow()
+  for _, row in ipairs(rows) do
+    syncSecure(row)
   end
   pump()
   reflow()

@@ -10,13 +10,13 @@ ns.AddLocale("enUS", {
   ["weapons.hint"] = "Some races start with a skill, no trainer needed",
   ["weapons.count"] = "%d skills for %s",
   ["weapons.raceLabel"] = "Faction and race (optional)",
-  ["weapons.noTeacher"] = "No teacher needed.",
+  ["weapons.noTeacher"] = "No trainer needed.",
   ["weapons.fromStart"] = "From the start",
   ["weapons.levelUnknown"] = "Level unknown",
   ["weapons.unconfirmed"] = "not confirmed",
   ["weapons.col.skill"] = "Skill",
   ["weapons.col.level"] = "From level",
-  ["weapons.col.trainer"] = "Teacher (faction)",
+  ["weapons.col.trainer"] = "Trainer (faction)",
   ["weapons.col.place"] = "Location",
   ["weapons.col.map"] = "Map",
   ["weapons.acq.start"] = "known from the start",
@@ -66,15 +66,16 @@ ns.AddLocale("deDE", {
   ["weapons.basis"] = "Hauptstädte, Classic-Positionen, Unbestätigtes markiert",
   ["tour.weapons.title"] = "Waffenfertigkeiten",
   ["tour.weapons.intro.title"] = "Waffenfertigkeiten",
-  ["tour.weapons.intro.text"] = "Sieh, welche Waffen deine Klasse nutzt und wo man sie lernt (Enter: weiter, Esc: Ende)",
+  ["tour.weapons.intro.text"] = "Sieh, welche Waffen deine Klasse nutzt und wo du sie lernst (Enter: weiter, Esc: Ende)",
   ["tour.weapons.filters.title"] = "Klasse, Fraktion und Rasse",
   ["tour.weapons.filters.text"] = "Klasse, Fraktion, Rasse wählen: die Rasse zeigt Startfertigkeiten",
   ["tour.weapons.list.title"] = "Fertigkeiten",
-  ["tour.weapons.list.text"] = "Je Fertigkeit: Waffenmeister mit Zone, Position, Karten- und Markerknopf",
+  ["tour.weapons.list.text"] = "Je Fertigkeit: Waffenmeister mit Zone, Position, Karten- und Wegpunktknopf",
 })
 
 -- Icon names are best-effort Classic-era references, not pixel-verified
 -- against the Forever client, spot-check in game and adjust if any look wrong.
+local SHARE_SIZE = 20
 local SKILL_ICONS = {
   axe1h = "INV_Axe_01",
   axe2h = "INV_Axe_02",
@@ -176,8 +177,10 @@ local ACQ_BADGE_COLOR = { start = "success", weaponMaster = "accent2", classTrai
 
 -- Table rows ---------------------------------------------------------------------
 
-local ROW_PAD = 8
-local SKILL_ICON_SIZE = 24
+-- The box of a row is inset BOX_GAP at the top and bottom, so ROW_PAD counts from the row edge.
+local ROW_PAD = 10
+local BOX_GAP = 2
+local SKILL_ICON_SIZE = 28
 local CREST_SIZE = 16
 local ACTIONS_W = W.MAP_ACTION_SIZE * 2 + W.MAP_ACTION_GAP
 local ACTIONS_H = W.MAP_ACTION_SIZE
@@ -248,12 +251,14 @@ local function layoutRow(row, width)
   row.icon:SetPoint("TOPLEFT", row, "TOPLEFT", ROW_PAD, -ROW_PAD)
   row.name:ClearAllPoints()
   row.name:SetPoint("TOPLEFT", row, "TOPLEFT", textX, -ROW_PAD)
-  row.name:SetWidth(textW)
+  row.name:SetWidth(textW - SHARE_SIZE - 4)
+  row.share:ClearAllPoints()
+  row.share:SetPoint("TOPLEFT", row, "TOPLEFT", textX + textW - SHARE_SIZE, -ROW_PAD)
   local nameH = row.name:GetStringHeight()
-  row.level:ClearAllPoints()
-  row.level:SetPoint("TOPLEFT", row, "TOPLEFT", textX, -(ROW_PAD + nameH + 2))
-  row.level:SetWidth(textW)
-  local leftBottom = ROW_PAD + nameH + 2 + row.level:GetStringHeight()
+  row.tags:ClearAllPoints()
+  row.tags:SetPoint("TOPLEFT", row, "TOPLEFT", textX, -(ROW_PAD + nameH + 4))
+  local tagsH = row.tags:fgLayout(textW)
+  local leftBottom = ROW_PAD + nameH + 4 + tagsH
   row.price:ClearAllPoints()
   if row.priceShown then
     row.price:SetPoint("TOPLEFT", row, "TOPLEFT", textX, -(leftBottom + 2))
@@ -297,14 +302,45 @@ local function layoutRow(row, width)
   return math.max(leftH, y - LINE_GAP + ROW_PAD)
 end
 
+-- Box of a row: surface fill and a one pixel edge, inset BOX_GAP at the top and bottom for the gap between rows.
+local function boxChrome(row)
+  row.bg = row:CreateTexture(nil, "BACKGROUND")
+  row.bg:SetPoint("TOPLEFT", row, "TOPLEFT", 0, -BOX_GAP)
+  row.bg:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, BOX_GAP)
+  local edges = {}
+  local function edge(p1, p2, horizontal)
+    local t = row:CreateTexture(nil, "BORDER")
+    t:SetPoint(p1, row.bg, p1)
+    t:SetPoint(p2, row.bg, p2)
+    if horizontal then
+      t:SetHeight(1)
+    else
+      t:SetWidth(1)
+    end
+    edges[#edges + 1] = t
+  end
+  edge("TOPLEFT", "TOPRIGHT", true)
+  edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+  edge("TOPLEFT", "BOTTOMLEFT", false)
+  edge("TOPRIGHT", "BOTTOMRIGHT", false)
+  ns.Bind(row, function()
+    row.bg:SetColorTexture(Theme.fillColor("rowRest"))
+    local r, g, b = Theme.rgb("lineStrong")
+    local a = Theme.highContrast() and 1 or Theme.fillAlpha.lineStrong
+    for _, t in ipairs(edges) do
+      t:SetColorTexture(r, g, b, a)
+    end
+  end)
+end
+
 local function makeRow(parent)
   local row = CreateFrame("Frame", nil, parent)
-  row.icon = row:CreateTexture(nil, "ARTWORK")
-  row.icon:SetSize(SKILL_ICON_SIZE, SKILL_ICON_SIZE)
-  row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  boxChrome(row)
+  row.icon = K.IconFrame(row, { size = SKILL_ICON_SIZE })
   row.name = W.Text(row, { role = "ui", color = "accent2", wrap = true })
-  row.level = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
-  row.price = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
+  row.share = ns.PageShare.Button(row, { size = SHARE_SIZE })
+  row.tags = K.TagRow(row)
+  row.price = W.Meta(row, { wrap = true })
   row.priceTip = priceTip(row, row.price)
   row.noTeacher = W.Text(row, { key = "weapons.noTeacher", role = "ui", color = "textMuted", wrap = true })
   row.hiddenNote = W.Text(row, { role = "micro", color = "textMuted", wrap = true })
@@ -313,7 +349,7 @@ local function makeRow(parent)
   row.divider:SetPoint("BOTTOMRIGHT")
   row.divider:SetHeight(1)
   ns.Bind(row, function()
-    row.divider:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.divider:SetColorTexture(Theme.fillColor("line"))
   end)
   row.lines = {}
   row.lineCount = 0
@@ -321,25 +357,30 @@ local function makeRow(parent)
   return row
 end
 
+-- The skill a page link chose (marked in the list), nil without one.
+local focusSkill
+
 local function paintRow(row, item)
   row.icon:SetTexture(skillIcon(item.skill))
   row.name:SetText(item.name)
+  W.SetColor(row.name, item.skill == focusSkill and "success" or "accent2")
+  row.share:SetTarget(row.class and item.skill and ("weapons/" .. row.class .. "/" .. item.skill) or nil)
 
   local noTeacher = needsNoTeacher(item)
   row.noTeacherMode = noTeacher
-  local levelText, levelColor
+  -- Level tag: the level the skill is learned at, or the note that it is known from the start.
+  local tags = {}
   if noTeacher then
-    levelText, levelColor = L["weapons.fromStart"], "success"
+    tags[1] = { text = L["weapons.fromStart"], color = "success" }
   elseif item.l then
-    levelText, levelColor = string.format(L["weapons.level"], item.l), "textSecondary"
+    tags[1] = { text = string.format(L["weapons.level"], item.l), color = "accent2" }
   else
-    levelText, levelColor = L["weapons.levelUnknown"], "textSecondary"
+    tags[1] = { text = L["weapons.levelUnknown"], color = "textSecondary" }
   end
   if item.unconfirmed then
-    levelText = levelText .. "  " .. Theme.hexText("textMuted", L["weapons.unconfirmed"])
+    tags[2] = { text = L["weapons.unconfirmed"], color = "textMuted" }
   end
-  row.level:SetText(levelText)
-  W.SetColor(row.level, levelColor)
+  row.tags:SetTags(tags)
   row.priceShown = paintPrice(row.price, row.priceTip, item.price)
   row.noTeacher:SetShown(noTeacher)
 
@@ -399,7 +440,7 @@ local function build(container)
   dropInvalidRace()
   local refresh
 
-  ns.AddParagraph(view, "weapons.intro")
+  ns.AddIntro(view, "weapons.intro")
   ns.AddParagraph(view, "weapons.basis", { role = "micro", color = "textMuted" })
 
   local classButtons = K.ClassButtons(view.content, {
@@ -413,9 +454,9 @@ local function build(container)
     end,
   })
   K.Anchor("FG.Weapons.Filters", classButtons)
-  s:Add(classButtons, { gap = 12 })
+  s:Add(classButtons, { gap = Theme.space.md })
 
-  s:Add(W.Text(view.content, { key = "weapons.raceLabel", role = "ui" }), { gap = 4 })
+  s:Add(W.Text(view.content, { key = "weapons.raceLabel", role = "ui" }), { gap = Theme.space.xs })
   local selector = K.FactionRaceSelector(view.content, {
     races = races,
     raceAllowed = raceAllowed,
@@ -435,7 +476,7 @@ local function build(container)
       refresh()
     end,
   })
-  s:Add(selector, { gap = 12 })
+  s:Add(selector, { gap = Theme.space.md })
 
   ns.AddParagraph(view, "weapons.hint", { role = "micro", color = "textMuted" })
   local message = ns.AddParagraph(view, nil, { role = "ui", color = "textSecondary" })
@@ -454,7 +495,7 @@ local function build(container)
     end,
   })
   K.Anchor("FG.Weapons.ViewToggle", viewToggle)
-  s:Add(viewToggle, { height = 22, gap = 10 })
+  s:Add(viewToggle, { height = 22, gap = Theme.space.md })
 
   local header = CreateFrame("Frame", nil, view.content)
   W.Fill(header, "surface", 1)
@@ -486,41 +527,48 @@ local function build(container)
 
   local rowList = K.RowPool(view.content, makeRow)
   K.Anchor("FG.Weapons.List", rowList)
-  s:Add(rowList, { gap = 14 })
+  s:Add(rowList, { gap = Theme.space.lg })
 
-  local weaponGrid = K.GridPool(view.content, 190, function(parent)
+  local weaponGrid = K.GridPool(view.content, 210, function(parent)
     local card = W.Card(parent, {})
-    card.icon = card:CreateTexture(nil, "ARTWORK")
+    card.icon = K.IconFrame(card, { size = Theme.size.iconFrame.lg })
     card.icon:SetPoint("TOPLEFT", 12, -12)
-    card.icon:SetSize(40, 40)
-    card.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    card.share = ns.PageShare.Button(card, { size = SHARE_SIZE })
+    card.share:SetPoint("TOPRIGHT", -10, -34)
     card.name = W.Text(card, { role = "ui", color = "accent2", wrap = true })
     card.name:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 10, -2)
     card.name:SetPoint("RIGHT", -24, 0)
-    card.badge = W.Badge(card, "weapons.acq.start", "success")
-    card.badge:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 10, -24)
-    card.level = W.Text(card, { role = "micro", color = "textMuted" })
-    card.level:SetPoint("LEFT", card.badge, "RIGHT", 8, 0)
+    card.badge = K.Tag(card, { key = "weapons.acq.start", color = "success" })
+    card.badge:SetPoint("TOPLEFT", card.icon, "TOPRIGHT", 10, -26)
+    -- The tag keeps to the room beside the icon (it truncates with a tooltip instead of leaving the card).
+    function card:fgSized(width)
+      self.badge:Fit(math.max(40, width - 12 - Theme.size.iconFrame.lg - 10 - 12))
+    end
+    card.level = W.Meta(card, { wrap = true })
+    card.level:SetPoint("TOPLEFT", card.icon, "BOTTOMLEFT", 0, -6)
+    card.level:SetPoint("RIGHT", -12, 0)
     card.dot = K.ConfidenceDot(card, 2)
     card.dot:SetPoint("TOPRIGHT", -10, -10)
-    card.price = W.Text(card, { role = "micro", color = "textSecondary" })
-    card.price:SetPoint("TOPLEFT", card.icon, "BOTTOMLEFT", 0, -6)
+    card.price = W.Meta(card, { wrap = true })
+    card.price:SetPoint("TOPLEFT", card.level, "BOTTOMLEFT", 0, -2)
+    card.price:SetPoint("RIGHT", -12, 0)
     card.priceTip = priceTip(card, card.price)
     card.body = W.Text(card, { role = "micro", color = "textSecondary", wrap = true })
     card.body:SetPoint("TOPLEFT", card.price, "BOTTOMLEFT", 0, -6)
     card.body:SetPoint("RIGHT", -12, 0)
     return card
   end)
-  s:Add(weaponGrid, { gap = 14 })
+  s:Add(weaponGrid, { gap = Theme.space.lg })
 
   local function paintWeaponCard(card, row)
     card.icon:SetTexture(skillIcon(row.skill))
+    card.share:SetTarget(row.skill and ("weapons/" .. state.class .. "/" .. row.skill) or nil)
     card.name:SetText(row.name)
     if row.raceStart then
-      card.badge:SetKey("weapons.fromStart", "success")
+      card.badge:SetTag({ key = "weapons.fromStart", color = "success" })
       card.level:SetText("")
     else
-      card.badge:SetKey("weapons.acq." .. tostring(row.a), ACQ_BADGE_COLOR[row.a] or "textMuted")
+      card.badge:SetTag({ key = "weapons.acq." .. tostring(row.a), color = ACQ_BADGE_COLOR[row.a] or "textMuted" })
       card.level:SetText(row.l and string.format(L["weapons.level"], row.l) or "")
     end
     card.dot:SetCf(row.unconfirmed and 1 or row.cf)
@@ -550,7 +598,10 @@ local function build(container)
     rowList:SetShown(asList)
     weaponGrid:SetShown(not asList)
     if asList then
-      rowList:Sync(rows, paintRow)
+      rowList:Sync(rows, function(row, item)
+        row.class = state.class
+        paintRow(row, item)
+      end)
     else
       weaponGrid:Sync(rows, paintWeaponCard)
     end
@@ -560,12 +611,19 @@ local function build(container)
     view:Layout()
   end
 
+  -- Page link of the header: the class. A weapon skill has its own share button.
+  function view:ShareState()
+    return { state.class }
+  end
+
+  -- params: class, then one weapon skill (marked in the list).
   function view:Show(params)
     local c = params and params[1]
     if c and R.className(c) ~= c then
       state.class = c
       dropInvalidRace()
     end
+    focusSkill = params and SKILL_ICONS[params[2]] and params[2] or nil
     refresh()
   end
   return view

@@ -532,8 +532,29 @@ LV.SKILL_ICONS = {
   shield = "INV_Shield_04",
 }
 
+-- Recipe-type trainer entries (rogue poisons) are no spellbook spells: the spell APIs may say no, so the
+-- recipe list, the trainer's "used" marks and the learn chat line count too.
 local function spellKnown(id)
-  return ns.MacroSpells and ns.MacroSpells.isKnown(id)
+  local known = ns.MacroSpells and ns.MacroSpells.isKnown(id)
+  if known == true then
+    return true
+  end
+  for _, name in ipairs({ "IsPlayerSpell", "IsSpellKnownOrOverridesKnown" }) do
+    local fn = rawget(_G, name)
+    if type(fn) == "function" then
+      local ok, answer = pcall(fn, id)
+      if ok and answer then
+        return true
+      end
+      if ok and known == nil then
+        known = false
+      end
+    end
+  end
+  if (ns.RecipeKnown and ns.RecipeKnown.OwnHas(id)) or (ns.LearnedSpells and ns.LearnedSpells.Has(id)) then
+    return true
+  end
+  return known
 end
 
 -- true/false, or nil when the game cannot tell. A learned higher rank counts as

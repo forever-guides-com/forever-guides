@@ -21,6 +21,11 @@ ns.AddLocale("enUS", {
   ["proflist.cleared"] = "Shopping list emptied.",
   ["proflist.imported"] = "Shopping list: %d positions taken over.",
   ["proflist.itemName"] = "Item %d",
+  ["proflist.ask.title"] = "Shopping list is not empty",
+  ["proflist.ask.text"] = "%d positions are already on your shopping list. Add the new ones to it or start over with an empty list?",
+  ["proflist.ask.sendText"] = "The price add-on already has a list named \"%s\". Add the new searches to it or replace it?",
+  ["proflist.ask.add"] = "Add to list",
+  ["proflist.ask.replace"] = "Empty list and refill",
 })
 ns.AddLocale("deDE", {
   ["proflist.added"] = "Zur Einkaufsliste hinzugefügt: %s",
@@ -33,18 +38,17 @@ ns.AddLocale("deDE", {
   ["proflist.cleared"] = "Einkaufsliste geleert.",
   ["proflist.imported"] = "Einkaufsliste: %d Positionen übernommen.",
   ["proflist.itemName"] = "Item %d",
+  ["proflist.ask.title"] = "Einkaufsliste ist nicht leer",
+  ["proflist.ask.text"] = "Auf deiner Einkaufsliste stehen schon %d Positionen. Willst du die neuen hinzufügen oder mit einer leeren Liste neu beginnen?",
+  ["proflist.ask.sendText"] = "Das Preis-Addon hat schon eine Liste mit dem Namen „%s“. Willst du die neuen Suchen hinzufügen oder die Liste ersetzen?",
+  ["proflist.ask.add"] = "Zur Liste hinzufügen",
+  ["proflist.ask.replace"] = "Liste leeren und neu füllen",
 })
 
-local function characterKey()
-  local roster = ns.CharRoster
-  return roster and roster.CurrentKey() or "?"
-end
-
--- The saved entry of the current character, created clean when it is missing or damaged.
+-- The saved entry of the current character (ns.charDB.profList.chr), created clean when it is missing or damaged.
 function M.Char()
-  local list = S.Root().list
-  local key = characterKey()
-  local chr = list[key]
+  local t = S.CharRoot()
+  local chr = t.chr
   if
     type(chr) ~= "table"
     or type(chr.items) ~= "table"
@@ -52,9 +56,9 @@ function M.Char()
     or type(chr.seq) ~= "number"
     or type(chr.ticks) ~= "table"
   then
-    list[key] = PL.CleanChar(chr)
+    t.chr = PL.CleanChar(chr)
   end
-  return list[key]
+  return t.chr
 end
 
 -- The saved ticks of the material rows of the current character, { [key] = true }.
@@ -406,19 +410,101 @@ function M.AddRoute(slug, steps)
   return count, full and "limit" or nil
 end
 
--- AddRoute with the answer as a notification.
-function M.AddRouteFromPage(slug, steps)
-  local count, status = M.AddRoute(slug, steps)
-  local name = R.Name(slug)
-  if count > 0 then
-    ns.Notify(string.format(ns.L["proflist.routeAdded"], name, count), "success")
-  else
-    ns.Notify(string.format(ns.L["proflist.routeEmpty"], name), "info")
+local askDlg
+
+-- Three way question before a list is added to one that is not empty: onAdd, onReplace or nothing (cancel,
+-- Esc or close). Enter takes the first choice. `text` is the finished sentence.
+function M.AskMerge(text, onAdd, onReplace)
+  local W = ns.W
+  if not askDlg then
+    local d = ns.Dialogs.Create("ForeverGuidesListMerge", 560, 170)
+    askDlg = d
+    W.SetText(d.title, "proflist.ask.title")
+    d.text = W.Text(d, { role = "text", wrap = true })
+    d.text:SetPoint("TOPLEFT", 16, -48)
+    d.text:SetPoint("RIGHT", -16, 0)
+    d.add = W.Action(d, {
+      label = "proflist.ask.add",
+      tooltip = "proflist.ask.add",
+      icon = "plus",
+      variant = "primary",
+      width = 170,
+    })
+    d.add:SetPoint("BOTTOMRIGHT", -16, 14)
+    d.replace = W.Action(d, {
+      label = "proflist.ask.replace",
+      tooltip = "proflist.ask.replace",
+      icon = "trash",
+      width = 210,
+    })
+    d.replace:SetPoint("RIGHT", d.add, "LEFT", -8, 0)
+    d.cancel = W.Action(d, {
+      label = "act.cancel",
+      tooltip = "common.cancel",
+      icon = "close",
+      width = 110,
+      onClick = function()
+        d:Hide()
+      end,
+    })
+    d.cancel:SetPoint("RIGHT", d.replace, "LEFT", -8, 0)
+    d.fgName = function()
+      return ns.L["proflist.ask.title"]
+    end
+    d:EnableKeyboard(true)
+    d:SetScript("OnKeyDown", function(self, key)
+      local enter = key == "ENTER" or key == "NUMPADENTER"
+      if enter then
+        self.add:Click()
+      end
+      ns.PropagateKeys(self, not enter)
+    end)
   end
-  if status == "limit" then
-    ns.Notify(string.format(ns.L["proflist.limit"], PL.MAX_ITEMS), "warning")
+  local d = askDlg
+  W.SetText(d.text, nil, text)
+  local function choose(name, fn)
+    d[name]:SetScript(
+      "OnClick",
+      ns.Wrap("proflist-ask-" .. name, function()
+        d:Hide()
+        fn()
+      end)
+    )
   end
-  return count, status
+  choose("add", onAdd)
+  choose("replace", onReplace)
+  d:SetHeight(math.max(170, 48 + d.text:GetStringHeight() + 64))
+  d:Show()
+end
+
+-- AddRoute with the answer as a notification. A list that is not empty asks first (add to it, empty it and
+-- refill, cancel); onDone runs once the route is taken over, never after a cancel. Returns the result
+-- of AddRoute, nothing while the question is open.
+function M.AddRouteFromPage(slug, steps, onDone)
+  local function run()
+    local count, status = M.AddRoute(slug, steps)
+    local name = R.Name(slug)
+    if count > 0 then
+      ns.Notify(string.format(ns.L["proflist.routeAdded"], name, count), "success")
+    else
+      ns.Notify(string.format(ns.L["proflist.routeEmpty"], name), "info")
+    end
+    if status == "limit" then
+      ns.Notify(string.format(ns.L["proflist.limit"], PL.MAX_ITEMS), "warning")
+    end
+    if onDone then
+      onDone()
+    end
+    return count, status
+  end
+  local open = #M.Char().items
+  if open == 0 then
+    return run()
+  end
+  M.AskMerge(string.format(ns.L["proflist.ask.text"], open), run, function()
+    M.Clear()
+    run()
+  end)
 end
 
 -- Takes over positions of a shared list as own positions (all open). Returns the number taken over.

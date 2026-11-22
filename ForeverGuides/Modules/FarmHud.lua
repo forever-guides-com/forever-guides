@@ -8,6 +8,9 @@
 -- minimap is cached; it is put back step by step (each in its own pcall) when the HUD goes off, in
 -- instances, during a loading screen, at logout and when a step fails. Combat only shows or hides our
 -- own frames. docs/TAINT-AUDIT.md lists what is touched.
+--
+-- The HUD, its overlay and our pins take no mouse, so clicks go through to the world. The tooltips of our spot
+-- symbols come from a cursor poll (Modules/FarmHudTip.lua) that runs only while the cursor is over the HUD.
 local _, ns = ...
 local FH, Layer = ns.FarmHudLogic, ns.MinimapLayer
 local Theme = ns.Theme
@@ -19,8 +22,8 @@ ns.FarmHud = H
 ns.AddLocale("enUS", {
   ["farmhud.on"] = "Farm HUD on.",
   ["farmhud.off"] = "Farm HUD off.",
-  ["farmhud.waitOn"] = "Farm HUD switches on after the combat.",
-  ["farmhud.waitOff"] = "Farm HUD switches off after the combat.",
+  ["farmhud.waitOn"] = "Farm HUD switches on after combat.",
+  ["farmhud.waitOff"] = "Farm HUD is hidden. The minimap goes back after combat.",
   ["farmhud.waitInstance"] = "Farm HUD is on and appears again outside of instances.",
   ["farmhud.failed"] = "Farm HUD could not start (%s). The minimap is back in its place.",
   ["farmhud.usage"] = "/fg farmhud [on | off]",
@@ -38,7 +41,7 @@ ns.AddLocale("deDE", {
   ["farmhud.on"] = "Farm-HUD an.",
   ["farmhud.off"] = "Farm-HUD aus.",
   ["farmhud.waitOn"] = "Farm-HUD schaltet sich nach dem Kampf ein.",
-  ["farmhud.waitOff"] = "Farm-HUD schaltet sich nach dem Kampf aus.",
+  ["farmhud.waitOff"] = "Farm-HUD ist ausgeblendet. Die Minimap kehrt nach dem Kampf zurück.",
   ["farmhud.waitInstance"] = "Farm-HUD ist an und erscheint außerhalb von Instanzen wieder.",
   ["farmhud.failed"] = "Farm-HUD konnte nicht starten (%s). Die Minimap ist wieder an ihrem Platz.",
   ["farmhud.usage"] = "/fg farmhud [an | aus]",
@@ -70,6 +73,7 @@ local hud, overlay, border, letters, ring
 local notes = {}
 local acc, sinceVerify = 0, 0
 local needsRefit = false
+local movableInCombat
 local lettersKey, ringPath
 
 -- Helpers -------------------------------------------------------------------------------------------------
@@ -222,6 +226,44 @@ local function restoreRotation()
   end
 end
 
+-- Mouse for the client's blip tooltips ---------------------------------------------------------------------
+
+-- Motion only where the client has it, so a click still reaches the world; the put back is EnableMouse(false).
+local function mouseOn(mm)
+  if type(mm.SetMouseMotionEnabled) == "function" and type(mm.SetMouseClickEnabled) == "function" then
+    return try(mm.SetMouseClickEnabled, mm, false) and try(mm.SetMouseMotionEnabled, mm, true)
+  end
+  return try(mm.EnableMouse, mm, true)
+end
+
+local function mouseOff(mm)
+  state.mouseOn = false
+  return try(mm.EnableMouse, mm, false)
+end
+
+-- The minimap takes the mouse only while the key is held and the HUD is up. In combat with a protected
+-- minimap nothing is touched.
+local function syncMouse()
+  local mm = minimap()
+  if not mm then
+    return
+  end
+  local enabled = not state.settings or state.settings.blipTips ~= false
+  local action = FH.MousePlan({
+    attached = state.attached,
+    shown = state.shown,
+    enabled = enabled,
+    down = ns.Keys.Matches("farmHudBlipTips"),
+    blocked = flag("InCombatLockdown") and not movableInCombat(),
+    on = state.mouseOn,
+  })
+  if action == "on" then
+    state.mouseOn = mouseOn(mm) == true
+  elseif action == "off" then
+    mouseOff(mm)
+  end
+end
+
 -- Put back --------------------------------------------------------------------------------------------------
 
 local RESTORE = {
@@ -298,6 +340,9 @@ local function leave()
   end
   local mm, snap = minimap(), snapshot
   local ok = true
+  if mm and state.mouseOn then
+    mouseOff(mm)
+  end
   if mm and #FH.Missing(snap) == 0 then
     for _, step in ipairs(FH.RestoreSteps(snap)) do
       if not try(RESTORE[step], mm, snap) then
@@ -311,6 +356,8 @@ local function leave()
   if hud then
     hud:Hide()
   end
+  ns.FarmHudTip.Stop()
+  Layer.SetHud(false)
   restoreRotation()
   ns.FarmHudIcons.Restore()
   state.attached, state.shown, state.groundChanged = false, false, nil
@@ -389,6 +436,9 @@ local function onUpdate(_, dt)
   if state.attached and state.settings and state.settings.hideOtherIcons then
     ns.Safe("farmhud-icons", ns.FarmHudIcons.Tick, dt)
   end
+  if state.attached and state.shown then
+    ns.FarmHudTip.Tick(dt)
+  end
   acc, sinceVerify = acc + dt, sinceVerify + dt
   if acc < TICK or not state.attached then
     return
@@ -415,6 +465,9 @@ local function ensureFrames()
   hud:EnableMouse(false)
   hud:Hide()
   hud:SetScript("OnUpdate", onUpdate)
+  ns.FarmHudTip.Bind(hud, function()
+    return not state.mouseOn
+  end)
   overlay = CreateFrame("Frame", nil, hud)
   overlay:SetAllPoints(hud)
   overlay:EnableMouse(false)
@@ -466,6 +519,7 @@ local function place(mm, s)
   local level = readable(call(hud.GetFrameLevel, hud)) or 1
   mm:SetFrameLevel(level + 1)
   mm:EnableMouse(false)
+  state.mouseOn = false
   mm:EnableMouseWheel(false)
   overlay:SetFrameLevel(level + LEVEL_ABOVE + 2)
   border:SetFrameStrata(s.strata)
@@ -529,6 +583,7 @@ local function attach(mm, s)
   try(drawBorder, s)
   applyRotation(s)
   local effective = readable(call(mm.GetEffectiveScale, mm))
+  Layer.SetHud(true)
   Layer.SetScale(FH.PinFactor(s.pinScale, snapshot.effective, effective))
   Layer.Refit()
   lettersKey, ringPath = nil, nil
@@ -566,11 +621,24 @@ end
 
 -- Switch -------------------------------------------------------------------------------------------------------
 
+-- In combat the minimap may still move when it is not protected and the client allows it: the HUD then opens
+-- and closes at once instead of waiting for the end of the fight.
+function movableInCombat()
+  local mm = minimap()
+  return mm ~= nil and call(mm.IsProtected, mm) ~= true and ns.ProtectedAllowed(mm)
+end
+
+-- True while the player's own switch runs: only that moves the minimap in combat, an automatic change (reload,
+-- loading screen, instance) still waits for the end of the fight.
+local playerSwitch = false
+
 local function context(s)
+  local combat = flag("InCombatLockdown")
   return {
     wanted = wanted,
     suspended = suspended,
-    combat = flag("InCombatLockdown"),
+    combat = combat,
+    canMove = combat and playerSwitch and movableInCombat() or false,
     instance = flag("IsInInstance"),
     hideInCombat = s.hideInCombat,
     hideInInstance = s.hideInInstance,
@@ -605,6 +673,9 @@ function H.Update()
   elseif action == "show" or action == "hide" then
     state.shown = action == "show"
     hud:SetShown(state.shown)
+    if not state.shown then
+      ns.FarmHudTip.Stop()
+    end
   end
   if state.attached and needsRefit and not ctx.combat then
     needsRefit = false
@@ -619,13 +690,20 @@ function H.Update()
       end
     end
   end
+  syncMouse()
   return action
 end
 
 function H.SetWanted(on)
   wanted = on == true
   rememberSwitch(wanted)
-  return H.Update()
+  playerSwitch = true
+  local ok, action = pcall(H.Update)
+  playerSwitch = false
+  if not ok then
+    error(action, 0)
+  end
+  return action
 end
 
 function H.Toggle()
@@ -715,6 +793,12 @@ end)
 
 ns.On("PLAYER_REGEN_DISABLED", function()
   H.Update()
+end)
+
+ns.On("MODIFIER_STATE_CHANGED", function()
+  if state.attached or state.mouseOn then
+    ns.Safe("farmhud-mouse", syncMouse)
+  end
 end)
 
 -- A loading screen puts the minimap back, the new world takes it again.

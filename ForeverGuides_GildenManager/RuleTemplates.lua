@@ -1,4 +1,4 @@
--- Rule engine, part 2: the twelve stock rules as data, no game calls. A template is a rule skeleton
+-- Rule engine, part 2: the stock rules as data, no game calls. A template is a rule skeleton
 -- with { param = "name" } holes, the parameters (type, default, limits) and locale keys. Instantiate
 -- copies it into plain draft rules (never enabled); the guild ranks are holes the user has to fill,
 -- every guild names its ranks differently.
@@ -167,6 +167,36 @@ RT.LIST = {
           { kind = "daysOffline", op = "lessThan", value = hole("days") },
         },
         action = { kind = "mark", tag = "returnee" },
+      },
+    },
+  },
+  {
+    -- Protect lists stay on (useGlobal), a removal is never pre-ticked, the global dry run setting applies.
+    id = "removeBanned",
+    warn = true,
+    params = { { name = "ranks", type = "ranks" } },
+    rules = {
+      {
+        template = "removeBanned",
+        ranks = hole("ranks"),
+        all = { { kind = "banned", op = "is" }, { kind = "online", op = "isNot" } },
+        action = { kind = "remove" },
+      },
+    },
+  },
+  {
+    id = "markReturned",
+    warn = true,
+    params = { { name = "ranks", type = "ranks" }, days("awayDays", 30), days("days", 14) },
+    rules = {
+      {
+        template = "markReturned",
+        ranks = hole("ranks"),
+        all = {
+          { kind = "returned", op = "awayAtLeast", value = hole("awayDays") },
+          { kind = "returned", op = "within", value = hole("days") },
+        },
+        action = { kind = "mark", tag = "review" },
       },
     },
   },

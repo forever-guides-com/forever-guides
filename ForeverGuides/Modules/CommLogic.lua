@@ -39,6 +39,8 @@ CL.FUNCTIONS = {
   LY = "layer",
   CM = "crestMark",
   TC = "teamChat",
+  FM = "friendMap",
+  VC = "versionCheck",
 }
 local CODES = {}
 for code, name in pairs(CL.FUNCTIONS) do

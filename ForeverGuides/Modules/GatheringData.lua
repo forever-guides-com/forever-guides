@@ -10,11 +10,11 @@ D.ADDON = "ForeverGuides_Gathering"
 D.STATUS = { ok = "ok", missing = "missing", noData = "noData" }
 
 ns.AddLocale("enUS", {
-  ["gatherdata.missing"] = "Data add-on missing: install Forever Guides: Gathering.",
+  ["gatherdata.missing"] = "Data addon missing: install Forever Guides: Gathering.",
   ["gatherdata.noData"] = "No gathering data found.",
 })
 ns.AddLocale("deDE", {
-  ["gatherdata.missing"] = "Daten-Addon fehlt: Forever Guides: Sammelpunkte installieren.",
+  ["gatherdata.missing"] = "Datenaddon fehlt: Forever Guides: Sammelpunkte installieren.",
   ["gatherdata.noData"] = "Keine Sammeldaten gefunden.",
 })
 

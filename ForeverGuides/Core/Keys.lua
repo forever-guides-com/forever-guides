@@ -13,7 +13,7 @@ ns.Keys = K
 
 -- Allowed values, in the order of the list in the settings. Modifiers always in the order ctrl, shift, alt.
 K.COMBOS = { "none", "ctrl", "shift", "alt", "ctrl+shift", "ctrl+alt", "shift+alt" }
-K.KINDS = { "click", "leftclick", "wheel", "drag" }
+K.KINDS = { "click", "leftclick", "wheel", "drag", "hover" }
 
 local IS_COMBO, IS_KIND = {}, {}
 for _, c in ipairs(K.COMBOS) do
@@ -31,7 +31,7 @@ local MODIFIERS = {
 
 local actions, order = {}, {}
 
--- def: id, area, kind (click, leftclick, wheel, drag), default (a combination), scope (actions with the
+-- def: id, area, kind (click, leftclick, wheel, drag, hover = keys held while the mouse is over something), default (a combination), scope (actions with the
 -- same scope and kind collide when they share a combination), allowNone (default false: the action
 -- changes a plain gesture, so "no modifier" would take that gesture over).
 -- Texts: keys.name.<id>, keys.desc.<id>, keys.area.<area> in the locale tables.
@@ -248,10 +248,12 @@ ns.AddLocale("enUS", {
   ["keys.combo.ctrl+alt"] = "Ctrl+Alt",
   ["keys.combo.shift+alt"] = "Shift+Alt",
   ["keys.kind.click"] = "Click",
-  ["keys.kind.leftclick"] = "Left Click",
-  ["keys.kind.wheel"] = "Mouse Wheel",
+  ["keys.kind.leftclick"] = "Left click",
+  ["keys.kind.wheel"] = "Mouse wheel",
   ["keys.kind.drag"] = "Drag",
-  ["keys.area.merchant"] = "Merchant",
+  ["keys.kind.hover"] = "Hover",
+  ["keys.area.farmhud"] = "Farm HUD",
+  ["keys.area.merchant"] = "Vendor",
   ["keys.area.map"] = "Map",
   ["keys.area.windows"] = "Windows",
   ["keys.area.lists"] = "Lists",
@@ -259,10 +261,14 @@ ns.AddLocale("enUS", {
   ["keys.desc.sellSwap"] = "Click with this key does the other of the two modes (sell now or open the selection).",
   ["keys.name.mapMarker"] = "Map: set a marker",
   ["keys.desc.mapMarker"] = "Sets a marker at the mouse position in any map mode.",
+  ["keys.name.mapRoutePoint"] = "Map: free route point",
+  ["keys.desc.mapRoutePoint"] = "Click on the map adds a free point to the route, in Map & Route and on the world map. The last point is the goal.",
+  ["keys.name.mapMenu"] = "World map: place menu",
+  ["keys.desc.mapMenu"] = "Right click on an empty spot of the world map opens the place menu while this key is held. Without the key it zooms out as usual.",
   ["keys.name.windowScale"] = "Windows: change size",
   ["keys.desc.windowScale"] = "On the title bar of our windows: the mouse wheel changes the size.",
   ["keys.name.windowGear"] = "Pinned windows: gear",
-  ["keys.desc.windowGear"] = "Hold these keys to reach the gear of a pinned window, else the mouse passes through.",
+  ["keys.desc.windowGear"] = "Hold these keys to reach the gear of a pinned window. Otherwise the mouse passes through.",
   ["keys.name.frameNativeDrag"] = "Game windows: default drag",
   ["keys.desc.frameNativeDrag"] = "Drag with this key moves a game window without saving its position.",
   ["keys.name.scaleSnap"] = "Game windows: snapped zoom",
@@ -271,6 +277,8 @@ ns.AddLocale("enUS", {
   ["keys.desc.listToEdge"] = "Click on an arrow of a note or drawing moves it to the end of the list.",
   ["keys.name.rosterNote"] = "Characters: open note",
   ["keys.desc.rosterNote"] = "Click on a to-do cell opens its note (the right click does that as well).",
+  ["keys.name.farmHudBlipTips"] = "Farm HUD: game tooltips",
+  ["keys.desc.farmHudBlipTips"] = "Hold these keys while the Farm HUD is on and the game shows its own tooltips for the tracked ores and herbs. Without them the mouse reaches the world as usual.",
   ["keys.name.rareFoundMove"] = "Rare find window: move",
   ["keys.desc.rareFoundMove"] = "Dragging the find window of a rare enemy with this key moves it, a plain click targets the rare.",
 })
@@ -286,6 +294,8 @@ ns.AddLocale("deDE", {
   ["keys.kind.leftclick"] = "Linksklick",
   ["keys.kind.wheel"] = "Mausrad",
   ["keys.kind.drag"] = "Ziehen",
+  ["keys.kind.hover"] = "Darüberfahren",
+  ["keys.area.farmhud"] = "Farm-HUD",
   ["keys.area.merchant"] = "Händler",
   ["keys.area.map"] = "Karte",
   ["keys.area.windows"] = "Fenster",
@@ -294,10 +304,14 @@ ns.AddLocale("deDE", {
   ["keys.desc.sellSwap"] = "Klick mit dieser Taste löst den jeweils anderen der beiden Modi aus (schnell verkaufen oder Auswahl öffnen).",
   ["keys.name.mapMarker"] = "Karte: Marker setzen",
   ["keys.desc.mapMarker"] = "Setzt in jedem Kartenmodus einen Marker an der Mausposition.",
+  ["keys.name.mapRoutePoint"] = "Karte: freier Routenpunkt",
+  ["keys.desc.mapRoutePoint"] = "Klick auf die Karte fügt der Route einen freien Punkt hinzu, in Karte & Route und auf der Weltkarte. Der letzte Punkt ist das Ziel.",
+  ["keys.name.mapMenu"] = "Weltkarte: Ortsmenü",
+  ["keys.desc.mapMenu"] = "Rechtsklick auf eine leere Stelle der Weltkarte öffnet das Ortsmenü, solange diese Taste gehalten wird. Sonst zoomt der Rechtsklick wie gewohnt heraus.",
   ["keys.name.windowScale"] = "Fenster: Größe ändern",
   ["keys.desc.windowScale"] = "Auf der Titelleiste unserer Fenster ändert das Mausrad die Größe.",
-  ["keys.name.windowGear"] = "Angepinnt: Zahnrad zeigen",
-  ["keys.desc.windowGear"] = "Diese Tasten halten, um das Zahnrad eines angepinnten Fensters zu erreichen, sonst geht die Maus durch.",
+  ["keys.name.windowGear"] = "Angepinnte Fenster: Zahnrad",
+  ["keys.desc.windowGear"] = "Halte diese Tasten, um das Zahnrad eines angepinnten Fensters zu erreichen. Sonst geht die Maus durch das Fenster.",
   ["keys.name.frameNativeDrag"] = "Spielfenster: Standard-Ziehen",
   ["keys.desc.frameNativeDrag"] = "Ziehen mit dieser Taste verschiebt ein Spielfenster, ohne die Position zu speichern.",
   ["keys.name.scaleSnap"] = "Spielfenster: Zoom gerastet",
@@ -306,6 +320,8 @@ ns.AddLocale("deDE", {
   ["keys.desc.listToEdge"] = "Klick auf einen Pfeil bei Notiz oder Zeichnung schiebt sie ans Ende der Liste.",
   ["keys.name.rosterNote"] = "Charaktere: Notiz öffnen",
   ["keys.desc.rosterNote"] = "Klick auf eine Aufgabenzelle öffnet ihre Notiz (der Rechtsklick tut das ebenfalls).",
+  ["keys.name.farmHudBlipTips"] = "Farm-HUD: Spiel-Tooltips",
+  ["keys.desc.farmHudBlipTips"] = "Halte diese Tasten, solange das Farm-HUD an ist, dann zeigt das Spiel seine eigenen Tooltips für die verfolgten Erze und Kräuter. Ohne sie erreicht die Maus die Welt wie gewohnt.",
   ["keys.name.rareFoundMove"] = "Fundfenster Seltene: verschieben",
   ["keys.desc.rareFoundMove"] = "Ziehen des Fundfensters mit dieser Taste verschiebt es, ein einfacher Klick nimmt den Seltenen ins Ziel.",
 })
@@ -319,3 +335,6 @@ K.Register({ id = "scaleSnap", area = "windows", kind = "drag", default = "shift
 K.Register({ id = "listToEdge", area = "lists", kind = "click", default = "shift" })
 K.Register({ id = "rosterNote", area = "lists", kind = "click", default = "shift" })
 K.Register({ id = "rareFoundMove", area = "windows", kind = "drag", default = "shift" })
+K.Register({ id = "farmHudBlipTips", area = "farmhud", kind = "hover", default = "alt" })
+K.Register({ id = "mapRoutePoint", area = "map", kind = "leftclick", default = "shift" })
+K.Register({ id = "mapMenu", area = "map", kind = "click", default = "alt" })

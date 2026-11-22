@@ -4,8 +4,9 @@
 -- MapPlayerMarkerLogic.Locate on the view the canvas shows. A zone-only report sits in the middle of its
 -- zone. Members on a map the view does not show stay off. The frames lie above the canvas without mouse
 -- (clicks go to the map), hover is polled like the player marker's. Shown while the option "world map"
--- (guildMapShowWorld) is on and receiving is on; the data are ns.GuildMapStore joined with the guild list.
--- Pool of at most MAX pins, no frame is built in combat. The keyboard route is the member list.
+-- (guildMapShowWorld) is on and receiving is on; the data are ns.GuildMapStore (guild and friends) joined with the
+-- guild list and the friends list.
+-- Pool of at most MAX pins, built on demand (also in combat, they are plain frames). The keyboard route is the member list.
 local _, ns = ...
 local L, Theme, ML, GLG, GML = ns.L, ns.Theme, ns.MapPlayerMarkerLogic, ns.WorldMapGuildLogic, ns.GuildMapListLogic
 
@@ -20,7 +21,7 @@ local LEVEL = 90
 local controllers = setmetatable({}, { __mode = "k" })
 
 local function receiving()
-  return ns.Consent.Allows("guildMap", "receive", "guild")
+  return ns.GuildMapStore.Receiving()
 end
 
 -- Are guild markers wanted on the map page now?
@@ -32,9 +33,19 @@ local function paintLine(kind, text)
   return Theme.hexText(kind == "warning" and "warning" or "textMuted", text)
 end
 
+-- Guild members, then friends that are no guild members (class and level for their dots).
 local function rosterOf()
   local snap = ns.GuildData.Get()
-  return snap and snap.members
+  local out, seen = {}, {}
+  for _, m in ipairs(snap and snap.members or {}) do
+    out[#out + 1], seen[m.key] = m, true
+  end
+  for _, m in ipairs(ns.FriendRoster.Members()) do
+    if not seen[m.key] then
+      out[#out + 1] = m
+    end
+  end
+  return out
 end
 
 -- ctx = {
@@ -168,10 +179,6 @@ function MGM.Attach(ctx)
   local function pinFor(index)
     local pin = ctl.pins[index]
     if not pin then
-      -- Never build a frame in combat: the groups that find no pin wait for the next update.
-      if ns.InCombat() then
-        return nil
-      end
       pin = ns.WorldMapGuildPins.NewSymbol(layer)
       pin:EnableMouse(false)
       ctl.pins[index] = pin
@@ -220,7 +227,7 @@ function MGM.Attach(ctx)
     local opts = GLG.Current()
     local view = ctx.view()
     local cw, ch = canvas:GetWidth(), canvas:GetHeight()
-    if not (opts.showWorld and receiving() and view) then
+    if not (opts.showWorld and receiving() and view) or ns.WorldMapGuildPins.HiddenHere(opts) then
       hideFrom(1)
       return
     end
@@ -264,18 +271,20 @@ end
 
 ns.On("FG_GUILDMAP_UPDATE", mark)
 ns.On("FG_GUILD_UPDATE", mark)
+ns.On("FG_FRIENDS_UPDATE", mark)
+ns.On("PLAYER_ENTERING_WORLD", mark)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and path:find("^settings%.guildMap") then
     mark()
   end
 end)
 ns.On("FG_CONSENT_CHANGED", function(_, fn)
-  if fn == "guildMap" then
+  if fn == "guildMap" or fn == "friendMap" then
     mark()
   end
 end)
 ns.On("FG_CONSENT_WITHDRAWN", function(_, fn)
-  if fn == "guildMap" then
+  if fn == "guildMap" or fn == "friendMap" then
     mark()
   end
 end)

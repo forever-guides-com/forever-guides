@@ -13,24 +13,24 @@ local BUTTON_W = 200
 local BUTTON_H = 24
 
 ns.AddLocale("enUS", {
-  ["guild.manager.enable"] = "Enable GuildManager",
+  ["guild.manager.enable"] = "Switch on GuildManager",
   ["guild.manager.copy"] = "Copy download link",
   ["guild.manager.tip.title"] = "GuildManager",
   ["guild.manager.tip"] = "Link mains and alts, keep personal notes and see an inactivity list. Officers and guild masters, meaning players with the needed guild rights and ranks, also get guild actions with a preview. Without the rights the guild stays read-only.",
   ["guild.manager.waitGuild"] = "GuildManager loads once you are in a guild.",
   ["guild.manager.wait"] = "GuildManager loads after combat or at the next start.",
-  ["guild.manager.disabled"] = "GuildManager is off in the add-on list of the game.",
+  ["guild.manager.disabled"] = "GuildManager is off in the addon list of the game.",
   ["guild.manager.failed"] = "GuildManager did not load. See Settings > Guild and the page Errors.",
   ["guild.manager.outdated"] = "GuildManager is outdated. See Settings > Guild.",
 })
 ns.AddLocale("deDE", {
   ["guild.manager.enable"] = "GildenManager einschalten",
-  ["guild.manager.copy"] = "Download-Link kopieren",
+  ["guild.manager.copy"] = "Downloadlink kopieren",
   ["guild.manager.tip.title"] = "GildenManager",
   ["guild.manager.tip"] = "Main und Alt verknüpfen, eigene Notizen führen und eine Inaktivitätsliste ansehen. Offiziere und Gildenleiter, also Spieler mit den nötigen Gildenrechten und Gildenrängen, bekommen zusätzlich Gildenaktionen mit Vorschau. Ohne die Rechte bleibt die Gilde schreibgeschützt.",
   ["guild.manager.waitGuild"] = "Der GildenManager lädt, sobald du in einer Gilde bist.",
   ["guild.manager.wait"] = "Der GildenManager lädt nach dem Kampf oder beim nächsten Start.",
-  ["guild.manager.disabled"] = "Der GildenManager ist in der Addon-Liste des Spiels aus.",
+  ["guild.manager.disabled"] = "Der GildenManager ist in der Addonliste des Spiels aus.",
   ["guild.manager.failed"] = "Der GildenManager konnte nicht laden. Siehe Einstellungen > Gilde und die Seite Fehler.",
   ["guild.manager.outdated"] = "Der GildenManager ist veraltet. Siehe Einstellungen > Gilde.",
 })

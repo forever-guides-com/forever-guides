@@ -28,6 +28,30 @@ ns.AddLocale("enUS", {
   ["chars.row.gold"] = "Gold",
   ["chars.row.zone"] = "Zone",
   ["chars.row.seen"] = "Last seen",
+  ["chars.row.xp"] = "XP",
+  ["chars.row.rested"] = "Rested XP",
+  ["rested.max"] = "Max",
+  ["rested.full"] = "full",
+  ["rested.approx"] = "ca. %s",
+  ["rested.fullIn"] = "full in %s",
+  ["rested.hours"] = "%d h",
+  ["rested.days"] = "%d d",
+  ["rested.soon"] = "< 1 h",
+  ["rested.alert"] = "Fully rested: %s",
+  ["rested.tip.xp"] = "Level %s: %s of %s XP (%s)",
+  ["rested.tip.maxLevel"] = "Maximum level, no rested XP",
+  ["rested.tip.rested"] = "Rested: %s of %s XP (%s)",
+  ["rested.tip.reach"] = "Reaches level %s, there %s of %s XP (%s)",
+  ["rested.tip.reachMax"] = "Reaches level %s",
+  ["rested.reach"] = "to %s (%s)",
+  ["rested.reachMax"] = "to %s",
+  ["rested.tip.approx"] = "Estimate from the last logout",
+  ["rested.tip.live"] = "Read from the game",
+  ["rested.tip.full"] = "Fully rested",
+  ["rested.tip.fullIn"] = "Full in about %s",
+  ["rested.tip.rateResting"] = "Logged out in an inn or capital: 5 % of a level per 8 hours",
+  ["rested.tip.rateOutside"] = "Logged out in the open: 5 % of a level per 32 hours",
+  ["rested.tip.since"] = "Logged out: %s",
   ["chars.row.raids"] = "Raids",
   ["chars.row.todos"] = "Todos",
   ["chars.row.alltodos"] = "All todos",
@@ -66,7 +90,7 @@ ns.AddLocale("enUS", {
   ["chars.tip.zone"] = "Zone: %s",
   ["chars.tip.gold"] = "Gold: %s",
   ["chars.tip.seen"] = "Last seen: %s",
-  ["chars.tip.asOf"] = "Read: %s",
+  ["chars.tip.asOf"] = "As of: %s",
   ["chars.tip.raid"] = "Raid: %s",
   ["chars.tip.expires"] = "Lock ends in %s",
   ["chars.tip.week"] = "Killed this week (%d/%d)",
@@ -92,19 +116,43 @@ ns.AddLocale("deDE", {
   ["chars.row.class"] = "Klasse",
   ["chars.row.faction"] = "Fraktion",
   ["chars.row.guild"] = "Gilde",
-  ["chars.row.ilvl"] = "Gegenstandsstufe",
+  ["chars.row.ilvl"] = "Itemlevel",
   ["chars.row.gold"] = "Gold",
   ["chars.row.zone"] = "Zone",
   ["chars.row.seen"] = "Zuletzt gesehen",
+  ["chars.row.xp"] = "EP",
+  ["chars.row.rested"] = "Erholt",
+  ["rested.max"] = "Max",
+  ["rested.full"] = "voll",
+  ["rested.approx"] = "ca. %s",
+  ["rested.fullIn"] = "voll in %s",
+  ["rested.hours"] = "%d Std",
+  ["rested.days"] = "%d T",
+  ["rested.soon"] = "< 1 Std",
+  ["rested.alert"] = "Voll erholt: %s",
+  ["rested.tip.xp"] = "Stufe %s: %s von %s EP (%s)",
+  ["rested.tip.maxLevel"] = "Höchststufe, kein Erholungsbonus",
+  ["rested.tip.rested"] = "Erholt: %s von %s EP (%s)",
+  ["rested.tip.reach"] = "Reicht bis Stufe %s, dort %s von %s EP (%s)",
+  ["rested.tip.reachMax"] = "Reicht bis Stufe %s",
+  ["rested.reach"] = "bis %s (%s)",
+  ["rested.reachMax"] = "bis %s",
+  ["rested.tip.approx"] = "Schätzung seit dem letzten Ausloggen",
+  ["rested.tip.live"] = "Aus dem Spiel gelesen",
+  ["rested.tip.full"] = "Voll erholt",
+  ["rested.tip.fullIn"] = "Voll in etwa %s",
+  ["rested.tip.rateResting"] = "Ausgeloggt in Gasthaus oder Hauptstadt: 5 % einer Stufe pro 8 Stunden",
+  ["rested.tip.rateOutside"] = "Ausgeloggt im Freien: 5 % einer Stufe pro 32 Stunden",
+  ["rested.tip.since"] = "Ausgeloggt: %s",
   ["chars.row.raids"] = "Raids",
   ["chars.row.todos"] = "Todos",
   ["chars.row.alltodos"] = "Alle Todos",
   ["chars.row.todos.strike"] = "Erledigte durchstreichen",
-  ["chars.todo.addRow"] = "+ Punkt hinzufügen",
+  ["chars.todo.addRow"] = "+ Eigenes Todo hinzufügen",
   ["chars.tip.note"] = "Notiz: %s",
   ["chars.tip.noteHint"] = "Rechtsklick: Notiz",
   ["chars.row.professions"] = "Berufe",
-  ["chars.row.professions.secondary"] = "Nebenberufe zeigen",
+  ["chars.row.professions.secondary"] = "Nebenberufe",
   ["chars.row.pvp"] = "PvP",
   ["chars.row.rep"] = "Ruf",
   ["chars.row.playtime"] = "Spielzeit",
@@ -115,7 +163,7 @@ ns.AddLocale("deDE", {
   ["chars.fresh.stale"] = "Veraltet",
   ["chars.fresh.never"] = "nie",
   ["chars.fresh.inventory"] = "Bestand",
-  ["chars.fresh.raids"] = "Raid-Sperren",
+  ["chars.fresh.raids"] = "Raidsperren",
   ["chars.fresh.hint"] = "Einloggen, Bank und Berufe öffnen",
   ["chars.tip.goldAll"] = "Alle Charaktere: %s",
   ["chars.tip.prof.age"] = "Stand: %s",
@@ -133,7 +181,7 @@ ns.AddLocale("deDE", {
   ["chars.tip.level"] = "%s, Stufe %s",
   ["chars.tip.zone"] = "Zone: %s",
   ["chars.tip.gold"] = "Gold: %s",
-  ["chars.tip.seen"] = "Zuletzt: %s",
+  ["chars.tip.seen"] = "Zuletzt gesehen: %s",
   ["chars.tip.asOf"] = "Stand: %s",
   ["chars.tip.raid"] = "Raid: %s",
   ["chars.tip.expires"] = "Sperre endet in %s",
@@ -398,6 +446,176 @@ V.Register({
   tip = function(char)
     return L["chars.row.seen"], dateText(char.seen) or "-"
   end,
+})
+
+-- XP and rested XP -------------------------------------------------------------------------------
+
+local function percentText(pct)
+  return string.format("%d %%", math.floor(pct + 0.5))
+end
+
+local function xpNumber(n)
+  return ns.XpLogic.Number(n)
+end
+
+-- "6 h" up to two days, then days.
+local function hoursText(hours)
+  if hours < 1 then
+    return L["rested.soon"]
+  elseif hours < 48 then
+    return string.format(L["rested.hours"], math.ceil(hours))
+  end
+  return string.format(L["rested.days"], math.ceil(hours / 24))
+end
+
+-- The estimate of a character (CharRoster.Rested): `max` is true at the maximum level, `est` the numbers,
+-- both nil when the character has no snapshot yet.
+local function restedOf(char, ctx)
+  if char.rested and char.rested.maxLevel then
+    return nil, true
+  end
+  return ns.CharRoster.Rested(char, ctx and ctx.now), false
+end
+
+-- Where the rested XP ends when it goes past the current level (RestedLogic.Reach), nil otherwise.
+local function reachOf(est, level)
+  local tbl = ns.XpTable
+  return tbl and ns.RestedLogic.Reach(est, tonumber(level), tbl.need, tbl.maxLevel)
+end
+
+-- "to 15 (50 %)", the short form for the cell.
+local function reachShort(reach)
+  if not reach.pct then
+    return string.format(L["rested.reachMax"], reach.level)
+  end
+  return string.format(L["rested.reach"], reach.level, percentText(reach.pct))
+end
+
+-- { text, plain (shorter forms), full } of the rested value: "ca. 120 % , full in 6 h", the live value of the
+-- logged-in character without "ca.". With the character's level the text names the level it reaches.
+function V.RestedText(est, current, level)
+  local value = percentText(est.restedPct)
+  if not current then
+    value = string.format(L["rested.approx"], value)
+  end
+  local reach = reachOf(est, level)
+  local head = reach and (value .. " · " .. reachShort(reach)) or value
+  if est.full then
+    return head .. " · " .. L["rested.full"], { reach and head or value, reach and value or nil }
+  end
+  local eta = est.hoursToFull and hoursText(est.hoursToFull)
+  if not eta then
+    return head, reach and { value } or nil
+  end
+  return head .. " · " .. string.format(L["rested.fullIn"], eta),
+    reach and { head .. " · " .. eta, head, value } or { value .. " · " .. eta, value }
+end
+
+-- One line for the start page: "61 % · ca. 120 %" or "61 % · full".
+function V.XpRestedText(char, now)
+  local est, max = restedOf(char, { now = now })
+  if max then
+    return L["rested.max"]
+  elseif not est then
+    return nil
+  end
+  local rested
+  if est.full then
+    rested = ns.Theme.hexText("success", L["rested.full"])
+  else
+    rested = percentText(est.restedPct)
+    if not char.current then
+      rested = string.format(L["rested.approx"], rested)
+    end
+  end
+  return percentText(est.xpPct) .. " · " .. rested, est
+end
+
+local function restedTip(char, ctx)
+  local est, max = restedOf(char, ctx)
+  if max then
+    return L["chars.row.rested"], L["rested.tip.maxLevel"]
+  elseif not est then
+    return nil
+  end
+  local lines = {
+    string.format(
+      L["rested.tip.xp"],
+      tostring(char.level or "?"),
+      xpNumber(est.xp),
+      xpNumber(est.xpMax),
+      percentText(est.xpPct)
+    ),
+    string.format(L["rested.tip.rested"], xpNumber(est.rested), xpNumber(est.xpMax), percentText(est.restedPct)),
+  }
+  local reach = reachOf(est, char.level)
+  if reach and reach.pct then
+    lines[#lines + 1] = string.format(
+      L["rested.tip.reach"],
+      reach.level,
+      xpNumber(reach.xp),
+      xpNumber(reach.xpMax),
+      percentText(reach.pct)
+    )
+  elseif reach then
+    lines[#lines + 1] = string.format(L["rested.tip.reachMax"], reach.level)
+  end
+  if est.full then
+    lines[#lines + 1] = L["rested.tip.full"]
+  elseif est.hoursToFull then
+    lines[#lines + 1] = string.format(L["rested.tip.fullIn"], hoursText(est.hoursToFull))
+  end
+  if char.current then
+    lines[#lines + 1] = ns.Theme.hexText("textMuted", L["rested.tip.live"])
+  else
+    lines[#lines + 1] = ns.Theme.hexText("textMuted", L["rested.tip.approx"])
+    lines[#lines + 1] = ns.Theme.hexText(
+      "textMuted",
+      L[char.rested.resting and "rested.tip.rateResting" or "rested.tip.rateOutside"]
+    )
+    local when = dateText(char.rested.at)
+    if when then
+      lines[#lines + 1] = ns.Theme.hexText("textMuted", string.format(L["rested.tip.since"], when))
+    end
+  end
+  return L["chars.row.rested"], table.concat(lines, "\n")
+end
+
+V.RestedTip = restedTip
+
+V.Register({
+  id = "xp",
+  label = "chars.row.xp",
+  default = true,
+  value = function(char, ctx)
+    local est, max = restedOf(char, ctx)
+    if max then
+      return { text = L["rested.max"] }
+    elseif not est then
+      return { text = "-" }
+    end
+    return { text = percentText(est.xpPct), bar = est.xpPct / 100 }
+  end,
+  tip = restedTip,
+})
+V.Register({
+  id = "rested",
+  label = "chars.row.rested",
+  default = true,
+  value = function(char, ctx)
+    local est, max = restedOf(char, ctx)
+    if max or not est then
+      return { text = "-" }
+    end
+    local text, plain = V.RestedText(est, char.current, char.level)
+    return {
+      text = text,
+      plain = plain,
+      color = est.full and "success" or nil,
+      status = est.full and "full" or "rested",
+    }
+  end,
+  tip = restedTip,
 })
 
 -- Professions ---------------------------------------------------------------------------------

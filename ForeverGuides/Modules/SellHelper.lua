@@ -1,5 +1,5 @@
 -- Sell helper at the merchant: reads the bags, applies the rules of Modules/SellLogic.lua, shows an
--- icon button with the item count inside the merchant window and sells item by item after the preview
+-- icon button with the item count inside the vendor window and sells item by item after the preview
 -- (Modules/SellPreview.lua) or, when switched on, right when the merchant opens.
 -- Safety: every game call is wrapped in pcall, a failed read of the bags, worn items or equipment
 -- sets sells nothing, and each step checks that the merchant is still open, that there is no combat
@@ -20,9 +20,9 @@ ns.AddLocale("enUS", {
   ["sell.tip.ctrlSelect"] = "{key:sellSwap}: open selection",
   ["sell.quick.confirm"] = "%d items, %d of them rare or better, for %s. Sell?",
   ["sell.tip.empty"] = "Nothing to sell",
-  ["sell.done"] = "%d items sold for %s, buyback possible in the merchant window",
+  ["sell.done"] = "%d items sold for %s, buyback possible in the vendor window",
   ["sell.stopped"] = "Sale stopped (%s): %d of %d items sold for %s",
-  ["sell.why.closed"] = "merchant closed",
+  ["sell.why.closed"] = "vendor closed",
   ["sell.why.combat"] = "combat",
   ["sell.why.rest"] = "items stayed",
   ["sell.warn12"] = "More than 12 items: buyback keeps only the last 12",
@@ -52,7 +52,7 @@ ns.AddLocale("deDE", {
 local BAGS = { 0, 1, 2, 3, 4 }
 local REAGENT_BAG = 5
 local LAST_EQUIP_SLOT = 19
--- Seconds between two sales, until the server has answered, and until the merchant window is filled.
+-- Seconds between two sales, until the server has answered, and until the vendor window is filled.
 local DELAY = 0.15
 local SETTLE = 0.8
 local SHOW_DELAY = 0.3
@@ -400,7 +400,7 @@ end
 local paintButton
 local hooked
 
--- The client redraws the merchant window on every page and tab change through MerchantFrame_Update.
+-- The client redraws the vendor window on every page and tab change through MerchantFrame_Update.
 local function hookWindow(frame)
   if hooked then
     return

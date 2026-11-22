@@ -4,18 +4,15 @@
 -- corner. The position is a corner of the canvas plus the offset from it (settings.worldMapPanelPos),
 -- the bar always unfolds towards the inside: upwards in the lower half, downwards otherwise, and
 -- right aligned in the right half. Markers: set a marker (mode of
--- the map click, see WorldMapLinks) and the list of the markers of the shown map. Route: start and
--- goal from the known places, the fastest route as a short step list, and the actions of the
--- addon's map page. Route planning is the page's own logic: TravelLogic computes, MapRouteList (a
--- hidden instance) takes the route as waypoints or points the arrow at the next stop. The stops are
--- places without exact map coordinates, so no lines are drawn on Blizzard's map. Flights: the nearest flight
+-- the map click, see WorldMapLinks) and the list of the markers of the shown map. Route: no page, only
+-- a button that opens and closes the route drawer (WorldMapRoutePanel), the one place of the route. Flights: the nearest flight
 -- points with their distance (FlightPointList), a click sets the waypoint. Like every control of the bar it
 -- stays out of the Tab ring, the keyboard route is /fg flights. Gather: the spots of ores and herbs and the
 -- explored look on the map (WorldMapGatherTab.lua, built when the tab is first used). Guild: the filters and the
 -- legend of the guild members on the map and the own side of sharing (WorldMapGuildTab.lua, symbol tab).
 local _, ns = ...
-local W, L, Theme, TL = ns.W, ns.L, ns.Theme, ns.TravelLogic
-local MRL, PL, MW, MM = ns.MapRouteList, ns.MapPlaceList, ns.MapWorld, ns.MapMarkers
+local W, L, Theme = ns.W, ns.L, ns.Theme
+local MM = ns.MapMarkers
 local FP, MI = ns.FlightPointsLogic, ns.MapIcons
 local WP = ns.Waypoints
 local B = ns.BlizzardLinks
@@ -24,8 +21,8 @@ local BL = ns.WorldMapBarLogic
 local Bar = {}
 ns.WorldMapBar = Bar
 
-local OPEN_W, CLOSED_W, HEAD_H = 240, 150, 24
-local PAD, GAP, TAB_H, ROW_H, BTN_H, ACTION_H = 8, 4, 22, 22, 24, 22
+local OPEN_W, MAX_W, CLOSED_W, HEAD_H = 320, 480, 150, 24 -- the open width is a minimum, the tabs may widen it
+local PAD, GAP, TAB_H, ROW_H = 8, 4, 22, 22
 local INNER = OPEN_W - 2 * PAD
 local MARGIN, TOP_RESERVE = 8, 36 -- the floor dropdown of Blizzard's map sits at the top left
 local CORNER_BTN, CORNER_GAP, CHEVRON_SPACE = 14, 2, 22
@@ -33,13 +30,14 @@ local CORNER_SPAN = 4 * CORNER_BTN + 3 * CORNER_GAP
 local CORNERS = { "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }
 local CORNER_OK = { TOPLEFT = true, TOPRIGHT = true, BOTTOMLEFT = true, BOTTOMRIGHT = true }
 local POS_KEY = "settings.worldMapPanelPos"
-local STEP_H, PICK_ROWS, MAX_ROWS, MAX_STEPS = 16, 5, 8, 8
-local DOT, DURATION_W, ZONE_W = 12, 44, 84
+local MAX_ROWS = 8
+local DOT = 12
 local FLIGHT_ROW_H, FLIGHT_DIST_W, FLIGHT_BADGE, FLIGHT_TEXT_X, FLIGHT_TICK = 30, 74, 14, 34, 1
-local TAB_IDS = { "markers", "route", "flights", "gather", "guild" }
--- The guild tab is a symbol without text, so the four labeled tabs keep their room.
+local TAB_IDS = { "markers", "flights", "gather", "guild" } -- the pages
+local TAB_ROW = { "markers", "route", "flights", "gather", "guild" } -- the route button sits among them
+-- The guild tab is a symbol without text, the other tabs are sized from their label.
 local GUILD_TAB_W = 24
-local TAB_W = (INNER - GUILD_TAB_W - (#TAB_IDS - 1) * GAP) / (#TAB_IDS - 1)
+local TAB_SLACK, TAB_PAD_MIN = 4, 2 -- spare pixels beside the text, narrowest inset when even the widest panel is short
 local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
 local LOGO = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
 local HEXAGON = "Interface\\AddOns\\ForeverGuides\\Media\\map_hexagon.png" -- the shape of the member symbols
@@ -95,12 +93,12 @@ local function listRow(parent)
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local hl = row:CreateTexture(nil, "BACKGROUND")
   hl:SetAllPoints()
-  hl:SetColorTexture(1, 1, 1, 0)
+  hl:SetColorTexture(ns.Theme.fillColor())
   row:HookScript("OnEnter", function()
-    hl:SetColorTexture(1, 1, 1, 0.08)
+    hl:SetColorTexture(Theme.fillColor("hover"))
   end)
   row:HookScript("OnLeave", function()
-    hl:SetColorTexture(1, 1, 1, 0)
+    hl:SetColorTexture(ns.Theme.fillColor())
     ns.HideTooltip()
   end)
   return row
@@ -115,74 +113,9 @@ function Bar.Create(map)
   W.Fill(f, "bg", 0.94)
   W.Border(f, "accentDim", 1)
 
-  local r = { picking = nil, query = "" }
-  local eng
-
-  -- Route engine: the data, the layout of the page and a hidden MapRouteList that does the work of
-  -- "take as waypoints" and "next stop". Built when the route tab is first used.
-  local function engine()
-    if eng then
-      return eng
-    end
-    local data = ns.Data and ns.Data.Travel
-    if not (data and data.nodes) then
-      return nil
-    end
-    local e = { data = data, byslug = {}, zoneName = {}, zoneOfMap = {}, state = { alt = 1 } }
-    for _, n in ipairs(data.nodes) do
-      e.byslug[n.s] = n
-    end
-    for _, z in ipairs(data.zones or {}) do
-      e.zoneName[z.s] = ns.T(z.n)
-    end
-    local okWorld, world = ns.Safe("wm-world", MW.Discover, data)
-    e.world = okWorld and world or nil
-    for slug, id in pairs(e.world and e.world.maps or {}) do
-      e.zoneOfMap[id] = slug
-    end
-    if e.world then
-      local okLayout, layout = ns.Safe("wm-layout", MW.LayoutWorld, data, e.world)
-      e.layout = okLayout and layout or nil
-    end
-    if e.layout then
-      local okIsland, island = ns.Safe("wm-island", MW.IslandView, e.layout)
-      e.island = okIsland and island or nil
-    end
-    function e.nameOf(slug)
-      local n = e.byslug[slug]
-      return n and ns.T(n.n) or tostring(slug or "?")
-    end
-    local host = CreateFrame("Frame", nil, f)
-    host:Hide()
-    e.list = MRL.Attach({
-      side = { content = host },
-      state = e.state,
-      nameOf = e.nameOf,
-      specFor = function(slug)
-        local n = e.byslug[slug]
-        return n and PL.ZonePoint({ e.layout, e.island }, n) or nil
-      end,
-      route = {
-        SetRoute = function() end,
-        SetHover = function() end,
-        Capped = function()
-          return false
-        end,
-      },
-      showStep = function() end,
-      relayout = function() end,
-    })
-    eng = e
-    return e
-  end
-
-  -- The options of the map page (faction, transport switches, flying, mount) when it was opened this
-  -- session, the defaults otherwise; start and goal are the bar's own.
-  local function options(e)
-    local o = MRL.Options(ns.MapRequest and ns.MapRequest.shared or {})
-    o.from, o.to = e.state.start, e.state.dest
-    return o
-  end
+  local r = {}
+  -- The question about sharing the own position, beside the bar until the player decided.
+  r.share = ns.MapSharePrompt.New(f, { docked = true, blizzard = true })
 
   -- Header and tabs ------------------------------------------------------------------------
   local function isOpen()
@@ -241,6 +174,9 @@ function Bar.Create(map)
     dy = clamp(dy, 0, math.max(0, mapH - (r.h or HEAD_H)))
     f:ClearAllPoints()
     f:SetPoint(corner, WML.Container(), corner, right and -dx or dx, up and dy or -dy)
+    if r.share then
+      r.share:Dock(f, corner, mapW - dx - (r.w or CLOSED_W))
+    end
   end
 
   local function cursor()
@@ -358,13 +294,12 @@ function Bar.Create(map)
     local b = button(f, {
       key = key,
       variant = "ghost",
-      width = TAB_W,
+      width = 60,
       height = TAB_H,
       tooltip = tooltip or key,
       tooltipText = tooltipText,
       onClick = function()
         ns.Store.set("settings.worldMapPanelTab", id)
-        r.picking = nil
         f:Layout()
       end,
     })
@@ -379,7 +314,17 @@ function Bar.Create(map)
     return b
   end
   newTab("markers", "map.marker.heading", nil, "wm.tip.tab.markers")
-  newTab("route", "map.route", nil, "wm.tip.tab.route")
+  do
+    local b = newTab("route", "wmr.toggle", nil, "wmr.toggle.tip")
+    b:SetScript(
+      "OnClick",
+      ns.Wrap("wm-route-toggle", function()
+        local drawer = ns.WorldMapRoutePanel
+        drawer.SetOpen(not drawer.IsOpen())
+        f:Layout()
+      end)
+    )
+  end
   newTab("flights", "fp.tab", "fp.list.title", "wm.tip.tab.flights")
   newTab("gather", "wm.gather.tab", nil, "wm.tip.tab.gather")
   do
@@ -393,7 +338,6 @@ function Bar.Create(map)
       wrap = "button",
       onClick = function()
         ns.Store.set("settings.worldMapPanelTab", "guild")
-        r.picking = nil
         f:Layout()
       end,
     })
@@ -545,342 +489,6 @@ function Bar.Create(map)
     return y + GAP + countH
   end
 
-  -- Route ----------------------------------------------------------------------------------
-  local rt = CreateFrame("Frame", nil, pageParent)
-  rt.picks, rt.steps = {}, {}
-
-  local function newEndButton(which)
-    local b = button(rt, {
-      text = "",
-      variant = "secondary",
-      width = INNER,
-      height = BTN_H,
-      tooltip = "wm." .. which .. ".title",
-      tooltipText = "wm." .. which .. ".tip",
-      onClick = function()
-        r.picking = r.picking ~= which and which or nil
-        r.query = ""
-        if rt.search then
-          rt.search.edit:SetText("")
-        end
-        f:Layout()
-        if r.picking and rt.search then
-          rt.search.edit:SetFocus()
-        end
-      end,
-    })
-    b.label:SetJustifyH("LEFT")
-    return b
-  end
-  rt.start, rt.dest = newEndButton("start"), newEndButton("dest")
-
-  local function calculate()
-    local e = engine()
-    if not e then
-      return
-    end
-    ns.TravelWalk.Ensure(e.data, calculate)
-    if e.state.start and e.state.dest then
-      local result = TL.Route(e.data, options(e))
-      r.status = result.status
-      e.list.Set(result, e.state.start .. ">" .. e.state.dest)
-    else
-      r.status = nil
-      e.list.Set(nil, nil)
-    end
-    f:Layout()
-  end
-
-  local function swap()
-    local e = engine()
-    if not e then
-      return
-    end
-    e.state.start, e.state.dest = e.state.dest, e.state.start
-    if e.list.result then
-      calculate()
-    else
-      f:Layout()
-    end
-  end
-
-  local function reset()
-    local e = engine()
-    r.picking, r.status, r.query = nil, nil, ""
-    if e then
-      e.state.start, e.state.dest = nil, nil
-      e.list.Set(nil, nil)
-    end
-    f:Layout()
-  end
-
-  local HALF_W = (INNER - BTN_H - 2 * GAP) / 2
-  rt.swap = button(rt, {
-    key = "wm.swap",
-    width = HALF_W,
-    height = BTN_H,
-    tooltip = "wm.swap",
-    tooltipText = "wm.swap.tip",
-    onClick = swap,
-  })
-  rt.calc = button(rt, {
-    key = "wm.calc",
-    variant = "primary",
-    width = HALF_W,
-    height = BTN_H,
-    tooltip = "wm.calc",
-    tooltipText = "wm.calc.tip",
-    onClick = calculate,
-  })
-  rt.reset = W.Action(rt, {
-    icon = "reset",
-    boxed = true,
-    size = BTN_H,
-    tooltip = "map.resetRoute",
-    tooltipText = "map.resetRoute.tip",
-    onClick = reset,
-  })
-  B.LeaveFocusRing(rt.reset)
-
-  local function choose(slug)
-    local e = engine()
-    if not (e and r.picking and slug) then
-      return
-    end
-    e.state[r.picking] = slug
-    r.picking, r.status = nil, nil
-    e.list.Set(nil, nil)
-    f:Layout()
-  end
-
-  local function pickEntries()
-    local e = engine()
-    if not e then
-      return {}
-    end
-    local entries = TL.Nodes(e.data, options(e), function(n)
-      return ns.T(n.n)
-    end, r.query, ns.SearchLogic.match)
-    return PL.Sort(entries, r.query, e.zoneOfMap[WML.MapID()])
-  end
-
-  rt.search = W.EditBox(rt, {
-    placeholder = "wm.search",
-    tooltip = "wm.search",
-    tooltipText = "wm.search.tip",
-    onChange = function(text)
-      r.query = text
-      f:Layout()
-    end,
-    onEnter = function()
-      local first = pickEntries()[1]
-      if first then
-        choose(first.node.s)
-      end
-    end,
-  })
-  rt.search.edit:HookScript("OnEscapePressed", function()
-    r.picking = nil
-    f:Layout()
-  end)
-  rt.noPlace = W.Text(rt, { key = "wm.noPlace", role = "ui", color = "textMuted" })
-  rt.msg = W.Text(rt, { role = "ui", color = "textSecondary", wrap = true })
-  rt.total = W.Text(rt, { role = "ui", color = "accent2" })
-  rt.more = W.Text(rt, { role = "micro", color = "textMuted" })
-
-  local function newPickRow()
-    local row = listRow(rt)
-    row.name = W.Text(row, { role = "ui", color = "text" })
-    row.name:SetPoint("LEFT", row, "LEFT", 4, 0)
-    row.name:SetPoint("RIGHT", row, "RIGHT", -(ZONE_W + 6), 0)
-    row.zone = W.Text(row, { role = "micro", color = "textMuted", justify = "RIGHT" })
-    row.zone:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-    row.zone:SetWidth(ZONE_W)
-    -- The row cuts long names: the tooltip has the whole name and the zone.
-    row:HookScript("OnEnter", function(self)
-      if self.pickName then
-        ns.ShowTooltip(self, self.pickName, (self.pickZone ~= "" and self.pickZone .. "\n" or "") .. L["wm.pick.tip"])
-      end
-    end)
-    row:SetScript(
-      "OnClick",
-      ns.Wrap("wm-pick", function(self)
-        choose(self.slug)
-      end)
-    )
-    return row
-  end
-
-  local function newStepRow()
-    local row = CreateFrame("Frame", nil, rt)
-    row:SetSize(INNER, STEP_H)
-    row.leg = W.Text(row, { role = "micro", color = "text" })
-    row.leg:SetPoint("LEFT", row, "LEFT", 0, 0)
-    row.leg:SetPoint("RIGHT", row, "RIGHT", -(DURATION_W + 4), 0)
-    row.dur = W.Text(row, { role = "micro", color = "textSecondary", justify = "RIGHT" })
-    row.dur:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-    row.dur:SetWidth(DURATION_W)
-    return row
-  end
-
-  local function action(key, tip, handler)
-    return button(rt, {
-      key = key,
-      width = INNER,
-      height = ACTION_H,
-      tooltip = key,
-      tooltipText = tip,
-      onClick = handler,
-    })
-  end
-  rt.show = action("wm.route.show", "wm.route.showTip", function()
-    local e = engine()
-    if e and ns.MapRequest then
-      ns.MapRequest.Open({
-        map = WML.MapID(),
-        start = e.state.start,
-        dest = e.state.dest,
-        faction = options(e).faction,
-      })
-      B.RaiseMain(map)
-    end
-  end)
-  rt.next = action("map.route.next", "map.route.next.tip", function()
-    local e = engine()
-    if e then
-      e.list.NextStop()
-    end
-  end)
-  rt.adopt = action("map.route.adopt", "map.route.adopt.tip", function()
-    local e = engine()
-    if e then
-      e.list.Adopt()
-    end
-  end)
-
-  local function layoutRoute(avail)
-    local e = engine()
-    local st = e and e.state or {}
-    local function endText(which)
-      local slug = st[which]
-      return string.format(L["map." .. which], slug and e.nameOf(slug) or L["map.none"])
-    end
-    W.SetText(rt.start.label, nil, endText("start"))
-    W.SetText(rt.dest.label, nil, endText("dest"))
-    local y = 0
-    for _, b in ipairs({ rt.start, rt.dest }) do
-      b:ClearAllPoints()
-      b:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-      y = y + BTN_H + GAP
-    end
-    rt.swap:ClearAllPoints()
-    rt.swap:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-    rt.calc:ClearAllPoints()
-    rt.calc:SetPoint("TOPLEFT", rt, "TOPLEFT", HALF_W + GAP, -y)
-    rt.reset:ClearAllPoints()
-    rt.reset:SetPoint("TOPRIGHT", rt, "TOPRIGHT", 0, -y)
-    rt.swap:SetEnabled(e ~= nil and (st.start ~= nil or st.dest ~= nil))
-    rt.calc:SetEnabled(e ~= nil and st.start ~= nil and st.dest ~= nil)
-    y = y + BTN_H + GAP + 2
-
-    local picking = r.picking ~= nil and e ~= nil
-    rt.search:SetShown(picking)
-    rt.noPlace:Hide()
-    rt.msg:Hide()
-    rt.total:Hide()
-    rt.more:Hide()
-    for _, b in ipairs({ rt.show, rt.next, rt.adopt }) do
-      b:Hide()
-    end
-    local shownSteps, shownPicks = 0, 0
-    if picking then
-      rt.search:ClearAllPoints()
-      rt.search:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-      rt.search:SetWidth(INNER)
-      y = y + rt.search:GetHeight() + GAP
-      local entries = pickEntries()
-      shownPicks = math.min(#entries, clamp(math.floor((avail - y) / ROW_H), 1, PICK_ROWS))
-      for i = 1, shownPicks do
-        local row = rt.picks[i]
-        if not row then
-          row = newPickRow()
-          rt.picks[i] = row
-        end
-        row.slug = entries[i].node.s
-        W.SetText(row.name, nil, entries[i].name)
-        W.SetText(row.zone, nil, e.zoneName[entries[i].node.z] or "")
-        row.pickName, row.pickZone = entries[i].name, e.zoneName[entries[i].node.z] or ""
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-        row:Show()
-        y = y + ROW_H
-      end
-      if #entries == 0 then
-        rt.noPlace:ClearAllPoints()
-        rt.noPlace:SetPoint("TOPLEFT", rt, "TOPLEFT", 4, -y)
-        rt.noPlace:Show()
-        y = y + ROW_H
-      end
-    else
-      local route = e and e.list.routes[1]
-      if route then
-        W.SetText(rt.total, nil, string.format(L["map.route.total"], TL.FormatDuration(route.totalSec), #route.steps))
-        rt.total:ClearAllPoints()
-        rt.total:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-        rt.total:SetWidth(INNER)
-        rt.total:Show()
-        y = y + 18
-        local reserved = 14 + 3 * (ACTION_H + GAP)
-        shownSteps = math.min(#route.steps, clamp(math.floor((avail - y - reserved) / STEP_H), 1, MAX_STEPS))
-        for i = 1, shownSteps do
-          local row = rt.steps[i]
-          if not row then
-            row = newStepRow()
-            rt.steps[i] = row
-          end
-          local step = route.steps[i]
-          W.SetText(row.leg, nil, string.format(L["map.route.leg"], i, e.nameOf(step.from), e.nameOf(step.to)))
-          W.SetText(row.dur, nil, TL.FormatDuration(step.sec))
-          row:ClearAllPoints()
-          row:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-          row:Show()
-          y = y + STEP_H
-        end
-        if #route.steps > shownSteps then
-          W.SetText(rt.more, nil, string.format(L["wm.route.more"], #route.steps - shownSteps))
-          rt.more:ClearAllPoints()
-          rt.more:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-          rt.more:Show()
-        end
-        y = y + 14
-        for _, b in ipairs({ rt.show, rt.next, rt.adopt }) do
-          b:ClearAllPoints()
-          b:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-          b:Show()
-          y = y + ACTION_H + GAP
-        end
-      else
-        local key = not e and "wm.noData"
-          or r.status == "same" and "map.route.same"
-          or r.status == "unreachable" and "map.route.none"
-          or "map.route.pick"
-        W.SetText(rt.msg, nil, L[key])
-        rt.msg:ClearAllPoints()
-        rt.msg:SetPoint("TOPLEFT", rt, "TOPLEFT", 0, -y)
-        rt.msg:SetWidth(INNER)
-        rt.msg:Show()
-        y = y + math.ceil(rt.msg:GetStringHeight())
-      end
-    end
-    for i = shownSteps + 1, #rt.steps do
-      rt.steps[i]:Hide()
-    end
-    for i = shownPicks + 1, #rt.picks do
-      rt.picks[i]:Hide()
-    end
-    return y
-  end
-
   -- Flights --------------------------------------------------------------------------------
   local fl = CreateFrame("Frame", nil, pageParent)
   fl.rows = {}
@@ -963,14 +571,14 @@ function Bar.Create(map)
   end
 
   -- The distances change while the player moves: one pass a second, only while the page is on screen
-  -- (the client stops OnUpdate of a hidden frame, the handler is also dropped on hide) and never in combat.
+  -- (the client stops OnUpdate of a hidden frame, the handler is also dropped on hide) and not in a combat lock.
   local tick = ns.Wrap("wm-flight-tick", function(page, elapsed)
     page.acc = page.acc + elapsed
     if page.acc < FLIGHT_TICK then
       return
     end
     page.acc = 0
-    if not (InCombatLockdown and InCombatLockdown()) then
+    if not ns.CombatLocked() then
       f:Layout()
     end
   end)
@@ -1008,10 +616,50 @@ function Bar.Create(map)
     return gu
   end
 
+  -- Sizes the labeled tabs from their measured text and returns the inner width of the panel. Never cuts a label:
+  -- the room is shared out first, then the panel grows up to MAX_W, last the inset of the buttons shrinks.
+  local function sizeTabs()
+    local ids = {}
+    for _, id in ipairs(TAB_ROW) do
+      if id ~= "guild" then
+        ids[#ids + 1] = id
+      end
+    end
+    local count, textSum, widest = #ids, 0, 0
+    local text = {}
+    for _, id in ipairs(ids) do
+      tabs[id].fgPad = nil
+      text[id] = math.ceil(tabs[id].label:GetStringWidth())
+      textSum = textSum + text[id]
+      widest = math.max(widest, text[id])
+    end
+    local fixed = GUILD_TAB_W + count * GAP -- the symbol tab and the gaps in front of every tab behind the first
+    local wanted = textSum + count * (2 * W.ACTION_PAD + TAB_SLACK)
+    local inner = clamp(wanted + fixed, INNER, MAX_W - 2 * PAD)
+    local room = inner - fixed
+    local pad = W.ACTION_PAD
+    if wanted > room then
+      pad = math.max(TAB_PAD_MIN, math.floor((room - textSum - count * TAB_SLACK) / (2 * count)))
+    end
+    local spare = room - textSum - count * (2 * pad + TAB_SLACK)
+    -- Equal tabs while the widest label fits an equal share, else every tab gets its text plus an equal part.
+    local equal = math.max(0, room / count)
+    for _, id in ipairs(ids) do
+      local tab = tabs[id]
+      tab.fgPad = pad ~= W.ACTION_PAD and pad or nil
+      local width = widest + 2 * pad + TAB_SLACK <= equal and equal
+        or text[id] + 2 * pad + TAB_SLACK + math.max(0, spare) / count
+      tab:SetWidth(width)
+      tab.fgPlace(tab)
+    end
+    return inner
+  end
+
   -- Layout -------------------------------------------------------------------------------------
   -- Header at the canvas edge the bar is anchored on, content on the inner side of it.
   function f:Layout()
     WML.Lift(f)
+    r.share:Refresh()
     local lift, _, mapHeight = WML.BarSpace()
     local corner, _, dy = position()
     local up = corner:find("^BOTTOM") ~= nil
@@ -1031,7 +679,7 @@ function Bar.Create(map)
     -- Only the pages that are not on show are hidden. A Layout runs on every typed letter of the place search,
     -- and hiding the page that holds the focused box takes the focus away (the client clears it on hide).
     local current = open and currentTab() or nil
-    local pages = { markers = mk, route = rt, flights = fl, gather = gt, guild = gu }
+    local pages = { markers = mk, flights = fl, gather = gt, guild = gu }
     for tabId, page in pairs(pages) do
       if tabId ~= current then
         page:Hide()
@@ -1048,6 +696,7 @@ function Bar.Create(map)
       place()
       return
     end
+    local innerW = sizeTabs()
     local top = HEAD_H + PAD
     local pageTop = top + TAB_H + PAD
     -- Content keeps clear of the overlays at the far end: the bottom ones, or the floor dropdown on top.
@@ -1055,27 +704,29 @@ function Bar.Create(map)
     local avail = BL.Space(mapHeight, dy, MARGIN, reserve, pageTop, PAD)
     local id = currentTab()
     local x = PAD
-    for _, tabId in ipairs(TAB_IDS) do
+    local drawerOpen = ns.WorldMapRoutePanel.IsOpen()
+    for _, tabId in ipairs(TAB_ROW) do
       local tab = tabs[tabId]
+      local on = tabId == id or tabId == "route" and drawerOpen
       tab:ClearAllPoints()
       tab:SetPoint(edge .. "LEFT", f, edge .. "LEFT", x, up and top or -top)
-      tab.bar:SetShown(tabId == id)
+      tab.bar:SetShown(on)
       if tab.label then
-        W.SetColor(tab.label, tabId == id and "accent" or "textSecondary")
+        W.SetColor(tab.label, on and "accent" or "textSecondary")
       else
-        tab.icon:SetVertexColor(Theme.color(tabId == id and "accent" or "textSecondary"))
+        tab.icon:SetVertexColor(Theme.color(on and "accent" or "textSecondary"))
       end
       x = x + tab:GetWidth() + GAP
     end
     local lazy = id == "gather" and gatherPage or id == "guild" and guildPage or nil
-    local page = lazy and lazy() or ({ markers = mk, route = rt, flights = fl })[id]
+    local page = lazy and lazy() or ({ markers = mk, flights = fl })[id]
     page:ClearAllPoints()
     page:SetPoint("TOPLEFT", pageParent, "TOPLEFT")
     local height
     if lazy then
       height = page:Layout(avail)
     else
-      height = ({ markers = layoutMarkers, route = layoutRoute, flights = layoutFlights })[id](avail)
+      height = ({ markers = layoutMarkers, flights = layoutFlights })[id](avail)
     end
     page:SetSize(INNER, height)
     page:Show()
@@ -1090,12 +741,12 @@ function Bar.Create(map)
       r.pageId = id
       scroll:ScrollTo(0)
     end
-    r.w, r.h = OPEN_W, pageTop + view + PAD
+    r.w, r.h = innerW + 2 * PAD, pageTop + view + PAD
     f:SetSize(r.w, r.h)
     place()
   end
 
-  f.parts = { head = head, tabs = tabs, markers = mk, route = rt, flights = fl, scroll = scroll }
+  f.parts = { head = head, tabs = tabs, markers = mk, flights = fl, scroll = scroll, share = r.share }
 
   function f:Refresh()
     if f:IsShown() then

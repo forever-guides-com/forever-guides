@@ -26,6 +26,7 @@ ns.AddLocale("enUS", {
   ["changelog.section.changed"] = "Changed",
   ["changelog.section.fixed"] = "Fixed",
   ["changelog.copy"] = "Copy release link",
+  ["changelog.news"] = "Show news window",
   ["changelog.copyTitle"] = "Release page",
   ["changelog.toggleHint"] = "Click or press Enter to show or hide this version.",
   ["changelog.badgeHint"] = "New entries",
@@ -50,6 +51,7 @@ ns.AddLocale("deDE", {
   ["changelog.section.changed"] = "Geändert",
   ["changelog.section.fixed"] = "Behoben",
   ["changelog.copy"] = "Release-Link kopieren",
+  ["changelog.news"] = "Neuerungen anzeigen",
   ["changelog.copyTitle"] = "Release-Seite",
   ["changelog.toggleHint"] = "Klicken oder Enter drücken, um diese Version ein- oder auszublenden.",
   ["changelog.badgeHint"] = "Neue Einträge",
@@ -149,7 +151,7 @@ local function newJump(row)
   local hover = jump:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
   ns.Bind(hover, function(t)
-    t:SetColorTexture(1, 1, 1, 0.08)
+    t:SetColorTexture(ns.Theme.fillColor("hover"))
   end)
   jump.arrow = W.Glyph(jump, "chevron-right", JUMP_ARROW, "accent2")
   jump.arrow:SetPoint("RIGHT", jump, "RIGHT", -4, 0)
@@ -189,7 +191,7 @@ local function newHeader(content, onToggle)
   local hover = header:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
   ns.Bind(hover, function(t)
-    t:SetColorTexture(1, 1, 1, 0.08)
+    t:SetColorTexture(ns.Theme.fillColor("hover"))
   end)
   W.Border(header, "accentDim", 0.5)
   header.arrow = W.Glyph(header, "chevron-right", ARROW, "accent2")
@@ -282,6 +284,7 @@ local function newSummary(content, count)
       text = W.Text(summary, { role = "text", color = "text", wrap = true }),
       jump = newJump(summary),
     }
+    summary.items[index].links = W.WebLinks(summary)
   end
 
   function summary:fgGridLayout(width)
@@ -307,6 +310,11 @@ local function newSummary(content, count)
         item.text:ClearAllPoints()
         item.text:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y)
         y = y + textH
+        if item.links.count > 0 then
+          item.links:ClearAllPoints()
+          item.links:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y - 2)
+          y = y + 2 + item.links:fgGridLayout(textRoom)
+        end
         item.jump:SetShown(linked)
         if linked then
           item.jump:ClearAllPoints()
@@ -343,6 +351,8 @@ local function newEntry(content)
   entry.text = W.Text(entry, { role = "small", color = "textSecondary", wrap = true })
   entry.jump = newJump(entry)
   entry.jump:SetAllPoints(entry)
+  -- Created after the jump button, so the address buttons sit above it and take their own clicks.
+  entry.links = W.WebLinks(entry)
 
   function entry:SetEntry(line, go)
     self.jump:SetShown(self.jump:SetGo(go))
@@ -350,6 +360,7 @@ local function newEntry(content)
     self.head:SetShown(head ~= nil)
     self.head:SetText(head or "")
     self.text:SetText(rest)
+    self.links:Set(rest)
   end
 
   function entry:fgGridLayout(width)
@@ -366,6 +377,11 @@ local function newEntry(content)
     self.text:ClearAllPoints()
     self.text:SetPoint("TOPLEFT", self, "TOPLEFT", left, -y)
     local height = y + textH
+    if self.links.count > 0 then
+      self.links:ClearAllPoints()
+      self.links:SetPoint("TOPLEFT", self, "TOPLEFT", left, -height - 2)
+      height = height + 2 + self.links:fgGridLayout(room)
+    end
     if self.jump.go then
       height = math.max(height, JUMP_MIN)
     end
@@ -417,7 +433,7 @@ local function build(container)
     return item
   end
 
-  add(W.Text(content, { key = "changelog.intro", role = "text", color = "textSecondary", wrap = true }), { gap = 8 })
+  ns.AddIntro(view, "changelog.intro", { gap = 8 })
   local status = add(W.Text(content, { role = "ui", color = "text", wrap = true }), { gap = 10 })
   add(
     W.Button(content, {
@@ -426,6 +442,17 @@ local function build(container)
       opens = true,
       onClick = function()
         ns.Dialogs.Copy("changelog.copyTitle", Logic.RELEASES_URL, "help.copyHint")
+      end,
+    }),
+    { height = 26, width = 240, gap = 6 }
+  )
+  add(
+    W.Button(content, {
+      key = "changelog.news",
+      width = 240,
+      opens = true,
+      onClick = function()
+        ns.ChangelogNews.ShowCurrent()
       end,
     }),
     { height = 26, width = 240, gap = 14 }
@@ -540,6 +567,7 @@ local function build(container)
           pair.text:SetShown(highlight ~= nil)
           pair.head:SetText(highlight and highlight.head or "")
           pair.text:SetText(highlight and highlight.text or "")
+          pair.links:Set(highlight and highlight.text or "")
           pair.jump:SetGo(highlight and highlight.go)
         end
         block.count = item.count

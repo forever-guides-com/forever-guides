@@ -102,7 +102,7 @@ ns.AddLocale("deDE", {
   ["notelink.err.tooLarge"] = "Diese Notiz ist zu groß, um sie im Chat zu teilen.",
   ["notelink.err.unavailable"] = "Teilen nicht verfügbar (Kompressionsbibliothek fehlt).",
   ["notelink.blocked"] = "Im Kampf nicht möglich.",
-  ["notelink.optInHint"] = "Forever-Guides-Link von %s. Zum Öffnen: Teilen aktivieren.",
+  ["notelink.optInHint"] = "Forever-Guides-Link von %s. Zum Öffnen: Teilen einschalten.",
   ["notelink.optin.title"] = "Link öffnen",
   ["notelink.optin.body"] = "Link von %s. Zum Öffnen fragt das Addon den Spieler nach dem Inhalt.",
   ["optin.send.linkShare"] = "Links im Chat brauchen Teilen.",
@@ -147,13 +147,23 @@ end
 -- Addon links are local-only and cannot be sent, so messages go out as "token".
 local SEND_MODE = "token"
 
+-- Readable lead of every token title for players without the add-on: it names the add-on and the kind, in the
+-- sender's language ("Addon Forever Guides (Note): "). A receiver with the add-on strips it again (StripHeader).
+function NL.Header(spec)
+  return "Addon Forever Guides (" .. L[(spec or KINDS.N).label] .. "): "
+end
+
+function NL.StripHeader(title)
+  return (tostring(title or ""):gsub("^Addon Forever Guides %([^)]*%): ?", "", 1))
+end
+
 -- The single place that knows the outgoing message format.
 function NL.Format(mode, payload, title, spec)
   spec = spec or KINDS.N
   if mode == "link" then
     return string.format("|Haddon:%s:%s|h[%s - %s]|h", spec.link, payload, L[spec.label], title)
   end
-  return string.format("[%s:%s:%s]", spec.token, payload, title)
+  return string.format("[%s:%s:%s%s]", spec.token, payload, NL.Header(spec), title)
 end
 
 -- One line, no brackets, pipes or control characters, short.
@@ -264,6 +274,16 @@ function NL.IsShared(id)
   return shared[id] ~= nil
 end
 
+-- What goes out instead of the token where the data can travel beside the line (ChatLabel.lua): the readable text and
+-- the kind and payload the receiver needs. nil while that module is not loaded.
+local function shareOf(letter, payload, title, spec)
+  local label = ns.ChatLabel
+  if not label then
+    return nil
+  end
+  return { letter = letter, payload = payload, text = label.KindText(L[spec.label], title) }
+end
+
 -- Builds the one chat message for printable content `code` of kind `letter`.
 -- `hash` is what the receiver checks a transferred code against. Returns
 -- { msg, entry } or nil, "tooLarge". `entry` (large content only) must be
@@ -272,9 +292,10 @@ function NL.BuildFor(letter, code, hash, title, mode)
   mode = mode or SEND_MODE
   local spec = KINDS[letter]
   title = shownTitle(title, spec)
+  local shown = title
   local msg = NL.Format(mode, "i" .. code, title, spec)
   if #msg <= LIMIT then
-    return { msg = msg }
+    return { msg = msg, share = shareOf(letter, "i" .. code, shown, spec) }
   end
   if #code > MAX_BYTES then
     return nil, "tooLarge"
@@ -292,7 +313,7 @@ function NL.BuildFor(letter, code, hash, title, mode)
   if #msg > LIMIT then
     return nil, "tooLarge"
   end
-  return { msg = msg, entry = entry }
+  return { msg = msg, entry = entry, share = shareOf(letter, payload, shown, spec) }
 end
 
 -- Builds the one chat message for a note. Returns { msg, entry } or nil, reason
@@ -311,8 +332,12 @@ end
 local LEGACY_FNS = { FN }
 
 -- Payloads of function linkShare, strictly checked. Returns { t = "Q", id, hash, letter },
--- { t = "D", seq, total, data }, { t = "N", reason } or nil.
-local function decodePayload(payload)
+-- { t = "D", seq, total, data }, { t = "N", reason } or nil. Type P (readable chat label, ChatLabel.lua) is a table
+-- { key, letter, payload }.
+local function decodePayload(payload, typ)
+  if typ == "P" then
+    return ns.ChatLabel and ns.ChatLabel.Decode(payload)
+  end
   local id, hash, letter = payload:match("^(" .. ID_PAT .. ")(" .. HASH_PAT .. ")(%u)$")
   if id then
     return KINDS[letter] and { t = "Q", id = id, hash = hash, letter = letter } or nil
@@ -630,7 +655,9 @@ function NL.Open(sender, payload, letter, title)
   if not (spec and p) then
     return false
   end
-  if not Consent.Allows(FN, "receive", "chat") then
+  -- Content inside the link needs no question to anybody, so it opens until the player switched receiving off.
+  local ok = p.kind == "i" and Consent.OnUnlessOff(FN, "receive", "chat") or Consent.Allows(FN, "receive", "chat")
+  if not ok then
     showOptIn(sender)
     return false
   end
@@ -721,7 +748,9 @@ local function rewrite(msg, sender)
     out = out:gsub("|Haddon:" .. spec.link .. ":([^|]*)|h([^|]*)|h", function(payload, label)
       return convert(payload, labelTitle(label))
     end)
-    out = out:gsub("%[" .. spec.token .. ":([^:%]|]+):([^%]|]*)%]", convert)
+    out = out:gsub("%[" .. spec.token .. ":([^:%]|]+):([^%]|]*)%]", function(payload, title)
+      return convert(payload, NL.StripHeader(title))
+    end)
   end
   if done == 0 then
     return nil
@@ -745,9 +774,10 @@ local CHAT_EVENTS = {
   "CHANNEL",
 }
 
--- Needs the receive consent: without it the token stays text and the filter does nothing else.
-function NL.Rewrite(msg, sender)
-  if not Consent.Allows(FN, "receive", "chat") then
+-- Needs the receive consent: without it the token stays text and the filter does nothing else. `label` (the line came
+-- from a readable chat text, ChatLabel.lua): on until the player switched receiving off.
+function NL.Rewrite(msg, sender, label)
+  if not (label and Consent.OnUnlessOff(FN, "receive", "chat") or Consent.Allows(FN, "receive", "chat")) then
     return nil
   end
   return rewrite(msg, sender)
@@ -822,8 +852,30 @@ end
 -- yet (they ask in the old format, such a request runs through the same consent checks).
 Comm.Register(FN, {
   version = 1,
-  audiences = { "whisper" },
-  on = { Q = onRequest, D = onAnswer, N = onAnswer },
+  audiences = { "group", "guild", "officer", "whisper", "channel" },
+  -- Requests and answers stay whispers; the chat label (type P) goes to the audience of the chat line.
+  typKinds = {
+    Q = { "whisper" },
+    D = { "whisper" },
+    N = { "whisper" },
+    P = { "group", "guild", "officer", "whisper", "channel" },
+  },
+  consentAud = "chat",
+  clickTyp = "P",
+  openChannel = true,
+  whisperPeer = function(name, typ)
+    return ns.ChatLabel ~= nil and ns.ChatLabel.IsPartner(name, typ)
+  end,
+  on = {
+    Q = onRequest,
+    D = onAnswer,
+    N = onAnswer,
+    P = function(sender, value)
+      if ns.ChatLabel then
+        ns.ChatLabel.OnPayload(sender, value)
+      end
+    end,
+  },
   decode = decodePayload,
   request = "Q",
   service = function(value)

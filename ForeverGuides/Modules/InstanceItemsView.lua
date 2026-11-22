@@ -39,7 +39,7 @@ ns.AddLocale("deDE", {
   ["instances.items.count.one"] = "1 Item",
   ["instances.items.count.other"] = "%d Items",
   ["instances.items.bossNone"] = "Beute noch nicht erfasst",
-  ["instances.items.bossHint"] = "Beute kommt beim eigenen Erfassen oder Export dazu.",
+  ["instances.items.bossHint"] = "Beute erscheint, sobald du sie erfasst oder exportierst.",
   ["instances.items.group.instance"] = "Weitere Beute der Instanz",
   ["instances.items.group.extra"] = "Weitere erfasste Beute",
   ["instances.items.group.quests"] = "Quests",
@@ -112,7 +112,7 @@ local function newLine(row)
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
   end)
 end
 
@@ -132,7 +132,7 @@ local function makeItemRow(view)
   row.meta = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
   local hover = row:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.06)
+  hover:SetColorTexture(Theme.fillColor("hover"))
   local function show()
     local entry = row.entry
     if entry then
@@ -142,13 +142,26 @@ local function makeItemRow(view)
   row:SetScript("OnEnter", show)
   row:SetScript("OnLeave", ns.HideTooltip)
   row.fgOnFocus, row.fgOnBlur = show, ns.HideTooltip
-  register(view, row, function() end)
+  register(view, row, function()
+    ns.ItemActions.Preview(row.entry and row.entry.id)
+  end)
+  ns.ItemActions.Bind(row, function()
+    return row.entry and row.entry.id
+  end)
   newLine(row)
+  row.star = ns.WishlistStar.Create(row, function()
+    return row.entry and row.entry.id
+  end, function(frame, activate)
+    register(view, frame, activate)
+  end)
 
   -- colX: left edge of the boss column (all-items list on a wide page), nil = boss under the name.
   function row:fgLayout(width)
     local textX = ICON + 10
-    local nameW = math.max(40, (self.colX and self.colX - 8 or width) - textX)
+    local starW = ns.WishlistStar.SIZE + 4
+    self.star:ClearAllPoints()
+    self.star:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -PAD)
+    local nameW = math.max(40, (self.colX and self.colX - 8 or width - starW) - textX)
     self.icon:ClearAllPoints()
     self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -PAD)
     self.name:ClearAllPoints()
@@ -165,7 +178,7 @@ local function makeItemRow(view)
       if self.colX then
         self.bossHost:SetPoint("TOPLEFT", self, "TOPLEFT", self.colX, -PAD)
         self.boss:SetPoint("TOPLEFT", self, "TOPLEFT", self.colX + shift, -PAD)
-        self.boss:SetWidth(math.max(40, width - self.colX - shift))
+        self.boss:SetWidth(math.max(40, width - self.colX - shift - starW))
         side = PAD + math.max(marked and BOSS_ICON or 0, ceil(self.boss))
       else
         self.bossHost:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(y + 2))
@@ -180,7 +193,7 @@ local function makeItemRow(view)
       self.meta:SetWidth(nameW)
       y = y + 2 + ceil(self.meta)
     end
-    return math.max(ICON + PAD * 2, y + PAD, side + PAD)
+    return math.max(ICON + PAD * 2, y + PAD, side + PAD, PAD * 2 + ns.WishlistStar.SIZE)
   end
   return row
 end
@@ -200,6 +213,8 @@ end
 -- inst is the instance of the view, it finds the boss mark of an item that belongs to a boss.
 local function paintItemRow(row, item, flat, inst)
   row.entry = item
+  row.star:SetShown(item.id ~= nil)
+  row.star:Refresh()
   row.colX = nil
   local name = IV.ItemName(item)
   row.label = name
@@ -343,7 +358,7 @@ function IIV.Create(parent)
     },
   })
   for _, id in ipairs(IL.VIEWS) do
-    rings[id] = W.Border(f.toolbar:GetButton(id), "accent2", 1, 2)
+    rings[id] = W.ActiveMark(f.toolbar:GetButton(id))
   end
   f.columns = makeColumns(f)
   f.lastFocus = f.columns.buttons.boss
@@ -414,6 +429,7 @@ function IIV.Create(parent)
           entries[#entries + 1] = { frame = frame }
           paintItemRow(frame, row.item, true, f.inst)
           ordered[#ordered + 1] = frame
+          ordered[#ordered + 1] = frame.star
         end
       else
         ordered = f.bossView:Frames()
@@ -516,8 +532,16 @@ function IIV.Create(parent)
   ns.On("GET_ITEM_INFO_RECEIVED", onItemData)
   ns.On("ITEM_DATA_LOAD_RESULT", onItemData)
 
-  function f:fgGridLayout(width)
+  -- True while the view can fill a fixed height (the by-boss view: list and detail scroll on their own).
+  function f:CanFill()
+    return self.view == "boss" and self.bossView:IsShown()
+  end
+
+  -- room.fill = { height, mode, listW } (from the instance page): the by-boss view takes what the toolbar leaves.
+  function f:fgGridLayout(width, room)
     local y = 0
+    local fill = room and room.fill or nil
+    self.bossView.fgFill = nil
     if self.empty:IsShown() then
       local textW = math.max(40, width - 2 * PAD)
       self.empty.title:ClearAllPoints()
@@ -552,6 +576,9 @@ function IIV.Create(parent)
         self.bossView:ClearAllPoints()
         self.bossView:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
         self.bossView:SetWidth(width)
+        if fill and self.view == "boss" then
+          self.bossView.fgFill = { height = math.max(1, fill.height - y), mode = fill.mode, listW = fill.listW }
+        end
         y = y + self.bossView:fgGridLayout(width)
       end
       for _, e in ipairs(self.entries) do

@@ -169,6 +169,39 @@ function R.TrainerGroups(class, faction)
   return out
 end
 
+-- Hunter stable masters for a faction ("A"/"H"/nil = all), shaped like trainer entries so the
+-- page rows, search and map actions work unchanged. The zone name goes into p and the map id
+-- into m (their zones are not the trainer zones), no z. Sorted by zone name, then NPC.
+function R.StableMasters(faction)
+  local d = data().StableMasters
+  local out = {}
+  for _, s in ipairs((d and d.masters) or {}) do
+    if factionOk(s.f, faction) then
+      local zone = d.zones[s.z]
+      out[#out + 1] = {
+        id = s.id,
+        c = "HUNTER",
+        f = s.f,
+        k = "stable",
+        n = s.n,
+        npc = s.npc,
+        m = zone.m,
+        p = ns.T(zone),
+        x = s.x,
+        y = s.y,
+        cf = 2,
+      }
+    end
+  end
+  table.sort(out, function(a, b)
+    if a.p ~= b.p then
+      return a.p < b.p
+    end
+    return a.id < b.id
+  end)
+  return out
+end
+
 -- Learning list of one class: { n, l, ... } sorted by level (generator order).
 function R.LearnList(class)
   return (data().Abilities and data().Abilities[class]) or {}

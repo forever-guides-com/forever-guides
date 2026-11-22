@@ -5,7 +5,7 @@
 ## Notes-deDE: Quests und Questketten der Dungeons und Raids. Wird von selbst geladen, sobald du die Instanzen-Seite öffnest.
 ## Author: Wosande
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
-## Version: 0.10.2
+## Version: 1.0.0
 ## Dependencies: ForeverGuides
 ## LoadOnDemand: 1
 ## X-Website: https://forever-guides.com
@@ -16,9 +16,20 @@
 
 InstanceQuests_1.lua
 InstanceQuests_2.lua
+InstanceQuests_3.lua
+InstanceLoot_1.lua
+InstanceLoot_2.lua
+WorldQuests_1.lua
+WorldQuests_2.lua
+WorldDrops_1.lua
 InstanceQuestText_1.lua
 InstanceQuestText_2.lua
 InstanceQuestText_3.lua
 InstanceQuestText_4.lua
 InstanceQuestText_5.lua
 InstanceQuestText_6.lua
+InstanceQuestText_7.lua
+DungeonMinimaps_1.lua
+DungeonRooms_1.lua
+DungeonRoutes_1.lua
+DungeonRoutes_2.lua

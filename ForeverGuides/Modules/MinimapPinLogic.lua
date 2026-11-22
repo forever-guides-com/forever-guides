@@ -37,6 +37,16 @@ ML.NEAR_MIN, ML.NEAR_MAX, ML.NEAR_STEP, ML.NEAR_DEFAULT = 0, 200, 5, 60
 ML.RING_SIZE_MIN, ML.RING_SIZE_MAX, ML.RING_SIZE_DEFAULT = 8, 40, 18
 ML.RING_WIDTH_MIN, ML.RING_WIDTH_MAX, ML.RING_WIDTH_DEFAULT = 1, 4, 2
 
+-- Look of the gathering pins on the minimap and the farm HUD. Our points are possible spots, the real nodes are
+-- the blips the game draws itself, so the default "subtle" recedes: a hollow ring in the item color, smaller
+-- (SUBTLE_SIZE of the pin size), slightly transparent (SUBTLE_ALPHA), with a line of SUBTLE_WIDTH px and a dot
+-- of SUBTLE_DOT px for a spot with several possible items. "icon" draws the item symbol.
+ML.SPOT_STYLES = { subtle = true, icon = true }
+ML.SPOT_STYLE_DEFAULT = "subtle"
+ML.SUBTLE_SIZE, ML.SUBTLE_ALPHA, ML.SUBTLE_WIDTH, ML.SUBTLE_DOT = 0.75, 0.7, 1, 3
+-- Smallest size of the area a pin answers the mouse on (px), and the margin around the symbol.
+ML.HIT_MIN, ML.HIT_PAD = 12, 3
+
 local function finite(v)
   return type(v) == "number" and v == v and v > -math.huge and v < math.huge
 end
@@ -68,6 +78,16 @@ end
 function ML.NearRange(value)
   local yards = ML.Clamp(value, ML.NEAR_MIN, ML.NEAR_MAX, ML.NEAR_DEFAULT)
   return math.floor(yards / ML.NEAR_STEP + 0.5) * ML.NEAR_STEP
+end
+
+-- The stored look of the pins: "subtle" or "icon", the default for anything else.
+function ML.SpotStyle(value)
+  return ML.SPOT_STYLES[value] and value or ML.SPOT_STYLE_DEFAULT
+end
+
+-- Radius in px around a pin's center in which the cursor counts as on it.
+function ML.HitRadius(size)
+  return math.max(ML.HIT_MIN, finite(size) and size or 0) / 2 + ML.HIT_PAD
 end
 
 -- How a spot at dist yards from the player is drawn for the near range: "ring" up to and including the
@@ -246,7 +266,17 @@ function ML.BuildIndex(points, frame, cell)
         bucket = {}
         index.buckets[key] = bucket
       end
-      bucket[#bucket + 1] = { wx = wx, wy = wy, itemId = p.itemId, own = p.own, rare = p.rare, id = p.id }
+      bucket[#bucket + 1] = {
+        wx = wx,
+        wy = wy,
+        itemId = p.itemId,
+        own = p.own,
+        rare = p.rare,
+        id = p.id,
+        items = p.items,
+        selected = p.selected,
+        multi = p.multi,
+      }
       index.count = index.count + 1
     end
   end

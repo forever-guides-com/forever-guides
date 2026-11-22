@@ -14,12 +14,12 @@ local DOUBLE_CLICK = 0.4
 
 ns.AddLocale("enUS", {
   ["page.drawings"] = "Drawings",
-  ["draw.intro"] = "Paint-like editor, stored locally, shareable in chat.",
+  ["draw.intro"] = "Paint-style editor. Drawings stay on your PC and you can share them in chat.",
   ["draw.new"] = "New drawing",
   ["draw.import"] = "Import...",
   ["draw.backup"] = "Backup (all)",
   ["draw.backupTip"] = "Copies all drawings as strings.\nSettings save only at logout.",
-  ["draw.empty"] = 'Empty: "New drawing" or /fg draw.',
+  ["draw.empty"] = 'Nothing here yet. Click "New drawing" or type /fg draw.',
   ["draw.pick"] = "Pick a drawing in the list to see its preview.",
   ["draw.usage"] = "%d of %d drawings.",
   ["draw.usage.warn"] = "The limit is close.",
@@ -30,13 +30,14 @@ ns.AddLocale("enUS", {
   ["draw.row.sub"] = "%d x %d cells, %s",
   ["draw.row.broken"] = "unreadable",
   ["draw.page.open"] = "Open in new window",
-  ["draw.page.openTip"] = "Opens the editor, resizable.",
+  ["draw.page.openTip"] = "Opens the editor in a resizable window.",
   ["draw.page.window"] = "Open as window",
-  ["draw.page.windowTip"] = "Small window over the game.\nPin it, make it transparent, auto-hide the title bar.",
+  ["draw.page.windowTip"] = "Small window over the game.\nYou can pin it, make it transparent and auto-hide the title bar.",
   ["draw.page.rename"] = "Rename",
   ["draw.page.duplicate"] = "Duplicate",
   ["draw.page.delete"] = "Delete",
   ["draw.page.share"] = "Share",
+  ["draw.page.shareTip"] = "Sends the drawing as a chat link.",
   ["draw.page.export"] = "Export string",
   ["draw.info"] = "%d x %d cells, stored %s of %s, changed %s",
   ["draw.info.broken"] = "Unreadable. You can still export or delete it.",
@@ -48,12 +49,12 @@ ns.AddLocale("enUS", {
   ["draw.dlg.create"] = "Create",
   ["draw.dlg.rename"] = "Rename",
   ["draw.delete.title"] = "Delete drawing?",
-  ["draw.delete.text"] = "Removed for good, export first to keep a copy.",
+  ["draw.delete.text"] = "Deletes it for good. Export it first to keep a copy.",
   ["draw.export.title"] = "Export drawing",
-  ["draw.export.hint"] = "Copy with Ctrl+C, Import... reads it back.",
+  ["draw.export.hint"] = "Copy with Ctrl+C. Import... reads it back.",
   ["draw.backup.title"] = "Backup of all drawings",
   ["draw.backup.hint"] = "To restore, paste all blocks into Import...",
-  ["draw.msg.limit"] = "Drawing limit %d reached: delete one first.",
+  ["draw.msg.limit"] = "Drawing limit of %d reached. Delete one first.",
   ["draw.msg.createFailed"] = "The drawing could not be created.",
   ["draw.msg.exportFail"] = "Export failed.",
   ["draw.msg.noDrawings"] = "There are no drawings to back up.",
@@ -75,39 +76,40 @@ ns.AddLocale("enUS", {
   ["draw.import.err.shape"] = "The data has an unexpected shape.",
   ["draw.import.err.type"] = "This string is not a drawings export.",
   ["draw.import.err.version"] = "This string comes from a newer version of the addon.",
-  ["draw.import.err.items"] = "Drawings in this string are invalid or too many.",
+  ["draw.import.err.items"] = "This string holds invalid drawings or too many.",
   ["draw.import.err.drawing"] = "A drawing in this string is damaged.",
   ["draw.import.err.at"] = " (entry %d)",
 })
 
 ns.AddLocale("deDE", {
   ["page.drawings"] = "Zeichnungen",
-  ["draw.intro"] = "Editor wie Paint, Zeichnungen lokal, im Chat teilbar.",
+  ["draw.intro"] = "Editor im Stil von Paint. Die Zeichnungen bleiben lokal, du teilst sie im Chat.",
   ["draw.new"] = "Neue Zeichnung",
   ["draw.import"] = "Import...",
   ["draw.backup"] = "Sicherung (alle)",
   ["draw.backupTip"] = "Kopiert alle Zeichnungen als Strings.\nEinstellungen speichern erst beim Ausloggen.",
-  ["draw.empty"] = 'Noch leer: "Neue Zeichnung" oder /fg draw.',
+  ["draw.empty"] = 'Noch leer. Klicke auf „Neue Zeichnung“ oder gib /fg draw ein.',
   ["draw.pick"] = "Wähle eine Zeichnung in der Liste, um die Vorschau zu sehen.",
   ["draw.usage"] = "%d von %d Zeichnungen.",
   ["draw.usage.warn"] = "Das Limit ist bald erreicht.",
-  ["draw.order.hint"] = "Ziehen oder Pfeile sortieren ({mod:listToEdge}: ganz oben/unten).\nDoppelklick oder Enter öffnet den Editor.",
+  ["draw.order.hint"] = "Zum Sortieren ziehen oder Pfeile nutzen ({mod:listToEdge}: ganz oben/unten).\nDoppelklick oder Enter öffnet den Editor.",
   ["draw.row.up"] = "Nach oben ({mod:listToEdge}: ganz nach oben)",
   ["draw.row.down"] = "Nach unten ({mod:listToEdge}: ganz nach unten)",
   ["draw.row.delete"] = "Löschen",
   ["draw.row.sub"] = "%d x %d Zellen, %s",
   ["draw.row.broken"] = "nicht lesbar",
   ["draw.page.open"] = "In neuem Fenster öffnen",
-  ["draw.page.openTip"] = "Öffnet den Editor, Größe änderbar.",
+  ["draw.page.openTip"] = "Öffnet den Editor in einem Fenster mit änderbarer Größe.",
   ["draw.page.window"] = "Als Fenster öffnen",
-  ["draw.page.windowTip"] = "Kleines Fenster über dem Spiel.\nAnheften, durchsichtig, Kopfzeile automatisch ausblenden.",
+  ["draw.page.windowTip"] = "Kleines Fenster über dem Spiel.\nDu kannst es anheften, durchsichtig machen und die Kopfzeile automatisch ausblenden.",
   ["draw.page.rename"] = "Umbenennen",
   ["draw.page.duplicate"] = "Duplizieren",
   ["draw.page.delete"] = "Löschen",
   ["draw.page.share"] = "Teilen",
+  ["draw.page.shareTip"] = "Sendet die Zeichnung als Chatlink.",
   ["draw.page.export"] = "Export-String",
   ["draw.info"] = "%d x %d Zellen, gespeichert %s von %s, geändert %s",
-  ["draw.info.broken"] = "Nicht lesbar. Exportieren oder löschen möglich.",
+  ["draw.info.broken"] = "Nicht lesbar. Du kannst sie trotzdem exportieren oder löschen.",
   ["draw.dlg.newTitle"] = "Neue Zeichnung",
   ["draw.dlg.renameTitle"] = "Zeichnung umbenennen",
   ["draw.dlg.name"] = "Name",
@@ -116,12 +118,12 @@ ns.AddLocale("deDE", {
   ["draw.dlg.create"] = "Anlegen",
   ["draw.dlg.rename"] = "Umbenennen",
   ["draw.delete.title"] = "Zeichnung löschen?",
-  ["draw.delete.text"] = "Wird unwiderruflich entfernt, vorher exportieren.",
+  ["draw.delete.text"] = "Löscht sie endgültig. Exportiere sie vorher, um eine Kopie zu behalten.",
   ["draw.export.title"] = "Zeichnung exportieren",
-  ["draw.export.hint"] = "Mit Strg+C kopieren, Import... liest ihn wieder ein.",
+  ["draw.export.hint"] = "Mit Strg+C kopieren. Import... liest ihn wieder ein.",
   ["draw.backup.title"] = "Sicherung aller Zeichnungen",
   ["draw.backup.hint"] = "Zum Wiederherstellen alle Blöcke in Import... einfügen.",
-  ["draw.msg.limit"] = "Zeichnungs-Limit %d erreicht: erst eine löschen.",
+  ["draw.msg.limit"] = "Zeichnungslimit von %d erreicht. Lösche zuerst eine.",
   ["draw.msg.createFailed"] = "Die Zeichnung konnte nicht angelegt werden.",
   ["draw.msg.exportFail"] = "Export fehlgeschlagen.",
   ["draw.msg.noDrawings"] = "Es gibt keine Zeichnungen zum Sichern.",
@@ -138,12 +140,12 @@ ns.AddLocale("deDE", {
   ["draw.import.err.empty"] = "Nichts zu importieren.",
   ["draw.import.err.too-large"] = "Die Eingabe ist zu groß.",
   ["draw.import.err.too-many"] = "Zu viele Strings auf einmal (höchstens 8).",
-  ["draw.import.err.decode"] = "Kein gültiger String. Komplett neu kopieren.",
+  ["draw.import.err.decode"] = "Kein gültiger String. Kopiere ihn komplett neu.",
   ["draw.import.err.json"] = "Die Daten im String sind beschädigt.",
   ["draw.import.err.shape"] = "Die Daten haben eine unerwartete Form.",
   ["draw.import.err.type"] = "Dieser String ist kein Zeichnungs-Export.",
   ["draw.import.err.version"] = "Dieser String stammt aus einer neueren Addon-Version.",
-  ["draw.import.err.items"] = "Zeichnungen im String ungültig oder zu viele.",
+  ["draw.import.err.items"] = "Der String enthält ungültige oder zu viele Zeichnungen.",
   ["draw.import.err.drawing"] = "Eine Zeichnung in diesem String ist beschädigt.",
   ["draw.import.err.at"] = " (Eintrag %d)",
 })
@@ -382,7 +384,7 @@ local function build(container)
   local ui = {}
   P.ui = ui
 
-  ns.AddParagraph(view, "draw.intro")
+  ns.AddIntro(view, "draw.intro")
 
   local bar = CreateFrame("Frame", nil, view.content)
   local newBtn = W.Action(bar, {
@@ -501,6 +503,7 @@ local function build(container)
   end
 
   local list = K.NewList(leftPane, {
+    look = "flat", -- narrow side rail with drag reorder
     rowHeight = 42,
     canReorder = function()
       return true
@@ -624,12 +627,19 @@ local function build(container)
       confirmDelete(item)
     end
   end)
-  actionButton("shareBtn", "draw.page.share", "act.share", "share", 100, function()
-    local item = sel()
-    if item then
-      ns.Share.OpenDrawing(item.id)
-    end
-  end)
+  ui.shareBtn = ns.PageShare.Button(actions, {
+    tooltip = "draw.page.share",
+    tooltipText = "draw.page.shareTip",
+    size = 28,
+    opens = true,
+    onClick = function()
+      local item = sel()
+      if item then
+        ns.Share.OpenDrawing(item.id)
+      end
+    end,
+  })
+  buttons[#buttons + 1] = ui.shareBtn
   actionButton("exportBtn", "draw.page.export", "act.export", "export", 130, function()
     local item = sel()
     local text = item and DR.exportString(item.id)

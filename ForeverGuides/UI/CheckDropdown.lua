@@ -74,7 +74,7 @@ function W.CheckDropdown(parent, opts)
     row.fgItem = item
     row.hl = row:CreateTexture(nil, "BACKGROUND")
     row.hl:SetAllPoints()
-    row.hl:SetColorTexture(1, 1, 1, 0)
+    row.hl:SetColorTexture(ns.Theme.fillColor())
     row.iconBox = CreateFrame("Frame", nil, row)
     row.iconBox:SetSize(ICON, ICON)
     row.iconBox:SetPoint("LEFT", row.box, "RIGHT", PAD, 0)
@@ -95,10 +95,10 @@ function W.CheckDropdown(parent, opts)
       end
     end
     row:HookScript("OnEnter", function()
-      row.hl:SetColorTexture(1, 1, 1, 0.08)
+      row.hl:SetColorTexture(Theme.fillColor("hover"))
     end)
     row:HookScript("OnLeave", function()
-      row.hl:SetColorTexture(1, 1, 1, 0)
+      row.hl:SetColorTexture(ns.Theme.fillColor())
     end)
     W.AttachTooltip(row, item.tooltip, item.tooltipText)
     row.fgOnFocus, row.fgOnBlur = showTip, ns.HideTooltip

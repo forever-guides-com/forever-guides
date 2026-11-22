@@ -1,4 +1,4 @@
--- Registry of the settings: 8 groups, 45 features (the tabs of the settings page) and the cards of each
+-- Registry of the settings: 9 groups, 49 features (the tabs of the settings page) and the cards of each
 -- feature. Plain data, the rules are in Modules/SettingsFeatureLogic.lua, the texts in
 -- Modules/SettingsFeatureLocale.lua. The ids are stable keys of the code, never shown to the player.
 --
@@ -13,7 +13,7 @@ ns.SettingsFeatures = SF
 
 SF.LOCALES = { "enUS", "deDE" }
 
-SF.GROUPS = { "basics", "interface", "display", "world", "trade", "chat", "party", "data" }
+SF.GROUPS = { "basics", "interface", "display", "game", "world", "trade", "chat", "party", "data" }
 
 local function cards(list)
   local out = {}
@@ -39,8 +39,10 @@ SF.FEATURES = {
     { "setup.tour", "settings.advanced" },
     { "setup.addons", "addons.set.heading" },
   }, { dynamic = "setup.addon." }),
+  feature("profiles", "basics", { { "profiles.main", "profile.heading" } }),
   feature("messages", "basics", {
     { "messages.feedback", "settings.feedback" },
+    { "messages.updates", "settings.updates" },
     { "messages.errors", "auto.card.errors" },
   }),
   feature("automation", "basics", {
@@ -71,10 +73,25 @@ SF.FEATURES = {
   feature("farmhud", "display", { { "farmhud.main", "farmhud.set.heading" } }),
   feature("hudwindows", "display", { { "hudwindows.main", "settings.feature.hudwindows" } }),
 
+  feature("tooltips", "game", {
+    { "tooltips.items", "gameui.items.heading" },
+    { "tooltips.units", "gameui.units.heading" },
+    { "tooltips.general", "gameui.tooltip.heading" },
+  }),
+  feature("unitframes", "game", {
+    { "unitframes.look", "gameui.frames.heading" },
+    { "unitframes.size", "gameui.size.heading" },
+  }),
+  feature("spells", "game", {
+    { "spells.castbar", "gameui.castbar.heading" },
+    { "spells.actions", "gameui.actions.heading" },
+  }),
+
   feature("map", "world", {
     { "map.world", "wm.set.heading" },
     { "map.rares", "rare.set.heading" },
     { "map.guild", "guildmap.set.heading" },
+    { "map.navigation", "wp.set.screenNav" },
   }),
   feature("flight", "world", { { "flight.main", "flightlabel.heading" } }),
   feature("gathering", "world", {
@@ -116,9 +133,9 @@ SF.FEATURES = {
     { "items.inspect", "gs.setting.heading" },
   }),
   feature("inventory", "trade", { { "inventory.stock", "inv.set.heading" } }),
-  feature("loot", "trade", { { "loot.main", "loot.heading" } }),
+  feature("loot", "trade", { { "loot.main", "loot.heading" }, { "loot.fast", "fastloot.card" } }),
 
-  feature("chatname", "chat", { { "chatname.main", "chatname.heading" } }),
+  feature("chatname", "chat", { { "chatname.main", "chatname.heading" }, { "chaturl.main", "chaturl.heading" } }),
   feature("foreverchat", "chat", {
     { "foreverchat.enable", "subaddon.chat.title" },
     { "foreverchat.options" },
@@ -197,7 +214,8 @@ SF.CONTROLS = {
   ["flighttimer.enable"] = "flight.main",
   ["fp.set.listCount"] = "map.world",
   ["guildmap.set.showWorld"] = "map.guild",
-  ["inv.set.enable"] = "inventory.stock",
+  ["wp.set.screenNav"] = "map.navigation",
+  ["inv.set.enable"] = "tooltips.items",
   ["ilvl.probe"] = "diagnostics.dev",
   ["nearbyprobe.open"] = "diagnostics.dev",
   ["guild.demo.start"] = "diagnostics.dev",
@@ -219,6 +237,7 @@ SF.CONTROL_IDS = {
   ["lfg.set.panel"] = "lfg-panel",
   ["chatname.heading"] = "chatname-enable",
   ["guildmap.set.showWorld"] = "guildmap-set-showWorld",
+  ["wp.set.screenNav"] = "setting-screenNav",
   ["inv.set.enable"] = "inventory-inventoryTooltip",
 }
 
@@ -253,6 +272,15 @@ SF.SEE = {
 -- ids of the controls (fgId). The search and the jumps know them from here, a test keeps the list equal to
 -- what the card builds.
 SF.MORE = {
+  ["profiles.main"] = {
+    "profile-rename",
+    "profile-delete",
+    "profile-reset",
+    "profile-export",
+    "profile-import",
+    "profile-send",
+    "profile-accept",
+  },
   ["gathering.sparkles.general"] = {
     "sparkles-instanceHide",
     "sparkles-gameIcons",
@@ -266,6 +294,10 @@ SF.MORE = {
     "sparkles-measureStatus",
     "sparkles-measureReset",
     "sparkles-measureChat",
+  },
+  ["map.navigation"] = {
+    "setting-navBeamHeight",
+    "setting-navSize",
   },
   ["map.rares"] = {
     "setting-rareMapPins",
@@ -285,6 +317,7 @@ SF.MORE = {
     "setting-mapFlightWorld",
     "setting-mapFlightAddonMap",
     "setting-mapZoneArrowsWorld",
+    "setting-mapZoneLevels",
     "setting-mapZoneArrowsAddonMap",
     "setting-mapZoneArrowsGuess",
     "setting-zoneCrossRecord",
@@ -294,6 +327,7 @@ SF.MORE = {
   },
   ["gathering.pins"] = {
     "gather-set-minimapEdge",
+    "gather-set-minimapStyle",
     "gather-set-minimapSize",
     "gather-set-minimapAlpha",
     "gather-set-minimapNear",
@@ -305,10 +339,12 @@ SF.MORE = {
   ["window.size"] = {
     "button-settings-dock",
     "setting-combatHide",
+    "setting-combatLock",
     "setting-sidebarCollapsed",
     "setting-buttonLabels",
     "setting-characterButton",
     "setting-hideTalkingHead",
+    "setting-minimapCollect",
     "host-skin",
   },
   ["window.look"] = {
@@ -419,12 +455,14 @@ SF.MORE = {
     "ench-enchantInspect",
     "ench-size",
   },
+  ["tooltips.items"] = {
+    "inventory-inventoryCurrentFirst",
+    "inventory-inventoryColors",
+  },
   ["inventory.stock"] = {
     "inventory-inventoryGuildBank",
     "inventory-inventoryFaction",
-    "inventory-inventoryCurrentFirst",
-    "inventory-inventoryColors",
-    "inventory-priceTooltip",
+    "inventory-bagFreeSlots",
     "inventory-rescan",
     "inventory-clear",
   },
@@ -575,6 +613,9 @@ SF.MORE = {
     "keys-listToEdge",
     "keys-rosterNote",
     "keys-rareFoundMove",
+    "keys-farmHudBlipTips",
+    "keys-mapRoutePoint",
+    "keys-mapMenu",
     "keys-reset-all",
   },
   ["fishing.cast"] = {
@@ -604,5 +645,6 @@ SF.SHARES = {
   contacts = { "presenceMark" },
   logos = { "crestMark" },
   foreverchat = { "linkShare", "chatPeer", "teamChat" },
-  map = { "guildMap" },
+  messages = { "versionCheck" },
+  map = { "guildMap", "friendMap" },
 }

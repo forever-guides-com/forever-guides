@@ -343,6 +343,7 @@ function CV.Build(host)
 
   local listOpts = { gap = 12 }
   local list = K.NewList(view.content, {
+    look = "flat", -- dense roster, class icon and per-row actions
     rowHeight = Kit.ROW_HEIGHT,
     bind = function(e)
       local peer = peerOf(e.name, e.guid)

@@ -125,6 +125,7 @@ end
 function KB.OpenUI()
   -- Showing Blizzard's option panels in combat can raise ADDON_ACTION_BLOCKED.
   if InCombatLockdown and InCombatLockdown() then
+    ns.CombatBlocked("settings panel")
     return false
   end
   local ok, direct = pcall(function()
@@ -163,17 +164,17 @@ ns.AddLocale("enUS", {
   ["binding.chatReply"] = "Forever Chat: reply to last whisper",
 })
 ns.AddLocale("deDE", {
-  ["binding.notes"] = "Notizen-Seite",
+  ["binding.notes"] = "Notizenseite",
   ["binding.noteNew"] = "Neue Notiz",
-  ["binding.drawings"] = "Zeichnungen-Seite",
+  ["binding.drawings"] = "Zeichnungsseite",
   ["binding.drawingNew"] = "Neue Zeichnung",
-  ["binding.talents"] = "Talent-Editor",
-  ["binding.levels"] = "Lernliste (Stufen-Übersicht)",
-  ["binding.map"] = "Karten-Seite",
-  ["binding.route"] = "Routen-Fenster",
+  ["binding.talents"] = "Talenteditor",
+  ["binding.levels"] = "Lernliste (Stufenübersicht)",
+  ["binding.map"] = "Kartenseite",
+  ["binding.route"] = "Routenfenster",
   ["binding.weapons"] = "Waffenmeister",
   ["binding.trainers"] = "Klassenlehrer",
-  ["binding.share"] = "Teilen-Dialog",
+  ["binding.share"] = "Dialog zum Teilen",
   ["binding.chat"] = "Forever Chat: öffnen oder schließen",
   ["binding.chatReply"] = "Forever Chat: Auf letztes Flüstern antworten",
 })

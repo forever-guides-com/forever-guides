@@ -124,8 +124,9 @@ local function wayInfo()
   local choice = SL.Get(sctx(), "actionBackend")
   local way = gm.Backend.Resolve(choice, "promote")
   local dry = guild().settings.dryRun == true
-  local text = gm.Backend.Locked() and L["gm.rules.way.locked"]
-    or string.format(L["gm.rules.way"], L["gm.rules.choice." .. tostring(choice)], L["gm.rules.way." .. way])
+  local name = way == "macro" and SL.Get(sctx(), "macroMode") == "batch" and "batch" or way
+  local text = way == "copy" and gm.Backend.Locked() and L["gm.rules.way.locked"]
+    or string.format(L["gm.rules.way"], L["gm.rules.choice." .. tostring(choice)], L["gm.rules.way." .. name])
   return {
     live = not dry,
     dry = L[dry and "gm.rules.dryOn" or "gm.rules.dryOff"],

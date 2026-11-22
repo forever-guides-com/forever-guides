@@ -10,9 +10,13 @@
 -- state alone: shape and fill do. A pin is a button of its own, a left click opens the menu (waypoint,
 -- whisper, invite). There is no right click: the map zooms out with it. Pins show only while receiving
 -- the guild map is switched on, and only while the client lets us touch the map (ns.ProtectedAllowed);
--- no frame is built in combat. The keyboard route is the member list (a later package).
+-- pins are plain frames and build in combat too. The keyboard route is the member list (a later package).
+-- Opening the map draws at once and in place: the glide state is dropped on open, so a point glides only
+-- when a new report arrives while the map is open. While it is closed, reports are stored and nothing is
+-- drawn. Age shows through the hollow shape only. Online guild members and friends without a shared
+-- position show as one badge per zone (the number of players inside), placed at the middle of the zone.
 local _, ns = ...
-local L, W, WML, GLG, Consent = ns.L, ns.W, ns.WorldMapLinks, ns.WorldMapGuildLogic, ns.Consent
+local L, W, WML, GLG = ns.L, ns.W, ns.WorldMapLinks, ns.WorldMapGuildLogic
 local Store, PN, GD, Theme = ns.GuildMapStore, ns.PlayerName, ns.GuildData, ns.Theme
 
 local WMG = {}
@@ -20,6 +24,10 @@ ns.WorldMapGuildPins = WMG
 
 ns.AddLocale("enUS", {
   ["wm.guild.tip.cluster"] = "%d guild members",
+  ["wm.friend.tip.cluster"] = "%d players",
+  ["wm.friend.tip.zone"] = "Zone (friends list): %s",
+  ["wm.friend.tip.private"] = "Location not shared",
+  ["wm.guild.tip.zoneCluster"] = "%s: %d players",
   ["wm.guild.tip.level"] = "Level %d %s",
   ["wm.guild.tip.rank"] = "Rank: %s",
   ["wm.guild.tip.zone"] = "Zone (guild list): %s",
@@ -37,6 +45,10 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["wm.guild.tip.cluster"] = "%d Gildenmitglieder",
+  ["wm.friend.tip.cluster"] = "%d Spieler",
+  ["wm.friend.tip.zone"] = "Zone laut Freundesliste: %s",
+  ["wm.friend.tip.private"] = "Standort nicht geteilt",
+  ["wm.guild.tip.zoneCluster"] = "%s: %d Spieler",
   ["wm.guild.tip.level"] = "Stufe %d %s",
   ["wm.guild.tip.rank"] = "Rang: %s",
   ["wm.guild.tip.zone"] = "Zone laut Gildenliste: %s",
@@ -69,13 +81,31 @@ local map, menu
 local pins = {}
 local hooked = {}
 local ticking, depth = false, 0
+-- Seconds between two redraws while a pin slides to a new position, the glide state per member and its timer.
+WMG.GLIDE_STEP = 0.1
+local glide, gliding = {}, false
 
 local function g(name)
   return rawget(_G, name)
 end
 
+-- Guild members and friends are drawn while either source may store.
 local function receiving()
-  return Consent.Allows("guildMap", "receive", "guild")
+  return Store.Receiving()
+end
+
+local function inInstance()
+  local fn = g("IsInInstance")
+  if type(fn) ~= "function" then
+    return false
+  end
+  local ok, value = pcall(fn)
+  return ok and value == true
+end
+
+-- True while the option hides the dots in dungeons, raids and battlegrounds and the player is in one.
+function WMG.HiddenHere(opts)
+  return opts.hideInstances == true and inInstance()
 end
 
 -- Pins ---------------------------------------------------------------------------------------------
@@ -106,8 +136,12 @@ local function memberLines(item)
       lines[#lines + 1] = string.format(L["wm.guild.tip.rank"], m.rankName)
     end
     if m.zone ~= "" then
-      lines[#lines + 1] = string.format(L["wm.guild.tip.zone"], m.zone)
+      lines[#lines + 1] = string.format(L[m.friend and "wm.friend.tip.zone" or "wm.guild.tip.zone"], m.zone)
     end
+  end
+  if e.badge then
+    lines[#lines + 1] = Theme.hexText("textMuted", L["wm.friend.tip.private"])
+    return lines
   end
   local n, unit = GLG.AgeParts(e.age)
   lines[#lines + 1] = string.format(L[unit == "s" and "wm.guild.tip.age" or "wm.guild.tip.ageMin"], n)
@@ -149,7 +183,17 @@ local function tooltip(pin)
     lines[#lines + 1] = string.format(L["wm.guild.tip.more"], #items - WMG.LIST_LINES)
   end
   lines[#lines + 1] = Theme.hexText("textMuted", L["wm.guild.tip.clusterHint"])
-  ns.ShowTooltip(pin, string.format(L["wm.guild.tip.cluster"], #items), table.concat(lines, "\n"))
+  local guildOnly = true
+  for _, item in ipairs(items) do
+    guildOnly = guildOnly and item.entry.guild == true
+  end
+  if group.zone then
+    local title = string.format(L["wm.guild.tip.zoneCluster"], group.zone, #items)
+    ns.ShowTooltip(pin, title, table.concat(lines, "\n"))
+    return
+  end
+  local title = L[guildOnly and "wm.guild.tip.cluster" or "wm.friend.tip.cluster"]
+  ns.ShowTooltip(pin, string.format(title, #items), table.concat(lines, "\n"))
 end
 
 -- Actions ------------------------------------------------------------------------------------------
@@ -427,7 +471,7 @@ local function paintPin(pin, group, opts)
   })
   local hit = math.max(ns.MapPins.HIT, drawn + 6)
   pin:SetSize(hit, hit)
-  pin:SetAlpha(single and style.hollow and 0.7 or 1)
+  pin:SetAlpha(1)
 end
 
 -- Data ---------------------------------------------------------------------------------------------
@@ -437,11 +481,18 @@ local function parentOf(id)
   return type(info) == "table" and info.parentMapID or nil
 end
 
+-- Guild members by key, then friends that are no guild members.
 local function rosterByKey()
   local snap = GD.Get()
   local out = {}
   for _, m in ipairs(snap and snap.members or {}) do
     out[m.key] = m
+  end
+  for _, m in ipairs(ns.FriendRoster.Members()) do
+    if not out[m.key] then
+      m.friend = true
+      out[m.key] = m
+    end
   end
   return out
 end
@@ -472,19 +523,100 @@ local function placements(id, kind, opts)
       end
     end
   end
+  if opts.friendZones then
+    -- Online players that do not share (friends, guild members): a badge on the zone the lists name.
+    local badged = {}
+    local function badge(m, zoneId)
+      local member = { known = true, level = m.level, rank = m.rank, online = true }
+      if badged[m.key] or PN.Equal(m.name, me) or Store.Get(m.name) ~= nil then
+        return
+      end
+      if not GLG.Passes(opts, member) or inGroup(m.name) then
+        return
+      end
+      local nx, ny = GLG.Resolve(zoneId, nil, nil, id, kind, WML.Project, parentOf)
+      if nx and nx >= 0 and nx <= 1 and ny >= 0 and ny <= 1 then
+        badged[m.key] = true
+        local entry = {
+          key = m.key,
+          name = m.name,
+          map = zoneId,
+          mode = "zone",
+          state = "current",
+          check = "zone",
+          age = 0,
+          badge = true,
+          guild = not m.friend,
+        }
+        out[#out + 1] = { key = m.key, entry = entry, member = m, nx = nx, ny = ny, approx = true, zone = m.zone }
+      end
+    end
+    if Store.Allowed("guild") then
+      for _, m in pairs(roster) do
+        local zoneId = not m.friend and m.online == true and m.zone and m.zone ~= "" and ns.FriendRoster.ZoneMap(m.zone)
+        if zoneId then
+          badge(m, zoneId)
+        end
+      end
+    end
+    for _, place in ipairs(ns.FriendRoster.ZonePlaces()) do
+      if roster[place.key] then
+        badge(roster[place.key], place.map)
+      end
+    end
+  end
   return out
 end
 
 -- Draw ---------------------------------------------------------------------------------------------
 
-local arm
+local arm, armGlide
+
+-- Milliseconds of the client clock; the time from the open of the map to the last placed point.
+local function nowMs()
+  local fn = g("debugprofilestop")
+  if type(fn) == "function" then
+    local ok, ms = pcall(fn)
+    if ok and type(ms) == "number" then
+      return ms
+    end
+  end
+  return ns.Comm.clock() * 1000
+end
+
+local openAt
+WMG.lastOpen = nil -- { ms, pins } of the last open
+
+-- One group per zone for the badges: { px, py, items, zone }. Sorted by key, so the order never varies.
+local function zoneGroups(badges)
+  table.sort(badges, function(a, b)
+    return a.key < b.key
+  end)
+  local byMap, groups = {}, {}
+  for _, item in ipairs(badges) do
+    local group = byMap[item.entry.map]
+    if not group then
+      group = { px = item.px, py = item.py, items = {}, zone = item.zone }
+      byMap[item.entry.map] = group
+      groups[#groups + 1] = group
+    end
+    group.items[#group.items + 1] = item
+  end
+  return groups
+end
 
 local function draw()
+  -- A closed map draws nothing: reports are stored by the store alone.
+  if map and not map:IsShown() then
+    hidePins(1)
+    return
+  end
   if not (map and ns.ProtectedAllowed(map)) then
     return
   end
   local opts = GLG.Current()
-  local canvas = opts.showWorld and receiving() and map:IsShown() and WML.Canvas()
+  local shows = opts.showWorld and (receiving() or opts.friendZones) and not WMG.HiddenHere(opts)
+  local canvas = shows and map:IsShown() and WML.Canvas()
   local id = canvas and WML.MapID()
   if not id then
     hidePins(1)
@@ -496,13 +628,35 @@ local function draw()
     return
   end
   local items, scale = placements(id, kind, opts), WML.CanvasScale()
+  local now, moving, seen = ns.Comm.clock(), false, {}
+  for _, item in ipairs(items) do
+    seen[item.key] = true
+    if not item.entry.badge then
+      local slides
+      item.nx, item.ny, slides = GLG.Glide(glide, item.key, id, item.nx, item.ny, now)
+      moving = moving or slides
+    end
+  end
+  for key in pairs(glide) do
+    if not seen[key] then
+      glide[key] = nil
+    end
+  end
   local width = canvas:GetWidth() * scale
   local height = canvas:GetHeight() * scale
   for _, item in ipairs(items) do
     item.px, item.py = item.nx * width, item.ny * height
   end
   local size = GLG.Size(WMG.BASE, opts.worldSize)
-  local groups = GLG.Group(items, size * WMG.GROUP_FACTOR, opts.group)
+  local plain, badges = {}, {}
+  for _, item in ipairs(items) do
+    local list = item.entry.badge and badges or plain
+    list[#list + 1] = item
+  end
+  local groups = GLG.Group(plain, size * WMG.GROUP_FACTOR, opts.group)
+  for _, group in ipairs(zoneGroups(badges)) do
+    groups[#groups + 1] = group
+  end
   local shown = 0
   for _, group in ipairs(groups) do
     if shown >= WMG.MAX_PINS then
@@ -510,10 +664,6 @@ local function draw()
     end
     local pin = pins[shown + 1]
     if not pin then
-      -- Never build a frame in combat: the groups that find no free pin wait for the next draw.
-      if ns.InCombat() then
-        break
-      end
       pin = newPin(canvas)
       pins[shown + 1] = pin
     end
@@ -530,8 +680,15 @@ local function draw()
     pin:Show()
   end
   hidePins(shown + 1)
+  if openAt then
+    WMG.lastOpen = { ms = nowMs() - openAt, pins = shown }
+    openAt = nil
+  end
   if shown > 0 then
     arm()
+  end
+  if moving then
+    armGlide()
   end
 end
 
@@ -556,11 +713,40 @@ arm = function()
   end
 end
 
+-- Redraws at a short step while a pin slides; the same guard against a client that runs timers at once.
+armGlide = function()
+  local timer = g("C_Timer")
+  if gliding or type(timer) ~= "table" or type(timer.After) ~= "function" then
+    return
+  end
+  gliding = true
+  local ok = pcall(timer.After, WMG.GLIDE_STEP, function()
+    gliding = false
+    depth = depth + 1
+    if depth <= 2 and map and map:IsShown() then
+      ns.Safe("wmg-glide", draw)
+    end
+    depth = depth - 1
+  end)
+  if not ok then
+    gliding = false
+  end
+end
+
 WMG.Refresh = ns.Wrap("wmg-refresh", draw)
 
 -- Zoom and canvas size change which members lie close together: draw again, the data is local.
 local function rescale()
   WMG.Refresh()
+end
+
+-- One line for /fg diag: the time from the open of the map until its points stood, at the last open.
+function WMG.DiagLine()
+  local last = WMG.lastOpen
+  if not last then
+    return "guild map open: -"
+  end
+  return string.format("guild map open: %.1f ms, %d pins", last.ms, last.pins)
 end
 
 -- Number of shown pins.
@@ -588,6 +774,17 @@ function WMG.Attach()
   if not map then
     return
   end
+  -- The open draws in the same frame (the deferred hook of WorldMapLinks follows for the layout), and
+  -- starts without a glide: every point stands where it is now.
+  if type(map.HookScript) == "function" then
+    pcall(map.HookScript, map, "OnShow", function()
+      openAt, glide = nowMs(), {}
+      ns.Safe("wmg-open", draw)
+    end)
+    pcall(map.HookScript, map, "OnHide", function()
+      openAt = nil
+    end)
+  end
   WML.HookScript("guild", "OnShow", WMG.Refresh)
   hookMethod("OnMapChanged", draw)
   hookMethod("OnCanvasScaleChanged", rescale)
@@ -607,18 +804,20 @@ end)
 -- New, changed, removed or expired positions (debounced by the store), a new guild list, a changed option.
 ns.On("FG_GUILDMAP_UPDATE", WMG.Refresh)
 ns.On("FG_GUILD_UPDATE", WMG.Refresh)
+ns.On("FG_FRIENDS_UPDATE", WMG.Refresh)
+ns.On("PLAYER_ENTERING_WORLD", WMG.Refresh)
 ns.On("FG_SETTING_CHANGED", function(_, path)
   if type(path) == "string" and path:find("^settings%.guildMap") then
     WMG.Refresh()
   end
 end)
 ns.On("FG_CONSENT_CHANGED", function(_, fn)
-  if fn == "guildMap" then
+  if fn == "guildMap" or fn == "friendMap" then
     WMG.Refresh()
   end
 end)
 ns.On("FG_CONSENT_WITHDRAWN", function(_, fn)
-  if fn == "guildMap" then
+  if fn == "guildMap" or fn == "friendMap" then
     WMG.Refresh()
   end
 end)

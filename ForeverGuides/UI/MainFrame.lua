@@ -10,6 +10,7 @@ ns.MainLayout = Layout.compute(Layout.DEFAULT_W, false)
 local frame, sidebar, content, contentHost, header, footer, search
 local views = {}
 local currentView
+local currentId
 
 -- Skin "forever": the title bar moves into the metal bar at the top of the window (see "Title bar" below), the page
 -- header stays under it. band.on = true while the bar sits in the band, band.rect = Skins.BandRect, band.tier = how
@@ -41,7 +42,7 @@ ns.AddLocale("enUS", {
   ["bar.channel.live"] = "live on " .. CHANNEL.text,
   ["channel.promo.badge"] = "Livestream",
   ["channel.promo.title"] = "Questions or feedback? Join our livestream!",
-  ["channel.promo.text"] = "Ask your questions, send feedback or tell us what the add-on is missing. In the Twitch chat we talk to you directly.",
+  ["channel.promo.text"] = "Ask your questions, send feedback or tell us what the addon is missing. In the Twitch chat we talk to you directly.",
   ["channel.promo.button"] = "Copy channel link",
   ["channel.promo.tip"] = "Opens a window with the link to paste into your browser.",
   ["channel.row"] = "Questions or feedback? Livestream",
@@ -225,7 +226,7 @@ function Main.Relayout()
   if not frame then
     return
   end
-  local lay = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, sidebar.editing)
+  local lay = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, sidebar.editing, sidebar:WantedWidth())
   ns.MainLayout = lay
   sidebar:SetWidth(lay.sidebarWidth)
   sidebar:Layout(lay.sidebar == "icons")
@@ -236,27 +237,49 @@ function Main.Relayout()
   ns.Emit("FG_LAYOUT_CHANGED", lay)
 end
 
+-- A language, font size or navigation rename changes what the longest label needs: the sidebar follows.
+ns.On("FG_UI_REFRESHED", function()
+  if frame and frame:IsShown() and sidebar and sidebar.WantedWidth and not sidebar.editing then
+    local wanted = Layout.compute(frame:GetWidth(), ns.db.settings.sidebarCollapsed, false, sidebar:WantedWidth())
+    if wanted.sidebarWidth ~= ns.MainLayout.sidebarWidth then
+      Main.Relayout()
+    end
+  end
+end)
+
 -- Routing ------------------------------------------------------------------
 
 local crumbButtons = {}
 local crumbCount = 0
 parts.crumbs = crumbButtons
 
+-- Gap between the trail and the page title.
+local CRUMB_GAP = 2
+
+-- Height of the trail line: the micro text at its real size (never below 16 px), 0 without a trail.
+local function crumbLine()
+  if crumbCount == 0 then
+    return 0
+  end
+  return math.max(16, math.ceil(Theme.fontSize("micro") * 1.2))
+end
+
 -- Flat: the trail sits above the page title, each crumb right of the one before.
 local function placeCrumbs()
   local prev
+  local lineH = crumbLine()
   for i, b in ipairs(crumbButtons) do
     local on = i <= crumbCount
     b:SetShown(on)
     if on then
-      b:SetHeight(16)
+      b:SetHeight(lineH)
       b:ClearAllPoints()
       b:SetPoint(
         "BOTTOMLEFT",
         prev or header.title,
         prev and "BOTTOMRIGHT" or "TOPLEFT",
         prev and 4 or 0,
-        prev and 0 or 4
+        prev and 0 or CRUMB_GAP
       )
       prev = b
     end
@@ -301,7 +324,9 @@ local function getView(page)
   local container = CreateFrame("Frame", nil, contentHost)
   container:SetAllPoints()
   container:Hide()
+  ns.buildingPage = page
   view = page.build(container, page) or {}
+  ns.buildingPage = nil
   view.container = container
   views[page.id] = view
   return view
@@ -317,8 +342,16 @@ local function dropView(id)
     views[id] = nil
     stale[id] = nil
     if currentView == v then
-      currentView = nil
+      currentView, currentId = nil, nil
     end
+  end
+end
+
+-- Scroll position and bound fields of the page shown go to the character (ns.PageState).
+local currentBare, routeSeq = true, 0
+local function saveCurrentPage()
+  if currentId and currentView then
+    ns.PageState.Save(currentId, currentView, currentBare)
   end
 end
 
@@ -326,6 +359,7 @@ local function onRoute(path, page, params)
   if not frame then
     return
   end
+  saveCurrentPage()
   for _, v in pairs(views) do
     v.container:Hide()
   end
@@ -335,10 +369,14 @@ local function onRoute(path, page, params)
     end
   end
   local view = getView(page)
-  currentView = view
+  local bare = not (params and #params > 0)
+  currentView, currentId, currentBare = view, page.id, bare
+  routeSeq = routeSeq + 1
+  local seq = routeSeq
   view.container:Show()
   W.SetText(header.title, page.title)
   header:SetTour(ns.Tutorials.ForPage(page.id))
+  header:SetPage(page, view)
   renderCrumbs(path)
   header.back:SetEnabled(ns.Router:canBack())
   header.fwd:SetEnabled(ns.Router:canForward())
@@ -346,8 +384,21 @@ local function onRoute(path, page, params)
   if view.Show then
     ns.Safe("view-show:" .. page.id, view.Show, view, params)
   end
+  header:SetShareable(ns.PageShare.Shareable(path))
   if view.Layout then
     ns.Safe("view-layout", view.Layout, view, ns.MainLayout)
+  end
+  -- The list route of a page (no params) takes its scroll position and the entry the player came from back,
+  -- also when the view was only shown again (back from a detail of the same page). A route that names a place
+  -- keeps priority: it does not restore anything. The content height is known after the layout; the second
+  -- pass in the next frame catches a layout that settles late.
+  if bare then
+    ns.Safe("page-scroll", ns.PageState.Restore, page.id, view)
+    C_Timer.After(0, function()
+      if routeSeq == seq then
+        ns.PageState.RestoreScroll(page.id, view)
+      end
+    end)
   end
   ns.charDB.lastRoute = page.id
   ns.Emit("FG_ROUTE_CHANGED", path, page.id)
@@ -355,11 +406,12 @@ end
 
 -- Locale change: rebuild page views so module texts are fresh.
 local function invalidateViews()
+  saveCurrentPage()
   for id, v in pairs(views) do
     v.container:Hide()
     views[id] = nil
   end
-  currentView = nil
+  currentView, currentId = nil, nil
   if ns.Router.current then
     local id, params = ns.RouterClass.parse(ns.Router.current)
     onRoute(ns.Router.current, ns.Router:get(id), params)
@@ -388,8 +440,17 @@ local function onPagesChanged()
   end
 end
 ns.On("FG_SUBADDON_CHANGED", onPagesChanged)
+ns.On("PLAYER_LOGOUT", saveCurrentPage)
 
 -- Keyboard -------------------------------------------------------------------
+
+-- A page with a detail that replaces its list (narrow master/detail) takes the back key and Esc first.
+local function pageBack()
+  local ok, handled = ns.Safe("page-back", function()
+    return currentView and currentView.HandleBack and currentView:HandleBack() or false
+  end)
+  return ok and handled == true
+end
 
 local function handleKey(key)
   if ns.TutorialUI and ns.TutorialUI.HandleKey(key) then
@@ -430,8 +491,8 @@ local function handleKey(key)
     ns.Focus.current:fgArrow(key == "LEFT" and -1 or 1)
     return true
   elseif key == "BACKSPACE" then
-    return ns.Router:goBack()
-  elseif key == "F" and IsControlKeyDown() then
+    return pageBack() or ns.Router:goBack()
+  elseif (key == "F" or key == "K") and IsControlKeyDown() then
     search.edit:SetFocus()
     return true
   elseif
@@ -536,7 +597,7 @@ local function buildTitleBar()
     return field, symbol
   end
   parts.link = { text = "forever-guides.com" }
-  parts.website, parts.websiteIcon = linkField("help.websiteButton", "share", { text = parts.link.text }, function()
+  parts.website, parts.websiteIcon = linkField("help.websiteButton", "open", { text = parts.link.text }, function()
     ns.Dialogs.Copy("help.websiteButton", parts.link.address or ns.Website)
   end)
   -- The channel is the one call to action of the bar: filled in the channel purple with a larger text than the rest.
@@ -560,71 +621,8 @@ local function buildTitleBar()
   end)
   parts.gear = settings
 
-  -- Quick language toggle next to the gear icon: shows which language is
-  -- currently active (the "auto" setting in Settings still resolves to one
-  -- of these two, ns.GetActiveLocale() always returns the resolved value)
-  -- and switches it with one click instead of a trip through the Settings
-  -- page. Selection ring on the active side mirrors K.ClassSwitcher,
-  -- deliberately not color-only (see that widget for the same reasoning).
-  local function setLocale(loc)
-    ns.Store.set("settings.locale", loc)
-    ns.SetLocale(loc)
-    ns.RefreshUI()
-    ns.Main.InvalidateViews()
-  end
-  local langToggle = CreateFrame("Frame", nil, bar)
-  langToggle:SetSize(64, 22)
-  local langDE = W.Button(langToggle, {
-    text = "DE",
-    variant = "ghost",
-    width = 32,
-    height = 22,
-    tooltip = "settings.languageLabel",
-    onClick = function()
-      setLocale("deDE")
-    end,
-  })
-  langDE:SetPoint("LEFT")
-  local langEN = W.Button(langToggle, {
-    text = "EN",
-    variant = "ghost",
-    width = 32,
-    height = 22,
-    tooltip = "settings.languageLabel",
-    onClick = function()
-      setLocale("enUS")
-    end,
-  })
-  langEN:SetPoint("LEFT", langDE, "RIGHT", 4, 0)
-  -- The default 8 px label padding leaves 12 px in a 28 px button, too little
-  -- for two letters, so the text was cut to "...". Size to the widest label.
-  -- Bound on the label so it runs after the label's own font refresh.
-  local function fitLangButtons()
-    local width = 32
-    for _, b in ipairs({ langDE, langEN }) do
-      b.label:ClearAllPoints()
-      b.label:SetPoint("LEFT", 3, 0)
-      b.label:SetPoint("RIGHT", -3, 0)
-      width = math.max(width, math.ceil(b.label:GetStringWidth()) + 10)
-    end
-    langDE:SetWidth(width)
-    langEN:SetWidth(width)
-    langToggle:SetWidth(2 * width + 4)
-  end
-  ns.Bind(langEN.label, fitLangButtons)
-  local langDERing = W.Border(langDE, "accent2", 1, 2)
-  local langENRing = W.Border(langEN, "accent2", 1, 2)
-  local function refreshLangToggle()
-    local active = ns.GetActiveLocale()
-    langDERing.show(active == "deDE")
-    langENRing.show(active == "enUS")
-  end
-  -- The active language is the one source: the setting is stored before ns.SetLocale resolves it, so the ring
-  -- follows FG_LOCALE_CHANGED, and every repaint (style, size, font) reads it again through the bind.
-  ns.Bind(langToggle, refreshLangToggle)
-  ns.On("FG_LOCALE_CHANGED", refreshLangToggle)
-  parts.lang, parts.langDE, parts.langEN = langToggle, langDE, langEN
-  parts.langRing = { deDE = langDERing, enUS = langENRing }
+  -- Quick language toggle next to the gear icon.
+  parts.lang, parts.langDE, parts.langEN = ns.PageKit.LanguageToggle(bar)
 
   local help = W.Action(bar, { icon = "help", size = 26, tooltip = "page.help", opens = true })
   help:SetScript("OnClick", function()
@@ -637,6 +635,17 @@ local function buildTitleBar()
     ns.Dock.Toggle()
   end)
   parts.dock = dock
+  local codeButton = W.Action(bar, {
+    icon = "import",
+    size = 26,
+    tooltip = "pageshare.codeButton",
+    tooltipText = "pageshare.codeButtonText",
+    opens = true,
+  })
+  codeButton:SetScript("OnClick", function()
+    ns.PageShare.OpenCodeDialog()
+  end)
+  parts.code = codeButton
 
   search = W.EditBox(bar, {
     placeholder = "search.placeholder",
@@ -660,10 +669,17 @@ end
 local HEADER_LEFT, HEADER_TITLE_MIN = 74, 140
 -- 96 px of text and icon plus the "opens" mark of the commands button.
 local HEADER_BUTTON_MAX, HEADER_BUTTON_HEIGHT, HEADER_BUTTON_GAP = 112, 24, 6
+-- Space between the title and the subtitle line.
+local HEADER_SUB_GAP = 1
+
+-- Height of one text line: its real string height, never below the font size of the role plus leading.
+local function textLine(fs, role)
+  return math.max(math.ceil(Theme.fontSize(role) * 1.2), math.ceil(fs:GetStringHeight() or 0))
+end
 
 local function buildHeader(parent)
   local h = CreateFrame("Frame", nil, parent)
-  h:SetHeight(Theme.size.contentHeader + 8)
+  h:SetHeight(Theme.size.contentHeader)
   h.back = W.Action(h, { icon = "chevron-left", size = 24, tooltip = "nav.back" })
   h.back:SetScript("OnClick", function()
     ns.Router:goBack()
@@ -672,6 +688,35 @@ local function buildHeader(parent)
   h.fwd:SetScript("OnClick", function()
     ns.Router:goForward()
   end)
+  -- The "?" of a page with a help strip (ns.AddIntro): shows or hides the strip. Made between the arrows and
+  -- the share button so the keyboard reaches it in screen order.
+  h.help = W.Action(h, {
+    icon = "help",
+    size = HEADER_BUTTON_HEIGHT,
+    tooltip = "help.strip.tip",
+    tooltipText = "help.strip.tipText",
+    onClick = function()
+      local strip = h.page and h.page.introStrip
+      if strip then
+        strip:SetCollapsed(strip:IsOpen())
+      end
+    end,
+  })
+  h.help:Hide()
+  ns.Anchors["FG.Header.Help"] = h.help
+  -- Page link, leftmost of the header buttons: the view into the chat or as an address (Modules/PageShare.lua).
+  h.share = W.Action(h, {
+    icon = "share",
+    boxed = true,
+    size = HEADER_BUTTON_HEIGHT,
+    tooltip = "pageshare.tip",
+    tooltipText = "pageshare.tipText",
+    opens = true,
+    onClick = function()
+      ns.PageShare.Open()
+    end,
+  })
+  ns.Anchors["FG.Header.Share"] = h.share
   -- The tour of the page (Tutorials.ForPage), shown left of the commands link on pages that have
   -- one. Made first so the keyboard reaches it before the commands, in screen order.
   h.tour = W.Action(h, {
@@ -704,7 +749,9 @@ local function buildHeader(parent)
     end,
   })
   ns.Anchors["FG.Header.Commands"] = h.commands
-  h.title = W.Text(h, { role = "h2", family = "heading", color = "text" })
+  h.title = W.Text(h, { role = "h2", family = "heading", color = "heading" })
+  -- One line under the title: the page field subtitle or the first sentence of its intro (ns.PageSubtitle).
+  h.sub = W.Text(h, { role = "small", color = "textSecondary" })
 
   -- The labels of both buttons stay while the title keeps its room, else only the icons remain.
   local function fitButtons()
@@ -713,7 +760,10 @@ local function buildHeader(parent)
       return
     end
     local want = h.commands:FullWidth() + (h.tour:IsShown() and h.tour:FullWidth() + HEADER_BUTTON_GAP or 0)
-    local room = width - HEADER_LEFT - 12 - HEADER_TITLE_MIN - 8
+    local room = width - HEADER_LEFT - 12 - HEADER_TITLE_MIN - 8 - HEADER_BUTTON_HEIGHT - HEADER_BUTTON_GAP
+    if h.help:IsShown() then
+      room = room - HEADER_BUTTON_HEIGHT - HEADER_BUTTON_GAP
+    end
     local cap = want <= room and HEADER_BUTTON_MAX or 0
     h.commands:SetWidth(h.commands:Fit(cap))
     h.tour:SetWidth(h.tour:Fit(cap))
@@ -722,36 +772,88 @@ local function buildHeader(parent)
   -- right edge. Both styles use this row as it is.
   local function placeRow()
     h.back:SetSize(24, 24)
-    put(h.back, "LEFT", 12, -6)
+    put(h.back, "LEFT", 12, 0)
     h.fwd:SetSize(24, 24)
     put(h.fwd, "LEFT", h.back, "RIGHT", 2, 0)
     h.commands:SetHeight(HEADER_BUTTON_HEIGHT)
-    put(h.commands, "RIGHT", -12, -6)
+    put(h.commands, "RIGHT", -12, 0)
     h.commands:Show()
     h.tour:SetHeight(HEADER_BUTTON_HEIGHT)
     put(h.tour, "RIGHT", h.commands, "LEFT", -HEADER_BUTTON_GAP, 0)
     h.tour:SetShown(h.tourId ~= nil)
-    put(h.title, "LEFT", h.fwd, "RIGHT", 12, -2)
-    h.title:SetPoint("RIGHT", h.tourId and h.tour or h.commands, "LEFT", -8, 0)
+    local hasSub = (h.sub:GetText() or "") ~= ""
+    -- The height follows the content: top space, trail, title, subtitle, bottom space. The buttons stay centered.
+    local pad = Theme.space.sm
+    local crumbBlock = crumbCount > 0 and crumbLine() + CRUMB_GAP or 0
+    local titleH = textLine(h.title, "h2")
+    local subH = hasSub and textLine(h.sub, "small") or 0
+    local stack = crumbBlock + titleH + (hasSub and HEADER_SUB_GAP + subH or 0)
+    local total = math.max(Theme.size.contentHeader, 2 * pad + stack)
+    h:SetHeight(total)
+    put(h.title, "TOPLEFT", h, "TOPLEFT", HEADER_LEFT, -(pad + crumbBlock))
+    h.title:SetHeight(titleH)
+    h.share:SetSize(HEADER_BUTTON_HEIGHT, HEADER_BUTTON_HEIGHT)
+    put(h.share, "RIGHT", h.tourId and h.tour or h.commands, "LEFT", -HEADER_BUTTON_GAP, 0)
+    h.help:SetSize(HEADER_BUTTON_HEIGHT, HEADER_BUTTON_HEIGHT)
+    local right = h.tourId and h.tour or h.commands
+    local edge = h.share:IsShown() and h.share or right
+    put(h.help, "RIGHT", edge, "LEFT", -HEADER_BUTTON_GAP, 0)
+    local last = h.help:IsShown() and h.help or edge
+    -- Right edge of the title next to the buttons: it is cut with an ellipsis, never drawn under them.
+    h.title:SetPoint("TOPRIGHT", last, "TOPLEFT", -8, (total - HEADER_BUTTON_HEIGHT) / 2 - pad - crumbBlock)
+    h.sub:ClearAllPoints()
+    h.sub:SetPoint("TOPLEFT", h.title, "BOTTOMLEFT", 0, -HEADER_SUB_GAP)
+    h.sub:SetPoint("TOPRIGHT", h.title, "BOTTOMRIGHT", 0, -HEADER_SUB_GAP)
+    h.sub:SetShown(hasSub)
   end
   function h.place()
     placeRow()
     placeCrumbs()
     fitButtons()
   end
+  -- The page link only exists for a page that can be shared (PageShare.Shareable).
+  function h:SetShareable(on)
+    h.share:SetShown(on)
+    h.place()
+  end
   function h:SetTour(tour)
     h.tourId = tour and tour.id or nil
     h.place()
   end
+  -- The view of the page shown: its help strip drives the "?" button, its intro gives the subtitle.
+  local function paintPage()
+    local view = h.page
+    local strip = view and view.introStrip
+    h.help:SetShown(strip ~= nil and strip.available)
+    if strip then
+      h.help:SetSelected(strip:IsOpen())
+    end
+    h.sub:SetText(h.pageInfo and ns.PageSubtitle(h.pageInfo, view) or "")
+    h.place()
+  end
+  function h:SetPage(page, view)
+    h.pageInfo, h.page = page, view
+    paintPage()
+  end
+  function h:SyncHelp(view)
+    if view == h.page then
+      paintPage()
+    end
+  end
+  ns.Bind(h.sub, function()
+    if h.pageInfo then
+      paintPage()
+    end
+  end)
   h:SetTour(nil)
   h:SetScript("OnSizeChanged", fitButtons)
-  ns.Bind(h, fitButtons)
+  ns.Bind(h, h.place)
   h.line = h:CreateTexture(nil, "BORDER")
   h.line:SetPoint("BOTTOMLEFT", 12, 0)
   h.line:SetPoint("BOTTOMRIGHT", -12, 0)
   h.line:SetHeight(1)
   ns.Bind(h.line, function(t)
-    t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    t:SetColorTexture(Theme.fillColor("line"))
   end)
   return h
 end
@@ -768,8 +870,8 @@ end
 local BAR_GAP, BAR_GROUP = 4, 10
 -- Sizes per style: the flat title bar keeps its larger symbols, the metal bar takes smaller ones with room above and below
 -- (pad = bar edge to logo, edge = bar edge to the close button).
-local BAR_FLAT = { pad = 10, edge = 8, gear = 24, help = 26, dock = 26, web = 24, search = 26 }
-local BAR_BAND = { pad = 6, edge = 4, gear = 20, help = 20, dock = 20, web = 20, search = 24 }
+local BAR_FLAT = { pad = 10, edge = 8, gear = 24, help = 26, dock = 26, web = 24, search = 26, code = 26 }
+local BAR_BAND = { pad = 6, edge = 4, gear = 20, help = 20, dock = 20, web = 20, search = 24, code = 20 }
 -- The link text of each middle field is at least this wide, the search box shrinks in two steps.
 local LINK_MIN = 160
 local SEARCH_NARROW, SEARCH_LEAST = 140, 120
@@ -862,7 +964,7 @@ local function placeContent(rect)
     put(sidebar, "TOPLEFT", parts.bar, "BOTTOMLEFT")
   end
   sidebar:SetPoint("BOTTOMLEFT", footer, "TOPLEFT")
-  put(contentHost, "TOPLEFT", header, "BOTTOMLEFT")
+  put(contentHost, "TOPLEFT", header, "BOTTOMLEFT", 0, -Theme.space.md)
   contentHost:SetPoint("BOTTOMRIGHT")
 end
 
@@ -903,6 +1005,7 @@ layoutBar = function()
     help = square(p.help, m.help),
     dock = square(p.dock, m.dock),
     web = square(p.websiteIcon, m.web),
+    code = square(p.code, m.code),
     chan = square(p.channelIcon, m.web),
     lang = p.lang:GetWidth(),
     close = band.on and square(p.close, ns.W.CLOSE_SIZE) or p.close:GetWidth(),
@@ -919,7 +1022,7 @@ layoutBar = function()
     local w = m.edge + size.close + BAR_GAP + size.gear + BAR_GROUP + size.lang
     w = w + (s.help and BAR_GAP + size.help or 0) + (s.dock and BAR_GAP + size.dock or 0)
     w = w + (s.web and BAR_GAP + size.web or 0) + (s.chan and BAR_GAP + size.chan or 0)
-    return w + (s.search > 0 and BAR_GROUP + s.search or 0)
+    return w + (s.search > 0 and BAR_GROUP + size.code + BAR_GAP + s.search or 0)
   end
   local function need(s)
     return leftW(s) + (s.link and BAR_GROUP + size.link + BAR_GAP + size.channel or 0) + BAR_GROUP + rightW(s)
@@ -948,7 +1051,9 @@ layoutBar = function()
   right(p.channelIcon, BAR_GAP, state.chan)
   right(p.websiteIcon, BAR_GAP, state.web)
   p.search:SetSize(math.max(state.search, 1), math.min(m.search, cap))
-  right(p.search, BAR_GROUP, state.search > 0)
+  -- The code button sits right of the search box, close to it.
+  right(p.code, BAR_GROUP, state.search > 0)
+  right(p.search, BAR_GAP, state.search > 0)
 
   -- Left edge, rightwards: everything is placed by its offset from the bar.
   put(p.logo, "LEFT", p.bar, "LEFT", m.pad, 0)
@@ -990,20 +1095,9 @@ applyHeaderMode = function()
   layoutBar()
 end
 
-local function charLine()
-  local _, classFile = UnitClass("player")
-  local level = UnitLevel("player")
-  local faction = UnitFactionGroup and UnitFactionGroup("player")
-  local className = classFile and L["class." .. classFile] or "?"
-  local text = classFile and Theme.classColors[classFile] and Theme.hexText(classFile, className) or className
-  local factionText = faction
-      and (faction == "Alliance" and L["faction.alliance"] or faction == "Horde" and L["faction.horde"])
-    or ""
-  return string.format("%s %s%s", text, tostring(level or "?"), factionText ~= "" and (" · " .. factionText) or "")
-end
-
--- Narrowest the data status of the footer is cut to.
+-- Narrowest the data status of the footer is cut to, and the space around the update hint.
 local DATA_MIN = 24
+local UH_GAP = 12
 
 local function buildFooter()
   local f = CreateFrame("Frame", nil, frame)
@@ -1016,7 +1110,7 @@ local function buildFooter()
   line:SetPoint("TOPRIGHT")
   line:SetHeight(1)
   ns.Bind(line, function(t)
-    t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    t:SetColorTexture(Theme.fillColor("line"))
   end)
 
   local data = CreateFrame("Button", nil, f)
@@ -1039,16 +1133,6 @@ local function buildFooter()
   end)
   W.AttachTooltip(data, "footer.dataTitle", "footer.dataText")
   ns.Anchors["FG.Footer.Data"] = data
-
-  local char = W.Text(f, { role = "micro", color = "textSecondary", justify = "CENTER" })
-  char:SetPoint("CENTER")
-  ns.Bind(char, function(fs)
-    fs:SetText(charLine())
-  end)
-  ns.On("PLAYER_LEVEL_UP", function()
-    char:SetText(charLine())
-  end)
-  ns.Anchors["FG.Footer.Char"] = char
 
   local grip = CreateFrame("Button", nil, f)
   grip:SetSize(16, 16)
@@ -1075,9 +1159,11 @@ local function buildFooter()
   save:SetPoint("RIGHT", version, "LEFT", -8, 0)
   ns.Anchors["FG.Footer.Save"] = save
 
+  -- Opacity and zoom sit behind one button; the controls themselves are its popover.
   local controls = ns.FooterControls.Build(f)
-  controls:SetPoint("RIGHT", save, "LEFT", -8, 0)
+  controls.button:SetPoint("RIGHT", save, "LEFT", -8, 0)
   ns.Anchors["FG.Footer.Controls"] = controls
+  ns.Anchors["FG.Footer.View"] = controls.button
 
   local errors = W.Button(f, {
     text = "",
@@ -1088,42 +1174,36 @@ local function buildFooter()
       ns.Router:navigate("errors")
     end,
   })
-  errors:SetPoint("RIGHT", controls, "LEFT", -8, 0)
+  errors:SetPoint("RIGHT", controls.button, "LEFT", -8, 0)
 
-  -- The data status gives way: the controls lose their sliders first (then their captions),
-  -- the character line moves left when it would touch them, and the data status is cut to the
-  -- room that is left. The controls themselves are never cut.
+  -- The update hint sits between the data status and the right side, as near the middle as they allow.
+  local update = ns.UpdateHint.Build(f)
+  ns.Anchors["FG.Footer.Update"] = update.button
+
+  -- The data status gives way: it is cut to the room the right side (errors, view button, Save, version, grip)
+  -- leaves. The Save caption gives way before the data status is cut, then the update hint shortens.
   function fitData()
     local width = f:GetWidth()
     local base = grip:GetWidth() + 10 + version:GetStringWidth() + 8
     local errorsWidth = errors:IsShown() and errors:GetWidth() + 8 or 0
-    local charWidth = char:GetStringWidth()
     local dataWidth = data.text:GetStringWidth() + 4
-    -- The Save caption gives way before the controls lose sliders or captions. level() lays the
-    -- controls out for a button width and says how much of them is left (3 sliders, 2 captions, 1).
-    local function level(saveWidth)
-      local room = width - base - saveWidth - 8 - errorsWidth - 10 - charWidth - 12 - 8
-      controls:Fit(room - dataWidth, room - DATA_MIN)
-      return controls.alphaSlider:IsShown() and 3 or controls.alphaLabel:IsShown() and 2 or 1
+    local function room(saveWidth)
+      return width - base - saveWidth - 8 - controls.button:GetWidth() - 8 - errorsWidth - 10 - 10
     end
-    local withCaption = level(save.FitCaption(true))
-    if withCaption >= level(save.FitCaption(false)) then
+    if room(save.FitCaption(true)) < math.min(dataWidth, DATA_MIN * 3) then
+      save.FitCaption(false)
+    else
       save.FitCaption(true)
     end
-    local right = base + save:GetWidth() + 8
-    -- Space for data status, character line and the controls side by side (10, 8 and 12 are gaps).
-    local shared = width - right - errorsWidth - 10 - charWidth - 12 - 8
-    controls:Fit(shared - dataWidth, shared - DATA_MIN)
-    local rightEdge = width - right - controls:GetWidth() - errorsWidth
-    char:ClearAllPoints()
-    if width / 2 + charWidth / 2 + 12 <= rightEdge then
-      char:SetPoint("CENTER")
-    else
-      char:SetPoint("RIGHT", f, "RIGHT", -(width - rightEdge + 12), 0)
+    local space = room(save:GetWidth())
+    local hintWidth = update.Fit(space - DATA_MIN - UH_GAP)
+    local dataSpace = math.max(DATA_MIN, space - (hintWidth > 0 and hintWidth + UH_GAP or 0))
+    data:SetWidth(U.clamp(dataWidth, DATA_MIN, dataSpace))
+    if hintWidth > 0 then
+      update.Place(width / 2, 10 + data:GetWidth() + UH_GAP / 2, 10 + space)
     end
-    local charLeft = math.min(width / 2 - charWidth / 2, rightEdge - 12 - charWidth)
-    data:SetWidth(U.clamp(dataWidth, DATA_MIN, math.max(DATA_MIN, math.min(charLeft - 18, rightEdge - 10))))
   end
+  update.onChange = fitData
   f:SetScript("OnSizeChanged", fitData)
   ns.On("FG_LAYOUT_CHANGED", fitData)
   ns.On("FG_UI_REFRESHED", fitData)
@@ -1222,6 +1302,8 @@ local function create()
   buildTitleBar()
   footer = buildFooter()
   sidebar = ns.Sidebar.Create(frame)
+  -- Forever: sidebar and footer sit on the stone itself, their flat fills give way to it.
+  ns.WindowShell.Also(frame, { sidebar.fgBack, footer.fgBack })
 
   content = CreateFrame("Frame", nil, frame)
   content:SetPoint("TOPLEFT", sidebar, "TOPRIGHT")
@@ -1252,6 +1334,7 @@ local function create()
     ns.Focus.clear()
     if not frame:IsShown() then
       announcedOpen = false
+      saveCurrentPage()
       ns.Emit("FG_MAIN_HIDDEN")
     end
   end)
@@ -1266,6 +1349,9 @@ local function create()
   ns.WindowShell.RegisterEsc(frame, function()
     if ns.SidebarEdit.Leave() then
       ns.Focus.clear()
+      return true
+    end
+    if pageBack() then
       return true
     end
     if ns.Focus.current then
@@ -1287,6 +1373,7 @@ local function create()
     parts.langEN,
     parts.help,
     parts.dock,
+    parts.code,
     parts.search,
   }
   parts.focusSlots = {}
@@ -1302,6 +1389,7 @@ local function create()
     parts.website,
     parts.channel,
     parts.search,
+    parts.code,
     parts.websiteIcon,
     parts.channelIcon,
     parts.dock,
@@ -1311,7 +1399,18 @@ local function create()
     parts.gear,
     parts.close,
   }
+  -- The footer controls come last in the Tab order, after the page (ns.Focus.move).
+  for _, item in ipairs(ns.Focus.items) do
+    local node = item
+    while node and node ~= footer do
+      node = ns.SafeParent(node)
+    end
+    item.fgFocusLast = node == footer or nil
+  end
   ns.Bind(header, applyHeaderMode)
+  ns.On("FG_HELPSTRIP_CHANGED", function(view)
+    header:SyncHelp(view)
+  end)
   ns.On("FG_UI_REFRESHED", layoutBar)
   frame:HookScript("OnSizeChanged", layoutBar)
   ns.Router.onChange = onRoute
@@ -1358,6 +1457,11 @@ end
 
 function Main.IsShown()
   return frame ~= nil and frame:IsShown()
+end
+
+-- The view of the page on screen (page links ask it for its tab and selection).
+function Main.View()
+  return currentView
 end
 
 ns.On("PLAYER_LOGOUT", function()

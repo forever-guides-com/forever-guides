@@ -138,8 +138,8 @@ ns.AddLocale("deDE", {
   ["client.forever"] = "Forever",
   ["client.retail"] = "Retail",
   ["client.unknown"] = "unbekannt",
-  ["client.line"] = "Spiel-Client: %s",
-  ["client.lineForced"] = "Spiel-Client: %s (von Hand gesetzt, erkannt: %s)",
+  ["client.line"] = "Spielclient: %s",
+  ["client.lineForced"] = "Spielclient: %s (von Hand gesetzt, erkannt: %s)",
 })
 
 -- One display line for the settings and info pages.

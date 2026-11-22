@@ -46,9 +46,9 @@ ns.AddLocale("deDE", {
   ["access.sum"] = "Zugang: %d von %d",
   ["access.sumAll"] = "Zugang: alles erfüllt",
   ["access.sumUnknown"] = "%d unbekannt",
-  ["access.filter"] = "Mir fehlt noch",
+  ["access.filter"] = "Noch fehlend",
   ["access.filterEmpty"] = "Nichts fehlt.",
-  ["access.kind.item"] = "Gegenstand",
+  ["access.kind.item"] = "Item",
   ["access.kind.quest"] = "Quest",
   ["access.kind.rep"] = "Ruf",
   ["access.kind.level"] = "Stufe",
@@ -243,7 +243,7 @@ local function makeRow(parent)
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
   end)
 
   function row:fgLayout(width)
@@ -516,10 +516,11 @@ function V.Save()
   return changed
 end
 
--- Without access data no timer is started at all (bag events come often).
+-- No timer without access data or while the access row is off (its default): bag events come often
+-- and nobody reads what would be saved.
 local function schedule()
   local data = accessData()
-  if data and next(data) then
+  if data and next(data) and ns.CharRoster.RowEnabled("access", false) then
     ns.Debounce("access-save", SAVE_DELAY, V.Save)
   end
 end

@@ -12,9 +12,19 @@
 -- Zoom: the picture sits on a canvas that grows with the zoom (100 to 400 percent, MapMagnify) inside a
 -- clipping viewport. Pins keep their pixel size (scaled by the pin size setting) and are placed by fractions
 -- of the canvas, so data, clicks and the marker are independent of the zoom.
+-- Route: when the data add-on has routes for the instance (docs/DUNGEONROUTES-FORMAT.md) a checkbox shows their
+-- paths (strokes of Modules/MapRouteStrokeLogic.lua, rebuilt with the zoom, own pool) and numbered stop markers
+-- (pool like the pins) on the floor; a dropdown picks between several routes. A stop whose boss is defeated
+-- (Modules/BossProgress.lua) shows a tick instead of its number.
+-- Rooms: when the data add-on has room names for the instance (docs/DUNGEONROUTES-FORMAT.md) a second checkbox shows
+-- them as small faint labels (pool of font strings). A label that would overlap a stop, a pin or a label placed before
+-- it is skipped (DungeonRouteLogic.PickLabels), the choice is made again with every zoom step.
+-- Composed floor (floor.mm, docs/DUNGEONMINIMAPS-FORMAT.md): no tile grid but a list of minimap pictures of the
+-- client from the data add-on, each placed in the 1002x668 frame with its own texture coordinates (a picture can
+-- be turned) and draw sublevel. They share the texture pool with the tiles.
 local _, ns = ...
 local W, L, Theme, P, PD = ns.W, ns.L, ns.Theme, ns.PinLogic, ns.DungeonPinDialogs
-local MG = ns.MapMagnify
+local MG, R, S = ns.MapMagnify, ns.DungeonRouteLogic, ns.MapRouteStrokeLogic
 
 local DMV = {}
 ns.DungeonMapView = DMV
@@ -31,13 +41,23 @@ DMV.PIN = 20
 -- The entrance pin is bigger than the others; "show entrance" zooms in to at least this many percent.
 DMV.ENTRANCE_SCALE, DMV.ENTRANCE_ZOOM = 1.25, 200
 DMV.FLOOR_VIEW = "floor"
+-- Route display: on or off (kept while the game runs), strokes per floor at most.
+DMV.showRoute = true
+DMV.ROUTE_BUDGET = 3000
+-- Room labels: on or off (kept while the game runs), alpha of a label.
+DMV.showRooms = true
+DMV.ROOM_ALPHA = 0.75
 
 local GAP, CTRL_H, DROP_W, DROP_H, MARKER = 6, 24, 170, 46, 22
 local PIN_GROUP_W, PIN_SLIDER_W, PIN_VALUE_W = 250, 90, 40
 
 -- Visible part of a floor in texture pixels: { cols, rows, w, h }. A minimap crop (floor.cols and
--- floor.rows) shows every tile whole, any other floor is the 4 by 3 grid cut to 3:2.
+-- floor.rows) shows every tile whole, any other floor is the 4 by 3 grid cut to 3:2. A composed floor has the
+-- same 1002x668 frame without tiles (mm = true).
 function DMV.Geometry(floor)
+  if floor and floor.mm then
+    return { cols = 1, rows = 1, w = DMV.VIEW_W, h = DMV.VIEW_H, mm = true }
+  end
   if floor and floor.cols and floor.rows then
     return { cols = floor.cols, rows = floor.rows, w = floor.cols * DMV.TILE, h = floor.rows * DMV.TILE }
   end
@@ -86,6 +106,17 @@ ns.AddLocale("enUS", {
   ["dmap.legend.entrance"] = "E Entrance",
   ["dmap.legend.boss"] = "Skull Boss",
   ["dmap.legend.link"] = "Number Passage to that floor",
+  ["dmap.route"] = "Show route",
+  ["dmap.route.tip"] = "Draws the route and its stops on the map.",
+  ["dmap.rooms"] = "Show rooms",
+  ["dmap.rooms.tip"] = "Writes the names of the rooms on the map.",
+  ["dmap.route.choose"] = "Choose route",
+  ["dmap.routeN"] = "Route %d",
+  ["dmap.route.stop"] = "Stop %d",
+  ["dmap.route.optional"] = "Optional stop",
+  ["dmap.route.rare"] = "Rare stop",
+  ["dmap.route.note"] = "Note",
+  ["dmap.route.done"] = "Defeated",
 })
 ns.AddLocale("deDE", {
   ["dmap.floor"] = "Ebene wählen",
@@ -94,7 +125,7 @@ ns.AddLocale("deDE", {
   ["dmap.export"] = "Exportieren",
   ["dmap.import"] = "Importieren",
   ["dmap.noInstance"] = "Wähle eine Instanz, um ihre Karte zu sehen.",
-  ["dmap.surface"] = "Dungeon-Karte",
+  ["dmap.surface"] = "Dungeonkarte",
   ["dmap.soon"] = "Karte folgt",
   ["dmap.pins.none"] = "Auf dieser Ebene sind noch keine Pins gesetzt.",
   ["dmap.pins.bosses"] = "Bosse auf dieser Ebene: %s",
@@ -106,7 +137,7 @@ ns.AddLocale("deDE", {
   ["dmap.delete.title"] = "Pin löschen",
   ["dmap.delete.text"] = "Diesen Pin löschen?",
   ["dmap.error"] = "Pin nicht gespeichert: %s",
-  ["dmap.entrance"] = "Eingang zeigen",
+  ["dmap.entrance"] = "Eingang anzeigen",
   ["dmap.entrance.tip"] = "Zoomt hinein und zentriert die Karte auf den Eingang.",
   ["dmap.entrance.none"] = "Auf dieser Ebene ist kein Eingang gesetzt.",
   ["dmap.pinSize"] = "Pin-Größe",
@@ -115,6 +146,17 @@ ns.AddLocale("deDE", {
   ["dmap.legend.entrance"] = "E Eingang",
   ["dmap.legend.boss"] = "Totenkopf Boss",
   ["dmap.legend.link"] = "Zahl Übergang zu dieser Ebene",
+  ["dmap.route"] = "Route anzeigen",
+  ["dmap.route.tip"] = "Zeichnet die Route und ihre Stopps auf die Karte.",
+  ["dmap.rooms"] = "Räume anzeigen",
+  ["dmap.rooms.tip"] = "Schreibt die Namen der Räume auf die Karte.",
+  ["dmap.route.choose"] = "Route wählen",
+  ["dmap.routeN"] = "Route %d",
+  ["dmap.route.stop"] = "Stopp %d",
+  ["dmap.route.optional"] = "Optionaler Stopp",
+  ["dmap.route.rare"] = "Seltener Stopp",
+  ["dmap.route.note"] = "Hinweis",
+  ["dmap.route.done"] = "Besiegt",
 })
 
 local function maps()
@@ -169,11 +211,16 @@ end
 function DMV.Create(parent)
   local f = CreateFrame("Frame", nil, parent)
   local state = { key = nil, floor = 1, floors = 0, edit = false, bosses = {}, width = nil, mapW = 0, mapH = 0 }
+  state.routeIndex = 1
   f.state = state
   f.tiles, f.pinFrames = {}, {}
   f.tilesUsed, f.pinsUsed = 0, 0
+  f.stopFrames, f.stopsUsed = {}, 0
+  f.strokes, f.strokesUsed = { shadow = {}, main = {} }, { shadow = 0, main = 0 }
+  f.roomLabels, f.roomsUsed = {}, 0
   local floorDrop, floorOptions, editToggle, exportButton, importButton, map, hint, info, marker, soon
-  local view, mag, entranceButton, pinGroup
+  local view, mag, entranceButton, pinGroup, routeToggle, routeDrop, routeOptions
+  local roomToggle
   local pins = {}
 
   -- Called after a click changed what the widget needs in height (the page lays out again).
@@ -194,6 +241,25 @@ function DMV.Create(parent)
     end
     tex:Show()
     return tex
+  end
+
+  -- A picture of a composed floor: texture, draw sublevel (higher building parts over lower ones). Its place
+  -- follows in placeAll. A damaged row is left out.
+  local function acquirePiece(row)
+    if type(row) ~= "table" or #row < 14 or type(row[1]) ~= "number" then
+      return
+    end
+    local tex = acquireTile()
+    tex:SetTexture(row[1])
+    tex:SetDrawLayer("BACKGROUND", math.max(0, math.min(7, math.floor(tonumber(row[14]) or 0))))
+    tex.piece = row
+  end
+
+  local function placePiece(tex, row, sx, sy)
+    tex:ClearAllPoints()
+    tex:SetPoint("TOPLEFT", map, "TOPLEFT", row[2] * sx, -row[3] * sy)
+    tex:SetSize(row[4] * sx, row[5] * sy)
+    tex:SetTexCoord(row[6], row[7], row[8], row[9], row[10], row[11], row[12], row[13])
   end
 
   local function cursorFraction()
@@ -443,19 +509,226 @@ function DMV.Create(parent)
     marker:Show()
   end
 
+  -- Route ---------------------------------------------------------------------------------------
+
+  local function activeRoute()
+    return DMV.showRoute and state.routes and state.routes[state.routeIndex] or nil
+  end
+
+  -- True when the boss of the stop is defeated (BossProgress), false when it is not or the data does not know it.
+  local function stopDefeated(stop)
+    local idx = R.BossIndex(stop, state.bosses)
+    local BP, inst = ns.BossProgress, state.key and findInstance(state.key)
+    return idx ~= nil and BP ~= nil and inst ~= nil and BP.WingStatus(inst, idx) ~= nil
+  end
+
+  local function stopTitle(item)
+    if item.note then
+      return L["dmap.route.note"]
+    end
+    local idx = R.BossIndex(item.stop, state.bosses)
+    for _, b in ipairs(state.bosses) do
+      if b.idx == idx then
+        return PD.BossName(b)
+      end
+    end
+    return ns.T(item.stop.n) or string.format(L["dmap.route.stop"], item.number)
+  end
+
+  local function showStopTip(frame)
+    local item, lines = frame.row, {}
+    local stop = item.stop
+    if stop and (stop.k == "optional" or stop.k == "rare") then
+      lines[#lines + 1] = L["dmap.route." .. stop.k]
+    end
+    if item.done then
+      lines[#lines + 1] = L["dmap.route.done"]
+    end
+    local text = ns.T(stop and stop.t or (item.note and item.note.t))
+    if text and text ~= "" then
+      lines[#lines + 1] = text
+    end
+    ns.ShowTooltip(frame, stopTitle(item), table.concat(lines, "\n"))
+  end
+
+  local function createStop()
+    local stop = CreateFrame("Frame", nil, map)
+    stop:SetSize(DMV.PIN, DMV.PIN)
+    stop.plate = stop:CreateTexture(nil, "BACKGROUND")
+    stop.plate:SetAllPoints()
+    stop.glyph = W.Text(stop, { role = "micro", color = "text", justify = "CENTER" })
+    stop.glyph:SetPoint("CENTER")
+    stop.tick = W.CheckMark(stop, 12, "text")
+    stop.tick:SetPoint("CENTER")
+    W.Border(stop, "white", 0.8, 1)
+    stop:EnableMouse(true)
+    stop:SetScript("OnEnter", function(self)
+      if self.row then
+        showStopTip(self)
+      end
+    end)
+    stop:SetScript("OnLeave", ns.HideTooltip)
+    -- A click on a stop is a click on the map below it.
+    stop:SetScript("OnMouseUp", function(_, button)
+      local click = map:GetScript("OnClick")
+      if click then
+        click(map, button)
+      end
+    end)
+    return stop
+  end
+
+  local function acquireStop(item)
+    f.stopsUsed = f.stopsUsed + 1
+    local frame = f.stopFrames[f.stopsUsed]
+    if not frame then
+      frame = createStop()
+      f.stopFrames[f.stopsUsed] = frame
+    end
+    item.done = item.stop ~= nil and stopDefeated(item.stop)
+    frame.row = item
+    frame.plate:SetColorTexture(Theme.color(item.stop and R.StopToken(item.stop.k) or "info", 0.95))
+    W.SetText(frame.glyph, nil, (item.done and "") or (item.stop and tostring(item.number)) or "i")
+    frame.tick:SetShown(item.done)
+    frame:Show()
+  end
+
+  -- The rows of the active route on the shown floor and a marker for each stop and note.
+  local function fillRoute()
+    local route = activeRoute()
+    state.routeView = route and R.Visible(route, state.floor) or nil
+    local routeView = state.routeView
+    if not routeView then
+      return
+    end
+    for _, item in ipairs(routeView.stops) do
+      acquireStop(item)
+    end
+    for _, note in ipairs(routeView.notes) do
+      acquireStop({ note = note })
+    end
+  end
+
+  -- Rooms ---------------------------------------------------------------------------------------
+
+  -- A label per room of the shown floor, text and size are fixed here, the place follows the zoom (placeRooms).
+  local function fillRooms()
+    if not (DMV.showRooms and state.rooms) then
+      return
+    end
+    for _, row in ipairs(R.RoomLabels(state.rooms, state.floor)) do
+      f.roomsUsed = f.roomsUsed + 1
+      local label = f.roomLabels[f.roomsUsed]
+      if not label then
+        label = W.Text(map, { role = "micro", color = "textMuted", justify = "CENTER" })
+        label:SetAlpha(DMV.ROOM_ALPHA)
+        f.roomLabels[f.roomsUsed] = label
+      end
+      W.SetText(label, nil, ns.T(row.n))
+      label.row = row
+      label.w, label.h = math.ceil(label:GetStringWidth()) + 4, math.ceil(label:GetStringHeight()) + 2
+    end
+  end
+
+  local function placeRooms()
+    local items, blockers = {}, {}
+    for i = 1, f.roomsUsed do
+      local label = f.roomLabels[i]
+      items[i] = { x = label.row.x * state.mapW, y = label.row.y * state.mapH, w = label.w, h = label.h }
+    end
+    local function block(frame, at)
+      local size = frame:GetWidth()
+      blockers[#blockers + 1] = { x = at.x * state.mapW, y = at.y * state.mapH, w = size, h = size }
+    end
+    for i = 1, f.stopsUsed do
+      block(f.stopFrames[i], f.stopFrames[i].row.stop or f.stopFrames[i].row.note)
+    end
+    for i = 1, f.pinsUsed do
+      block(f.pinFrames[i], f.pinFrames[i].pin)
+    end
+    local picked = R.PickLabels(items, blockers, state.mapW, state.mapH)
+    for i = 1, f.roomsUsed do
+      local label, rect = f.roomLabels[i], picked[i]
+      label:ClearAllPoints()
+      if rect then
+        label:SetPoint("CENTER", map, "TOPLEFT", rect.x, -rect.y)
+      end
+      label:SetShown(rect ~= false)
+    end
+  end
+
+  local sbuf, pxs, pys = S.NewBuffer(), {}, {}
+
+  local function acquireStroke(kind, sublevel)
+    local used = f.strokesUsed[kind] + 1
+    f.strokesUsed[kind] = used
+    local line = f.strokes[kind][used]
+    if not line then
+      line = map:CreateLine(nil, "ARTWORK", nil, sublevel)
+      f.strokes[kind][used] = line
+    end
+    return line
+  end
+
+  local function hideStrokes()
+    for _, kind in ipairs({ "shadow", "main" }) do
+      for i = 1, f.strokesUsed[kind] do
+        f.strokes[kind][i]:Hide()
+      end
+      f.strokesUsed[kind] = 0
+    end
+  end
+
+  -- The paths as strokes in canvas px (a new build per zoom step; the line width stays the same in px).
+  local function strokeRoute()
+    hideStrokes()
+    local routeView = state.routeView
+    if not (routeView and state.mapW > 0 and state.mapH > 0 and map.CreateLine) then
+      return
+    end
+    local rect = { 0, 0, state.mapW, state.mapH }
+    for _, path in ipairs(routeView.paths) do
+      local style = R.PathStyle(path.k)
+      local n = R.Points(path.v, state.mapW, state.mapH, pxs, pys)
+      S.Reset(sbuf)
+      S.Build(sbuf, pxs, pys, n, rect, {
+        style = style.style,
+        width = style.width,
+        budget = math.max(1, DMV.ROUTE_BUDGET - f.strokesUsed.shadow - f.strokesUsed.main),
+      })
+      for k = 1, sbuf.n do
+        local shadow = sbuf.shadow[k]
+        local line = acquireStroke(shadow and "shadow" or "main", shadow and 1 or 2)
+        line:SetThickness(sbuf.w[k])
+        if shadow then
+          line:SetColorTexture(Theme.color("bg", style.alpha * 0.7))
+        else
+          line:SetColorTexture(Theme.color(style.token, style.alpha))
+        end
+        line:SetStartPoint("TOPLEFT", map, sbuf.x1[k], -sbuf.y1[k])
+        line:SetEndPoint("TOPLEFT", map, sbuf.x2[k], -sbuf.y2[k])
+        line:Show()
+      end
+    end
+  end
+
   local function placeAll()
     local geo = state.geo
     for i = 1, geo and f.tilesUsed or 0 do
       local col, row = (i - 1) % geo.cols, math.floor((i - 1) / geo.cols)
       local tex = f.tiles[i]
-      -- The last column and row are cut to the visible area, the rest of the tile is empty.
-      local cw = math.min(DMV.TILE, geo.w - col * DMV.TILE)
-      local ch = math.min(DMV.TILE, geo.h - row * DMV.TILE)
       local sx, sy = state.mapW / geo.w, state.mapH / geo.h
-      tex:ClearAllPoints()
-      tex:SetPoint("TOPLEFT", map, "TOPLEFT", col * DMV.TILE * sx, -row * DMV.TILE * sy)
-      tex:SetSize(cw * sx, ch * sy)
-      tex:SetTexCoord(0, cw / DMV.TILE, 0, ch / DMV.TILE)
+      if tex.piece then
+        placePiece(tex, tex.piece, sx, sy)
+      else
+        -- The last column and row are cut to the visible area, the rest of the tile is empty.
+        local cw = math.min(DMV.TILE, geo.w - col * DMV.TILE)
+        local ch = math.min(DMV.TILE, geo.h - row * DMV.TILE)
+        tex:ClearAllPoints()
+        tex:SetPoint("TOPLEFT", map, "TOPLEFT", col * DMV.TILE * sx, -row * DMV.TILE * sy)
+        tex:SetSize(cw * sx, ch * sy)
+        tex:SetTexCoord(0, cw / DMV.TILE, 0, ch / DMV.TILE)
+      end
     end
     for i = 1, f.pinsUsed do
       local frame = f.pinFrames[i]
@@ -464,6 +737,16 @@ function DMV.Create(parent)
       frame:ClearAllPoints()
       frame:SetPoint("CENTER", map, "TOPLEFT", frame.pin.x * state.mapW, -frame.pin.y * state.mapH)
     end
+    for i = 1, f.stopsUsed do
+      local frame = f.stopFrames[i]
+      local at = frame.row.stop or frame.row.note
+      local px = math.floor(DMV.PIN * ns.InstanceDisplay.PinFactor() * 0.9 + 0.5)
+      frame:SetSize(px, px)
+      frame:ClearAllPoints()
+      frame:SetPoint("CENTER", map, "TOPLEFT", at.x * state.mapW, -at.y * state.mapH)
+    end
+    strokeRoute()
+    placeRooms()
     placeMarker()
   end
 
@@ -498,8 +781,13 @@ function DMV.Create(parent)
 
   local function releaseAll()
     for i = 1, f.tilesUsed do
-      f.tiles[i]:SetTexture(nil)
-      f.tiles[i]:Hide()
+      local tex = f.tiles[i]
+      tex:SetTexture(nil)
+      tex:Hide()
+      if tex.piece then
+        tex.piece = nil
+        tex:SetDrawLayer("ARTWORK", 0)
+      end
     end
     for i = 1, f.pinsUsed do
       local frame = f.pinFrames[i]
@@ -507,7 +795,19 @@ function DMV.Create(parent)
       frame.pin = nil
       frame:Hide()
     end
-    f.tilesUsed, f.pinsUsed = 0, 0
+    for i = 1, f.stopsUsed do
+      f.stopFrames[i].row = nil
+      f.stopFrames[i]:Hide()
+    end
+    hideStrokes()
+    for i = 1, f.roomsUsed do
+      f.roomLabels[i]:SetText("")
+      f.roomLabels[i].row = nil
+      f.roomLabels[i]:Hide()
+    end
+    f.roomsUsed = 0
+    state.routeView = nil
+    f.tilesUsed, f.pinsUsed, f.stopsUsed = 0, 0, 0
     soon.pic:SetTexture(nil)
   end
 
@@ -551,6 +851,16 @@ function DMV.Create(parent)
     return name or string.format(L["dmap.floorN"], n)
   end
 
+  local function paintRoutes()
+    for i = #routeOptions, 1, -1 do
+      routeOptions[i] = nil
+    end
+    for i, route in ipairs(state.routes or {}) do
+      routeOptions[i] = { value = i, text = ns.T(route.n) or string.format(L["dmap.routeN"], i) }
+    end
+    routeDrop.Refresh()
+  end
+
   local function paintFloors()
     for i = #floorOptions, 1, -1 do
       floorOptions[i] = nil
@@ -585,6 +895,9 @@ function DMV.Create(parent)
     soon:SetShown(waiting)
     hint:SetShown(not hasMap and not waiting)
     editToggle:SetShown(hasMap)
+    routeToggle:SetShown(hasMap and state.routes ~= nil)
+    roomToggle:SetShown(hasMap and state.rooms ~= nil)
+    routeDrop:SetShown(hasMap and DMV.showRoute and state.routes ~= nil and #state.routes > 1)
     exportButton:SetShown(hasMap)
     importButton:SetShown(hasMap)
     W.SetText(hint, "dmap.noInstance")
@@ -607,7 +920,10 @@ function DMV.Create(parent)
     local floor = state.entry.floors[state.floor]
     state.geo = DMV.Geometry(floor)
     paintFloors()
+    paintRoutes()
     editToggle.Refresh()
+    routeToggle.Refresh()
+    roomToggle.Refresh()
     pinGroup.Refresh()
     paintZoomControls()
     W.SetText(info, nil, infoText(onFloor))
@@ -615,10 +931,16 @@ function DMV.Create(parent)
     if not f:IsVisible() then
       return
     end
-    for i, id in ipairs(floor.fid) do
-      acquireTile():SetTexture(id)
-      if i >= state.geo.cols * state.geo.rows then
-        break
+    if floor.mm then
+      for _, row in ipairs(ns.InstanceDataAccess and ns.InstanceDataAccess.Minimaps(state.key, state.floor) or {}) do
+        acquirePiece(row)
+      end
+    else
+      for i, id in ipairs(floor.fid) do
+        acquireTile():SetTexture(id)
+        if i >= state.geo.cols * state.geo.rows then
+          break
+        end
       end
     end
     for _, p in ipairs(onFloor) do
@@ -633,6 +955,8 @@ function DMV.Create(parent)
       paintPin(frame, p)
       frame:Show()
     end
+    fillRoute()
+    fillRooms()
     placeAll()
   end
 
@@ -702,8 +1026,11 @@ function DMV.Create(parent)
     if state.floors > 0 then
       local items = {
         { frame = floorDrop, w = math.min(DROP_W, width), h = DROP_H },
+        { frame = routeDrop, w = math.min(DROP_W, width), h = DROP_H },
         { frame = entranceButton, w = 150, h = CTRL_H, low = true },
         { frame = pinGroup, w = math.min(PIN_GROUP_W, width), h = 22, low = true },
+        { frame = routeToggle, w = 170, h = 22, low = true },
+        { frame = roomToggle, w = 170, h = 22, low = true },
         { frame = editToggle, w = 170, h = 22, low = true },
         { frame = exportButton, w = 110, h = CTRL_H, low = true },
         { frame = importButton, w = 110, h = CTRL_H, low = true },
@@ -766,6 +1093,9 @@ function DMV.Create(parent)
     -- Without a floor there is nothing to put pins on.
     state.key = state.floors > 0 and key or nil
     state.bosses = state.key and P.BossList(state.key) or {}
+    state.routes = state.key and ns.InstanceDataAccess and R.Routes(ns.InstanceDataAccess.Routes(state.key)) or nil
+    state.routeIndex = 1
+    state.rooms = state.key and ns.InstanceDataAccess and ns.InstanceDataAccess.Rooms(state.key) or nil
     state.edit = false
     state.marker = nil
     state.floor = state.floors > 0 and startFloor() or 1
@@ -838,6 +1168,45 @@ function DMV.Create(parent)
     end,
     set = function(on)
       state.edit = on
+      render()
+      changed()
+    end,
+  })
+  routeOptions = {}
+  routeDrop = W.Dropdown(f, {
+    key = "dmap.route.choose",
+    options = routeOptions,
+    width = DROP_W,
+    get = function()
+      return state.routeIndex
+    end,
+    set = function(i)
+      state.routeIndex = i
+      render()
+      changed()
+    end,
+  })
+  ns.FlowLayout.FitDropdown(routeDrop)
+  routeToggle = W.Checkbox(f, {
+    key = "dmap.route",
+    tooltipText = "dmap.route.tip",
+    get = function()
+      return DMV.showRoute
+    end,
+    set = function(on)
+      DMV.showRoute = on
+      render()
+      changed()
+    end,
+  })
+  roomToggle = W.Checkbox(f, {
+    key = "dmap.rooms",
+    tooltipText = "dmap.rooms.tip",
+    get = function()
+      return DMV.showRooms
+    end,
+    set = function(on)
+      DMV.showRooms = on
       render()
       changed()
     end,
@@ -988,7 +1357,7 @@ function DMV.Create(parent)
   soon.pic:SetAllPoints()
   soon.dim = soon:CreateTexture(nil, "OVERLAY")
   soon.dim:SetAllPoints()
-  soon.dim:SetColorTexture(0, 0, 0, 0.65)
+  soon.dim:SetColorTexture(ns.Theme.scrim(0.65))
   soon.plate = CreateFrame("Frame", nil, soon)
   W.Fill(soon.plate, "surface", 0.92)
   W.Border(soon.plate, "accent2", 1, 1)
@@ -996,6 +1365,7 @@ function DMV.Create(parent)
   f.map, f.view, f.info, f.hint, f.soon, f.floorDrop = map, view, info, hint, soon, floorDrop
   f.entranceButton, f.pinSlider, f.pinGroup = entranceButton, pinSlider, pinGroup
   f.exportButton, f.importButton, f.editToggle = exportButton, importButton, editToggle
+  f.routeToggle, f.routeDrop, f.roomToggle = routeToggle, routeDrop, roomToggle
 
   f:SetScript(
     "OnShow",

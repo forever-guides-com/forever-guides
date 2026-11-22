@@ -5,7 +5,7 @@ local _, gm = ...
 if not gm.ext then
   return
 end
-local FG, BL, K, DL = gm.FG, gm.BansLogic, gm.RulesKit, gm.DatesLogic
+local FG, BL, K, DL, AS = gm.FG, gm.BansLogic, gm.RulesKit, gm.DatesLogic, gm.AltSuggest
 local W, L, PK, GD = FG.W, FG.L, FG.PageKit, FG.GuildData
 
 local X = {}
@@ -15,7 +15,7 @@ local ROW_HEIGHT = 52
 local GAP = 8
 local FIELD_WIDTH = 220
 local SHOWN_WARNINGS = 4
-local PAGES = { "bans", "former", "alts" }
+local PAGES = { "bans", "former", "alts", "suggest" }
 
 local function guild()
   return gm.Guild()
@@ -88,6 +88,48 @@ end)
 FG.On("CHAT_MSG_SYSTEM", function()
   FG.Safe("gm-lists-check", X.Check)
 end)
+
+-- Alt suggestions ------------------------------------------------------------------------------------------
+
+-- The open suggestions for the roster and the store. Read-only: nothing is linked until the player clicks.
+function X.Suggestions()
+  local g = guild()
+  local rights = FG.GuildExt.Rights() or {}
+  return AS.Find({
+    store = g.members,
+    rows = rosterRows(),
+    dismissed = g.altSkip,
+    officerNote = rights.officerNote == true,
+  })
+end
+
+local function reasonText(sug)
+  local parts = {}
+  for i, r in ipairs(sug.reasons) do
+    parts[i] = string.format(L["gm.alt.reason." .. r.code], L["gm.alt.src." .. r.source], r.name)
+  end
+  return table.concat(parts, "; ")
+end
+
+local function link(item, ctx)
+  if locked() then
+    return
+  end
+  local ok, why = AS.Link(guild().members, item)
+  if not ok then
+    notify(L[why == "changed" and "gm.alt.err.changed" or "gm.err." .. why], "warning")
+  end
+  ctx.Refresh()
+end
+
+local function dismiss(item, ctx)
+  if locked() then
+    return
+  end
+  guild().altSkip = guild().altSkip or {}
+  AS.Dismiss(guild().altSkip, item, today())
+  ctx.Refresh()
+end
 
 -- Ban dialog -------------------------------------------------------------------------------------------
 
@@ -276,6 +318,30 @@ local function build(parent, ctx)
         end
         return out
       end
+      if state.page == "suggest" then
+        return {
+          title = string.format(L["gm.alt.title"], item.name, item.mainName),
+          sub = reasonText(item),
+          wrapSub = true,
+          badge = { text = L["gm.alt.conf." .. item.confidence], color = item.confidence == "low" and "warning" or "textSecondary" },
+          actions = {
+            {
+              icon = "check",
+              tooltip = L["gm.alt.link"],
+              onClick = function()
+                link(item, ctx)
+              end,
+            },
+            {
+              icon = "close",
+              tooltip = L["gm.alt.dismiss"],
+              onClick = function()
+                dismiss(item, ctx)
+              end,
+            },
+          },
+        }
+      end
       local out =
         { title = item.name, sub = string.format(L["gm.alts.list"], table.concat(item.alts, ", ")), wrapSub = true }
       if item.banned then
@@ -364,6 +430,16 @@ local function update(ctx, body)
     end
     rows = BL.Former(g, state.search, current)
     total = #BL.Former(g, "", current)
+  elseif state.page == "suggest" then
+    local all = X.Suggestions()
+    total = #all
+    rows = {}
+    local needle = FG.PlayerName.Lower(state.search)
+    for _, sug in ipairs(all) do
+      if needle == "" or FG.PlayerName.Lower(sug.name .. " " .. sug.mainName):find(needle, 1, true) then
+        rows[#rows + 1] = sug
+      end
+    end
   else
     rows = BL.AltGroups(g, state.search)
     total = #BL.AltGroups(g, "")

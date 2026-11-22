@@ -9,7 +9,7 @@ ns.SleepBagSettings = S
 
 ns.AddLocale("enUS", {
   ["sleepbag.set.heading"] = "Sleeping bag",
-  ["sleepbag.set.hint"] = "A small bar while you use the sleeping bag: the cast, the walk to the bag, then the stacks of Well Rested (one more for every minute of lying, up to 3) with the countdown to the next stack and how long the effect lasts. Standing up with one or two stacks keeps the bar until the effect ends, at 3 stacks it ends with standing up.",
+  ["sleepbag.set.hint"] = "A small bar while you use the sleeping bag: the cast, the walk to the bag, then the stacks of Well Rested (one more for every minute of lying, up to 3) with the countdown to the next stack and how long the effect lasts. With one or two stacks the bar stays until the effect ends. At 3 stacks it ends when you stand up.",
   ["sleepbag.set.enable"] = "Show the sleeping bag display",
   ["sleepbag.set.enableTip"] = "Shows the bar from the moment you use the sleeping bag until you stand up (with one or two stacks until the effect ends). It works in combat too. Hover the bar for the details.",
   ["sleepbag.set.message"] = "Chat message when it ends",
@@ -19,10 +19,10 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["sleepbag.set.heading"] = "Schlafsack",
-  ["sleepbag.set.hint"] = "Eine kleine Leiste beim Benutzen des Schlafsacks: das Ausrollen, der Weg zum Sack, danach die Stapel von Gut erholt (jede Minute im Liegen kommt einer dazu, höchstens 3) mit dem Countdown bis zum nächsten Stapel und der Dauer des Effekts. Wer mit ein oder zwei Stapeln aufsteht, behält die Leiste bis der Effekt endet, bei 3 Stapeln endet sie mit dem Aufstehen.",
-  ["sleepbag.set.enable"] = "Schlafsack-Anzeige anzeigen",
-  ["sleepbag.set.enableTip"] = "Zeigt die Leiste ab dem Benutzen des Schlafsacks, bis du aufstehst (mit ein oder zwei Stapeln bis der Effekt endet). Sie funktioniert auch im Kampf. Fahre mit der Maus über die Leiste für die Details.",
-  ["sleepbag.set.message"] = "Chat-Meldung am Ende",
+  ["sleepbag.set.hint"] = "Eine kleine Leiste beim Benutzen des Schlafsacks: das Ausrollen, der Weg zum Sack, danach die Stapel von Gut erholt (jede Minute im Liegen kommt einer dazu, höchstens 3) mit dem Countdown bis zum nächsten Stapel und der Dauer des Effekts. Mit ein oder zwei Stapeln bleibt die Leiste, bis der Effekt endet. Bei 3 Stapeln endet sie mit dem Aufstehen.",
+  ["sleepbag.set.enable"] = "Schlafsackanzeige anzeigen",
+  ["sleepbag.set.enableTip"] = "Zeigt die Leiste ab dem Benutzen des Schlafsacks, bis du aufstehst (mit ein oder zwei Stapeln, bis der Effekt endet). Sie funktioniert auch im Kampf. Details im Tooltip der Leiste.",
+  ["sleepbag.set.message"] = "Chatmeldung am Ende",
   ["sleepbag.set.messageTip"] = "Eine kurze Zeile mit der Liegedauer und den Stapeln, oder ein Hinweis, wenn du vor dem ersten Stapel aufgestanden bist.",
   ["sleepbag.set.lock"] = "Position sperren",
   ["sleepbag.set.lockTip"] = "Ohne Sperre verschiebst du die Leiste durch Ziehen.",

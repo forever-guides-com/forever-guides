@@ -10,11 +10,11 @@ local S = {}
 ns.CrestSettings = S
 
 ns.AddLocale("enUS", {
-  ["crest.hint"] = "Choose the logos others see next to your name. Only logos from the add-on's list can be chosen.",
+  ["crest.hint"] = "Choose the logos others see next to your name. Only logos from the addon's list can be chosen.",
   ["crest.guild.show"] = "Show my guild",
   ["crest.guild.show.tip"] = "The logo of your guild next to your name, for addon users who allowed it.",
   ["crest.guild.found"] = "Your guild has a logo: %s",
-  ["crest.guild.none"] = "Your guild has no logo in the add-on yet.",
+  ["crest.guild.none"] = "Your guild has no logo in the addon yet.",
   ["crest.guild.noGuild"] = "No guild found for this character.",
   ["crest.communities"] = "My communities",
   ["crest.communities.tip"] = "Up to 8 community logos next to your name, in the order you choose them.",
@@ -24,7 +24,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["crest.hint"] = "Wähle die Logos, die andere neben deinem Namen sehen. Nur Logos aus der Liste des Addons sind wählbar.",
-  ["crest.guild.show"] = "Meine Gilde zeigen",
+  ["crest.guild.show"] = "Meine Gilde anzeigen",
   ["crest.guild.show.tip"] = "Das Logo deiner Gilde neben deinem Namen, für Addon-Nutzer, die es erlaubt haben.",
   ["crest.guild.found"] = "Deine Gilde hat ein Logo: %s",
   ["crest.guild.none"] = "Deine Gilde hat noch kein Logo im Addon.",

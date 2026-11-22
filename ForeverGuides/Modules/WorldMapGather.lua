@@ -143,7 +143,7 @@ local function attachLayer(canvas, feed, items)
       return target == canvas or target == container
     end,
   })
-  layer.layer:SetFrameLevel(WLinks.CanvasLevel(canvas, "spots"))
+  WLinks.TrackLevel(layer.layer, canvas, "spots")
   return layer
 end
 
@@ -237,7 +237,7 @@ local function ensureReveal(canvas)
   end
   host = CreateFrame("Frame", nil, canvas)
   host:SetAllPoints(canvas)
-  host:SetFrameLevel(ns.WorldMapLinks.CanvasLevel(canvas, "reveal"))
+  ns.WorldMapLinks.TrackLevel(host, canvas, "reveal")
   host:EnableMouse(false)
   host:Hide()
   return host
@@ -254,7 +254,9 @@ function WG.PaintReveal()
   local id = ns.WorldMapLinks.MapID()
   local RV = ns.MapReveal
   local state = RV.Available() and "ready" or ns.PackageUI.State(RV.ADDON)
-  local mode = WL.RevealMode(revealSwitch() and canvas ~= nil and shown(m), id, ns.WorldMapLinks.MapType(id), state)
+  -- A stitched map replaces the explored look of the client, there is nothing to reveal on it.
+  local on = revealSwitch() and canvas ~= nil and shown(m) and not ns.StitchedMapCompat.Stitched()
+  local mode = WL.RevealMode(on, id, ns.WorldMapLinks.MapType(id), state)
   lastMode = mode
   if mode ~= "draw" then
     clearReveal()

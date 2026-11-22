@@ -102,9 +102,9 @@ ns.AddLocale("deDE", {
   ["canvas.spell.pick"] = "Öffnet die Zauberliste mit Suche und Klassenfilter.",
   ["canvas.spell.none"] = "Kein Zauber gewählt",
   ["canvas.spell.clear"] = "Zauber entfernen",
-  ["canvas.item.pick"] = "Öffnet die Gegenstandsliste mit Suche.",
-  ["canvas.item.none"] = "Kein Gegenstand gewählt",
-  ["canvas.item.clear"] = "Gegenstand entfernen",
+  ["canvas.item.pick"] = "Öffnet die Item-Liste mit Suche.",
+  ["canvas.item.none"] = "Kein Item gewählt",
+  ["canvas.item.clear"] = "Item entfernen",
   ["canvas.fold.tip"] = "Klick öffnet oder schließt diesen Abschnitt.",
   ["canvas.sec.basics"] = "Grundlagen",
   ["canvas.sec.look"] = "Aussehen",
@@ -158,7 +158,7 @@ function C.Color(parent, o)
       chip.tex:SetColorTexture(U.hex(hex))
       W.SetText(button.label, nil, "#" .. hex:upper())
     else
-      chip.tex:SetColorTexture(0, 0, 0, 0)
+      chip.tex:SetColorTexture(ns.Theme.fillColor())
       W.SetText(button.label, "canvas.color.none")
     end
   end
@@ -458,7 +458,7 @@ function C.Gallery(parent, o)
     cell.chip:SetDrawLayer("OVERLAY", 1)
     cell.chip:SetSize(16, 16)
     cell.chip:SetPoint("BOTTOMRIGHT", -2, 2)
-    cell.chip:SetColorTexture(0, 0, 0, 0.75)
+    cell.chip:SetColorTexture(ns.Theme.scrim(0.75))
     cell.check = W.CheckMark(cell, 12, "text")
     cell.check:SetPoint("CENTER", cell.chip, "CENTER")
     cell.check:Fit(12)

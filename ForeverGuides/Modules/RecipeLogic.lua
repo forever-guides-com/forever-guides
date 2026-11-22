@@ -70,6 +70,50 @@ function R.Name(r, lang)
   return name
 end
 
+-- The name of an id in one of the name tables of a recipe file ({ [id] = { de, en } }), lang "de" or "en"; falls
+-- back to the other language, then to "#id".
+local function tableName(names, id, lang)
+  local e = type(names) == "table" and names[id] or nil
+  local first, second = "en", "de"
+  if lang == "de" then
+    first, second = "de", "en"
+  end
+  local n = type(e) == "table" and (e[first] ~= "" and e[first] or e[second]) or nil
+  return type(n) == "string" and n ~= "" and n or "#" .. tostring(id)
+end
+
+-- What a recipe needs besides its reagents: { tools = { names }, station = name, spec = name, cooldown = seconds },
+-- every field nil when the data has none. data is the recipe file table (tables tools, stations, specs).
+function R.Needs(r, data, lang)
+  local out = {}
+  if type(r.tl) == "table" then
+    for _, id in ipairs(r.tl) do
+      if type(id) == "number" then
+        out.tools = out.tools or {}
+        out.tools[#out.tools + 1] = tableName(data and data.tools, id, lang)
+      end
+    end
+  end
+  if type(r.st) == "number" then
+    out.station = tableName(data and data.stations, r.st, lang)
+  end
+  if type(r.sp) == "number" then
+    out.spec = tableName(data and data.specs, r.sp, lang)
+  end
+  if type(r.cd) == "number" and r.cd > 0 then
+    out.cooldown = r.cd
+  end
+  return out
+end
+
+-- A cooldown in whole hours, or in minutes under one hour: value, "h" or "min".
+function R.Duration(seconds)
+  if seconds >= 3600 then
+    return floor(seconds / 3600 + 0.5), "h"
+  end
+  return math.max(1, floor(seconds / 60 + 0.5)), "min"
+end
+
 -- "t" trainer, "i" recipe item, "u" everything else (unknown or not told apart yet).
 function R.SourceKind(r)
   return (r.src == "t" or r.src == "i") and r.src or "u"

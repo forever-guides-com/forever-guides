@@ -38,9 +38,9 @@ ns.AddLocale("enUS", {
   ["wparrow.hide"] = "Hide arrow",
   ["wparrow.gear"] = "Window settings",
   ["wparrow.showTitle"] = "Show title bar",
-  ["wparrow.showTitleTip"] = "Without the title bar the name shows above the distance.",
+  ["wparrow.showTitleTip"] = "Without the title bar, the name appears in small text above the distance.",
   ["wparrow.showBackground"] = "Show background",
-  ["wparrow.showBackgroundTip"] = "Hides background and frame.\nDrag anywhere to move.",
+  ["wparrow.showBackgroundTip"] = "Off hides the background and frame.\nYou can drag the window anywhere.",
   ["wparrow.noPosition"] = "Your position cannot be read here.",
   ["wparrow.noDirection"] = "Direction not available here.",
   ["wparrow.farAway"] = "Other area: %s",
@@ -52,17 +52,17 @@ ns.AddLocale("deDE", {
   ["wparrow.prev"] = "Vorheriger Wegpunkt",
   ["wparrow.remove"] = "Diesen Wegpunkt entfernen",
   ["wparrow.clear"] = "Alle Wegpunkte entfernen...",
-  ["wparrow.list"] = "Wegpunkt-Liste öffnen",
-  ["wparrow.settings"] = "Wegpunkt-Einstellungen",
-  ["wparrow.look"] = "Fenster-Aussehen...",
+  ["wparrow.list"] = "Wegpunktliste öffnen",
+  ["wparrow.settings"] = "Wegpunkteinstellungen",
+  ["wparrow.look"] = "Fensteraussehen...",
   ["wparrow.lock"] = "Position sperren",
   ["wparrow.unlock"] = "Position entsperren",
   ["wparrow.hide"] = "Pfeil ausblenden",
-  ["wparrow.gear"] = "Fenster-Einstellungen",
+  ["wparrow.gear"] = "Fenstereinstellungen",
   ["wparrow.showTitle"] = "Titelzeile anzeigen",
   ["wparrow.showTitleTip"] = "Ohne Titelzeile steht der Name klein über der Entfernung.",
   ["wparrow.showBackground"] = "Hintergrund anzeigen",
-  ["wparrow.showBackgroundTip"] = "Blendet Fläche und Rahmen aus.\nFenster überall ziehbar.",
+  ["wparrow.showBackgroundTip"] = "Aus blendet Hintergrund und Rahmen aus.\nDas Fenster lässt sich überall ziehen.",
   ["wparrow.noPosition"] = "Deine Position lässt sich hier nicht lesen.",
   ["wparrow.noDirection"] = "Die Richtung ist hier nicht verfügbar.",
   ["wparrow.farAway"] = "Anderes Gebiet: %s",
@@ -251,7 +251,7 @@ function WA.Update()
   setArrow(f, angle, wp.color)
   if yards then
     setText(f.dist, WL.formatDistance(yards, ns.GetActiveLocale()))
-    local eta = string.format(L["wparrow.eta"], WL.formatEta(WL.etaSeconds(yards)))
+    local eta = string.format(L["wparrow.eta"], WL.formatEta(ns.WaypointNav.Eta(yards)))
     setText(f.info, angle and eta or (eta .. "\n" .. L["wparrow.noDirection"]))
   elseif not map then
     setText(f.dist, "")
@@ -589,7 +589,8 @@ function WA.Refresh()
     return
   end
   local settings = WP.Settings()
-  local show = settings.arrow and WP.Active() ~= nil
+  -- The marker on the native navigation frame replaces the window while it shows.
+  local show = settings.arrow and WP.Active() ~= nil and not ns.WaypointNav.MarkerActive()
   if show and not frame then
     frame = create()
   end

@@ -22,10 +22,16 @@ ns.AddLocale("enUS", {
   ["inv.diag.you"] = " (current)",
   ["inv.diag.hidden"] = ", hidden in the overview",
   ["inv.diag.never"] = "never",
+  ["inv.diag.last"] = "Last read of your bags this session: bags %s, worn items %s, written: %s",
+  ["inv.diag.lastNone"] = "No read of your bags yet this session",
+  ["inv.diag.ok"] = "readable",
+  ["inv.diag.bad"] = "not readable",
+  ["inv.diag.yes"] = "yes",
+  ["inv.diag.no"] = "no",
   ["inv.diag.account"] = "Account bank: last capture %s, %d items",
   ["inv.diag.guild"] = "Guild bank %s: last capture %s, %d items in %d tabs",
   ["inv.diag.errors"] = "Captured errors from the tooltip or capture: %d, last: %s",
-  ["inv.diag.noItem"] = "No item: hover an item in your bags and type /fg inventory again, or use /fg inventory <item link or id>.",
+  ["inv.diag.noItem"] = "No item. Hover an item in your bags and enter /fg inventory again, or use /fg inventory <item link or ID>.",
   ["inv.diag.item"] = "Item %d:",
   ["inv.diag.owner"] = "  %s",
   ["inv.diag.nobody"] = "  no recorded character owns it",
@@ -34,7 +40,7 @@ ns.AddLocale("enUS", {
   ["inv.diag.failed"] = "Inventory check failed: %s",
 })
 ns.AddLocale("deDE", {
-  ["inv.diag.title"] = "Bestand-Prüfung",
+  ["inv.diag.title"] = "Bestandsprüfung",
   ["inv.diag.hook"] = "Bestand im Tooltip: angebunden",
   ["inv.diag.hookNone"] = "Bestand im Tooltip: nicht angebunden, der Block kann nicht erscheinen",
   ["inv.diag.hookPath"] = "Detail für den Support, Tooltip-Anbindung: %s",
@@ -47,16 +53,22 @@ ns.AddLocale("deDE", {
   ["inv.diag.you"] = " (aktuell)",
   ["inv.diag.hidden"] = ", in der Übersicht ausgeblendet",
   ["inv.diag.never"] = "nie",
+  ["inv.diag.last"] = "Letzte Erfassung deiner Taschen in dieser Sitzung: Taschen %s, Ausrüstung %s, gespeichert: %s",
+  ["inv.diag.lastNone"] = "In dieser Sitzung noch keine Erfassung deiner Taschen",
+  ["inv.diag.ok"] = "lesbar",
+  ["inv.diag.bad"] = "nicht lesbar",
+  ["inv.diag.yes"] = "ja",
+  ["inv.diag.no"] = "nein",
   ["inv.diag.account"] = "Kontobank: letzte Erfassung %s, %d Items",
   ["inv.diag.guild"] = "Gildenbank %s: letzte Erfassung %s, %d Items in %d Reitern",
   ["inv.diag.errors"] = "Erfasste Fehler aus Tooltip oder Erfassung: %d, zuletzt: %s",
-  ["inv.diag.noItem"] = "Kein Item: Mauszeiger in den Taschen auf ein Item halten und /fg inventar erneut tippen, oder /fg inventar <Item-Link oder ID> nutzen.",
+  ["inv.diag.noItem"] = "Kein Item. Halte den Mauszeiger in den Taschen auf ein Item und gib /fg inventar erneut ein, oder nutze /fg inventar <Itemlink oder ID>.",
   ["inv.diag.item"] = "Item %d:",
   ["inv.diag.owner"] = "  %s",
   ["inv.diag.nobody"] = "  kein erfasster Charakter besitzt es",
   ["inv.diag.shown"] = "Der Tooltip zeigt dafür den Block.",
   ["inv.diag.notShown"] = "Der Tooltip zeigt dafür nichts (nur du besitzt es, niemand, oder die Einstellung ist aus).",
-  ["inv.diag.failed"] = "Bestand-Prüfung fehlgeschlagen: %s",
+  ["inv.diag.failed"] = "Bestandsprüfung fehlgeschlagen: %s",
 })
 
 local API_NAMES = { "postcall", "script", "methods" }
@@ -148,6 +160,17 @@ function D.Lines(argument)
       itemCount(snap),
       c.hidden and L["inv.diag.hidden"] or ""
     )
+  end
+  local read = Inv.last
+  if read then
+    add(
+      "inv.diag.last",
+      L[read.bags and "inv.diag.ok" or "inv.diag.bad"],
+      L[read.equip and "inv.diag.ok" or "inv.diag.bad"],
+      L[read.wrote and "inv.diag.yes" or "inv.diag.no"]
+    )
+  else
+    add("inv.diag.lastNone")
   end
   local account = inv[Logic.ACCOUNT_KEY]
   if type(account) == "table" and itemCount(account) > 0 then

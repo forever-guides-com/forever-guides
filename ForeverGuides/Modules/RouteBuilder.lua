@@ -32,7 +32,7 @@ ns.AddLocale("enUS", {
   ["rb.summary.recording"] = "Recording: %d waypoint(s) in %d zone(s)",
   ["rb.summary.done"] = "Finished: %d waypoint(s) in %d zone(s)",
   ["rb.hint"] = "Click a waypoint to mark it on the world map.",
-  ["rb.empty"] = "No waypoints: stand somewhere, then Save position.",
+  ["rb.empty"] = "No waypoints yet. Stand somewhere, then save your position.",
   ["rb.up"] = "Move up",
   ["rb.down"] = "Move down",
   ["rb.delete"] = "Delete waypoint",
@@ -42,11 +42,11 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["rb.title"] = "Routen-Aufzeichnung",
+  ["rb.title"] = "Routenaufzeichnung",
   ["rb.close"] = "Routenfenster schließen",
-  ["rb.namePlaceholder"] = "Wegpunkt-Name (optional)",
+  ["rb.namePlaceholder"] = "Wegpunktname (optional)",
   ["rb.save"] = "Position speichern",
-  ["rb.saveTip"] = "Speichert deine Position als Wegpunkt.\nEnter im Namensfeld geht auch.",
+  ["rb.saveTip"] = "Speichert deine Position als Wegpunkt.\nEnter im Namensfeld speichert ebenfalls.",
   ["rb.done"] = "Fertig",
   ["rb.doneTip"] = "Schließt die Route ab und öffnet den Exporttext.",
   ["rb.clear"] = "Leeren",
@@ -58,13 +58,13 @@ ns.AddLocale("deDE", {
   ["rb.doneEmpty"] = "Speichere zuerst mindestens einen Wegpunkt.",
   ["rb.summary.recording"] = "Aufzeichnung läuft: %d Wegpunkt(e) in %d Zone(n)",
   ["rb.summary.done"] = "Fertig: %d Wegpunkt(e) in %d Zone(n)",
-  ["rb.hint"] = "Wegpunkt anklicken: auf der Weltkarte markieren.",
-  ["rb.empty"] = "Keine Wegpunkte: stell dich hin, dann Position speichern.",
+  ["rb.hint"] = "Klicke einen Wegpunkt an, um ihn auf der Weltkarte zu markieren.",
+  ["rb.empty"] = "Noch keine Wegpunkte. Stell dich an eine Stelle und speichere deine Position.",
   ["rb.up"] = "Nach oben",
   ["rb.down"] = "Nach unten",
   ["rb.delete"] = "Wegpunkt löschen",
   ["rb.grip"] = "Ziehen, um die Größe zu ändern",
-  ["rb.export.title"] = "Route exportieren",
+  ["rb.export.title"] = "Routenexport",
   ["rb.export.hint"] = "Eine Zeile je Wegpunkt, danach /way-Befehle.",
 })
 
@@ -433,6 +433,7 @@ local function create()
   f.status:SetHeight(K.scaledHeight(40))
 
   f.list = K.NewList(f, {
+    look = "flat", -- tiny tool window list
     rowHeight = 38,
     bind = bindRow,
     onClick = function(item)

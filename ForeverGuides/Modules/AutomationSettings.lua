@@ -21,16 +21,16 @@ ns.AddLocale("enUS", {
   ["auto.set.keyTip"] = "Hold it: no helper acts.\nIn combat none acts either.",
   ["auto.set.chat"] = "Messages in chat",
   ["auto.set.chatTip"] = "One chat line per action",
-  ["auto.tip.autoRepair"] = "Repairs when a merchant opens.\nOnly with enough gold.",
+  ["auto.tip.autoRepair"] = "Repairs when a vendor opens.\nOnly with enough gold.",
   ["auto.set.repairGuild"] = "Guild bank first",
   ["auto.tip.repairGuild"] = "Uses the guild bank when you\nmay withdraw that much.",
-  ["auto.tip.autoSummon"] = "Never in combat.\nSummoner and place are checked again.",
+  ["auto.tip.autoSummon"] = "Never in combat.\nChecks summoner and place again.",
   ["auto.set.summonDelay"] = "Delay (seconds)",
   ["auto.set.summonTrusted"] = "Only known players",
   ["auto.tip.summonTrusted"] = "Group, guild and friends.\nOthers: nothing happens.",
   ["auto.tip.autoResurrect"] = "Group, guild and friends only.\nAccepts after 1 second.",
   ["auto.set.resNoCombat"] = "Not in combat",
-  ["auto.tip.resNoCombat"] = "Skips resurrections that are\ncast during combat.",
+  ["auto.tip.resNoCombat"] = "Skips resurrections\nduring combat.",
   ["auto.tip.autoQuest"] = "No reward choice, no gold,\nno currency. Hold the key to pause.",
   ["auto.set.questNormal"] = "Normal quests",
   ["auto.set.questDaily"] = "Daily quests",
@@ -40,14 +40,35 @@ ns.AddLocale("enUS", {
   ["auto.set.questKey"] = "Key needed",
   ["auto.tip.questKey"] = "Only acts while the stop key is held.",
   ["auto.set.questNotice"] = "Quest hints",
-  ["auto.tip.questNotice"] = "One chat line when a quest has to be\ndone by hand: reward choice, items\nor a full quest log. It only explains.",
+  ["auto.tip.questNotice"] = "Writes a chat line when you have to do a\nquest by hand: reward choice, items or a\nfull quest log. Nothing else happens.",
   ["auto.overview.heading"] = "All helpers at a glance",
-  ["auto.overview.hint"] = "Each helper has its switch in the tab where you look for it. Here you only see which ones are on.",
+  ["auto.overview.hint"] = "Each helper has its switch in the matching tab. Here you only see which ones are on.",
   ["auto.overview.row"] = "%s: %s",
   ["auto.overview.open"] = "Open",
   ["auto.set.questReady"] = "Quest ready message",
-  ["auto.tip.questReady"] = "One chat line when a quest of your log\nis done and ready to hand in.",
+  ["auto.tip.questReady"] = "Shows one chat line when a quest of your\nlog is done and ready to hand in.",
   ["auto.set.questReadyHint"] = "Shows a chat line as soon as all objectives of a quest\nare done, so you know when to hand it in. Off by default.",
+  ["auto.set.questReadyGroup"] = "Post done quests to group",
+  ["auto.tip.questReadyGroup"] = "Posts one line with a clickable quest link\nto your party, raid or instance chat.",
+  ["auto.set.questReadyGroupHint"] = "Posts one line per quest in the group chat.\nOnly while you are in a group. Off by default.",
+  ["auto.set.questProgressGroup"] = "Post progress to group",
+  ["auto.tip.questProgressGroup"] = "Posts a line like \"Wolves slain: 3/10\" to your\nparty, raid or instance chat when a goal advances.",
+  ["auto.set.questProgressGroupHint"] = "Posts your objective progress in the group chat.\nQuick changes are combined into one line.\nOnly while you are in a group. Off by default.",
+  ["auto.set.questChatPrefix"] = "Name in group lines",
+  ["auto.tip.questChatPrefix"] = "Starts the quest lines for the group with\n\"Forever Guides:\".",
+  ["auto.set.questChatIcon"] = "Icon in group lines",
+  ["auto.tip.questChatIcon"] = "Shows a picture in front of the quest lines for the group.",
+  ["auto.set.questChatIconHint"] = "The logo shows for players with Forever Guides.\nEveryone else sees a diamond instead.",
+  ["auto.icon.logo"] = "Forever Guides logo",
+  ["auto.icon.none"] = "No icon",
+  ["auto.icon.rt1"] = "Star",
+  ["auto.icon.rt2"] = "Circle",
+  ["auto.icon.rt3"] = "Diamond",
+  ["auto.icon.rt4"] = "Triangle",
+  ["auto.icon.rt5"] = "Moon",
+  ["auto.icon.rt6"] = "Square",
+  ["auto.icon.rt7"] = "Cross",
+  ["auto.icon.rt8"] = "Skull",
   ["auto.set.ignoreQuests"] = "Ignored quest IDs",
   ["auto.set.ignoreNpcs"] = "Ignored NPC IDs",
   ["auto.set.questHint"] = "Add by chat: /fg autoquest ignore <ID>",
@@ -55,16 +76,16 @@ ns.AddLocale("enUS", {
   ["auto.set.socialDuel"] = "Block duels",
   ["auto.set.inviteHeading"] = "Accept group invites",
   ["auto.set.inviteHint"] = "- Every switch works on its own\n- Never while you are queued\n- Hold the stop key to decide yourself",
-  ["auto.tip.acceptFriends"] = "Group invites of friends are\naccepted right away.",
-  ["auto.tip.acceptGuild"] = "Group invites of guild members are\naccepted right away.",
-  ["auto.tip.acceptContacts"] = "Group invites of players in Guild &\nContacts. The list also holds strangers\nfrom trade and groups.",
+  ["auto.tip.acceptFriends"] = "Accepts group invites of friends\nright away.",
+  ["auto.tip.acceptGuild"] = "Accepts group invites of guild members\nright away.",
+  ["auto.tip.acceptContacts"] = "Accepts group invites of players in\nGuild & Contacts. The list also holds\nstrangers from trade and groups.",
   ["auto.set.contactsHint"] = "Careful: the contact list also holds strangers\nyou only met in trade or groups.",
   ["auto.tip.autoRoleCheck"] = "Dungeon finder: confirms your saved roles.\nGroup role poll: sets your role.\nNothing without a saved role.",
   ["auto.set.socialDecline"] = "Decline strangers",
-  ["auto.tip.socialDecline"] = "Group invites of everyone else.\nNot while you are queued.",
+  ["auto.tip.socialDecline"] = "Declines group invites of everyone else.\nNot while you are queued.",
   ["auto.tip.autoRelease"] = "Battlegrounds and PvP maps only.\nNot with a soulstone.",
   ["auto.set.releaseDelay"] = "Delay (ms)",
-  ["auto.tip.hideErrors"] = "Hides red text like Out of range.\nChat is not touched.",
+  ["auto.tip.hideErrors"] = "Hides red text like \"Out of range\".\nChat is not touched.",
   ["auto.set.errorsKeep"] = "Keep important ones",
   ["auto.tip.errorsKeep"] = "Bag full, quest log full,\nnot enough gold stay visible.",
 })
@@ -76,7 +97,7 @@ ns.AddLocale("deDE", {
   ["auto.card.summon"] = "Beschwörung und Tod",
   ["auto.card.duels"] = "Duelle und Fremde",
   ["auto.card.errors"] = "Fehlermeldungen ausblenden",
-  ["auto.set.hint"] = "- Alles ist aus, bis du es einschaltest\n- Gehaltene Stopp-Taste pausiert jede Automatik",
+  ["auto.set.hint"] = "- Alles ist aus, bis du es einschaltest\n- Stopp-Taste halten pausiert jeden Helfer",
   ["auto.set.key"] = "Stopp-Taste",
   ["auto.set.keyTip"] = "Gedrückt halten: nichts passiert.\nIm Kampf passiert ebenfalls nichts.",
   ["auto.set.chat"] = "Meldungen im Chat",
@@ -84,14 +105,14 @@ ns.AddLocale("deDE", {
   ["auto.tip.autoRepair"] = "Repariert beim Öffnen des Händlers.\nNur mit genug Gold.",
   ["auto.set.repairGuild"] = "Gildenkasse zuerst",
   ["auto.tip.repairGuild"] = "Nutzt die Gildenkasse, wenn du\nso viel entnehmen darfst.",
-  ["auto.tip.autoSummon"] = "Nie im Kampf.\nBeschwörer und Ort werden erneut geprüft.",
+  ["auto.tip.autoSummon"] = "Nie im Kampf.\nPrüft Beschwörer und Ort erneut.",
   ["auto.set.summonDelay"] = "Pause (Sekunden)",
   ["auto.set.summonTrusted"] = "Nur bekannte Spieler",
   ["auto.tip.summonTrusted"] = "Gruppe, Gilde und Freunde.\nBei anderen passiert nichts.",
   ["auto.tip.autoResurrect"] = "Nur Gruppe, Gilde und Freunde.\nNimmt nach 1 Sekunde an.",
   ["auto.set.resNoCombat"] = "Nicht im Kampf",
-  ["auto.tip.resNoCombat"] = "Überspringt Wiederbelebungen,\ndie im Kampf gewirkt werden.",
-  ["auto.tip.autoQuest"] = "Keine Belohnungswahl, kein Gold,\nkeine Währung. Taste hält an.",
+  ["auto.tip.resNoCombat"] = "Überspringt Wiederbelebungen\nwährend des Kampfes.",
+  ["auto.tip.autoQuest"] = "Keine Belohnungswahl, kein Gold,\nkeine Währung. Taste halten pausiert.",
   ["auto.set.questNormal"] = "Normale Quests",
   ["auto.set.questDaily"] = "Tägliche Quests",
   ["auto.set.questWeekly"] = "Wöchentliche Quests",
@@ -100,14 +121,35 @@ ns.AddLocale("deDE", {
   ["auto.set.questKey"] = "Taste nötig",
   ["auto.tip.questKey"] = "Wirkt nur bei gehaltener Stopp-Taste.",
   ["auto.set.questNotice"] = "Quest-Hinweise",
-  ["auto.tip.questNotice"] = "Hinweis, wenn eine Quest von Hand erledigt\nwerden muss: Belohnungswahl, Items oder\nvolles Questlog. Er erklärt nur.",
+  ["auto.tip.questNotice"] = "Schreibt eine Chatzeile, wenn du eine Quest\nvon Hand erledigen musst: Belohnungswahl,\nItems oder volles Questlog. Mehr passiert nicht.",
   ["auto.overview.heading"] = "Alle Helfer im Überblick",
-  ["auto.overview.hint"] = "Jeder Helfer hat seinen Schalter in dem Reiter, in dem du ihn suchst. Hier siehst du nur, welche an sind.",
+  ["auto.overview.hint"] = "Jeder Helfer hat seinen Schalter im passenden Reiter. Hier siehst du nur, welche eingeschaltet sind.",
   ["auto.overview.row"] = "%s: %s",
   ["auto.overview.open"] = "Öffnen",
   ["auto.set.questReady"] = "Quest-fertig-Meldung",
-  ["auto.tip.questReady"] = "Eine Chatzeile, sobald eine Quest deines\nLogs erfüllt und abgabebereit ist.",
+  ["auto.tip.questReady"] = "Zeigt eine Chatzeile, sobald eine Quest deines\nLogs erfüllt und abgabebereit ist.",
   ["auto.set.questReadyHint"] = "Zeigt eine Chatzeile, sobald alle Ziele einer Quest\nerfüllt sind, damit du weißt, wann du sie abgeben kannst.\nStandardmäßig aus.",
+  ["auto.set.questReadyGroup"] = "Fertige Quests an Gruppe",
+  ["auto.tip.questReadyGroup"] = "Schreibt eine Zeile mit anklickbarem Questlink\nin den Gruppen-, Raid- oder Instanzchat.",
+  ["auto.set.questReadyGroupHint"] = "Schreibt pro Quest eine Zeile in den Gruppenchat.\nNur in einer Gruppe. Standardmäßig aus.",
+  ["auto.set.questProgressGroup"] = "Fortschritt an Gruppe",
+  ["auto.tip.questProgressGroup"] = "Schreibt eine Zeile wie „Wölfe getötet: 3/10“\nin den Gruppen-, Raid- oder Instanzchat,\nsobald ein Ziel weiterkommt.",
+  ["auto.set.questProgressGroupHint"] = "Schreibt deinen Fortschritt in den Gruppenchat.\nSchnelle Änderungen kommen in eine Zeile.\nNur in einer Gruppe. Standardmäßig aus.",
+  ["auto.set.questChatPrefix"] = "Name in Gruppenzeilen",
+  ["auto.tip.questChatPrefix"] = "Beginnt die Questzeilen für die Gruppe mit\n„Forever Guides:“.",
+  ["auto.set.questChatIcon"] = "Icon in Gruppenzeilen",
+  ["auto.tip.questChatIcon"] = "Zeigt ein Bild vor den Questzeilen für die Gruppe.",
+  ["auto.set.questChatIconHint"] = "Spieler mit Forever Guides sehen das Logo.\nAlle anderen sehen stattdessen einen Diamanten.",
+  ["auto.icon.logo"] = "Forever-Guides-Logo",
+  ["auto.icon.none"] = "Kein Icon",
+  ["auto.icon.rt1"] = "Stern",
+  ["auto.icon.rt2"] = "Kreis",
+  ["auto.icon.rt3"] = "Diamant",
+  ["auto.icon.rt4"] = "Dreieck",
+  ["auto.icon.rt5"] = "Mond",
+  ["auto.icon.rt6"] = "Quadrat",
+  ["auto.icon.rt7"] = "Kreuz",
+  ["auto.icon.rt8"] = "Totenkopf",
   ["auto.set.ignoreQuests"] = "Ignorierte Quest-IDs",
   ["auto.set.ignoreNpcs"] = "Ignorierte NPC-IDs",
   ["auto.set.questHint"] = "Per Chat: /fg autoquest ignore <ID>",
@@ -115,16 +157,16 @@ ns.AddLocale("deDE", {
   ["auto.set.socialDuel"] = "Duelle blocken",
   ["auto.set.inviteHeading"] = "Einladungen annehmen",
   ["auto.set.inviteHint"] = "- Jeder Schalter wirkt für sich\n- Nie während einer Warteschlange\n- Stopp-Taste halten: du entscheidest selbst",
-  ["auto.tip.acceptFriends"] = "Gruppeneinladungen von Freunden\nwerden sofort angenommen.",
-  ["auto.tip.acceptGuild"] = "Gruppeneinladungen von Gildenmitgliedern\nwerden sofort angenommen.",
-  ["auto.tip.acceptContacts"] = "Gruppeneinladungen von Spielern aus Gilde &\nKontakte. Die Liste enthält auch Fremde aus\nHandel und Gruppen.",
+  ["auto.tip.acceptFriends"] = "Nimmt Gruppeneinladungen von Freunden\nsofort an.",
+  ["auto.tip.acceptGuild"] = "Nimmt Gruppeneinladungen von Gildenmitgliedern\nsofort an.",
+  ["auto.tip.acceptContacts"] = "Nimmt Gruppeneinladungen von Spielern\naus Gilde & Kontakte an. Die Liste enthält\nauch Fremde aus Handel und Gruppen.",
   ["auto.set.contactsHint"] = "Vorsicht: Die Kontaktliste enthält auch Fremde,\ndie du nur im Handel oder in Gruppen getroffen hast.",
   ["auto.tip.autoRoleCheck"] = "Dungeonbrowser: bestätigt deine gespeicherten Rollen.\nGruppen-Rollenabfrage: setzt deine Rolle.\nOhne gespeicherte Rolle passiert nichts.",
   ["auto.set.socialDecline"] = "Fremde ablehnen",
-  ["auto.tip.socialDecline"] = "Gruppeneinladungen aller anderen.\nNicht während einer Warteschlange.",
+  ["auto.tip.socialDecline"] = "Lehnt Gruppeneinladungen aller anderen ab.\nNicht während einer Warteschlange.",
   ["auto.tip.autoRelease"] = "Nur Schlachtfelder und PvP-Karten.\nNicht mit Seelenstein.",
   ["auto.set.releaseDelay"] = "Pause (ms)",
-  ["auto.tip.hideErrors"] = "Blendet roten Text wie Außer Reichweite aus.\nDer Chat bleibt unberührt.",
+  ["auto.tip.hideErrors"] = "Blendet roten Text wie „Außer Reichweite“ aus.\nDer Chat bleibt unberührt.",
   ["auto.set.errorsKeep"] = "Wichtige behalten",
   ["auto.tip.errorsKeep"] = "Tasche voll, Questlog voll,\nzu wenig Gold bleiben sichtbar.",
 })
@@ -285,11 +327,49 @@ function S.AddRepair(view)
   toggle(view, "autoRepairGuild", "auto.set.repairGuild", "auto.tip.repairGuild", true)
 end
 
+-- Icon choice of the group lines: the add-on logo, the raid marks (the only pictures chat carries) or none.
+function S.AddQuestIcon(view)
+  local QR = ns.QuestReadyLogic
+  local function mark(n)
+    return string.format("|TInterface\\TargetingFrame\\UI-RaidTargetingIcon_%d:14|t", n)
+  end
+  local logo = ns.BadgeAssets and string.format("|T%s:14:14|t", ns.BadgeAssets.Path(14)) or nil
+  local options = { { value = "logo", key = "auto.icon.logo", icon = logo } }
+  for n, id in ipairs(QR.MARKS) do
+    options[#options + 1] = { value = id, key = "auto.icon." .. id, icon = mark(n) }
+  end
+  options[#options + 1] = { value = "none", key = "auto.icon.none" }
+  local control = W.Dropdown(view.content, {
+    key = "auto.set.questChatIcon",
+    tooltip = "auto.set.questChatIcon",
+    tooltipText = "auto.tip.questChatIcon",
+    width = 240,
+    options = options,
+    get = function()
+      return QR.CleanIcon(stored("questChatIcon"))
+    end,
+    set = function(value)
+      Store.set("settings.questChatIcon", QR.CleanIcon(value))
+    end,
+  })
+  control.fgId = "auto-questChatIcon"
+  add(view, control, { height = 46, width = 240, indent = INDENT })
+  ns.AddParagraph(view, "auto.set.questChatIconHint", { role = "micro", color = "textMuted" })
+end
+
 function S.AddQuests(view)
   ns.AddHeading(view, "auto.card.quests")
   toggle(view, "autoQuest", "auto.name.autoQuest", "auto.tip.autoQuest")
   toggle(view, "questReadyNotice", "auto.set.questReady", "auto.tip.questReady")
   ns.AddParagraph(view, "auto.set.questReadyHint", { role = "micro", color = "textMuted" })
+  toggle(view, "questReadyGroup", "auto.set.questReadyGroup", "auto.tip.questReadyGroup")
+  ns.AddParagraph(view, "auto.set.questReadyGroupHint", { role = "micro", color = "textMuted" })
+  toggle(view, "questProgressGroup", "auto.set.questProgressGroup", "auto.tip.questProgressGroup")
+  ns.AddParagraph(view, "auto.set.questProgressGroupHint", { role = "micro", color = "textMuted" })
+  toggle(view, "questChatPrefix", "auto.set.questChatPrefix", "auto.tip.questChatPrefix", true)
+  S.AddQuestIcon(view)
+  -- The marker of the tracked quest: the same settings as in Map > Navigation.
+  ns.WaypointNavSettings.AddQuestMarker(view)
   -- Which quests the helper takes and how it behaves: behind "More settings".
   local more = W.Accordion(view, { id = view.id or "quests.main" })
   toggle(more, "autoQuestNormal", "auto.set.questNormal", nil, true)

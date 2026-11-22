@@ -53,6 +53,8 @@ RL.CONDITIONS = {
   "tag",
   "dateKnown",
   "online",
+  "banned",
+  "returned",
 }
 RL.ACTIONS = { "promote", "demote", "setRank", "remove", "setNote", "mark", "none" }
 RL.DATE_FIELDS = { "joined", "rankSince", "lastOnline" }
@@ -252,6 +254,8 @@ local KINDS = {
   tag = { ops = set({ "has", "hasNot" }), value = "tag" },
   dateKnown = { ops = set({ "exact", "bounded" }), value = "field" },
   online = { ops = set({ "is", "isNot" }), bare = set({ "is", "isNot" }) },
+  banned = { ops = set({ "is", "isNot" }), bare = set({ "is", "isNot" }) },
+  returned = { ops = set({ "awayAtLeast", "within" }), value = "days" },
 }
 
 local FIELDS = set(RL.DATE_FIELDS)
@@ -497,6 +501,49 @@ function EVAL.online(c, m)
     return UNKNOWN, nil, "online"
   end
   return (c.op == "is") == m.online and YES or NO
+end
+
+-- Row field banned: true when the member, its main or an alt of its group is on the ban list, false when
+-- the caller checked and none is, nil when the ban list is not known. Unknown never triggers a rule.
+function EVAL.banned(c, m, env)
+  local hit, known = m.banned == true, m.banned ~= nil
+  if not hit then
+    for _, g in ipairs(RL.GroupOf(env, m)) do
+      hit = hit or g.banned == true
+      known = known or g.banned ~= nil
+    end
+  end
+  if hit then
+    return (c.op == "is") and YES or NO
+  elseif not known then
+    return UNKNOWN, nil, "bans"
+  end
+  return (c.op == "isNot") and YES or NO
+end
+
+-- Row fields returnedDay (day the add-on saw the return), returnedAfter (days away before it) and
+-- historyKnown (false when the add-on has no log yet: then no return proves nothing). No return in a known
+-- log answers no.
+function EVAL.returned(c, m, env)
+  local day = whole(m.returnedDay)
+  if not day then
+    if m.historyKnown == false then
+      return UNKNOWN, { need = c.value }, "returned"
+    end
+    return NO, { need = c.value }
+  end
+  if c.op == "within" then
+    local ago = env.today and env.today - day
+    if not ago then
+      return UNKNOWN, { need = c.value }, "returned"
+    end
+    return (ago >= 0 and ago <= c.value) and YES or NO, { need = c.value }
+  end
+  local after = whole(m.returnedAfter)
+  if not after then
+    return UNKNOWN, { need = c.value }, "returnedAfter"
+  end
+  return after >= c.value and YES or NO, { need = c.value }
 end
 
 -- Answer of one condition: { kind, op, result, key, params, missing, quality }. key is the locale

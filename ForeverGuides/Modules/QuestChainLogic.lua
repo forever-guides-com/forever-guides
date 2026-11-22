@@ -3,7 +3,9 @@
 -- l (quest level), rq or ml (minimum level), av (available from, chain aware), pre and nxt (quest ids),
 -- pair (counterpart of the other faction), ch ({ line, i }), ac (access quest), dg (server tag 81 or 62 of a
 -- direct quest), direct (false for a chain link), sn and sz (giver and zone), m, x, y (giver place), xp, mo,
--- step, head, pos (follow-up row of a chain), grp, var (parallel chains), preAny, excl, cls, rpt.
+-- step, head, pos (follow-up row of a chain), grp, var (parallel chains), preAny, excl, cls (a token or a list of tokens), ind
+-- (an objective inside the dungeon: the row is never a hidden step), rpt, en and em, ex, ey
+-- (hand-in NPC and place), ob (objective places).
 -- Today's data has no `av`.
 local _, ns = ...
 
@@ -70,6 +72,41 @@ function QC.HasPlace(q)
   return type(q.m) == "number" and type(q.x) == "number" and type(q.y) == "number"
 end
 
+local function spot(m, x, y)
+  return type(m) == "number" and type(x) == "number" and type(y) == "number" and x >= 0 and x <= 1 and y >= 0 and y <= 1
+end
+
+-- Hand-in place of a quest ({ map, x, y, label } for a waypoint), nil without one. em, ex, ey are the map and the
+-- position of the hand-in NPC, en its name.
+function QC.FinishPlace(q)
+  if not spot(q.em, q.ex, q.ey) then
+    return nil
+  end
+  return { map = q.em, x = q.ex, y = q.ey, label = type(q.en) == "string" and q.en ~= "" and q.en or nil }
+end
+
+local OBJECTIVE_KINDS = { k = true, i = true, o = true, e = true, s = true }
+QC.MAX_OBJECTIVES = 12
+
+-- Objective places of a quest (`ob`: k kind, id, c count, n name, m, x, y): { kind, name, count, map, x, y } per
+-- row with a valid place, in data order. Other rows are skipped.
+function QC.Objectives(q)
+  local out = {}
+  for _, o in ipairs(type(q.ob) == "table" and q.ob or {}) do
+    if type(o) == "table" and OBJECTIVE_KINDS[o.k] and spot(o.m, o.x, o.y) and #out < QC.MAX_OBJECTIVES then
+      out[#out + 1] = {
+        kind = o.k,
+        name = type(o.n) == "string" and o.n ~= "" and o.n or nil,
+        count = whole(o.c, 2),
+        map = o.m,
+        x = o.x,
+        y = o.y,
+      }
+    end
+  end
+  return out
+end
+
 -- Index of every quest of the data by id: { [id] = { quest, inst } }. The instance given first wins when
 -- an id is listed twice (a quest shared by two instances). `instances` defaults to the data.
 local function index(inst, instances)
@@ -114,19 +151,38 @@ local function leadsOn(quests)
 end
 
 -- Direct dungeon quest: a row of the list. A follow-up step (`step`) is never one, it shows in the chain; `dg` is only
--- the server tag (81 dungeon, 62 raid), `direct = false` marks a chain link and `ac` an access quest. Without
--- any flag a quest is direct unless it only leads on to another quest of the list (a prerequisite).
+-- the server tag (81 dungeon, 62 raid), `direct = false` marks a chain link, `ac` an access quest and `ind` a quest with an
+-- objective inside the dungeon (always a row). Without any flag a quest is direct unless it only leads on to another quest
+-- of the list (a prerequisite).
 function QC.IsDirect(q, leads)
   if q.step == true or q.direct == false then
     return false
-  elseif q.dg or q.direct == true or q.ac == true then
+  elseif q.dg or q.direct == true or q.ac == true or q.ind == true then
     return true
   end
   return not (leads and leads[q.id or 0])
 end
 
+-- Class tokens of a quest: `cls` is one token ("MAGE") or a list of tokens for a quest of several classes; nil without any.
+function QC.Classes(q)
+  local cls = q and q.cls
+  if type(cls) == "string" then
+    return cls ~= "" and { cls } or nil
+  end
+  local out = {}
+  if type(cls) == "table" then
+    for _, token in ipairs(cls) do
+      if type(token) == "string" and token ~= "" then
+        out[#out + 1] = token
+      end
+    end
+  end
+  return #out > 0 and out or nil
+end
+
 -- Builds the entry of one quest for a list or a step.
 local function entry(q, owner, direct)
+  local classes = QC.Classes(q)
   local avail = QC.Availability(q)
   return {
     id = q.id,
@@ -146,7 +202,8 @@ local function entry(q, owner, direct)
     access = q.ac == true,
     pair = whole(q.pair, 1),
     repeatable = q.rpt == true,
-    class = type(q.cls) == "string" and q.cls ~= "" and q.cls or nil,
+    class = classes and (#classes == 1 and classes[1] or classes) or nil,
+    classes = classes,
     grp = type(q.grp) == "string" and q.grp ~= "" and q.grp or nil,
     var = whole(q.var, 1),
     step = q.step == true,
@@ -585,7 +642,7 @@ function QC.Entries(inst, quests)
   local entries = {}
   for _, q in ipairs(quests or {}) do
     local e = entry(q, inst, QC.IsDirect(q, leads))
-    e.name = ns.T and ns.T(q.n) or (q.n and (q.n.en or q.n.de)) or ""
+    e.name = ns.QuestNames and ns.QuestNames.Name(q) or ns.T and ns.T(q.n) or (q.n and (q.n.en or q.n.de)) or ""
     entries[#entries + 1] = e
   end
   table.sort(entries, function(a, b)
@@ -681,7 +738,7 @@ function QC.Reference(inst, byId, id)
   if not hit then
     return nil
   end
-  local name = ns.T and ns.T(hit.quest.n)
+  local name = ns.QuestNames and ns.QuestNames.Name(hit.quest) or ns.T and ns.T(hit.quest.n)
   return {
     id = id,
     name = (name and name ~= "") and name or ("#" .. id),

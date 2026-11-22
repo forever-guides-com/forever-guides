@@ -1,0 +1,19 @@
+## Interface: 16001
+## Title: Forever Guides: Item set data
+## Title-deDE: Forever Guides: Setdaten
+## Notes: Armor and weapon sets with pieces, set bonuses and sources. Loads by itself when the page is opened.
+## Notes-deDE: Rüstungs- und Waffensets mit Teilen, Set-Boni und Quellen. Wird von selbst geladen, sobald du die Seite öffnest.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 1.0.0
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+Meta.lua
+Data1.lua
+Data2.lua

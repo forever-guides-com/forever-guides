@@ -10,11 +10,11 @@ D.ADDON = "ForeverGuides_Professions"
 D.STATUS = { ok = "ok", missing = "missing", noRoute = "noRoute" }
 
 ns.AddLocale("enUS", {
-  ["profdata.missing"] = "Data add-on missing: install Forever Guides: Professions.",
+  ["profdata.missing"] = "Data addon missing: install Forever Guides: Professions.",
   ["profdata.noRoute"] = "No route for this profession.",
 })
 ns.AddLocale("deDE", {
-  ["profdata.missing"] = "Daten-Addon fehlt: Forever Guides: Berufsdaten installieren.",
+  ["profdata.missing"] = "Datenaddon fehlt: Forever Guides: Berufsdaten installieren.",
   ["profdata.noRoute"] = "Keine Route für diesen Beruf.",
 })
 

@@ -61,7 +61,8 @@ end
 -- addon, session.
 local MAX_STORED = 100
 local MAX_MSG = 500
-local MAX_STACK = 1500
+-- A blocked map refresh needs about 3000 characters to reach the first add-on frame.
+local MAX_STACK = 4000
 local MAX_OPS = 1500
 local SESSION_CAP = 100
 local Errors = { list = {}, sessionCount = 0, dropped = 0, MAX_STORED = MAX_STORED }

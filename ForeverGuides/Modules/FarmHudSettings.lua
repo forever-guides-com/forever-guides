@@ -9,11 +9,11 @@ ns.FarmHudSettings = S
 
 ns.AddLocale("enUS", {
   ["farmhud.set.heading"] = "Farm HUD",
-  ["farmhud.set.hint"] = "Enlarges the real minimap over the middle of the screen, behind the interface, so you can see the ore and herb blips of the game with your pins on top. It starts only when you ask for it (/fg farmhud or a key binding) and the minimap moves back when you switch it off, in instances and at logout. It never changes in combat; a switch during combat waits for the end of it.",
+  ["farmhud.set.hint"] = "Enlarges the real minimap over the middle of the screen, behind the interface. You see the game's ore and herb blips with your pins on top. It starts only on request (/fg farmhud or a key binding). The minimap moves back when you switch it off, in instances and at logout. In combat nothing changes: a switch waits until the fight ends.",
   ["farmhud.set.enabled"] = "Farm HUD",
-  ["farmhud.set.enabledHint"] = "On or off for this session. Also /fg farmhud and the key binding in the game's key bindings.",
+  ["farmhud.set.enabledHint"] = "Switches on or off for this session. Also works with /fg farmhud and the key binding in the game's key bindings.",
   ["farmhud.set.scale"] = "Size",
-  ["farmhud.set.scaleHint"] = "Share of the smaller screen side the minimap takes.",
+  ["farmhud.set.scaleHint"] = "Share of the shorter screen edge that the minimap takes.",
   ["farmhud.set.strata"] = "Layer",
   ["farmhud.set.strataHint"] = "Background lies behind the whole interface and in front of the 3D world. Low and Medium lie in front of more windows.",
   ["farmhud.set.strata.BACKGROUND"] = "Background",
@@ -34,8 +34,8 @@ ns.AddLocale("enUS", {
   ["farmhud.set.hideInCombatHint"] = "Hides the HUD during a fight and shows it afterwards. The minimap is gone while it is hidden.",
   ["farmhud.set.hideInInstance"] = "Hide in instances",
   ["farmhud.set.hideInInstanceHint"] = "Inside instances the game gives no position. The minimap goes back to its place there and returns outside.",
-  ["farmhud.set.hideOtherIcons"] = "Hide other add-on icons",
-  ["farmhud.set.hideOtherIconsHint"] = "Hides the minimap buttons of other add-ons while the HUD is on, so none sits on top of you.",
+  ["farmhud.set.hideOtherIcons"] = "Hide other addon buttons",
+  ["farmhud.set.hideOtherIconsHint"] = "Hides the minimap buttons of other addons while the HUD is on, so none covers the view.",
   ["farmhud.set.compass"] = "Compass",
   ["farmhud.set.compassHint"] = "The four directions at the edge. North is up unless the minimap turns with you.",
   ["farmhud.set.compassSize"] = "Compass size",
@@ -53,6 +53,8 @@ ns.AddLocale("enUS", {
   ["farmhud.set.rotationHint"] = "Heading up turns the map with you and the player arrow always points up. North up keeps the map still and the arrow turns. The HUD sets this for itself and puts your minimap setting back when it goes off.",
   ["farmhud.set.rotation.heading"] = "Heading up (map turns)",
   ["farmhud.set.rotation.north"] = "North up (arrow turns)",
+  ["farmhud.set.blipTips"] = "Game tooltips on ores and herbs",
+  ["farmhud.set.blipTipsHint"] = "While you hold {mod:farmHudBlipTips}, the HUD takes the mouse and the game shows its own tooltips for tracked ores and herbs. Without the key, the mouse reaches the world as usual. This does not work in combat with a protected minimap. Set the key in the card Key combinations.",
   ["farmhud.set.frame"] = "Frame around the HUD",
   ["farmhud.set.frameHint"] = "A line around the edge of the HUD while it is on. It follows the shape of the minimap and sits below the pins.",
   ["farmhud.set.frameColor"] = "Frame color",
@@ -62,11 +64,11 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["farmhud.set.heading"] = "Farm-HUD",
-  ["farmhud.set.hint"] = "Vergrößert die echte Minimap über die Bildschirmmitte, hinter die Oberfläche, damit du die Erz- und Kraut-Blips des Spiels mit deinen Pins darauf siehst. Es startet nur auf Wunsch (/fg farmhud oder eine Tastenbelegung) und die Minimap geht beim Ausschalten, in Instanzen und beim Ausloggen an ihren Platz zurück. Im Kampf ändert sich nichts, ein Schalter im Kampf wartet auf dessen Ende.",
+  ["farmhud.set.hint"] = "Vergrößert die echte Minimap über die Bildschirmmitte, hinter die Oberfläche. So siehst du die Erz- und Kraut-Blips des Spiels mit deinen Pins darauf. Es startet nur auf Wunsch (/fg farmhud oder eine Tastenbelegung). Die Minimap geht beim Ausschalten, in Instanzen und beim Ausloggen an ihren Platz zurück. Im Kampf ändert sich nichts: Ein Wechsel wartet, bis der Kampf endet.",
   ["farmhud.set.enabled"] = "Farm-HUD",
-  ["farmhud.set.enabledHint"] = "An oder aus für diese Sitzung. Auch /fg farmhud und die Tastenbelegung in den Tastaturbelegungen des Spiels.",
+  ["farmhud.set.enabledHint"] = "Schaltet für diese Sitzung ein oder aus. Geht auch mit /fg farmhud und der Tastenbelegung in den Tastaturbelegungen des Spiels.",
   ["farmhud.set.scale"] = "Größe",
-  ["farmhud.set.scaleHint"] = "Anteil der kleineren Bildschirmseite, den die Minimap einnimmt.",
+  ["farmhud.set.scaleHint"] = "Anteil der kürzeren Bildschirmkante, den die Minimap einnimmt.",
   ["farmhud.set.strata"] = "Ebene",
   ["farmhud.set.strataHint"] = "Hintergrund liegt hinter der ganzen Oberfläche und vor der 3D-Welt. Niedrig und Mittel liegen vor mehr Fenstern.",
   ["farmhud.set.strata.BACKGROUND"] = "Hintergrund",
@@ -87,8 +89,8 @@ ns.AddLocale("deDE", {
   ["farmhud.set.hideInCombatHint"] = "Blendet das HUD während eines Kampfs aus und danach wieder ein. Solange es ausgeblendet ist, fehlt die Minimap.",
   ["farmhud.set.hideInInstance"] = "In Instanzen ausblenden",
   ["farmhud.set.hideInInstanceHint"] = "In Instanzen gibt das Spiel keine Position. Die Minimap geht dort an ihren Platz zurück und kommt draußen wieder.",
-  ["farmhud.set.hideOtherIcons"] = "Symbole anderer Addons ausblenden",
-  ["farmhud.set.hideOtherIconsHint"] = "Blendet die Minimap-Symbole anderer Addons aus, solange das HUD an ist, damit keines auf dir liegt.",
+  ["farmhud.set.hideOtherIcons"] = "Knöpfe anderer Addons ausblenden",
+  ["farmhud.set.hideOtherIconsHint"] = "Blendet die Minimap-Knöpfe anderer Addons aus, solange das HUD an ist, damit keiner das Bild verdeckt.",
   ["farmhud.set.compass"] = "Kompass",
   ["farmhud.set.compassHint"] = "Die vier Himmelsrichtungen am Rand. Norden ist oben, solange sich die Minimap nicht mit dir dreht.",
   ["farmhud.set.compassSize"] = "Kompassgröße",
@@ -106,6 +108,8 @@ ns.AddLocale("deDE", {
   ["farmhud.set.rotationHint"] = "Blickrichtung oben dreht die Karte mit dir und der Spielerpfeil zeigt immer nach oben. Norden oben hält die Karte still und der Pfeil dreht sich. Das HUD stellt das für sich ein und setzt deine Minimap-Einstellung beim Ausschalten zurück.",
   ["farmhud.set.rotation.heading"] = "Blickrichtung oben (Karte dreht)",
   ["farmhud.set.rotation.north"] = "Norden oben (Pfeil dreht)",
+  ["farmhud.set.blipTips"] = "Spiel-Tooltips an Erzen und Kräutern",
+  ["farmhud.set.blipTipsHint"] = "Solange du {mod:farmHudBlipTips} hältst, nimmt das HUD die Maus an und das Spiel zeigt eigene Tooltips für verfolgte Erze und Kräuter. Ohne die Taste erreicht die Maus die Welt wie gewohnt. Im Kampf mit geschützter Minimap geht das nicht. Die Taste stellst du in der Karte Tastenkombinationen ein.",
   ["farmhud.set.frame"] = "Rahmen um das HUD",
   ["farmhud.set.frameHint"] = "Eine Linie um den Rand des HUDs, solange es an ist. Sie folgt der Form der Minimap und liegt unter den Pins.",
   ["farmhud.set.frameColor"] = "Rahmenfarbe",
@@ -325,6 +329,7 @@ function S.Add(view)
   end)
   stateToggle(view, "hideInCombat")
   stateToggle(view, "hideOtherIcons")
+  stateToggle(view, "blipTips")
   -- Everything else is rarely changed: behind "More settings".
   local more = W.Accordion(view, { id = view.id or "farmhud.main" })
   dropdown(more, "strata", FH.STRATA, "farmhud.set.strata.", function()

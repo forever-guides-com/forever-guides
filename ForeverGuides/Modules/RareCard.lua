@@ -41,7 +41,7 @@ ns.AddLocale("enUS", {
   ["rare.card.new"] = "Not seen yet",
   ["rare.card.seen"] = "Last seen: %s",
   ["rare.card.killed"] = "Last killed: %s",
-  ["rare.card.spawns"] = "%d more spawn points (small markers on the map)",
+  ["rare.card.spawns"] = "%d more spawn points (small pins on the map)",
 })
 ns.AddLocale("deDE", {
   ["rare.card.chance"] = "Dropchance: %s",
@@ -50,7 +50,7 @@ ns.AddLocale("deDE", {
   ["rare.card.new"] = "Noch nicht gesehen",
   ["rare.card.seen"] = "Zuletzt gesehen: %s",
   ["rare.card.killed"] = "Zuletzt getötet: %s",
-  ["rare.card.spawns"] = "%d weitere Spawnpunkte (kleine Marker auf der Karte)",
+  ["rare.card.spawns"] = "%d weitere Spawnpunkte (kleine Pins auf der Karte)",
 })
 
 local QUESTION = 134400
@@ -193,7 +193,7 @@ local function chatLink(id)
     return link
   end
   local name = itemName(id)
-  return name and string.format("|Hitem:%d|h[%s]|h", id, name) or nil
+  return name and ("[" .. name .. "]") or nil
 end
 
 -- Into the open chat edit box, else opens the chat with the link in it.
@@ -375,6 +375,8 @@ local function showModel(model)
 end
 
 local function setPortrait(rare, id)
+  card.previewId = type(id) == "number" and id or nil
+  card.preview:SetShown(card.previewId ~= nil)
   local model = card.model
   RC.SetIcon(card.portraitIcon, rare, RC.Standing(id))
   card.portraitIcon:Show()
@@ -404,6 +406,16 @@ local function buildPortrait()
   card.portraitIcon = box:CreateTexture(nil, "ARTWORK")
   card.portraitIcon:SetPoint("CENTER")
   card.portraitIcon:SetSize(PORTRAIT - 20, PORTRAIT - 20)
+  -- The small eye opens the large preview of the creature, the portrait itself stays a plain picture.
+  card.preview = W.Action(box, { icon = "eye", size = 18, tooltip = "preview.open", tooltipText = "preview.openTip" })
+  card.preview:SetFrameLevel(box:GetFrameLevel() + 5)
+  card.preview:SetPoint("BOTTOMRIGHT", -2, 2)
+  card.preview:SetScript(
+    "OnClick",
+    ns.Wrap("rarecard-preview", function()
+      ns.ModelPreview.OpenCreature({ name = card.name:GetText(), npcId = card.previewId })
+    end)
+  )
   local ok, model = pcall(CreateFrame, "PlayerModel", nil, box)
   if ok and model then
     model:SetPoint("TOPLEFT", 1, -1)

@@ -85,6 +85,7 @@ end
 local function inGuild()
   return try(g("IsInGuild")) == true
 end
+GM.InGuild = inGuild
 
 -- Settings ---------------------------------------------------------------------------------------------
 
@@ -154,6 +155,14 @@ end
 -- on that record, so a coarse mode does not send more often than its picture changes.
 local function prepare(map, x, y)
   local msg = { typ = "P", map = map, x = G.Promille(x), y = G.Promille(y), mode = GM.Accuracy() }
+  if msg.mode == "exact" then
+    local fx, fy
+    msg.x, fx = G.Fine(x)
+    msg.y, fy = G.Fine(y)
+    if fx and fy then
+      msg.fx, msg.fy = fx, fy
+    end
+  end
   local payload = G.Encode(GM.FN, msg)
   if not payload then
     return nil
@@ -162,7 +171,12 @@ local function prepare(map, x, y)
   if not back then
     return nil
   end
-  return payload, { map = back.map, x = (back.x or 0) / 1000, y = (back.y or 0) / 1000 }
+  return payload,
+    {
+      map = back.map,
+      x = G.Fraction(back.x or 0, back.x and back.fx),
+      y = G.Fraction(back.y or 0, back.y and back.fy),
+    }
 end
 
 -- Sending ----------------------------------------------------------------------------------------------
@@ -393,6 +407,9 @@ local function onEnd(sender, msg)
     ns.GuildMapStore.Remove(sender)
   end
 end
+
+-- The same reads and checks serve the friends line (FriendMapComm.lua).
+GM.PauseReason, GM.ReadPosition, GM.Prepare, GM.Dist, GM.KnownMap = pauseReason, readPosition, prepare, dist, knownMap
 
 -- Pace and heard senders, for the status line and the tests.
 function GM.Status()

@@ -128,6 +128,18 @@ function F.SetItem(itemId, on)
   changed()
 end
 
+-- Switches many items on or off with one change message, the profession switch stays as it is.
+function F.SetItems(ids, on)
+  local hidden = copyHidden()
+  for _, id in ipairs(ids) do
+    if type(id) == "number" then
+      hidden[id] = (not on) and true or nil
+    end
+  end
+  ns.Store.set("settings.gather.hidden", hidden)
+  changed()
+end
+
 -- Everything on: the profession (nil: both) and each of its items. data is optional, it is read through
 -- ns.GatherDataAccess when left out.
 function F.All(prof, data)

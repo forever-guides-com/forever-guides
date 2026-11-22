@@ -12,14 +12,14 @@ S.ADDON = "ForeverGuides_Professions"
 S.STATUS = { ok = "ok", missing = "missing" }
 
 ns.AddLocale("enUS", {
-  ["vendordata.missing"] = "Data add-on missing: install Forever Guides: Professions.",
+  ["vendordata.missing"] = "Data addon missing. Install Forever Guides: Professions.",
   ["vendor.where"] = "Vendor: %s",
   ["vendor.whereCoord"] = "%s (%s, %s)",
   ["vendor.listTip"] = "Click: set a waypoint at the nearest vendor",
   ["vendor.set"] = "Vendor %s",
 })
 ns.AddLocale("deDE", {
-  ["vendordata.missing"] = "Daten-Addon fehlt: Forever Guides: Berufsdaten installieren.",
+  ["vendordata.missing"] = "Datenaddon fehlt. Installiere Forever Guides: Berufsdaten.",
   ["vendor.where"] = "Händler: %s",
   ["vendor.whereCoord"] = "%s (%s, %s)",
   ["vendor.listTip"] = "Klick: Wegpunkt am nächsten Händler setzen",
@@ -61,9 +61,21 @@ function S.Index(loadIt)
     return nil, S.STATUS.missing
   end
   if not cached or cached.data ~= d then
-    cached = { data = d, index = VL.Build(d) }
+    local mounts = rawget(ns, "Data")
+    cached = { data = d, index = VL.AddMounts(VL.Build(d), type(mounts) == "table" and mounts.Mounts or nil) }
   end
   return cached.index, S.STATUS.ok
+end
+
+-- The NPC id of the vendor with this English name when exactly one vendor has it, else nil (loads the data).
+function S.NpcByName(name)
+  return VL.NpcByName(S.Index(), name)
+end
+
+-- The NPC id when the vendors page has this vendor (loads the data), else nil.
+function S.Known(npc)
+  local index = S.Index()
+  return index and index.byNpc[npc] and npc or nil
 end
 
 function S.Hint()
@@ -87,6 +99,9 @@ local zoneCache = {}
 
 -- Zone of an entry in the client's language, the English name of the data as the fallback.
 function S.ZoneName(entry)
+  if not entry.map then
+    return entry.zoneEn
+  end
   local hit = zoneCache[entry.map]
   if not hit then
     local api = rawget(_G, "C_Map")
@@ -111,6 +126,22 @@ function S.ItemName(id)
       return name
     end
   end
+end
+
+-- Icon and quality of an item from the client item table, nil while the item is not cached.
+function S.ItemIcon(id)
+  local api = rawget(_G, "C_Item")
+  local byId = type(api) == "table" and api.GetItemIconByID or nil
+  if type(byId) == "function" then
+    local ok, icon = pcall(byId, id)
+    if ok and icon then
+      return icon
+    end
+  end
+end
+
+function S.ItemQuality(id)
+  return ns.ItemInfo and ns.ItemInfo.quality(id) or nil
 end
 
 function S.Money(copper)
@@ -181,13 +212,13 @@ end
 -- Only vendors free of conditions count as the place of a click.
 function S.Best(itemId, loadIt)
   for _, seller in ipairs(S.Sellers(itemId, loadIt)) do
-    if not VL.Restricted(seller.offer.flags) then
+    if not VL.Restricted(seller.offer.flags) and seller.vendor.x and seller.vendor.y then
       local v = seller.vendor
       local zone = S.ZoneName(v) or "?"
       local coords = string.format("%.1f, %.1f", v.x * 100, v.y * 100)
       return {
         seller = seller,
-        text = string.format(ns.L["vendor.whereCoord"], v.name, zone, coords),
+        text = string.format(ns.L["vendor.whereCoord"], VL.Name(v), zone, coords),
         place = VL.Place(v, zone),
       }
     end

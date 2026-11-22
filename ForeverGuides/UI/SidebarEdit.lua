@@ -48,7 +48,7 @@ ns.AddLocale("deDE", {
   ["nav.edit.renameHint"] = "Ein leerer Name stellt den Standard wieder her.",
   ["nav.edit.scope"] = "Nur dieser Charakter",
   ["nav.edit.scopeHint"] = "Aus: Die Anordnung gilt für alle deine Charaktere. An: Dieser Charakter bekommt eine eigene Anordnung.",
-  ["nav.edit.scopeNotice"] = "Dieser Charakter hat eine eigene Anordnung, sie geht dieser vor.",
+  ["nav.edit.scopeNotice"] = "Dieser Charakter hat eine eigene Anordnung, sie hat Vorrang.",
   ["nav.edit.reset"] = "Auf Standard zurücksetzen",
   ["nav.edit.done"] = "Bearbeiten beenden",
   ["nav.reset.title"] = "Navigation zurücksetzen",
@@ -593,7 +593,7 @@ function SE.Place(f, collapsed)
   end
   local width = f:GetWidth()
   if not width or width <= 0 then
-    width = ns.Layout.SIDEBAR_FULL
+    width = ns.MainLayout and ns.MainLayout.sidebarWidth or ns.Layout.SIDEBAR_FULL
   end
   local banner, bar = e.banner, e.bar
   banner.title:SetWidth(width - 20)

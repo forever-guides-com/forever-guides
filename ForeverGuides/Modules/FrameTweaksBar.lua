@@ -645,7 +645,7 @@ end
 local function separator(bar)
   local line = bar:CreateTexture(nil, "ARTWORK")
   line:SetSize(1, Bar.HEIGHT - 8)
-  line:SetColorTexture(1, 1, 1, 0.25)
+  line:SetColorTexture(ns.Theme.fillColor("lineStrong"))
   return line
 end
 
@@ -666,7 +666,7 @@ local function slider(owner, o)
   rim:SetPoint("LEFT", 0, 0)
   rim:SetPoint("RIGHT", 0, 0)
   rim:SetHeight(6)
-  rim:SetColorTexture(1, 1, 1, 0.35)
+  rim:SetColorTexture(ns.Theme.fillColor("lineStrong"))
   local track = s:CreateTexture(nil, "BACKGROUND")
   track:SetPoint("LEFT", 1, 0)
   track:SetPoint("RIGHT", -1, 0)

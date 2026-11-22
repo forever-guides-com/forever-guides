@@ -40,7 +40,7 @@ ns.AddLocale("enUS", {
   ["guild.search"] = "Search",
   ["guild.onlyOnline"] = "Online only",
   ["guild.map"] = "Map",
-  ["guild.map.tip"] = "Members that share their position.",
+  ["guild.map.tip"] = "Shows members that share their position.",
   ["guild.rank"] = "Rank",
   ["guild.rank.all"] = "All ranks",
   ["guild.sort"] = "Sort by",
@@ -80,24 +80,24 @@ ns.AddLocale("enUS", {
   ["guild.peer.tip"] = "As of %s, source: %s",
   ["guild.peer.source.game"] = "Game",
   ["guild.peer.source.inspect"] = "Inspect",
-  ["guild.peer.source.addon"] = "Add-on",
+  ["guild.peer.source.addon"] = "Addon",
   ["guild.peer.source.manual"] = "Manual",
   ["guild.peer.now"] = "just now",
   ["guild.peer.minutes"] = "%d min ago",
   ["guild.reading"] = "reading ...",
   ["guild.unshared"] = "not shared",
   ["guild.unshared.both"] = "iLvl, professions: %s",
-  ["guild.unshared.tip"] = "The member does not use the add-on or does not share item level and professions, or you do not receive them: tab Share.",
+  ["guild.unshared.tip"] = "The member does not use the addon or does not share item level and professions, or you do not receive them: tab Share.",
   ["guild.whisper"] = "Whisper",
   ["guild.seen.local"] = "Stored locally only",
   ["guild.set.heading"] = "Guild: item level and professions",
   ["guild.set.seen"] = "Store data of seen players locally",
   ["guild.set.inspect"] = "Read group item level",
   ["guild.set.inspectHint"] = "Inspects members in range, never in combat.",
-  ["guild.set.share"] = "Share jobs, item level",
-  ["guild.set.shareHint"] = "Sending and receiving item level and professions is set in the tab Share. Off by default.",
+  ["guild.set.share"] = "Share professions and item level",
+  ["guild.set.shareHint"] = "You set sending and receiving of item level and professions in the tab Share. Off by default.",
   ["guild.set.shareGuild"] = "Also share with guild",
-  ["guild.set.shareOpen"] = "Go to Share",
+  ["guild.set.shareOpen"] = "Open Share",
   ["guild.refresh"] = "Refresh",
   ["guild.refresh.tip"] = "Announces your own data again. Needs Presence under Share.",
   ["guild.refresh.sent"] = "Your data is announced.",
@@ -119,10 +119,10 @@ ns.AddLocale("deDE", {
   ["guild.search"] = "Suchen",
   ["guild.onlyOnline"] = "Nur online",
   ["guild.map"] = "Karte",
-  ["guild.map.tip"] = "Mitglieder, die ihre Position teilen.",
+  ["guild.map.tip"] = "Zeigt Mitglieder, die ihre Position teilen.",
   ["guild.rank"] = "Rang",
   ["guild.rank.all"] = "Alle Ränge",
-  ["guild.sort"] = "Sortierung",
+  ["guild.sort"] = "Sortieren nach",
   ["guild.sort.rank"] = "Rang",
   ["guild.sort.name"] = "Name",
   ["guild.sort.level"] = "Stufe",
@@ -166,17 +166,17 @@ ns.AddLocale("deDE", {
   ["guild.reading"] = "wird gelesen",
   ["guild.unshared"] = "nicht geteilt",
   ["guild.unshared.both"] = "iLvl, Berufe: %s",
-  ["guild.unshared.tip"] = "Das Mitglied nutzt das Addon nicht oder teilt Itemlevel und Berufe nicht, oder du empfängst sie nicht: Tab Teilen.",
+  ["guild.unshared.tip"] = "Das Mitglied nutzt das Addon nicht oder teilt Itemlevel und Berufe nicht, oder du empfängst sie nicht: Reiter Teilen.",
   ["guild.whisper"] = "Flüstern",
   ["guild.seen.local"] = "Nur lokal gespeichert",
   ["guild.set.heading"] = "Gilde: Itemlevel und Berufe",
   ["guild.set.seen"] = "Daten gesehener Spieler lokal speichern",
   ["guild.set.inspect"] = "Gruppen-Itemlevel lesen",
   ["guild.set.inspectHint"] = "Betrachtet Mitglieder in Reichweite, nie im Kampf.",
-  ["guild.set.share"] = "Berufe, Itemlevel teilen",
-  ["guild.set.shareHint"] = "Itemlevel und Berufe senden und empfangen stellst du im Tab Teilen ein. Standard aus.",
+  ["guild.set.share"] = "Berufe und Itemlevel teilen",
+  ["guild.set.shareHint"] = "Itemlevel und Berufe senden und empfangen stellst du im Reiter Teilen ein. Standardmäßig aus.",
   ["guild.set.shareGuild"] = "Auch mit Gilde teilen",
-  ["guild.set.shareOpen"] = "Zu Teilen",
+  ["guild.set.shareOpen"] = "Teilen öffnen",
   ["guild.refresh"] = "Aktualisieren",
   ["guild.refresh.tip"] = "Kündigt deine eigenen Daten erneut an. Braucht Anwesenheit unter Teilen.",
   ["guild.refresh.sent"] = "Deine Daten sind angekündigt.",
@@ -430,6 +430,8 @@ local function build(container)
   motd:SetScript("OnLeave", ns.HideTooltip)
   ns.Focus.register(motd, showMotd)
   add("guild", motd, { height = 18, gap = 6 })
+  -- The message of the day cannot hold links (the tooltip neither): its addresses are buttons below it.
+  local motdLinks = add("guild", W.WebLinks(view.content), { gap = 6 })
   local levelsLine = add("guild", ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 2 }))
   local classesLine = add("guild", ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 10 }))
   -- Hints for data of other add-on users that needs sharing; they follow the consent on their own, so
@@ -525,6 +527,7 @@ local function build(container)
 
   local guildOpts = { gap = 12 }
   local guildList = K.NewList(view.content, {
+    look = "flat", -- dense roster rows with class icon and columns
     rowHeight = ROW_HEIGHT,
     subRole = "ui",
     bind = function(m)
@@ -629,6 +632,7 @@ local function build(container)
     title:SetText(snap.name)
     onlineLine:SetText(string.format(L["guild.online"], snap.online, #snap.members))
     motd.full = snap.motd
+    motdLinks:Set(snap.motd)
     motd.text:SetText(snap.motd ~= "" and GL.Truncate(snap.motd, GL.MOTD_LENGTH) or L["guild.motd.empty"])
     local stats = GL.Stats(snap.members)
     local levels, classes = {}, {}

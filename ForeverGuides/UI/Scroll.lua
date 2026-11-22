@@ -132,7 +132,7 @@ local function hscrollbar(parent, onDrag, onPage)
   bar:SetHeight(HBAR)
   local track = bar:CreateTexture(nil, "BACKGROUND")
   track:SetAllPoints()
-  track:SetColorTexture(1, 1, 1, 0.06)
+  track:SetColorTexture(Theme.fillColor("hover"))
   local thumb = bar:CreateTexture(nil, "ARTWORK")
   thumb:SetHeight(HBAR)
   ns.Bind(thumb, function(t)
@@ -266,9 +266,10 @@ Stack.__index = Stack
 -- clipped, and a button that starts exactly at the padding lost its left border
 -- there. The slack is wider than the 2 px selected border.
 local EDGE = 2
+local SHARE_GAP = 6
 
 function W.Stack(area, padding)
-  return setmetatable({ area = area, parent = area.content, items = {}, pad = padding or 16 }, Stack)
+  return setmetatable({ area = area, parent = area.content, items = {}, pad = padding or Theme.space.lg }, Stack)
 end
 
 -- item: frame or fontstring; opts: height (number) or auto for text, gap, indent
@@ -289,6 +290,10 @@ function Stack:Layout()
       item:SetPoint("TOPLEFT", self.parent, "TOPLEFT", self.pad + indent + EDGE, y)
       -- A fixed width never reaches past the page on a narrow window.
       local room = width - indent - EDGE
+      -- opts.share: a share button at the right end of the row; the item gives up its width.
+      if o.share then
+        room = math.max(1, room - o.share:GetWidth() - SHARE_GAP)
+      end
       local itemWidth = o.width and math.min(o.width, room) or room
       if item.fgHasLabel then
         -- An icon button with a short label: the label goes when the setting or the room says so,
@@ -297,12 +302,17 @@ function Stack:Layout()
         itemWidth = item.fgLabelOn and itemWidth or fit
       end
       item:SetWidth(itemWidth)
+      if o.share and item.button then
+        -- A dropdown keeps the width of its field: never wider than the room left of the share icon.
+        item.fgFieldWidth = item.fgFieldWidth or item.button:GetWidth()
+        item.button:SetWidth(math.min(item.fgFieldWidth, itemWidth))
+      end
       local h = o.height
       if item.fgGridLayout then
         -- The second argument tells an item that fills the page how much room is left.
         h = item:fgGridLayout(
           width - indent - EDGE,
-          { top = -y, viewHeight = self.area:GetHeight(), pad = self.pad, gap = o.gap or 10 }
+          { top = -y, viewHeight = self.area:GetHeight(), pad = self.pad, gap = o.gap or Theme.space.stack }
         )
       elseif h then
         -- Explicit height from the caller (e.g. K.NewList) was only ever
@@ -311,12 +321,21 @@ function Stack:Layout()
         -- forever regardless of how many times Layout() ran.
         item:SetHeight(h)
       elseif item.GetStringHeight then
+        -- Dropping the old height first: a clipped FontString measures its clipped text.
+        item:SetHeight(0)
         h = item:GetStringHeight()
         item:SetHeight(h)
       else
         h = item:GetHeight()
       end
-      y = y - h - (o.gap or 10)
+      if o.share then
+        o.share:ClearAllPoints()
+        o.share:SetPoint("TOPRIGHT", self.parent, "TOPRIGHT", -self.pad, y - math.max(0, math.floor((h - o.share:GetHeight()) / 2)))
+        o.share:Show()
+      end
+      y = y - h - (o.gap or Theme.space.stack)
+    elseif o.share then
+      o.share:Hide()
     end
   end
   if self.area.SetContentHeight then
@@ -327,7 +346,7 @@ end
 -- Grid of equal cards; columns from the window breakpoint.
 function W.Grid(parent, cards, cardHeight, gap)
   local f = CreateFrame("Frame", nil, parent)
-  gap = gap or 12
+  gap = gap or Theme.space.md
   function f:fgGridLayout(width)
     local cols = (ns.MainLayout and ns.MainLayout.columns) or 2
     local cw = (width - gap * (cols - 1)) / cols
@@ -337,6 +356,9 @@ function W.Grid(parent, cards, cardHeight, gap)
       card:ClearAllPoints()
       card:SetPoint("TOPLEFT", f, "TOPLEFT", col * (cw + gap), -row * (cardHeight + gap))
       card:SetSize(cw, cardHeight)
+      if card.fgSized then
+        card:fgSized(cw)
+      end
     end
     local rows = math.ceil(#cards / cols)
     local h = rows * cardHeight + math.max(0, rows - 1) * gap
@@ -433,6 +455,21 @@ function W.ScrollList(parent, opts)
     end
     offset = U.clamp(offset, 0, maxOffset())
     refresh()
+  end
+  -- Shows `item` (the same table as in the data) and puts the keyboard focus on its row. False when it is not listed.
+  function f:FocusItem(item)
+    for index, entry in ipairs(data) do
+      if entry == item then
+        f:Reveal(index)
+        local row = rows[index - offset]
+        if row and row:IsShown() and row.fgActivate then
+          ns.Focus.set(row)
+          return true
+        end
+        return false
+      end
+    end
+    return false
   end
 
   -- Drag and drop reordering. The row frames are pooled, so the dragged item

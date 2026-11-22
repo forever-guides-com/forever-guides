@@ -10,20 +10,20 @@ ns.KeysSettings = KS
 
 ns.AddLocale("enUS", {
   ["keys.set.heading"] = "Key combinations",
-  ["keys.set.hint"] = "Mouse actions with a modifier key. Editor shortcuts such as Ctrl+C, Ctrl+Z or Shift+Tab stay as they are. Keys that open the addon, search, dock and screenshot are in the card Key bindings.",
+  ["keys.set.hint"] = "Mouse actions with a modifier key. Editor shortcuts such as Ctrl+C, Ctrl+Z or Shift+Tab stay as they are. Keys for opening the addon, search, dock and screenshot are in the card \"Key bindings\".",
   ["keys.set.resetOne"] = "Reset to default",
   ["keys.set.resetAll"] = "Reset all",
-  ["keys.set.resetAllTip"] = "Sets every key combination back to its default",
+  ["keys.set.resetAllTip"] = "Sets every key combination back to its default.",
   ["keys.set.resetAllTitle"] = "Reset key combinations",
   ["keys.set.resetAllText"] = "All key combinations go back to their defaults. Continue?",
   ["keys.set.conflict"] = "Same combination as: %s",
 })
 ns.AddLocale("deDE", {
   ["keys.set.heading"] = "Tastenkombinationen",
-  ["keys.set.hint"] = "Mausaktionen mit Zusatztaste. Editor-Kürzel wie Strg+C, Strg+Z oder Umschalt+Tab bleiben fest. Tasten für Addon öffnen, Suche, Dock und Screenshot stehen in der Karte Tastenbelegung.",
+  ["keys.set.hint"] = "Mausaktionen mit Zusatztaste. Editorkürzel wie Strg+C, Strg+Z oder Umschalt+Tab bleiben fest. Tasten zum Öffnen des Addons, für Suche, Dock und Screenshot findest du in der Karte „Tastenbelegung“.",
   ["keys.set.resetOne"] = "Auf Standard zurücksetzen",
   ["keys.set.resetAll"] = "Alle zurücksetzen",
-  ["keys.set.resetAllTip"] = "Setzt jede Tastenkombination auf den Standard zurück",
+  ["keys.set.resetAllTip"] = "Setzt jede Tastenkombination auf den Standard zurück.",
   ["keys.set.resetAllTitle"] = "Tastenkombinationen zurücksetzen",
   ["keys.set.resetAllText"] = "Alle Tastenkombinationen gehen auf ihren Standard zurück. Fortfahren?",
   ["keys.set.conflict"] = "Gleiche Belegung wie: %s",

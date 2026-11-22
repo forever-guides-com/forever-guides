@@ -5,6 +5,7 @@
 -- Minimap maps (Ruins of Lordaeron, Dalaran, ...): grid = { x, y, cols, rows, fid, world } is the crop of the
 -- tiles World/Minimaps/<MapID>/map<x>_<y>.blp, floors[1] = { fid, cols, rows } the same tiles as the one floor,
 -- tiles every tile of the map, soon = true while the crop is open (data stand 2026-10-09).
+-- Composed floors: floors[n] = { mm = true, n = { de, en } }, the pieces are in the data add-on (DungeonMinimaps_<n>.lua).
 -- loading[instance] = { fid, src }: the loading screen of the instance map and the LoadingScreens column it
 -- came from (wide169, wide, narrow or main). Not confirmed in the Forever client, only loadScreens is.
 local _, ns = ...
@@ -58,12 +59,28 @@ ns.Data.DungeonAssets = {
     ["Zul'Farrak"] = { fid = 131885, src = "narrow" },
   },
   maps = {
+    ["Alcaz Prison"] = {
+      floors = {
+        { mm = true, n = { de = "Gefängnis von Alcaz", en = "Alcaz Prison" } },
+        { mm = true, n = { de = "Der Hochsicherheitstrakt", en = "Maximum Security" } },
+      },
+    },
     ["Blackfathom Deeps"] = {
       folder = "BlackFathomDeeps",
       floors = {
         { fid = { 447578, 447582, 447583, 447584, 447585, 447586, 447587, 447588, 447589, 447579, 447580, 447581 } },
         { fid = { 447590, 447594, 447595, 447596, 447597, 447598, 447599, 447600, 447601, 447591, 447592, 447593 } },
         { fid = { 447602, 447606, 447607, 447608, 447609, 447610, 447611, 447612, 447613, 447603, 447604, 447605 } },
+      },
+    },
+    ["Blackmaw Hold"] = {
+      floors = {
+        { mm = true, n = { de = "Die Schwarzschlundfeste", en = "Blackmaw Hold" } },
+        { mm = true, n = { de = "Die Eitergrotte", en = "Festering Grotto" } },
+        { mm = true, n = { de = "Tiefen des Gefallenen Hains", en = "Depths of the Fallen Grove" } },
+        { mm = true, n = { de = "Tiefen der Ältesten", en = "Depths of the Elders" } },
+        { mm = true, n = { de = "Tiefen des Baus", en = "Depths of the Burrow" } },
+        { mm = true, n = { de = "Tiefen der Verbotenen Magie", en = "Depths of Forbidden Magic" } },
       },
     },
     ["Blackrock Depths"] = {
@@ -86,7 +103,8 @@ ns.Data.DungeonAssets = {
         world = { x0 = 533.33, y0 = 533.33, x1 = -533.33, y1 = 0 },
       },
       floors = {
-        { fid = { 6982328, 6982441 }, cols = 1, rows = 2 },
+        { fid = { 6982328, 6982441 }, cols = 1, rows = 2, n = { de = "Dalaran", en = "City of Dalaran" } },
+        { mm = true, n = { de = "Die Schattenseite", en = "The Underbelly" } },
       },
       tiles = { 6982320, 6982324, 6982330, 6982437, 6982443, 6982318, 6982326, 6982332, 6982439, 6982445, 6982316, 6982322, 6982328, 6982441, 6982447, 6982389, 6982391, 6982395, 6982489, 6982485, 6982393, 6982397, 6982399, 6982487, 6982491 },
       lo = 7963775,
@@ -158,6 +176,11 @@ ns.Data.DungeonAssets = {
         { fid = { 7726086, 7726092, 7726140, 7726146, 7726194, 7726200 }, cols = 2, rows = 3 },
       },
       tiles = { 7725792, 7725846, 7725900, 7725954, 7726008, 7726062, 7726116, 7726170, 7726224, 7725798, 7725852, 7725906, 7725960, 7726014, 7726068, 7726122, 7726176, 7726230, 7725804, 7725858, 7725912, 7725966, 7726020, 7726074, 7726128, 7726182, 7726236, 7725810, 7725864, 7725918, 7725972, 7726026, 7726080, 7726134, 7726188, 7726242, 7725816, 7725870, 7725924, 7725978, 7726032, 7726086, 7726140, 7726194, 7726248, 7725822, 7725876, 7725930, 7725984, 7726038, 7726092, 7726146, 7726200, 7726254, 7725828, 7725882, 7725936, 7725990, 7726044, 7726098, 7726152, 7726206, 7726260, 7725834, 7725888, 7725942, 7725996, 7726050, 7726104, 7726158, 7726212, 7726266, 7725840, 7725894, 7725948, 7726002, 7726056, 7726110, 7726164, 7726218, 7726272 },
+    },
+    ["Krol'dok Stronghold"] = {
+      floors = {
+        { mm = true, n = { de = "Feste Krol'dok", en = "Krol'dok Stronghold" } },
+      },
     },
     ["Lower Blackrock Spire"] = {
       folder = "BlackrockSpire",
@@ -316,6 +339,11 @@ ns.Data.DungeonAssets = {
         { fid = { 448298, 448302, 448303, 448304, 448305, 448306, 448307, 448308, 448309, 448299, 448300, 448301 } },
       },
     },
+    ["Shaper's Terrace"] = {
+      floors = {
+        { mm = true, n = { de = "Die Terrasse des Formers", en = "The Shaper's Terrace" } },
+      },
+    },
     ["Stormwind Stockade"] = {
       folder = "TheStockade",
       floors = {
@@ -340,6 +368,12 @@ ns.Data.DungeonAssets = {
       floors = {
         { fid = { 449591, 449595, 449596, 449597, 449598, 449599, 449600, 449601, 449602, 449592, 449593, 449594 } },
         { fid = { 449603, 449607, 449608, 449609, 449610, 449611, 449612, 449613, 449614, 449604, 449605, 449606 } },
+      },
+    },
+    ["The Drowned City"] = {
+      floors = {
+        { mm = true, n = { de = "Die Versunkene Stadt", en = "The Drowned City" } },
+        { mm = true, n = { en = "Ataal'Byzal" } },
       },
     },
     ["Uldaman"] = {

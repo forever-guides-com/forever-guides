@@ -2,7 +2,7 @@
 -- post hooks and method calls on the windows: nothing of Blizzard's code is replaced and no field of
 -- a window is written. Every game call runs under pcall, so a window that behaves differently in
 -- some client costs that window, never an error. In combat a window is left alone when it is
--- protected (or when "no changes in combat" is on) and the action waits for PLAYER_REGEN_ENABLED.
+-- protected (or when "Lock in combat" is on) and the action waits for PLAYER_REGEN_ENABLED.
 -- Windows are found in the fixed list, UIPanelWindows, UISpecialFrames and by a signature scan.
 -- Every window also gets an invisible drag handle over its top edge, because the title strip of
 -- some windows lies under children that catch the mouse.
@@ -23,7 +23,7 @@ ns.AddLocale("enUS", {
   ["tweaks.listKnown"] = "Active: %s",
   ["tweaks.listAuto"] = "Detected: %s",
   ["tweaks.zoomLine"] = "%s: zoom %d %%",
-  ["tweaks.conflict"] = "Other move addon loaded: %s",
+  ["tweaks.conflict"] = "Another move addon is loaded: %s",
   ["tweaks.resetAll"] = "Window positions reset: %d",
   ["tweaks.resetOne"] = "Window position reset: %s",
   ["tweaks.noSaved"] = "No saved position: %s",
@@ -34,7 +34,7 @@ ns.AddLocale("deDE", {
   ["tweaks.listKnown"] = "Aktiv: %s",
   ["tweaks.listAuto"] = "Erkannt: %s",
   ["tweaks.zoomLine"] = "%s: Zoom %d %%",
-  ["tweaks.conflict"] = "Anderes Move-Addon geladen: %s",
+  ["tweaks.conflict"] = "Ein anderes Move-Addon ist geladen: %s",
   ["tweaks.resetAll"] = "Fensterpositionen zurückgesetzt: %d",
   ["tweaks.resetOne"] = "Fensterposition zurückgesetzt: %s",
   ["tweaks.noSaved"] = "Keine Position gespeichert: %s",
@@ -45,6 +45,7 @@ local ADDON_NAME = "ForeverGuides"
 
 local weak = { __mode = "k" }
 local hooked = setmetatable({}, weak) -- frame -> name
+local moveParts = setmetatable({}, weak) -- frame -> true once movable, handle and drag hooks are in
 local dragging = setmetatable({}, weak) -- frame -> true while the user moves it
 local handles = setmetatable({}, weak) -- frame -> its drag handle
 local restoring = setmetatable({}, weak) -- frame -> true while we set its points
@@ -85,7 +86,7 @@ end
 
 local function combatSafe()
   local s = settings()
-  return s == nil or s.frameTweaksCombat ~= false
+  return s ~= nil and s.combatLock == true
 end
 
 local function clampOn()
@@ -204,12 +205,16 @@ end
 
 -- The player's own drag. A window that is not protected may be moved in combat whatever "no changes in
 -- combat" says: the setting keeps our automatic changes (restore, zoom) out of a fight, a drag is the
--- player's hand and only moves the window.
+-- player's hand and only moves the window. A window held back for automatic changes only (the map) needs
+-- the client to allow protected calls on it as well.
 local function canMove(name, frame)
   if not inCombat() then
     return canTouch(name, frame)
   end
-  return not (FL.Protected(name) or isProtected(frame))
+  if FL.DragProtected(name) or isProtected(frame) then
+    return false
+  end
+  return not FL.Protected(name) or ns.ProtectedAllowed(frame)
 end
 
 -- Points of a window as the client has them now.
@@ -497,7 +502,13 @@ local function bothModifiers()
 end
 
 local function onDragStart(name, frame)
-  if dragging[frame] or not featureOn(name, "move") or bothModifiers() or not canMove(name, frame) then
+  if dragging[frame] or not featureOn(name, "move") or bothModifiers() then
+    return
+  end
+  if not canMove(name, frame) then
+    if inCombat() and not ns.CombatLocked() then
+      ns.CombatBlocked("frame drag")
+    end
     return
   end
   local key = keyOf(name, frame)
@@ -601,6 +612,28 @@ local function isOwn(frame)
   return shell ~= nil and type(shell.Of) == "function" and shell.Of(frame) ~= nil
 end
 
+-- The parts of a window that only serve the player's drag: movable, handle, drag surfaces.
+local function attachMove(name, frame)
+  if moveParts[frame] then
+    return
+  end
+  moveParts[frame] = true
+  pcall(frame.SetMovable, frame, true)
+  guard(buildHandle, name, frame)
+  for _, surface in ipairs(dragSurfaces(name, frame)) do
+    pcall(function()
+      surface:EnableMouse(true)
+      surface:RegisterForDrag("LeftButton")
+      surface:HookScript("OnDragStart", function()
+        guard(onDragStart, name, frame)
+      end)
+      surface:HookScript("OnDragStop", function()
+        guard(onDragStop, name, frame)
+      end)
+    end)
+  end
+end
+
 -- One hook set per window, however often a window shows up. detected: found by UISpecialFrames or
 -- the signature scan instead of the lists.
 local function attach(name, frame, detected)
@@ -616,25 +649,16 @@ local function attach(name, frame, detected)
   end
   known[name] = frame
   if not canTouch(name, frame) then
+    -- The automatic parts wait for the end of the fight, the drag does not.
+    if canMove(name, frame) then
+      guard(attachMove, name, frame)
+    end
     queue:Add(name, "hook")
     return
   end
   hooked[frame] = name
   auto[name] = detected and not FL.Listed(name) or nil
-  pcall(frame.SetMovable, frame, true)
-  guard(buildHandle, name, frame)
-  for _, surface in ipairs(dragSurfaces(name, frame)) do
-    pcall(function()
-      surface:EnableMouse(true)
-      surface:RegisterForDrag("LeftButton")
-      surface:HookScript("OnDragStart", function()
-        guard(onDragStart, name, frame)
-      end)
-      surface:HookScript("OnDragStop", function()
-        guard(onDragStop, name, frame)
-      end)
-    end)
-  end
+  attachMove(name, frame)
   -- The panel manager anchors a window again when it opens: put it back at once.
   -- Our own SetPoint (restoring) must not queue a second pass, a deferred one would find the flag cleared.
   local function onPlaced()
@@ -1385,7 +1409,7 @@ ns.On("PLAYER_REGEN_ENABLED", function()
   end
 end)
 ns.On("FG_SETTING_CHANGED", function(_, path)
-  if path == "settings.frameTweaks" or path == "settings.frameTweaksCombat" then
+  if path == "settings.frameTweaks" or path == "settings.combatLock" then
     FT.Apply()
   elseif LIMIT_PATHS[path] then
     configure()

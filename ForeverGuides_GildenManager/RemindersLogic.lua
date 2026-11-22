@@ -180,8 +180,9 @@ end
 
 -- Rows ---------------------------------------------------------------------------------------------------
 
--- roster: the members of the snapshot; store: guild.members.
-function RM.Rows(roster, store)
+-- roster: the members of the snapshot; store: guild.members; banned: optional function key -> true when the
+-- member, its main or an alt of the group is on the ban list.
+function RM.Rows(roster, store, banned)
   local rows = {}
   for _, m in ipairs(type(roster) == "table" and roster or {}) do
     if type(m) == "table" and type(m.key) == "string" then
@@ -197,6 +198,7 @@ function RM.Rows(roster, store)
         away = e.away,
         returnedDay = e.returnedDay,
         returnedAfter = e.returnedAfter,
+        banned = banned and banned(m.key) or nil,
       }
     end
   end
@@ -299,6 +301,7 @@ function RM.Returners(rows, today)
         day = day,
         ago = today - day,
         after = whole(r.returnedAfter),
+        banned = r.banned == true,
       }
     end
   end
@@ -449,14 +452,14 @@ end
 
 -- Everything -----------------------------------------------------------------------------------------------
 
--- input: { today, lead, weekStart, inactiveDays, roster, store, ranks, events, plan }. nil without a day.
+-- input: { today, lead, weekStart, inactiveDays, roster, store, banned, ranks, events, plan }. nil without a day.
 function RM.Build(input)
   if type(input) ~= "table" or not whole(input.today) then
     return nil
   end
   local today = input.today
   local lead = math.max(RM.LEAD.min, math.min(RM.LEAD.max, whole(input.lead) or RM.LEAD.default))
-  local rows = RM.Rows(input.roster, input.store)
+  local rows = RM.Rows(input.roster, input.store, input.banned)
   local anniversaries = RM.Anniversaries(rows, today, lead)
   local birthdays = RM.Birthdays(rows, today, lead)
   return {

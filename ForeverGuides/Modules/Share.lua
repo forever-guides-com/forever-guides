@@ -1,7 +1,7 @@
--- Share dialog: the only way out of the game is the chat, so text (notes,
--- later macros and routes) can be sent to a chat the player picks. Callers
--- pass plain text (no addon markup). Nothing is sent without a click on the
--- send button.
+-- Share dialog: the one channel picker of every share button. Text (notes, routes, pages) can be sent to a chat
+-- the player picks (Say, Yell, Party, Raid, Instance, Guild, Whisper, numbered channels), put into the chat box
+-- to edit and send by hand (Manual) or copied (Copy). Callers pass plain text (no addon markup) or a ready link
+-- message. Nothing is sent without a click on the send button.
 local _, ns = ...
 local W, L = ns.W, ns.L
 local PN = ns.PlayerName
@@ -27,15 +27,26 @@ ns.AddLocale("enUS", {
   ["share.note"] = "Goes to real chat, others see it. Check channel and text first.",
   ["share.channel"] = "Channel",
   ["share.ch.say"] = "Say",
+  ["share.ch.yell"] = "Yell",
   ["share.ch.party"] = "Party",
   ["share.ch.raid"] = "Raid",
   ["share.ch.instance"] = "Instance",
   ["share.ch.guild"] = "Guild",
   ["share.ch.whisper"] = "Whisper",
+  ["share.ch.manual"] = "Manual",
+  ["share.ch.copy"] = "Copy",
+  ["share.manualNote"] = "Goes into your chat box. Edit it there and send it yourself with Enter.",
+  ["share.copyNote"] = "Opens a field to copy with Ctrl+C. Nothing is sent.",
+  ["share.copyHint"] = "Ctrl+C copies the text.",
+  ["share.toBox"] = "To chat box",
+  ["share.toBoxNext"] = "Next to chat box (%d/%d)",
+  ["share.copyButton"] = "Copy",
+  ["share.boxed"] = "In your chat box: %s. Press Enter there to send.",
+  ["share.gatedBox"] = "One message per click. Send it with Enter, then click again for the next.",
   ["share.whisperFirst"] = "First name",
   ["share.whisperSurname"] = "Surname",
-  ["share.whisperNeedName"] = "Please enter first and last name, for example Isanja Wosande.",
-  ["share.whisperNeedName.retail"] = "Please enter the player name, for example Isanja.",
+  ["share.whisperNeedName"] = "Enter first and last name, for example Isanja Wosande.",
+  ["share.whisperNeedName.retail"] = "Enter the player name, for example Isanja.",
   ["share.whisperBadName"] = "First and last name need at least 2 letters each and no further parts, for example Isanja Wosande.",
   ["share.whisperBadName.retail"] = "The name needs at least 2 letters, optionally followed by -Realm, for example Isanja-Realm.",
   ["share.whisperNotFound"] = "Player not found: %s. Check first and last name and online status.",
@@ -43,7 +54,7 @@ ns.AddLocale("enUS", {
   ["share.input"] = "Text (is split into chat messages)",
   ["share.count.one"] = "%d message",
   ["share.count.many"] = "%d messages",
-  ["share.gated"] = "One message per click in Say and numbered channels. Click again for the next.",
+  ["share.gated"] = "One message per click in Say, Yell and numbered channels. Click again for the next.",
   ["share.truncated"] = "Too long: only the first %d of %d messages are sent.",
   ["share.send"] = "Send",
   ["share.sendNext"] = "Send next (%d/%d)",
@@ -59,26 +70,37 @@ ns.AddLocale("deDE", {
   ["share.note"] = "Geht in den echten Chat, andere sehen es. Prüfe Kanal und Text.",
   ["share.channel"] = "Kanal",
   ["share.ch.say"] = "Sagen",
+  ["share.ch.yell"] = "Schreien",
   ["share.ch.party"] = "Gruppe",
-  ["share.ch.raid"] = "Schlachtzug",
+  ["share.ch.raid"] = "Raid",
   ["share.ch.instance"] = "Instanz",
   ["share.ch.guild"] = "Gilde",
   ["share.ch.whisper"] = "Flüstern",
+  ["share.ch.manual"] = "Manuell",
+  ["share.ch.copy"] = "Kopieren",
+  ["share.manualNote"] = "Kommt in dein Chatfeld. Bearbeite den Text dort und sende ihn selbst mit Enter.",
+  ["share.copyNote"] = "Öffnet ein Feld zum Kopieren mit Strg+C. Es wird nichts gesendet.",
+  ["share.copyHint"] = "Strg+C kopiert den Text.",
+  ["share.toBox"] = "In das Chatfeld",
+  ["share.toBoxNext"] = "Nächste in das Chatfeld (%d/%d)",
+  ["share.copyButton"] = "Kopieren",
+  ["share.boxed"] = "In deinem Chatfeld: %s. Drücke dort Enter zum Senden.",
+  ["share.gatedBox"] = "Eine Nachricht pro Klick. Sende sie mit Enter, dann klicke erneut für die nächste.",
   ["share.whisperFirst"] = "Vorname",
   ["share.whisperSurname"] = "Nachname",
-  ["share.whisperNeedName"] = "Bitte Vor- und Nachnamen eingeben, zum Beispiel Isanja Wosande.",
-  ["share.whisperNeedName.retail"] = "Bitte den Spielernamen eingeben, zum Beispiel Isanja.",
+  ["share.whisperNeedName"] = "Gib Vor- und Nachnamen ein, zum Beispiel Isanja Wosande.",
+  ["share.whisperNeedName.retail"] = "Gib den Spielernamen ein, zum Beispiel Isanja.",
   ["share.whisperBadName"] = "Vor- und Nachname brauchen je mindestens 2 Buchstaben und keine weiteren Teile, zum Beispiel Isanja Wosande.",
   ["share.whisperBadName.retail"] = "Der Name braucht mindestens 2 Buchstaben, optional gefolgt von -Realm, zum Beispiel Isanja-Realm.",
-  ["share.whisperNotFound"] = "Spieler nicht gefunden: %s. Prüfe Vor- und Nachname und Online-Status.",
+  ["share.whisperNotFound"] = "Spieler nicht gefunden: %s. Prüfe Vor- und Nachname und Onlinestatus.",
   ["share.preview"] = "Vorschau (genau das wird gesendet)",
-  ["share.input"] = "Text (wird in Chat-Nachrichten aufgeteilt)",
+  ["share.input"] = "Text (wird in Chatnachrichten aufgeteilt)",
   ["share.count.one"] = "%d Nachricht",
   ["share.count.many"] = "%d Nachrichten",
-  ["share.gated"] = "Eine Nachricht pro Klick im Sagen-Chat und in nummerierten Kanälen. Klicke erneut für die nächste.",
+  ["share.gated"] = "Eine Nachricht pro Klick in Sagen, Schreien und nummerierten Kanälen. Klicke erneut für die nächste.",
   ["share.truncated"] = "Zu lang: nur die ersten %d von %d Nachrichten werden gesendet.",
   ["share.send"] = "Senden",
-  ["share.sendNext"] = "Nächste senden (%d/%d)",
+  ["share.sendNext"] = "Weiter senden (%d/%d)",
   ["share.sent"] = "Gesendet: %s.",
   ["share.failed"] = "Senden bei Nachricht %d von %d abgebrochen: %s",
   ["share.noNote"] = "Keine Notiz gefunden für: %s",
@@ -205,7 +227,14 @@ function Share.Prepare(title, text)
   if title and title ~= "" then
     body = "[" .. title .. "] " .. body
   end
-  local msgs = Share.Split(body)
+  local msgs = {}
+  for _, msg in ipairs(Share.Split(body)) do
+    -- Exactly what the client takes: the preview shows these messages and the send uses them unchanged.
+    msg = ns.ChatSafe.Prepare(msg)
+    if msg ~= "" then
+      msgs[#msgs + 1] = msg
+    end
+  end
   local total = #msgs
   for i = total, MAX_MESSAGES + 1, -1 do
     msgs[i] = nil
@@ -238,6 +267,7 @@ local function fillOptions(opts)
     opts[i] = nil
   end
   opts[#opts + 1] = { value = "SAY", key = "share.ch.say" }
+  opts[#opts + 1] = { value = "YELL", key = "share.ch.yell" }
   if ask(IsInGroup) then
     opts[#opts + 1] = { value = "PARTY", key = "share.ch.party" }
   end
@@ -254,6 +284,8 @@ local function fillOptions(opts)
   if GetChannelList then
     addChannels(opts, GetChannelList())
   end
+  opts[#opts + 1] = { value = "MANUAL", key = "share.ch.manual" }
+  opts[#opts + 1] = { value = "COPY", key = "share.ch.copy" }
 end
 
 local function hasOption(opts, value)
@@ -345,10 +377,12 @@ local function route(d)
   return d.channel
 end
 
--- Outside instances the game only lets Say and numbered channels send
--- inside a click, so a timer chain would lose every message after the first.
+-- Outside instances the game only lets Say, Yell and numbered channels send inside a click, so a timer chain
+-- would lose every message after the first. Manual is one part per click as well: the player sends each by hand.
 local function clickGated(chatType)
-  if chatType ~= "SAY" and chatType ~= "CHANNEL" then
+  if chatType == "MANUAL" then
+    return true
+  elseif chatType ~= "SAY" and chatType ~= "YELL" and chatType ~= "CHANNEL" then
     return false
   end
   local ok, inInstance = pcall(IsInInstance)
@@ -356,17 +390,21 @@ local function clickGated(chatType)
 end
 
 -- A link of the add-on (note, drawing, build, list) is served to whoever opens it, so it needs the send
--- consent of linkShare. Plain text and lines without a token are not affected.
+-- consent of linkShare. Plain text and lines without a token are not affected. The click on send is the consent
+-- for the readable line with its data (ChatLabel), as long as the player did not switch linkShare off.
 local function needsConsent(d)
-  return d.link ~= nil and not Consent.Allows("linkShare", "send", "chat")
+  if d.link == nil or d.link.free or Consent.Allows("linkShare", "send", "chat") then
+    return false
+  end
+  return not (d.link.share and ns.ChatLabel and ns.ChatLabel.Plan(route(d)))
 end
 
 local function paintSend(d)
   local job = d.job
   if job and job.gated then
-    W.SetText(d.go.label, nil, fmt("share.sendNext", job.i, #job.msgs))
+    W.SetText(d.go.label, nil, fmt(d.channel == "MANUAL" and "share.toBoxNext" or "share.sendNext", job.i, #job.msgs))
   else
-    W.SetText(d.go.label, "share.send")
+    W.SetText(d.go.label, d.channel == "MANUAL" and "share.toBox" or d.channel == "COPY" and "share.copyButton" or "share.send")
   end
   local ready = #d.msgs > 0 and (d.channel ~= "WHISPER" or firstName(d) ~= "") and not needsConsent(d)
   if ready and not (job and not job.gated) then
@@ -376,11 +414,23 @@ local function paintSend(d)
   end
 end
 
--- The name row of a whisper pushes the text areas down and grows the dialog.
-local function placeBody(d, whisper)
-  d.whisperRow = whisper
-  local shift = whisper and WHISPER_ROW or 0
+-- A hint of more than two lines pushes the channel and everything below it down, the name row of a whisper pushes
+-- the text areas down, and the dialog grows by both.
+local NOTE_TOP, CHANNEL_TOP, NOTE_GAP = 44, 84, 8
+
+local function placeBody(d, whisper, noteHeight)
+  d.whisperRow, d.noteHeight = whisper, noteHeight
+  local lead = math.max(0, NOTE_TOP + noteHeight + NOTE_GAP - CHANNEL_TOP)
+  local shift = lead + (whisper and WHISPER_ROW or 0)
   d:SetHeight(DIALOG_H + shift)
+  d.dropdown:ClearAllPoints()
+  d.dropdown:SetPoint("TOPLEFT", 16, -CHANNEL_TOP - lead)
+  d.first:ClearAllPoints()
+  d.first:SetPoint("TOPLEFT", 16, -136 - lead)
+  d.first:SetPoint("TOPRIGHT", d, "TOP", -4, -136 - lead)
+  d.surname:ClearAllPoints()
+  d.surname:SetPoint("TOPLEFT", d, "TOP", 4, -136 - lead)
+  d.surname:SetPoint("TOPRIGHT", -16, -136 - lead)
   d.bodyLabel:ClearAllPoints()
   d.bodyLabel:SetPoint("TOPLEFT", 16, -138 - shift)
   for _, area in ipairs({ d.preview, d.input }) do
@@ -394,18 +444,30 @@ local function refresh(d)
   d.job = nil
   local msgs, total
   if d.link then
-    -- A note goes out as exactly one link message, built by NoteLink.
-    msgs, total = d.link.msg and { d.link.msg } or {}, d.link.msg and 1 or 0
+    -- A note goes out as exactly one link message, built by NoteLink: the readable text where the data can travel
+    -- beside it (ChatLabel), else the token.
+    local text = d.link.msg
+    d.sharing = false
+    if text and d.link.share and ns.ChatLabel and ns.ChatLabel.Plan(route(d)) then
+      text, d.sharing = d.link.share.text, true
+    end
+    text = text and ns.ChatSafe.Prepare(text)
+    if text == "" then
+      text = nil
+    end
+    msgs, total = text and { text } or {}, text and 1 or 0
   else
     msgs, total = Share.Prepare(d.shareTitle, d.editable and d.input:GetValue() or d.source)
   end
   d.msgs = msgs
+  local noteKey = d.channel == "MANUAL" and "share.manualNote" or d.channel == "COPY" and "share.copyNote" or d.noteKey
+  W.SetText(d.note, noteKey)
   if not d.editable then
     d.preview:SetValue(table.concat(msgs, "\n"))
   end
   local line = countText(#msgs)
   if #msgs > 1 and clickGated((route(d))) then
-    line = line .. ". " .. L["share.gated"]
+    line = line .. ". " .. L[d.channel == "MANUAL" and "share.gatedBox" or "share.gated"]
   end
   if d.link and d.link.sizeLine then
     line = line .. ". " .. d.link.sizeLine
@@ -437,8 +499,9 @@ local function refresh(d)
   d.optin:Update(locked)
   d.warn:SetShown(not locked)
   local whisper = d.channel == "WHISPER"
-  if d.whisperRow ~= whisper then
-    placeBody(d, whisper)
+  local noteHeight = W.FitLabel(d.note, DIALOG_W - 32)
+  if d.whisperRow ~= whisper or d.noteHeight ~= noteHeight then
+    placeBody(d, whisper, noteHeight)
   end
   d.first:SetShown(whisper)
   d.surname:SetShown(whisper)
@@ -457,11 +520,20 @@ local function watchWhisper(d, job)
   d.listen = { target = job.target, at = now(), previous = job.previous }
 end
 
+-- One prepared message to its destination. Manual puts exactly the previewed text into the chat box and sends
+-- nothing; every other chat type goes out through ChatSafe.
+local function deliver(job)
+  if job.chatType == "MANUAL" then
+    return ns.ChatLabel.ToChat(nil, job.msgs[job.i])
+  end
+  return ns.ChatSafe.Send(job.msgs[job.i], job.chatType, job.target)
+end
+
 local function step(d, job)
   if d.job ~= job then
     return
   end
-  local ok, err = pcall(SendChatMessage, job.msgs[job.i], job.chatType, nil, job.target)
+  local ok, err = pcall(deliver, job)
   if not ok then
     ns.Notify(fmt("share.failed", job.i, #job.msgs, tostring(err)), "error")
     d.job = nil
@@ -477,7 +549,12 @@ local function step(d, job)
   end
   job.i = job.i + 1
   if job.i > #job.msgs then
-    ns.Notify(fmt("share.sent", countText(#job.msgs)), "success")
+    if job.chatType == "MANUAL" then
+      ns.Notify(fmt("share.boxed", countText(#job.msgs)), "info")
+      d:Hide()
+    else
+      ns.Notify(fmt("share.sent", countText(#job.msgs)), "success")
+    end
     d.job = nil
   elseif not job.gated then
     C_Timer.After(
@@ -492,6 +569,13 @@ end
 
 local function send(d)
   if needsConsent(d) then
+    return
+  end
+  if d.channel == "COPY" then
+    if #d.msgs > 0 then
+      d:Hide()
+      ns.Dialogs.Copy("share.ch.copy", table.concat(d.msgs, "\n"), "share.copyHint")
+    end
     return
   end
   local job = d.job
@@ -513,7 +597,17 @@ local function send(d)
     return
   end
   d.nameCheck = false
-  d.job = { msgs = d.msgs, i = 1, chatType = chatType, target = target, gated = clickGated(chatType) }
+  local msgs = d.msgs
+  local share = d.link and d.link.share
+  if share and d.sharing and not (ns.ChatLabel and ns.ChatLabel.Send(share, chatType, target)) then
+    -- The data could not be queued (combat, no consent any more): the token carries it, where it may go out.
+    if needsConsent(d) then
+      refresh(d)
+      return
+    end
+    msgs = { ns.ChatSafe.Prepare(d.link.msg) }
+  end
+  d.job = { msgs = msgs, i = 1, chatType = chatType, target = target, gated = clickGated(chatType) }
   step(d, d.job)
 end
 
@@ -566,7 +660,7 @@ local function build()
     end,
   })
   d.dropdown:SetWidth(220)
-  d.dropdown:SetPoint("TOPLEFT", 16, -84)
+  d.dropdown:SetPoint("TOPLEFT", 16, -CHANNEL_TOP)
 
   -- Two fields side by side in their own row, each one half of the dialog width.
   local function nameBox(key)
@@ -671,7 +765,7 @@ local function show(title, text, link, windowTitle)
   d.editable = text == nil and link == nil
   d.source = text or ""
   d.link = link
-  W.SetText(d.note, link and (link.hint or "share.noteLink") or "share.note")
+  d.noteKey = link and (link.hint or "share.noteLink") or "share.note"
   fillOptions(d.options)
   d.channel, d.status, d.nameCheck = defaultChannel(d.options), nil, false
   fillWhisper(d)
@@ -775,9 +869,9 @@ end
 
 -- A ready link message of any kind registered with NoteLink.RegisterKind: `built` is what
 -- NoteLink.BuildFor returned, or { err = reason }. hint and errPrefix are locale keys for the line
--- under the preview and the prefix of the error text.
-function Share.OpenLink(built, hint, errPrefix)
+-- under the preview and the prefix of the error text. windowTitle: ready text for the window title.
+function Share.OpenLink(built, hint, errPrefix, windowTitle)
   built = built or {}
   built.hint, built.errPrefix = hint, errPrefix
-  return show("", "", built)
+  return show("", "", built, windowTitle)
 end

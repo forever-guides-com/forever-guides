@@ -3,7 +3,8 @@
 ## Notes: In-game companion for forever-guides.com: trainers, talents, macros, exports and more.
 ## Notes-deDE: Begleiter für forever-guides.com im Spiel: Lehrer, Talente, Makros, Exporte und mehr.
 ## Author: Wosande
-## Version: 0.10.2
+## Version: 1.0.0
+## X-Release-Build: 1.0.0
 ## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
 ## SavedVariables: ForeverGuidesDB
 ## SavedVariablesPerCharacter: ForeverGuidesCharDB
@@ -28,6 +29,7 @@ Core\Store.lua
 Core\Consent.lua
 Core\Keys.lua
 Core\Capabilities.lua
+Core\SecureOverlay.lua
 Core\Loader.lua
 Core\SubAddons.lua
 Core\DataApi.lua
@@ -41,6 +43,10 @@ Core\Notify.lua
 Data\Manifest.lua
 Data\Meta.lua
 Data\Trainers.lua
+Data\StableMasters.lua
+Data\HunterPets.lua
+Data\Mounts.lua
+Data\Legendaries.lua
 Data\TrainerRoles.lua
 Data\Weapons.lua
 Data\TrainerCosts.lua
@@ -94,6 +100,8 @@ Data\Spells_GENERAL.lua
 Data\Tutorials.lua
 Data\Changelog.lua
 Data\ProfessionTools.lua
+Data\ConsoleVars.lua
+Data\SearchIndex.lua
 
 UI\Theme.lua
 UI\Skins.lua
@@ -101,6 +109,7 @@ UI\Widgets.lua
 UI\WindowShell.lua
 UI\Scroll.lua
 UI\Dialogs.lua
+UI\WebLink.lua
 UI\DesktopIcons.lua
 UI\Icons.lua
 UI\Desktop.lua
@@ -123,6 +132,7 @@ Modules\RaidLockLogic.lua
 Modules\RaidWeekLogic.lua
 Modules\AccessLogic.lua
 Modules\ProfessionLogic.lua
+Modules\RestedLogic.lua
 Modules\RosterStatsLogic.lua
 Modules\CharRoster.lua
 Modules\Professions.lua
@@ -134,6 +144,14 @@ Modules\Dashboard.lua
 Modules\Placeholders.lua
 Modules\TravelLogic.lua
 Modules\TravelWalk.lua
+Modules\WalkPathLogic.lua
+Modules\NavData.lua
+Modules\NavRouter.lua
+Modules\WalkLogic.lua
+Modules\RouteOrderLogic.lua
+Modules\TravelPlan.lua
+Modules\JourneyLogic.lua
+Modules\RouteWalk.lua
 Modules\TrainerRoles.lua
 Modules\RefLogic.lua
 Modules\InstanceLevelLogic.lua
@@ -150,7 +168,12 @@ Modules\StatsLogic.lua
 Modules\LevelLogic.lua
 Modules\CostLogic.lua
 Modules\CostCapture.lua
+Modules\LearnedSpells.lua
+Modules\CardFlowLogic.lua
 Modules\PageKit.lua
+Modules\PageKitCards.lua
+Modules\PageKitTable.lua
+Modules\PageKitSplit.lua
 UI\ManageWindow.lua
 Modules\LevelView.lua
 Modules\MapPoly.lua
@@ -171,11 +194,13 @@ Modules\MapPins.lua
 Modules\MapInstancePins.lua
 Modules\MapZoneArrows.lua
 Modules\GatheringMapLogic.lua
+Modules\SpotMarker.lua
 Modules\GatheringMap.lua
 Modules\MapPlayerMarkerLogic.lua
 Modules\MapPlayerMarker.lua
 Modules\MapPlaceList.lua
 Modules\MapLegend.lua
+Modules\MapRouteStrokeLogic.lua
 Modules\MapRoute.lua
 Modules\MapRouteList.lua
 Modules\MapReveal.lua
@@ -185,18 +210,31 @@ Modules\RaceLogic.lua
 Modules\RaceViews.lua
 Modules\ClassesPage.lua
 Modules\TrainersPage.lua
+Modules\PetsLogic.lua
+Modules\PetsPage.lua
+Modules\MountsLogic.lua
+Modules\MountsPage.lua
+Modules\LegendariesLogic.lua
+Modules\LegendariesPage.lua
 Modules\WeaponsPage.lua
 Modules\LevelPage.lua
 Modules\DungeonPinDialogs.lua
+Modules\DungeonRouteLogic.lua
 Modules\DungeonMapView.lua
 Modules\InstanceDataAccess.lua
+Modules\QuestNames.lua
+Modules\InstanceBracketLogic.lua
 Modules\InstanceListLogic.lua
+Modules\InstanceListView.lua
 Modules\InstanceCards.lua
+Modules\InstanceLayoutLogic.lua
 Modules\InstanceView.lua
 Modules\QuestChainLogic.lua
 Modules\QuestListLogic.lua
 Modules\QuestText.lua
 Modules\InstanceItemsLogic.lua
+Modules\WishlistLogic.lua
+Modules\WishlistStar.lua
 Modules\InstanceLootRow.lua
 Modules\InstanceBossView.lua
 Modules\InstanceItemsView.lua
@@ -222,6 +260,7 @@ Modules\TalentBuilds.lua
 Modules\TalentActive.lua
 Modules\TalentBuildList.lua
 Modules\Talents.lua
+Modules\SidePanel.lua
 Modules\TalentFrameOrderLogic.lua
 Modules\TalentFrameOrder.lua
 Modules\LegacyDialogs.lua
@@ -269,8 +308,11 @@ Modules\DrawingsPage.lua
 Modules\ShotLogic.lua
 Modules\ShotCapture.lua
 Modules\ShotPage.lua
+Modules\RealmName.lua
 Modules\Character.lua
 Modules\Appearance.lua
+Modules\ChatUrlLogic.lua
+Modules\ChatUrl.lua
 Modules\CommandHelp.lua
 Modules\ErrorCatcherLogic.lua
 Modules\ErrorCatcher.lua
@@ -312,6 +354,12 @@ Modules\ShareSyncLogic.lua
 Modules\ShareSync.lua
 Modules\ChatHistoryLimits.lua
 Modules\ChatHistoryLogic.lua
+Modules\PageShareLogic.lua
+Modules\ShareCodeLogic.lua
+Modules\PageShare.lua
+Modules\ChatLabelLogic.lua
+Modules\ChatLabel.lua
+Modules\ChatSafe.lua
 Modules\Share.lua
 Modules\NoteLink.lua
 Modules\DrawingLink.lua
@@ -319,17 +367,24 @@ Modules\TalentLink.lua
 Modules\ErrorsPage.lua
 Modules\ChangelogLogic.lua
 Modules\ChangelogPage.lua
+Modules\ChangelogNews.lua
 Modules\AddonCategoryLogic.lua
 Modules\AddonCategory.lua
 Modules\BlizzardScan.lua
 Modules\HostSkin.lua
+Modules\SpellbookSide.lua
 Modules\SpellbookPanel.lua
 Modules\BlizzardLinks.lua
 Modules\TalkingHead.lua
+Modules\MinimapCollector.lua
+Modules\BagSlots.lua
 Modules\KeyBindings.lua
 Modules\WaypointLogic.lua
 Modules\Waypoints.lua
 Modules\WaypointSlash.lua
+Modules\Journey.lua
+Modules\WaypointNav.lua
+Modules\WaypointCapture.lua
 Modules\FlightLogic.lua
 Modules\FlightRoute.lua
 Modules\FlightPointsLogic.lua
@@ -350,6 +405,9 @@ Modules\GroupTree.lua
 Modules\CanvasClipLogic.lua
 Modules\LayoutShareLogic.lua
 Modules\LayoutShare.lua
+Modules\ProfileLogic.lua
+Modules\Profiles.lua
+Modules\ProfileSettings.lua
 Modules\CanvasRender.lua
 Modules\PanelLogic.lua
 Modules\EditorSizeLogic.lua
@@ -398,6 +456,8 @@ Modules\Invites.lua
 Modules\InviteSettings.lua
 Modules\AutoGuard.lua
 Modules\AutoRepair.lua
+Modules\FastLootLogic.lua
+Modules\FastLoot.lua
 Modules\AutoSummon.lua
 Modules\AutoResurrect.lua
 Modules\AutoQuestLog.lua
@@ -439,6 +499,7 @@ Modules\FlightTimer.lua
 Modules\SleepBag.lua
 Modules\WaypointList.lua
 Modules\WorldMapLinks.lua
+Modules\StitchedMapCompat.lua
 Modules\WorldMapInstancePins.lua
 Modules\RareLogic.lua
 Modules\RareFoundLogic.lua
@@ -447,9 +508,17 @@ Modules\RareFound.lua
 Modules\WorldMapFlightPins.lua
 Modules\WorldMapRarePins.lua
 Modules\WorldMapZoneArrows.lua
+Modules\ZoneLevelLogic.lua
+Modules\WorldMapZoneLevels.lua
 Modules\ZoneCrossingRecorder.lua
 Modules\WorldMapBarLogic.lua
+Modules\WorldMapRouteLogic.lua
+Modules\RoutePlan.lua
 Modules\WorldMapBar.lua
+Modules\RouteStopList.lua
+Modules\MapPlanBlock.lua
+Modules\WorldMapRoute.lua
+Modules\WorldMapRoutePanel.lua
 Modules\CalcKeys.lua
 Modules\CalcView.lua
 Modules\CalcSide.lua
@@ -460,6 +529,10 @@ Modules\DurabilityWindow.lua
 Modules\DurabilitySettings.lua
 Modules\SleepBagSettings.lua
 Modules\TalentFrameSettings.lua
+Modules\TooltipTweaks.lua
+Modules\UnitFrameTweaks.lua
+Modules\CastBarTweaks.lua
+Modules\GameUiSettings.lua
 Modules\XpLogic.lua
 Modules\XpTracker.lua
 Modules\LayoutSet.lua
@@ -500,6 +573,9 @@ Modules\AreaLayouts.lua
 Modules\Cursor.lua
 Modules\CursorSettings.lua
 Modules\CursorPage.lua
+Modules\ConsoleLocale.lua
+Modules\ConsoleLogic.lua
+Modules\ConsolePage.lua
 Modules\AreaWindow.lua
 Modules\AreaSettings.lua
 Modules\ProfessionRouteLogic.lua
@@ -509,6 +585,7 @@ Modules\ProfessionData.lua
 Modules\GatheringCodec.lua
 Modules\GatheringData.lua
 Modules\GatheringLogic.lua
+Modules\GatherPickWindow.lua
 Modules\PriceSourceAddon.lua
 Modules\ProfessionShop.lua
 Modules\ProfessionCraft.lua
@@ -524,11 +601,23 @@ Modules\ProfessionTrainersLogic.lua
 Modules\ProfessionTrainersPage.lua
 Modules\VendorsPage.lua
 Modules\GatheringPage.lua
+Modules\GuideKitLogic.lua
+Modules\GuideKit.lua
+Modules\GuidePages.lua
+Modules\LibraryBooksPage.lua
+Modules\ReputationLogic.lua
+Modules\ReputationPage.lua
+Modules\ItemSetsLogic.lua
+Modules\ItemSetsPage.lua
+Modules\WishlistPage.lua
+Modules\GearPlanLogic.lua
+Modules\GearPlanPage.lua
 Modules\RecipeLogic.lua
 Modules\RecipeData.lua
 Modules\RecipeKnown.lua
 Modules\RecipePage.lua
 Modules\SearchProfessions.lua
+Modules\SearchSources.lua
 
 Modules\DungeonAreaLogic.lua
 Modules\BossProgressLogic.lua
@@ -538,6 +627,8 @@ Modules\BossReset.lua
 Modules\DungeonBossTab.lua
 Modules\BossPortrait.lua
 Modules\BossModelWindow.lua
+Modules\ModelPreview.lua
+Modules\ItemActions.lua
 Modules\DungeonWorldMap.lua
 Modules\GatheringFilter.lua
 Modules\GatherObjects.lua
@@ -550,8 +641,10 @@ Modules\WorldMapGather.lua
 Modules\GatheringSettings.lua
 Modules\MinimapPinLogic.lua
 Modules\MinimapLayer.lua
+Modules\MinimapRoute.lua
 Modules\FarmHudLogic.lua
 Modules\FarmHudIcons.lua
+Modules\FarmHudTip.lua
 Modules\FarmHud.lua
 Modules\FarmHudSettings.lua
 Modules\InstanceResetLogic.lua
@@ -571,16 +664,24 @@ Modules\GuildSyncCodec.lua
 Modules\GuildSyncLogic.lua
 Modules\GuildMapStore.lua
 Modules\GuildMapComm.lua
+Modules\FriendRoster.lua
+Modules\FriendMapComm.lua
 Modules\WorldMapGuildLogic.lua
 Modules\WorldMapGuildPins.lua
 Modules\WorldMapGuildTab.lua
+Modules\MapSharePrompt.lua
 Modules\GuildMapSettings.lua
+Modules\WaypointNavSettings.lua
 Modules\MinimapGuildLogic.lua
 Modules\MinimapGuildSource.lua
 Modules\MinimapRareSource.lua
 Modules\RareDetect.lua
 Modules\PresenceLogic.lua
 Modules\Presence.lua
+Modules\VersionCheckLogic.lua
+Modules\VersionCheck.lua
+Modules\VersionNotice.lua
+Modules\UpdateHint.lua
 Modules\CrestData.lua
 Modules\CrestLogic.lua
 Modules\CrestMark.lua
@@ -602,6 +703,7 @@ Modules\ChatHistoryRecord.lua
 Modules\ChatHistoryFormat.lua
 Modules\ChatHistory.lua
 Modules\ChatHistorySettings.lua
+Modules\ChatUrlSettings.lua
 Modules\ChatLauncher.lua
 Modules\FishingLauncher.lua
 Modules\ChatNameLogic.lua

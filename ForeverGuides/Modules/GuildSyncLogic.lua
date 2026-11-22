@@ -12,8 +12,9 @@ local DAY = 86400
 L.CONFIG = {
   -- gap = clamp(base * heardSenders / perSenders, min, max) seconds between two position messages.
   gap = { base = 5, perSenders = 15, min = 5, max = 30, window = 120, tracked = 600 },
-  -- Heartbeat while standing still: scales with the gap, at most max seconds, spread by +-jitter.
-  beat = { base = 60, max = 120, jitter = 0.2 },
+  -- Heartbeat while standing still: `base` seconds up to a gap of `from` seconds (about 30 senders heard),
+  -- then growing with the gap, at most max seconds, spread by +-jitter. base plus jitter stays under store.fresh.
+  beat = { base = 45, from = 10, max = 120, jitter = 0.2 },
   move = {
     -- Smallest move worth a message: yards, or this share of the map where yards are unknown.
     yards = 40,
@@ -38,6 +39,13 @@ L.CONFIG = {
   -- Send windows per function and type: every window must have a token. `total` covers the function.
   send = {
     guildMap = {
+      total = { burst = 5, refill = 0.6 },
+      types = {
+        P = { { burst = 4, refill = 0.5 } },
+        X = { { burst = 2, refill = 0.2 } },
+      },
+    },
+    friendMap = {
       total = { burst = 5, refill = 0.6 },
       types = {
         P = { { burst = 4, refill = 0.5 } },
@@ -108,7 +116,7 @@ end
 
 -- Seconds of standing still until the next "still here" message, before the spread.
 function L.Heartbeat(heard)
-  return math.min(C.beat.max, C.beat.base * L.Gap(heard) / C.gap.min)
+  return math.min(C.beat.max, C.beat.base * math.max(1, L.Gap(heard) / C.beat.from))
 end
 
 -- `value` spread by +-fraction. `random()` returns 0 to 1 (default math.random).

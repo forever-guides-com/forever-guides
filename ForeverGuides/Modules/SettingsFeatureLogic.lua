@@ -8,6 +8,8 @@ ns.SettingsFeatureLogic = L
 
 -- A row of tabs holds at most this many buttons and a feature name at most this many characters.
 L.MAX_PER_ROW = 8
+-- The group row has room for one group more (its width stays checked by the tests).
+L.MAX_GROUPS = 9
 L.MAX_NAME = 26
 -- Width model of a tab button: characters times CHAR, PAD around the text, GAP between two
 -- buttons. The game measures the real text; this model is for the registry test.
@@ -106,6 +108,27 @@ function L.CardFeature(cardId, data)
       return f.id
     end
   end
+end
+
+-- Ids in a page link use "-" where card and control ids use ".", the payload allows no dot.
+function L.ShareId(id)
+  return type(id) == "string" and (id:gsub("%.", "-")) or nil
+end
+
+-- The card id a link word stands for ("language-main" is "language.main"); other words pass through.
+function L.FromShare(word, data)
+  data = registry(data)
+  if type(word) ~= "string" or L.Target(word, nil, data) then
+    return word
+  end
+  for _, f in ipairs(data.FEATURES) do
+    for _, card in ipairs(f.cards or {}) do
+      if L.ShareId(card.id) == word then
+        return card.id
+      end
+    end
+  end
+  return word
 end
 
 -- Feature and card of a jump, Select(feature or old tab id, card). The card id is the more exact
@@ -249,7 +272,7 @@ end
 
 -- Problems of the registry as a list of texts, empty when it keeps the rules of the design: every
 -- feature in a known group with a name and keywords in both languages, a unique id, every card
--- in exactly one feature, at most MAX_PER_ROW features per group and groups, names up to MAX_NAME
+-- in exactly one feature, at most MAX_PER_ROW features per group and MAX_GROUPS groups, names up to MAX_NAME
 -- characters and no row wider than DEFAULT_ROW at font size 1.
 function L.Validate(text, data)
   data = registry(data)
@@ -258,8 +281,8 @@ function L.Validate(text, data)
     problems[#problems + 1] = msg
   end
   local groups, features, cards = {}, {}, {}
-  if #data.GROUPS > L.MAX_PER_ROW then
-    bad("more than " .. L.MAX_PER_ROW .. " groups")
+  if #data.GROUPS > L.MAX_GROUPS then
+    bad("more than " .. L.MAX_GROUPS .. " groups")
   end
   for _, g in ipairs(data.GROUPS) do
     groups[g] = 0

@@ -77,7 +77,7 @@ ns.AddLocale("deDE", {
   ["legacy.warn.placeholder"] = "%s ist ein Platzhalter und gehört in keinen Build.",
   ["legacy.warn.unknown"] = "%s ist kein bekannter Perk.",
   ["legacy.err.empty"] = "Der Text ist leer.",
-  ["legacy.err.nocode"] = "Der Link enthält keinen Legacy-Code.",
+  ["legacy.err.nocode"] = "Der Link enthält keinen Vermächtnis-Code.",
   ["legacy.err.format"] = "Der Code ist weder Version 1 noch Version 2.",
   ["legacy.err.version"] = "Diese Code-Version wird nicht unterstützt.",
   ["legacy.err.pair"] = "Ein Eintrag im Code ist fehlerhaft.",

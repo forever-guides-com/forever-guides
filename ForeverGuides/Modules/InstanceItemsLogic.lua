@@ -159,9 +159,17 @@ function IL.Build(inst, opts)
   opts = opts or {}
   local instances = opts.instances or (ns.Data and ns.Data.Instances) or {}
   local groups, bosses = {}, {}
+  local DA = ns.InstanceDataAccess
   for i, boss in ipairs(inst.bo or {}) do
-    local group =
-      { id = "b" .. i, kind = "boss", index = i, boss = boss, items = dataItems(boss.lo), byId = {}, fresh = {} }
+    local group = {
+      id = "b" .. i,
+      kind = "boss",
+      index = i,
+      boss = boss,
+      items = dataItems(DA and DA.Loot(inst, i) or boss.lo),
+      byId = {},
+      fresh = {},
+    }
     for _, item in ipairs(group.items) do
       item.group = group
       group.byId[item.id] = item
@@ -171,7 +179,7 @@ function IL.Build(inst, opts)
   end
   -- Loot of the instance that the data gives to no boss. A captured source without a boss adds its numbers
   -- here when the item is listed, else it goes to the extra group.
-  local own = { id = "instance", kind = "instance", items = dataItems(inst.tl), byId = {}, fresh = {} }
+  local own = { id = "instance", kind = "instance", items = dataItems(DA and DA.Trash(inst) or inst.tl), byId = {}, fresh = {} }
   for _, item in ipairs(own.items) do
     item.group = own
     own.byId[item.id] = item

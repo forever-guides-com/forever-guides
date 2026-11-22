@@ -10,9 +10,12 @@ local MR, MRL, MG = ns.MapRoute, ns.MapRouteList, ns.MapMagnify
 local RV, GMap, PM = ns.MapReveal, ns.GatheringMap, ns.MapPlayerMarker
 
 ns.AddLocale("enUS", {
-  ["map.intro"] = "Pick start and goal to see the fastest connection.",
+  ["map.intro"] = "Pick a destination and add stops if you like. The first point is the start, or switch on \"Start at my position\".",
+  ["map.flow.hint"] = "Pick a destination. The first point is the start.",
+  ["map.flow.hint.here"] = "Pick a destination. The start is your position.",
+  ["map.flow.empty"] = "The route appears here.",
   ["map.canvasNote"] = "Places sit on the travel canvas, not on game coordinates.\n%d of %d places have estimated positions.",
-  ["map.world.note"] = "World map: %d of %d places in their real zone.\n%d estimated, %d on the schematic island.",
+  ["map.world.note"] = "World view: %d of %d places in their real zone.\n%d estimated, %d on the schematic island.",
   ["map.world.island"] = "%s (schematic)",
   ["map.art.label"] = "Map image",
   ["map.display"] = "Display",
@@ -25,10 +28,10 @@ ns.AddLocale("enUS", {
   ["map.symbolBigger"] = "Bigger",
   ["map.symbolSizeTip"] = "Click: %d %%",
   ["map.dim"] = "Dim filtered places",
-  ["map.dimTip"] = "Filtered places stay faded and not clickable.\nOff: hidden.",
+  ["map.dimTip"] = "Shows filtered places faded and not clickable.\nOff: they are hidden.",
   ["map.rb.open"] = "Open route window",
   ["map.filters"] = "Filters",
-  ["map.filters.tip"] = "Transport types and route options. A tick means allowed.",
+  ["map.filters.tip"] = "Transport types and route settings. A tick means allowed.",
   ["map.useLevel"] = "Respect my level",
   ["map.skyborne"] = "Skyborne race",
   ["map.preferFlight"] = "Prefer flying",
@@ -39,6 +42,7 @@ ns.AddLocale("enUS", {
   ["map.mode.boat"] = "Boat",
   ["map.mode.zeppelin"] = "Zeppelin",
   ["map.mode.tram"] = "Tram",
+  ["map.mode.lift"] = "Lift",
   ["map.mode.portal"] = "Portal",
   ["map.mode.walk"] = "Walking",
   ["map.mode.spell"] = "Spell",
@@ -58,9 +62,6 @@ ns.AddLocale("enUS", {
   ["map.none"] = "not set",
   ["map.tagStart"] = "Start",
   ["map.tagDest"] = "Destination",
-  ["map.setStart"] = "Set as start",
-  ["map.setDest"] = "Set as destination",
-  ["map.swap"] = "Swap",
   ["map.route"] = "Route",
   ["map.route.pick"] = "Choose a start and a destination to see the route.",
   ["map.route.same"] = "Start and destination are the same place.",
@@ -84,7 +85,7 @@ ns.AddLocale("enUS", {
   ["map.kind.instanceEntrance"] = "Instance entrance",
   ["map.kind.landmark"] = "Landmark",
   ["map.placeholderZone"] = "Zone location unconfirmed",
-  ["tour.map.title"] = "Map & route",
+  ["tour.map.title"] = "Map and route",
   ["tour.map.intro.title"] = "Route planning",
   ["tour.map.intro.text"] = "Finds the fastest connection (Enter next, Esc ends the tour).",
   ["tour.map.filters.title"] = "Filters",
@@ -98,25 +99,28 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["map.intro"] = "Start und Ziel wählen, die schnellste Verbindung erscheint.",
+  ["map.intro"] = "Wähle ein Ziel und füge Stopps hinzu, wenn du willst. Der erste Punkt ist der Start, oder schalte „Ab meiner Position“ ein.",
+  ["map.flow.hint"] = "Wähle ein Ziel. Der erste Punkt ist der Start.",
+  ["map.flow.hint.here"] = "Wähle ein Ziel. Der Start ist deine Position.",
+  ["map.flow.empty"] = "Hier erscheint die Route.",
   ["map.canvasNote"] = "Orte liegen auf der Reise-Leinwand, nicht auf Spielkoordinaten.\n%d von %d Orten mit geschätzter Position.",
-  ["map.world.note"] = "Weltkarte: %d von %d Orten in echter Zone.\n%d geschätzt, %d auf der Schemainsel.",
+  ["map.world.note"] = "Weltansicht: %d von %d Orten in echter Zone.\n%d geschätzt, %d auf der Schemainsel.",
   ["map.world.island"] = "%s (schematisch)",
   ["map.art.label"] = "Kartenbild",
   ["map.display"] = "Anzeige",
   ["map.display.tip"] = "Was die Karte zeigt: Symbole, Namen, Erz- und Kräuterstellen und deine Position.",
   ["map.summary"] = "%s: %d von %d",
-  ["map.symbols"] = "Symbole zeigen",
-  ["map.names"] = "Namen zeigen",
+  ["map.symbols"] = "Symbole anzeigen",
+  ["map.names"] = "Namen anzeigen",
   ["map.symbolSize"] = "Symbolgröße",
   ["map.symbolSmaller"] = "Kleiner",
   ["map.symbolBigger"] = "Größer",
   ["map.symbolSizeTip"] = "Klick: %d %%",
   ["map.dim"] = "Gefilterte Orte dimmen",
-  ["map.dimTip"] = "Ausgefilterte Orte bleiben blass und nicht klickbar.\nAus: ausgeblendet.",
-  ["map.rb.open"] = "Routen-Fenster öffnen",
+  ["map.dimTip"] = "Zeigt ausgefilterte Orte blass und nicht klickbar.\nAus: Sie sind ausgeblendet.",
+  ["map.rb.open"] = "Routenfenster öffnen",
   ["map.filters"] = "Filter",
-  ["map.filters.tip"] = "Verkehrsmittel und Routenoptionen. Ein Haken heißt erlaubt.",
+  ["map.filters.tip"] = "Verkehrsmittel und Routeneinstellungen. Ein Haken heißt erlaubt.",
   ["map.useLevel"] = "Meine Stufe beachten",
   ["map.skyborne"] = "Skyborne-Volk",
   ["map.preferFlight"] = "Fliegen bevorzugen",
@@ -127,6 +131,7 @@ ns.AddLocale("deDE", {
   ["map.mode.boat"] = "Boot",
   ["map.mode.zeppelin"] = "Zeppelin",
   ["map.mode.tram"] = "Tiefenbahn",
+  ["map.mode.lift"] = "Aufzug",
   ["map.mode.portal"] = "Portal",
   ["map.mode.walk"] = "Zu Fuß",
   ["map.mode.spell"] = "Zauber",
@@ -136,7 +141,7 @@ ns.AddLocale("deDE", {
   ["map.rq.skyborne"] = "nur Skyborne",
   ["map.rq.quest"] = "Quest nötig",
   ["map.rq.reputation"] = "Ruf nötig",
-  ["map.rq.item"] = "Gegenstand nötig",
+  ["map.rq.item"] = "Item nötig",
   ["map.cf.reported"] = "gemeldet",
   ["map.cf.estimate"] = "geschätzt",
   ["map.places"] = "Orte",
@@ -146,9 +151,6 @@ ns.AddLocale("deDE", {
   ["map.none"] = "nicht gesetzt",
   ["map.tagStart"] = "Start",
   ["map.tagDest"] = "Ziel",
-  ["map.setStart"] = "Als Start",
-  ["map.setDest"] = "Als Ziel",
-  ["map.swap"] = "Tauschen",
   ["map.route"] = "Route",
   ["map.route.pick"] = "Wähle Start und Ziel, um die Route zu sehen.",
   ["map.route.same"] = "Start und Ziel sind derselbe Ort.",
@@ -172,7 +174,7 @@ ns.AddLocale("deDE", {
   ["map.kind.instanceEntrance"] = "Instanzeingang",
   ["map.kind.landmark"] = "Landmarke",
   ["map.placeholderZone"] = "Lage der Zone unbestätigt",
-  ["tour.map.title"] = "Karte & Route",
+  ["tour.map.title"] = "Karte und Route",
   ["tour.map.intro.title"] = "Routenplanung",
   ["tour.map.intro.text"] = "Findet die schnellste Verbindung (Enter weiter, Esc beenden).",
   ["tour.map.filters.title"] = "Filter",
@@ -182,7 +184,7 @@ ns.AddLocale("deDE", {
   ["tour.map.route.title"] = "Route",
   ["tour.map.route.text"] = "Etappen der schnellsten Route und Alternativen.",
   ["tour.map.canvas.title"] = "Kartenansicht",
-  ["tour.map.canvas.text"] = "Orte und Route auf der Weltkarte, Klick wählt einen Ort aus.",
+  ["tour.map.canvas.text"] = "Orte und Route auf der Karte, Klick wählt einen Ort aus.",
 })
 
 local UI_MODES = { "flight", "boat", "zeppelin", "tram", "portal", "walk", "spell" }
@@ -316,7 +318,7 @@ local function savedTab()
 end
 
 local function build(container)
-  local FL = ns.FlowLayout
+  local FL, RP = ns.FlowLayout, ns.RoutePlan
   local view = ns.NewPageView(container)
   local s = view.stack
   local state = {
@@ -325,7 +327,6 @@ local function build(container)
     skyborne = (K.PlayerRaceSlug() or ""):find("skyborne$") ~= nil,
     mount = true,
     preferFlight = true,
-    stops = {},
     artOn = true,
     modes = {},
     query = "",
@@ -338,8 +339,8 @@ local function build(container)
   Request.shared = state
   local byslug, zoneOf = {}, {}
   local data, world, layout, island, estimated
-  local refresh, layoutPanes, followTab, intro, paintCanvas
-  local markers, zoom, pins, instancePins, zoneArrows, places, legend, route, routeList, showStep, mag, stopsList, gather, objects, player, guild
+  local refresh, replan, layoutPanes, followTab, intro, paintCanvas, mapPoint
+  local markers, zoom, pins, instancePins, zoneArrows, places, legend, route, routeList, showStep, mag, gather, objects, player, guild
   local exploredCache = {}
   -- True while the map pane is laid out: a banner that changes its height then must not start another layout.
   local laying = false
@@ -359,7 +360,15 @@ local function build(container)
       view:Layout()
     end,
   })
-  local hint = W.Text(header, { key = "map.route.pick", role = "ui", color = "textSecondary", wrap = true })
+  local hint = W.Text(header, { key = "map.flow.hint", role = "ui", color = "textSecondary", wrap = true })
+  local function paintHint()
+    W.SetText(hint, RP.State().fromHere and "map.flow.hint.here" or "map.flow.hint")
+  end
+  paintHint()
+  ns.On("FG_ROUTEPLAN_CHANGED", function()
+    paintHint()
+    view:Layout()
+  end)
   -- Height of the header row: the hint wraps beside the button and the row grows with it.
   local headerH = HEADER_H
   function header:fgGridLayout(width)
@@ -376,6 +385,15 @@ local function build(container)
     return headerH
   end
   s:Add(header, { gap = GAP })
+  -- The one-time question about sharing the own position; takes no room once decided.
+  local share = ns.MapSharePrompt.New(view.content, {
+    onChanged = function()
+      if not laying then
+        view:Layout()
+      end
+    end,
+  })
+  s:Add(share, { gap = GAP })
   intro = ns.AddParagraph(view, "map.intro", { gap = GAP })
   intro:SetShown(false)
   function paintDetails()
@@ -383,12 +401,44 @@ local function build(container)
   end
   paintDetails()
   ns.On("FG_UI_REFRESHED", paintDetails)
+  K.Anchor("FG.Map.Hint", hint)
   K.Anchor("FG.Map.Details", detailsButton)
   K.Anchor("FG.Map.Intro", intro)
 
+  local function zoneOfMap(map)
+    for slug, id in pairs(layout and layout.maps or {}) do
+      if id == map then
+        return slug
+      end
+    end
+  end
+
+  -- A free point (see TL.PointSlug) as a pseudo place: the zone of its map and the position in it.
+  local pointNodes = {}
+  local function pointNode(slug)
+    local hit = pointNodes[slug]
+    if hit == nil then
+      local p = TL.ParsePoint(slug)
+      hit = p and { s = slug, free = true, f = "B", um = p.map, ux = p.x, uy = p.y, z = zoneOfMap(p.map) } or false
+      pointNodes[slug] = hit
+    end
+    return hit or nil
+  end
+
+  local function placeOf(slug)
+    return byslug[slug] or (TL.IsPoint(slug) and pointNode(slug)) or nil
+  end
+
   local function nodeName(slug)
     local n = byslug[slug]
-    return n and ns.T(n.n) or tostring(slug or "?")
+    if n then
+      return ns.T(n.n) or tostring(slug)
+    end
+    local p = TL.IsPoint(slug) and TL.ParsePoint(slug)
+    if p then
+      return MRL.PointName(p, zoneOfMap(p.map) and zoneOf[zoneOfMap(p.map)] and ns.T(zoneOf[zoneOfMap(p.map)].n))
+    end
+    return tostring(slug or "?")
   end
 
   local function zoneLabel(slug)
@@ -457,6 +507,21 @@ local function build(container)
     return MRL.Options(state)
   end
 
+  -- The ends of the one route (RoutePlan): "start" is the start, anything else the goal.
+  local function setEnd(which, slug)
+    if which == "start" then
+      RP.SetStart(slug)
+    else
+      RP.SetGoalPlace(slug)
+    end
+  end
+
+  -- Which end a click in the Start/Goal mode sets next.
+  local function nextWhich()
+    local start, dest = RP.Ends()
+    return state.pickNext or ((start and not dest) and "dest" or "start")
+  end
+
   -- Two panes under the header: the map on the left, the side column (filters, places,
   -- start/destination, route) with its own scroll on the right. Stacked on narrow pages, map first.
   local function visibleHeight()
@@ -488,6 +553,81 @@ local function build(container)
   -- Filters and display ------------------------------------------------------------------
   -- Faction on a row of its own, then two check lists: what the route may use (and how it is
   -- chosen) and what the map shows. Both write into the same places as the switches did before.
+  -- The route flow stands on top: target search and the route card (shared with the world map panel). The
+  -- filters and the display settings fold into "Options", the places into "Details"; both stay reachable, the
+  -- route steps follow below them.
+  local rootSide = side
+  local planBlock = ns.MapPlanBlock.Attach({
+    side = rootSide,
+    data = function()
+      return data
+    end,
+    options = function()
+      return opts()
+    end,
+    zoneNameOf = zoneLabel,
+    relayout = function()
+      view:Layout()
+    end,
+  })
+  K.Anchor("FG.Map.Target", planBlock.edit)
+  K.Anchor("FG.Map.RouteCard", planBlock.card)
+  local accView = {
+    content = rootSide.content,
+    stack = rootSide.stack,
+    area = view.area,
+    Layout = function()
+      view:Layout()
+    end,
+  }
+  -- Route ------------------------------------------------------------------
+  ns.AddHeading(side, "map.route")
+  local routeCtx = {
+    side = side,
+    state = state,
+    nameOf = nodeName,
+    specFor = function(slug)
+      local n = byslug[slug]
+      return n and PL.ZonePoint({ layout, island }, n) or nil
+    end,
+    showStep = function(step)
+      return showStep(step)
+    end,
+    relayout = function()
+      view:Layout()
+    end,
+    goal = function()
+      return (select(2, RP.Ends()))
+    end,
+    share = function()
+      local st = RP.State()
+      local list = st.start and { st.start, unpack(st.points) } or { unpack(st.points) }
+      if #list < 2 then
+        return nil
+      end
+      return MRL.Encode(state.faction, list)
+    end,
+  }
+  routeList = MRL.Attach(routeCtx)
+  K.Anchor("FG.Map.Route", routeList.box)
+  side.stack:Add(routeList.box)
+  side.stack:Add(FL.ButtonRow(side.content, {
+    {
+      id = "routeWindow",
+      label = "act.open",
+      icon = "open",
+      tooltip = "map.rb.open",
+      width = 200,
+      opens = true,
+      onClick = function()
+        if ns.RouteBuilder then
+          ns.RouteBuilder.Show()
+        end
+      end,
+    },
+  }))
+
+  side = W.Accordion(accView, { id = "map.options", title = L["map.options"] })
   ns.AddHeading(side, "map.filters")
   local filterBox = CreateFrame("Frame", nil, side.content)
   K.Anchor("FG.Map.Filters", filterBox)
@@ -497,7 +637,7 @@ local function build(container)
     end,
     set = function(v)
       state.faction = v
-      refresh()
+      replan()
     end,
   })
   -- The symbol the map draws for a kind of place, painted into the icon box of a list row.
@@ -521,7 +661,7 @@ local function build(container)
       end,
       set = function(v)
         state[field] = v
-        refresh()
+        replan()
       end,
     }
   end
@@ -536,7 +676,7 @@ local function build(container)
       end,
       set = function(v)
         state.modes[mode] = v
-        refresh()
+        replan()
       end,
     }
   end
@@ -789,6 +929,7 @@ local function build(container)
   side.stack:Add(displayBox)
 
   -- Places -----------------------------------------------------------------
+  side = W.Accordion(accView, { id = "map.details", title = L["map.details"] })
   ns.AddHeading(side, "map.places")
   local placeBox = CreateFrame("Frame", nil, side.content)
   K.Anchor("FG.Map.Places", placeBox)
@@ -828,8 +969,7 @@ local function build(container)
     hover = setHover,
     unhover = unhover,
     setRoute = function(which, slug)
-      state[which] = slug
-      refresh()
+      setEnd(which, slug)
     end,
     spec = function(n)
       return PL.ZonePoint({ layout, island }, n)
@@ -851,107 +991,6 @@ local function build(container)
   end
   side.stack:Add(placeBox)
 
-  -- Start, stops and goal ---------------------------------------------------------------
-  local function resetRoute()
-    state.start, state.dest, state.selected, state.pickNext = nil, nil, nil, nil
-    state.stops = {}
-    refresh()
-  end
-  local planHead = CreateFrame("Frame", nil, side.content)
-  local planTitle = W.Text(planHead, { key = "map.plan", role = "h3", family = "heading", color = "accent2" })
-  local resetButton = W.Action(planHead, {
-    icon = "reset",
-    size = 28,
-    boxed = true,
-    tooltip = "map.resetRoute",
-    tooltipText = "map.resetRoute.tip",
-    onClick = resetRoute,
-  })
-  K.Anchor("FG.Map.Reset", resetButton)
-  function planHead:fgGridLayout()
-    resetButton:ClearAllPoints()
-    resetButton:SetPoint("TOPRIGHT", self, "TOPRIGHT")
-    planTitle:ClearAllPoints()
-    planTitle:SetPoint("LEFT", self, "LEFT")
-    planTitle:SetPoint("RIGHT", resetButton, "LEFT", -6, 0)
-    local h = math.max(resetButton:GetHeight(), math.ceil(planTitle:GetStringHeight()))
-    self:SetHeight(h)
-    return h
-  end
-  side.stack:Add(planHead, { gap = 6 })
-  stopsList = MRL.AttachStops({
-    side = side,
-    state = state,
-    nameOf = nodeName,
-    changed = function()
-      refresh()
-    end,
-  })
-  local startText, destText = stopsList.startText, stopsList.destText
-  K.Anchor("FG.Map.StartText", startText)
-  K.Anchor("FG.Map.DestText", destText)
-  K.Anchor("FG.Map.Stops", stopsList.box)
-  side.stack:Add(stopsList.box, { gap = 6 })
-  local function useSelected(which)
-    return function()
-      if state.selected then
-        state[which] = state.selected
-        refresh()
-      end
-    end
-  end
-  local buttons = FL.ButtonRow(side.content, {
-    {
-      id = "start",
-      label = "act.start",
-      icon = "play",
-      tooltip = "map.setStart",
-      variant = "primary",
-      width = 110,
-      onClick = useSelected("start"),
-    },
-    {
-      id = "dest",
-      label = "act.goal",
-      icon = "marker",
-      tooltip = "map.setDest",
-      variant = "primary",
-      width = 110,
-      onClick = useSelected("dest"),
-    },
-    {
-      id = "stop",
-      label = "act.stop",
-      icon = "plus",
-      width = 150,
-      tooltip = "map.addStop",
-      tooltipText = "map.addStop.tip",
-      onClick = function()
-        if MRL.AddStop(state, state.selected) then
-          refresh()
-        end
-      end,
-    },
-    {
-      id = "swap",
-      label = "act.swap",
-      icon = "refresh",
-      tooltip = "map.swap",
-      width = 80,
-      onClick = function()
-        state.start, state.dest = state.dest, state.start
-        local reversed = {}
-        for i = #state.stops, 1, -1 do
-          reversed[#reversed + 1] = state.stops[i]
-        end
-        state.stops = reversed
-        refresh()
-      end,
-    },
-  })
-  K.Anchor("FG.Map.RouteButtons", buttons)
-  side.stack:Add(buttons)
-
   -- Takes over a route text (MRL.Encode): faction, start, stops and goal, all places known for it.
   local paste
   local function takeRoute(text)
@@ -964,14 +1003,19 @@ local function build(container)
     o.faction = spec.faction
     for _, slug in ipairs(MRL.Chain(spec)) do
       local n = byslug[slug]
-      if not (n and TL.NodeVisible(n, o)) then
+      if not (TL.IsPoint(slug) or (n and TL.NodeVisible(n, o))) then
         ns.Notify(string.format(L["map.route.paste.unknown"], slug), "warning")
         return
       end
     end
-    state.faction, state.start, state.stops, state.dest = spec.faction, spec.start, spec.stops, spec.dest
+    state.faction = spec.faction
+    local points = { unpack(spec.stops) }
+    points[#points + 1] = spec.dest
     paste.edit:SetText("")
-    ns.Notify(L["map.route.paste.done"], "success")
+    RP.Invalidate()
+    if RP.Assign({ start = spec.start, points = points, fromHere = false }) then
+      ns.Notify(L["map.route.paste.done"], "success")
+    end
     refresh()
   end
   paste = W.EditBox(side.content, {
@@ -990,6 +1034,7 @@ local function build(container)
   })
   K.Anchor("FG.Map.Paste", paste)
   side.stack:Add(paste, { height = 26 })
+
   legend = ML.Attach({
     side = side,
     relayout = function()
@@ -997,48 +1042,12 @@ local function build(container)
     end,
   })
 
-  -- Route ------------------------------------------------------------------
-  ns.AddHeading(side, "map.route")
-  local routeCtx = {
-    side = side,
-    state = state,
-    nameOf = nodeName,
-    specFor = function(slug)
-      local n = byslug[slug]
-      return n and PL.ZonePoint({ layout, island }, n) or nil
-    end,
-    showStep = function(step)
-      return showStep(step)
-    end,
-    relayout = function()
-      view:Layout()
-    end,
-    share = function()
-      return MRL.Encode(state.faction, MRL.Chain(state))
-    end,
-  }
-  routeList = MRL.Attach(routeCtx)
-  K.Anchor("FG.Map.Route", routeList.box)
-  side.stack:Add(routeList.box)
-  side.stack:Add(FL.ButtonRow(side.content, {
-    {
-      id = "routeWindow",
-      label = "act.open",
-      icon = "open",
-      tooltip = "map.rb.open",
-      width = 200,
-      opens = true,
-      onClick = function()
-        if ns.RouteBuilder then
-          ns.RouteBuilder.Show()
-        end
-      end,
-    },
-  }))
+  side = rootSide
 
   -- Map pane: tabs, island hint, canvas, toolbar, note -----------------------------------
   local silentTab = false
   local tabs = W.Tabs(leftPane, {
+    wrap = true,
     tabs = { { id = "azeroth", key = "map.tab.azeroth" }, { id = "island", key = "map.tab.island" } },
     onSelect = function(id)
       state.tab = id
@@ -1164,7 +1173,9 @@ local function build(container)
   local function nodePos(n)
     local fx, fy
     local zv = zoom and zoom.View()
-    if zv then
+    if n.free then
+      fx, fy = MW.ZoneToPoint(zv or (islandMode() and island) or (worldActive() and layout) or nil, n.z, n.ux, n.uy)
+    elseif zv then
       local p = zv.pos[n.s]
       fx, fy = p and p.x, p and p.y
     elseif islandMode() then
@@ -1218,7 +1229,35 @@ local function build(container)
     return best
   end
 
+  -- The free point under the cursor (zone, position in it) as a slug, nil off the map or without a
+  -- game map for the zone there.
+  local function pointAt(fx, fy)
+    local v = activeView()
+    local zone, x, y = MW.PointToZone(v, fx, fy)
+    local map = zone and v.maps and v.maps[zone]
+    return map and TL.PointSlug(map, x, y) or nil
+  end
+
+  -- Shift+click: puts a free point at the cursor into the plan. True when it did.
+  function mapPoint()
+    local fx, fy = MM.CursorFraction(canvas)
+    if not (fx and fx >= 0 and fx <= 1 and fy >= 0 and fy <= 1) then
+      return false
+    end
+    local slug = pointAt(fx, fy)
+    if not slug then
+      return false
+    end
+    return RP.AddPlace(slug) ~= false
+  end
+
   markers = MM.Attach({
+    -- The mode row lays itself out again after a font or language change: the page makes room for its new height.
+    resized = function()
+      if not laying then
+        view:Layout()
+      end
+    end,
     canvas = canvas,
     frame = viewport,
     toolbar = toolbar,
@@ -1234,8 +1273,7 @@ local function build(container)
     placeFor = placeFor,
     setRoute = function(which, slug)
       if slug then
-        state[which] = slug
-        refresh()
+        setEnd(which, slug)
       end
     end,
     relayout = function()
@@ -1243,12 +1281,16 @@ local function build(container)
     end,
     onClick = function(button)
       -- The release that ends a drag of the magnified map is no click on the map.
-      if not mag.WasDrag() then
-        zoom.Click(button)
+      if mag.WasDrag() then
+        return
       end
+      if button == "LeftButton" and ns.Keys.Matches("mapRoutePoint") and mapPoint() then
+        return
+      end
+      zoom.Click(button)
     end,
     hintText = function()
-      return L[MRL.NextWhich(state) == "dest" and "map.route.pickDest" or "map.route.pickStart"]
+      return L[nextWhich() == "dest" and "map.route.pickDest" or "map.route.pickStart"]
     end,
     routeModeChanged = function()
       state.pickNext = nil
@@ -1350,8 +1392,8 @@ local function build(container)
     skip = function(n)
       return n.k == "instanceEntrance"
         and instancePins.Covers(n.z)
-        and state.start ~= n.s
-        and state.dest ~= n.s
+        and select(1, RP.Ends()) ~= n.s
+        and select(2, RP.Ends()) ~= n.s
         and state.selected ~= n.s
     end,
     pos = nodePos,
@@ -1398,8 +1440,9 @@ local function build(container)
       -- Start/Goal mode: the click sets an end of the route, nothing else changes.
       if markers.routeMode then
         if button == "LeftButton" then
-          MRL.Pick(state, slug)
-          refresh()
+          local which = nextWhich()
+          state.pickNext = which == "start" and "dest" or "start"
+          setEnd(which, slug)
         end
         return
       end
@@ -1542,7 +1585,7 @@ local function build(container)
 
   -- Positions of a place on the current view as canvas px, y down.
   local function routePoint(slug)
-    local n = byslug[slug]
+    local n = placeOf(slug)
     if not n then
       return nil
     end
@@ -1559,20 +1602,43 @@ local function build(container)
       return zoom.Zone()
     end,
     inZone = function(slug)
-      local n = byslug[slug]
-      return n ~= nil and n.z == zoom.Zone()
+      local n = placeOf(slug)
+      return n ~= nil and n.z ~= nil and n.z == zoom.Zone()
     end,
     -- A place of another zone as the zone's map would see it: the world position of the place
     -- inside the rectangle of the open zone, beyond the canvas when it lies outside.
     outside = function(slug)
       local base, zone = baseView(), zoom.Zone()
       local p = base and base.pos[slug]
+      local free = not p and TL.IsPoint(slug) and pointNode(slug)
+      if free then
+        local fx, fy = MW.ZoneToPoint(base, free.z, free.ux, free.uy)
+        p = fx and { x = fx, y = fy }
+      end
       local r = base and zone and base.zones[zone]
       if not (p and r and r.right > r.left and r.bottom > r.top) then
         return nil
       end
       return (p.x - r.left) / (r.right - r.left) * canvas:GetWidth(),
         (p.y - r.top) / (r.bottom - r.top) * canvas:GetHeight()
+    end,
+    -- A world point of a walked path on this view: through the open zone, or the zone of the leg's
+    -- first place; the zone rectangle is linear in world yards, so points beyond it still land right.
+    pathPoint = function(pt, step)
+      local zone = zoom.Zone()
+      if not zone then
+        local n = placeOf(step.from) or placeOf(step.to)
+        zone = n and n.z
+      end
+      local base = zone and activeView()
+      local fx, fy = MR.MapPos(pt.uiMap, pt.x, pt.y, zone and layout and layout.maps and layout.maps[zone])
+      if not (base and fx) then
+        return nil
+      end
+      local vx, vy = MW.ZoneToPoint(base, zone, fx, fy)
+      if vx then
+        return vx * canvas:GetWidth(), vy * canvas:GetHeight()
+      end
     end,
     name = nodeName,
     viewKey = function()
@@ -1588,6 +1654,22 @@ local function build(container)
     picking = function()
       return markers.routeMode == true
     end,
+    -- A dragged pin of a free point lands on another point: the plan takes the new one.
+    drop = function(slug, fx, fy)
+      local new = pointAt(fx, fy)
+      if not new or new == slug then
+        return false
+      end
+      if RP.State().start == slug then
+        RP.SetStart(new)
+      end
+      for i, point in ipairs(RP.State().points) do
+        if point == slug then
+          RP.Replace(i, new)
+        end
+      end
+      return true
+    end,
     legTip = function(i)
       return routeList.LegTip(i)
     end,
@@ -1596,8 +1678,9 @@ local function build(container)
     end,
   })
   routeCtx.route = route
-  canvas.route, canvas.routeList, canvas.stopsList = route, routeList, stopsList
+  canvas.route, canvas.routeList = route, routeList
   canvas:HookScript("OnHide", route.Release)
+  canvas:HookScript("OnHide", ns.RouteWalk.Cancel)
   container:HookScript("OnHide", route.Release)
 
   -- A click on a step zooms into the zone of the step (the first of its two places that has a map).
@@ -1675,7 +1758,8 @@ local function build(container)
       tabs:ClearAllPoints()
       tabs:SetPoint("TOPLEFT", leftPane, "TOPLEFT")
       tabs:SetPoint("TOPRIGHT", leftPane, "TOPRIGHT")
-      y = tabs:GetHeight() + GAP
+      -- The tabs wrap onto a second line when the pane is too narrow for both labels.
+      y = tabs:fgGridLayout(w) + GAP
     end
     local onIsland = islandMode()
     islandHint:SetShown(onIsland)
@@ -1690,7 +1774,7 @@ local function build(container)
     -- Mode group and diagnostics share the first row. Below it (and below the hint of the
     -- Start/Goal mode) the image mode switch, the art switch and the dim switch flow side by side
     -- and wrap, then the banner of the map data comes last.
-    local rowH = math.max(Theme.lineHeight(TOOLBAR_H), markers.modeRow:SetWidthAvailable(MM.MODE_WIDTH))
+    local rowH = math.max(Theme.lineHeight(TOOLBAR_H), markers.modeRow:SetWidthAvailable(math.min(MM.MODE_WIDTH, w)))
     local artShown = layout ~= nil and not onIsland
     local revealShown = artShown and state.artOn
     local zoomed = zoom.View() ~= nil
@@ -1737,7 +1821,7 @@ local function build(container)
     toolbar:SetSize(w, toolbarH)
     markers.modeRow:ClearAllPoints()
     markers.modeRow:SetPoint("TOPLEFT", toolbar, "TOPLEFT")
-    markers.modeRow:SetWidth(MM.MODE_WIDTH)
+    markers.modeRow:SetWidth(math.min(MM.MODE_WIDTH, w))
     artToggle:SetShown(artShown)
     reveal.row:SetShown(revealShown)
     local chipsTop = rowH + extra + GAP
@@ -1768,13 +1852,38 @@ local function build(container)
   end
 
   -- State -> screen ----------------------------------------------------------
-  local function paintRoute()
-    if not (state.start and state.dest) then
+  -- The one route (RoutePlan) on the list and the canvas. Free points are planned with estimates first, then
+  -- the walk map gives the real times of those legs and the route is planned again (at most three rounds,
+  -- results are cached per pair).
+  local function paintRoute(round)
+    round = round or 0
+    local plan = RP.Plan()
+    if not plan then
       routeList.Set(nil, nil)
+      routeList.Message(L[RP.Why() == "data" and "kit.noData" or "map.flow.empty"])
+      route.SetPlan(nil)
       return
     end
-    local chain = MRL.Chain(state)
-    routeList.Set(TL.RouteVia(data, opts(), chain), table.concat(chain, ">"))
+    route.SetPlan(plan.status ~= "unreachable" and plan.list or nil)
+    routeList.Set(plan, table.concat(RP.State().points, ">") .. "@" .. tostring(RP.State().start))
+    if round < 3 and plan.status == "ok" then
+      local steps = {}
+      for _, r in ipairs(MRL.Routes(plan)) do
+        for _, step in ipairs(r.steps) do
+          steps[#steps + 1] = step
+        end
+      end
+      local missing = ns.RouteWalk.Missing(steps)
+      if #missing > 0 then
+        ns.RouteWalk.Refine(missing, function()
+          if container:IsShown() and data then
+            RP.Invalidate()
+            paintRoute(round + 1)
+            view:Layout()
+          end
+        end)
+      end
+    end
   end
 
   function refresh()
@@ -1782,33 +1891,32 @@ local function build(container)
       return
     end
     local o = opts()
-    for _, which in ipairs({ "start", "dest", "selected" }) do
-      local n = state[which] and byslug[state[which]]
-      if n and not TL.NodeVisible(n, o) then
-        state[which] = nil
-      end
-    end
-    for i = #state.stops, 1, -1 do
-      local n = byslug[state.stops[i]]
-      if not (n and TL.NodeVisible(n, o)) then
-        table.remove(state.stops, i)
-      end
+    local n = state.selected and byslug[state.selected]
+    if n and not TL.NodeVisible(n, o) then
+      state.selected = nil
     end
     places.Update()
-    stopsList.Update()
     faction.Refresh()
     note:SetText(noteText())
-    startText:SetText(string.format(L["map.start"], state.start and nodeName(state.start) or L["map.none"]))
-    destText:SetText(string.format(L["map.dest"], state.dest and nodeName(state.dest) or L["map.none"]))
-    buttons:SetItemEnabled("start", state.selected ~= nil)
-    buttons:SetItemEnabled("dest", state.selected ~= nil)
-    buttons:SetItemEnabled("stop", state.selected ~= nil and #state.stops < TL.MAX_STOPS)
     paintRoute()
     view:Layout()
   end
 
+  -- The transport options changed: plan the route again.
+  function replan()
+    RP.Invalidate()
+    refresh()
+  end
+
+  ns.On("FG_ROUTEPLAN_CHANGED", function()
+    if data and container:IsShown() then
+      refresh()
+    end
+  end)
+
   function view:Show(params)
     local request = Request.Take()
+    RP.Invalidate()
     zoom.Reset()
     mag.Reset()
     exploredCache = {}
@@ -1826,6 +1934,10 @@ local function build(container)
       zoneOf[z.s] = z
     end
     local est = 0
+    -- Lift stations are no places of the map, a route step still names them.
+    for _, n in ipairs(data.via or {}) do
+      byslug[n.s] = n
+    end
     for _, n in ipairs(data.nodes) do
       byslug[n.s] = n
       placesIn[n.z] = (placesIn[n.z] or 0) + 1
@@ -1836,6 +1948,7 @@ local function build(container)
     estimated = est
     ns.TravelWalk.Ensure(data, function()
       if container:IsShown() then
+        RP.Invalidate()
         paintRoute()
       end
     end)
@@ -1862,21 +1975,25 @@ local function build(container)
         state.query = request.query
         search.edit:SetText(request.query)
       end
-      for _, which in ipairs({ "start", "dest" }) do
-        if request[which] and byslug[request[which]] then
-          state[which] = request[which]
-        end
-      end
-      if request.start or request.dest or request.stops then
-        state.stops = {}
-        for _, stopSlug in ipairs(request.stops or {}) do
-          if byslug[stopSlug] and #state.stops < TL.MAX_STOPS then
-            state.stops[#state.stops + 1] = stopSlug
-          end
-        end
-      end
       if request.faction == "A" or request.faction == "H" then
         state.faction = request.faction
+      end
+      if request.start or request.dest or request.stops then
+        local o = opts()
+        local function known(want)
+          local n = want and byslug[want]
+          return want and ((n and TL.NodeVisible(n, o)) or (TL.IsPoint(want) and TL.ParsePoint(want))) and want or nil
+        end
+        local current = RP.State()
+        local points = {}
+        for _, stopSlug in ipairs(request.stops or {}) do
+          if known(stopSlug) and #points < TL.MAX_STOPS then
+            points[#points + 1] = stopSlug
+          end
+        end
+        points[#points + 1] = known(request.dest) or current.points[#current.points]
+        RP.Invalidate()
+        RP.Assign({ start = known(request.start) or current.start, points = points })
       end
       for zoneSlug, id in pairs(layout and layout.maps or {}) do
         if id == request.map then

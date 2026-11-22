@@ -8,7 +8,6 @@ local SG = {}
 ns.SettingsGrid = SG
 
 SG.GAP = 12
-SG.PAD = 12
 SG.MAX_COLUMNS = 3
 -- A switch needs its track and state text (76 px) plus its label in one line, and the longest
 -- label is about 235 px wide, so a card of this width keeps every label whole.
@@ -24,9 +23,47 @@ end
 local function lastGap(stack)
   for i = #stack.items, 1, -1 do
     local entry = stack.items[i]
-    if entry.item:IsShown() or entry.opts.keepSpace then
-      return entry.opts.gap or 10
+    if (entry.item:IsShown() and not entry.item.fgShareStrip) or entry.opts.keepSpace then
+      return entry.opts.gap or Theme.space.stack
     end
+  end
+end
+
+-- Kinds of control that get a share icon of their own (settings/<card id>/<control id>).
+local SHARE_KINDS = { toggle = true, slider = true, choice = true, text = true }
+local SHARE_SIZE = 20
+local SHARE_ALPHA = 0.7
+
+-- Every control added to the stack gets a muted share icon at the right end of its row (Stack reserves the
+-- width, so the control never runs under it); it brightens on hover and focus. A control whose ids do not
+-- make a valid payload gets none.
+function SG.WatchStack(card, stack)
+  if not card.id then
+    return
+  end
+  local add = stack.Add
+  function stack:Add(item, opts)
+    add(self, item, opts)
+    local spec = type(item) == "table" and rawget(item, "fgSetting")
+    if not (spec and SHARE_KINDS[spec.kind] and spec.key) then
+      return item
+    end
+    local control = rawget(item, "fgId") or spec.key:gsub("%.", "-")
+    local payload = ns.PageShareLogic.Encode({ "settings", ns.SettingsFeatureLogic.ShareId(card.id), control }, function(id)
+      return id == "settings"
+    end)
+    if payload then
+      local share = ns.PageShare.Button(self.parent, { size = SHARE_SIZE, target = payload })
+      share:SetAlpha(SHARE_ALPHA)
+      share:HookScript("OnEnter", function()
+        share:SetAlpha(1)
+      end)
+      share:HookScript("OnLeave", function()
+        share:SetAlpha(SHARE_ALPHA)
+      end)
+      self.items[#self.items].opts.share = share
+    end
+    return item
   end
 end
 
@@ -49,7 +86,24 @@ local function newCard(grid, view, opts)
     view.area:ScrollTo((card.top or 0) + y)
   end
   card.area = area
-  card.stack = W.Stack(area, SG.PAD)
+  card.stack = W.Stack(area, frame.pad)
+  card.watchStack = function(stack)
+    SG.WatchStack(card, stack)
+  end
+  card.watchStack(card.stack)
+  -- Page link of the card (settings/<card id>): a first row of its own, so no control or title is covered.
+  -- The row does not count as content, a card without a visible entry stays hidden.
+  if opts.id then
+    local strip = CreateFrame("Frame", nil, frame)
+    strip.fgShareStrip = true
+    local share = ns.PageShare.Button(strip, {
+      size = 20,
+      target = "settings/" .. ns.SettingsFeatureLogic.ShareId(opts.id),
+    })
+    share:SetPoint("TOPRIGHT", strip, "TOPRIGHT", 0, 0)
+    card.share, card.strip = share, strip
+    card.stack:Add(strip, { height = 20, gap = 4 })
+  end
 
   function card:Layout()
     view:Layout()
@@ -67,6 +121,9 @@ local function newCard(grid, view, opts)
   -- visible entry.
   function card:Measure(width)
     local gap = lastGap(self.stack)
+    if card.strip then
+      card.strip:SetShown(gap ~= nil)
+    end
     if not gap then
       frame:Hide()
       frame:SetHeight(0)

@@ -337,7 +337,7 @@ function BM.Hotspot(parent, region, keyboard)
   b:SetAllPoints(region)
   local hover = b:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.08)
+  hover:SetColorTexture(ns.Theme.fillColor("hover"))
   local function open(self)
     BM.Open(self.inst, self.boss)
   end

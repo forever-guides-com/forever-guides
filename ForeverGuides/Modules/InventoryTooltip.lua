@@ -26,6 +26,10 @@ local FRAMES = {
 local marked = setmetatable({}, { __mode = "k" })
 -- Tooltips the addon is still filling: the hooks leave them alone until T.AddForItem adds the block.
 local held = setmetatable({}, { __mode = "k" })
+-- tooltip -> number of lines right after our block was added. A tooltip that has fewer lines at the
+-- next hook call was rebuilt without OnTooltipCleared (another addon wiping and refilling it), so the
+-- mark of the old build no longer means the block is there.
+local blockLines = setmetatable({}, { __mode = "k" })
 local hooked = {}
 local cache
 
@@ -90,6 +94,29 @@ end)
 -- The characters the tooltip knows (also used by the check command).
 T.Characters = characters
 
+-- The current character is read live: a copy of the snapshots whose own entry carries the count of
+-- the game for this item (bags, bank, worn). The other characters stay as recorded.
+local function withLiveCount(inv, itemId)
+  local live = Inv.Live(itemId)
+  local current = Roster.CurrentKey()
+  if not (live and current) then
+    return inv
+  end
+  local own = inv[current]
+  local view = {}
+  for key, snap in pairs(inv) do
+    view[key] = snap
+  end
+  view[current] = {
+    t = Roster.Now(),
+    bags = { [itemId] = live.bags },
+    bank = { [itemId] = live.bank },
+    equip = { [itemId] = live.equip },
+    mail = type(own) == "table" and own.mail or {},
+  }
+  return view
+end
+
 -- The lines for an item id ({ text, kind, old }), nil when nobody owns it. The table is cached,
 -- callers must not change it.
 function T.Lines(itemId)
@@ -124,7 +151,8 @@ function T.Lines(itemId)
     end
   end
   local stored = ns.db and ns.db.inventory
-  local rows = Logic.Rows(chars, type(stored) == "table" and stored or {}, itemId, {
+  stored = withLiveCount(type(stored) == "table" and stored or {}, itemId)
+  local rows = Logic.Rows(chars, stored, itemId, {
     faction = faction,
     currentFirst = Inv.Option("inventoryCurrentFirst") ~= false,
     now = now,
@@ -153,11 +181,53 @@ local function lineColor(line)
   return v, v, v
 end
 
--- The number of items in the stack the tooltip shows, nil when unknown (then only the unit price is
--- shown). The place to extend once the tooltip data of a bag slot, bank slot or link is known to carry
--- the count reliably; read through T so a test can inject a count.
-function T.StackCountOf()
-  return nil
+local function plain(v, kind)
+  local secret = rawget(_G, "issecretvalue")
+  return type(v) == kind and not (type(secret) == "function" and secret(v))
+end
+
+local function try(obj, method)
+  if type(obj) ~= "table" or type(obj[method]) ~= "function" then
+    return nil
+  end
+  local ok, a, b = pcall(obj[method], obj)
+  return ok and a or nil, ok and b or nil
+end
+
+-- Bag and slot of the item button a tooltip hangs on (retail ItemButton, classic container frame), nil
+-- for every other owner.
+local function slotOf(owner)
+  local slot, bag = try(owner, "GetSlotAndBagID")
+  if plain(slot, "number") and plain(bag, "number") then
+    return bag, slot
+  end
+  bag, slot = try(owner, "GetBagID"), try(owner, "GetID")
+  if not plain(bag, "number") then
+    bag = try(try(owner, "GetParent"), "GetID")
+  end
+  if plain(bag, "number") and plain(slot, "number") then
+    return bag, slot
+  end
+end
+
+-- The number of items in the bag or bank slot the tooltip hangs on, nil when unknown (then only the unit
+-- price is shown). Read through T so a test can inject a count. The slot must hold the item of the build.
+function T.StackCountOf(tooltip, data)
+  local bag, slot = slotOf(try(tooltip, "GetOwner"))
+  local api = rawget(_G, "C_Container")
+  local get = type(api) == "table" and api.GetContainerItemInfo or rawget(_G, "GetContainerItemInfo")
+  if not (bag and type(get) == "function") then
+    return nil
+  end
+  local ok, info = pcall(get, bag, slot)
+  if not (ok and type(info) == "table" and plain(info.stackCount, "number")) then
+    return nil
+  end
+  local id = type(data) == "table" and data.id
+  if plain(id, "number") and info.itemID ~= id then
+    return nil
+  end
+  return info.stackCount
 end
 
 local function priceEnabled()
@@ -174,7 +244,7 @@ function T.PriceLines(itemId, stack)
     return nil
   end
   local now = Roster.Now()
-  local key = itemId .. "#" .. (stack or 1)
+  local key = itemId .. "#" .. (stack or "")
   local hit = priceCache[key]
   if hit and now >= hit.at and now - hit.at < CACHE_SECONDS then
     return hit.lines or nil
@@ -194,10 +264,10 @@ function T.PriceLines(itemId, stack)
   return lines
 end
 
-local MUTED_PRICE = { hint = true, old = true, neutralOnly = true }
+local MUTED_PRICE = { hint = true, old = true, neutralOnly = true, legacyOnly = true }
 
 local function priceColor(line)
-  if line.key == "header" or line.key == "neutralHeader" then
+  if line.key == "header" or line.key == "otherHeader" or line.total then
     return ns.Theme.rgb("accent")
   end
   local v = MUTED_PRICE[line.key] and 0.7 or 1
@@ -210,7 +280,10 @@ function T.Append(tooltip, itemId, data)
   if type(tooltip.AddLine) ~= "function" then
     return false
   end
-  local added = false
+  local counted, stack = pcall(T.StackCountOf, tooltip, data)
+  stack = counted and tonumber(stack) or nil
+  -- Item level, sell price and id lines (settings area Tooltips) come first, right under the item text.
+  local added = ns.TooltipTweaks and ns.TooltipTweaks.AddItemLines(tooltip, itemId, stack) or false
   local lines = T.Lines(itemId)
   if lines then
     tooltip:AddLine(" ")
@@ -227,6 +300,13 @@ function T.Append(tooltip, itemId, data)
     for _, text in ipairs(crafters) do
       tooltip:AddLine(text, 0.8, 0.8, 0.8, false)
     end
+    added = true
+  end
+  -- The item is on the wishlist of this character.
+  local wish = ns.Wishlist and ns.Wishlist.TooltipLine(itemId)
+  if wish then
+    tooltip:AddLine(" ")
+    tooltip:AddLine(wish, ns.Theme.rgb("accent"))
     added = true
   end
   -- Where the item drops (instance data), only from stored data.
@@ -255,17 +335,48 @@ function T.Append(tooltip, itemId, data)
     end
     added = true
   end
-  local counted, stack = pcall(T.StackCountOf, tooltip, data)
-  local prices = T.PriceLines(itemId, counted and tonumber(stack) or nil)
+  local prices = T.PriceLines(itemId, stack)
   if prices then
     tooltip:AddLine(" ")
     for _, line in ipairs(prices) do
       local r, g, b = priceColor(line)
-      tooltip:AddLine(line.text, r, g, b, false)
+      if line.total then
+        tooltip:AddLine(" ") -- the stack value stands apart from the unit prices above
+      end
+      if line.right and type(tooltip.AddDoubleLine) == "function" then
+        -- Other auction houses: house left, price and age right, so the prices line up.
+        tooltip:AddDoubleLine(line.left, line.right, 0.8, 0.8, 0.8, 1, 1, 1)
+      else
+        tooltip:AddLine(line.text, r, g, b, false)
+      end
+      if line.key == "stack" then
+        tooltip:AddLine(" ") -- room before the lines other blocks add below
+      end
     end
     added = true
   end
   return added
+end
+
+local function lineTotal(tooltip)
+  if type(tooltip.NumLines) ~= "function" then
+    return nil
+  end
+  local ok, n = pcall(tooltip.NumLines, tooltip)
+  return ok and plain(n, "number") and n or nil
+end
+
+-- Remembers the line count of a tooltip whose block was just added.
+local function remember(tooltip)
+  blockLines[tooltip] = lineTotal(tooltip)
+end
+
+-- Drops the mark when the tooltip lost lines since the block was added.
+local function dropStaleMark(tooltip)
+  local was, now = blockLines[tooltip], lineTotal(tooltip)
+  if marked[tooltip] ~= nil and was and now and now < was then
+    marked[tooltip], blockLines[tooltip] = nil, nil
+  end
 end
 
 local function forbidden(tooltip)
@@ -314,6 +425,7 @@ function T.OnItem(tooltip, data)
   if type(tooltip) ~= "table" or type(data) ~= "table" or held[tooltip] or forbidden(tooltip) then
     return
   end
+  dropStaleMark(tooltip)
   local seen = marked[tooltip]
   if seen == true or seen == data then
     return
@@ -322,18 +434,25 @@ function T.OnItem(tooltip, data)
   if id then
     marked[tooltip] = data
     T.Append(tooltip, id, data)
+    remember(tooltip)
   end
 end
 
 -- Script and method hooks: the block once per build, the tooltip says which item it shows.
 local function onSetItem(tooltip)
-  if type(tooltip) ~= "table" or marked[tooltip] ~= nil or held[tooltip] or forbidden(tooltip) then
+  if type(tooltip) ~= "table" or held[tooltip] or forbidden(tooltip) then
+    return
+  end
+  dropStaleMark(tooltip)
+  if marked[tooltip] ~= nil then
     return
   end
   local id = T.ItemIdOf(tooltip)
   if id then
     marked[tooltip] = true
-    if T.Append(tooltip, id) and type(tooltip.Show) == "function" then
+    local added = T.Append(tooltip, id)
+    remember(tooltip)
+    if added and type(tooltip.Show) == "function" then
       tooltip:Show()
     end
   end
@@ -366,7 +485,9 @@ function T.AddForItem(tooltip, item)
     return false
   end
   marked[tooltip] = true
-  return T.Append(tooltip, id)
+  local added = T.Append(tooltip, id)
+  remember(tooltip)
+  return added
 end
 
 -- Methods that fill a tooltip with an item, for clients where neither the post call nor the

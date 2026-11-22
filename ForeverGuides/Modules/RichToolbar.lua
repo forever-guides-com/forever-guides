@@ -44,23 +44,23 @@ RT.PALETTE = {
 ns.AddLocale("enUS", {
   ["notes.tb.bold"] = "Bold",
   ["notes.tb.italic"] = "Italic",
-  ["notes.tb.boldTip"] = "Ctrl+B. A thick outline in the game.\nApplies to selection or next text.",
-  ["notes.tb.italicTip"] = "Ctrl+I. Skurri decorative font in the game.\nApplies to selection or next text.",
+  ["notes.tb.boldTip"] = "Ctrl+B. Shown as a thick outline in the game.\nApplies to the selection or the next text.",
+  ["notes.tb.italicTip"] = "Ctrl+I. Shown in the decorative Skurri font in the game.\nApplies to the selection or the next text.",
   ["notes.tb.alignLeft"] = "Align left",
   ["notes.tb.alignCenter"] = "Align center",
   ["notes.tb.alignRight"] = "Align right",
-  ["notes.tb.alignLeftTip"] = "Ctrl+L, lines of the selection.",
-  ["notes.tb.alignCenterTip"] = "Ctrl+E, lines of the selection.",
-  ["notes.tb.alignRightTip"] = "Ctrl+R, lines of the selection.",
+  ["notes.tb.alignLeftTip"] = "Ctrl+L. Aligns the lines of the selection.",
+  ["notes.tb.alignCenterTip"] = "Ctrl+E. Aligns the lines of the selection.",
+  ["notes.tb.alignRightTip"] = "Ctrl+R. Aligns the lines of the selection.",
   ["notes.tb.size"] = "Text size",
-  ["notes.tb.sizeTip"] = "Size for the selection or the next text.",
+  ["notes.tb.sizeTip"] = "Sets the size for the selection or the next text.",
   ["notes.tb.color"] = "Text color",
   ["notes.tb.colorTip"] = "Opens the palette, the bar shows the color at the cursor.",
   ["notes.tb.colorDefault"] = "Default color",
   ["notes.tb.class"] = "Class color",
   ["notes.tb.classTip"] = "Colors the text in the color of a class.",
   ["notes.tb.mode"] = "Code view",
-  ["notes.tb.modeTip"] = "Raw text with tags instead of finished text.\nSame button switches back.",
+  ["notes.tb.modeTip"] = "Shows raw text with tags instead of the finished text.\nThe same button switches back.",
   ["notes.tb.stateOn"] = "on",
   ["notes.tb.stateOff"] = "off",
   ["notes.tb.stateMixed"] = "mixed",
@@ -84,23 +84,23 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["notes.tb.bold"] = "Fett",
   ["notes.tb.italic"] = "Kursiv",
-  ["notes.tb.boldTip"] = "Strg+B. Im Spiel als dicker Umriss.\nGilt für Auswahl oder nächsten Text.",
-  ["notes.tb.italicTip"] = "Strg+I. Im Spiel in Zierschrift (Skurri).\nGilt für Auswahl oder nächsten Text.",
+  ["notes.tb.boldTip"] = "Strg+B. Im Spiel als dicker Umriss.\nGilt für die Auswahl oder den nächsten Text.",
+  ["notes.tb.italicTip"] = "Strg+I. Im Spiel in Zierschrift (Skurri).\nGilt für die Auswahl oder den nächsten Text.",
   ["notes.tb.alignLeft"] = "Linksbündig",
   ["notes.tb.alignCenter"] = "Zentriert",
   ["notes.tb.alignRight"] = "Rechtsbündig",
-  ["notes.tb.alignLeftTip"] = "Strg+L, Zeilen der Auswahl.",
-  ["notes.tb.alignCenterTip"] = "Strg+E, Zeilen der Auswahl.",
-  ["notes.tb.alignRightTip"] = "Strg+R, Zeilen der Auswahl.",
+  ["notes.tb.alignLeftTip"] = "Strg+L. Richtet die Zeilen der Auswahl aus.",
+  ["notes.tb.alignCenterTip"] = "Strg+E. Richtet die Zeilen der Auswahl aus.",
+  ["notes.tb.alignRightTip"] = "Strg+R. Richtet die Zeilen der Auswahl aus.",
   ["notes.tb.size"] = "Schriftgröße",
-  ["notes.tb.sizeTip"] = "Größe für Auswahl oder nächsten Text.",
+  ["notes.tb.sizeTip"] = "Setzt die Größe für die Auswahl oder den nächsten Text.",
   ["notes.tb.color"] = "Textfarbe",
   ["notes.tb.colorTip"] = "Öffnet die Palette, der Balken zeigt die Farbe am Cursor.",
   ["notes.tb.colorDefault"] = "Standardfarbe",
   ["notes.tb.class"] = "Klassenfarbe",
   ["notes.tb.classTip"] = "Färbt den Text in der Farbe einer Klasse.",
-  ["notes.tb.mode"] = "Code-Ansicht",
-  ["notes.tb.modeTip"] = "Rohtext mit Tags statt fertigem Text.\nDerselbe Knopf schaltet zurück.",
+  ["notes.tb.mode"] = "Codeansicht",
+  ["notes.tb.modeTip"] = "Zeigt Rohtext mit Tags statt des fertigen Texts.\nDerselbe Knopf schaltet zurück.",
   ["notes.tb.stateOn"] = "an",
   ["notes.tb.stateOff"] = "aus",
   ["notes.tb.stateMixed"] = "gemischt",
@@ -199,125 +199,40 @@ end)
 
 -- Toggle button ---------------------------------------------------------------------------
 
--- opts: glyph (text label), icon (a name of ns.UI_ICONS, else an IconDraw glyph, shown instead of
--- a label), level (the label sits right of the icon and shows a short value), chevron (small arrow
+-- opts: glyph (text label), icon (a name of ns.UI_ICONS, else a drawn symbol, shown instead of a
+-- label), level (the label sits right of the icon and shows a short value), chevron (small arrow
 -- for a dropdown), tooltip / tooltipText (locale keys), onClick, size (height, base px), width.
--- b:SetState(true|false|"mixed", glyph?, icon?). The state shows as fill, border and a
--- bar along the bottom edge (full width = on, short = mixed), not only as color.
+-- b:SetState(true|false|"mixed", glyph?, icon?): a W.StateButton whose state the editor sets.
 function RT.Toggle(parent, opts)
   local size = opts.size or 24
-  local width = opts.width or size
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(width, ns.Desktop.scaled(size))
-  b.fgState = false
-  b.bg = b:CreateTexture(nil, "BACKGROUND")
-  b.bg:SetAllPoints()
-  local shift = opts.chevron and -4 or 0
-  b.label = b:CreateFontString(nil, "OVERLAY")
-  b.label:SetPoint("CENTER", shift + (opts.level and 9 or 0), 1)
-  if opts.icon then
-    if ns.UI_ICONS[opts.icon] then
-      b.icon = W.Glyph(b, opts.icon, 14, "textSecondary")
-    else
-      b.icon = IconDraw.new(b, 14)
-      b.icon:Draw(opts.icon)
-    end
-    b.icon:SetPoint("CENTER", shift + (opts.level and -6 or 0), 1)
-  end
-  if opts.chevron then
-    b.chevron = IconDraw.new(b, 8)
-    b.chevron:SetPoint("RIGHT", -4, -1)
-    b.chevron:Draw("chevron-down")
-  end
-  b.ringOn = W.Border(b, "accent2", 1, 2)
-  b.ringMixed = W.Border(b, "accentDim", 1, 1)
-  b.bar = b:CreateTexture(nil, "OVERLAY")
-  b.bar:SetHeight(2)
-  b.bar:SetPoint("BOTTOMLEFT", 3, 2)
-  b.bar:SetPoint("BOTTOMRIGHT", -3, 2)
-  b.dash = b:CreateTexture(nil, "OVERLAY")
-  b.dash:SetSize(math.max(4, math.floor(width / 3)), 2)
-  b.dash:SetPoint("BOTTOM", 0, 2)
-  local hover = false
-  local function paint()
-    local state = b.fgState
-    local ar, ag, ab = Theme.rgb("accent2")
-    local tint = "textSecondary"
-    if state == true then
-      b.bg:SetColorTexture(Theme.color("surface3"))
-      tint = "accent"
-    elseif state == "mixed" then
-      b.bg:SetColorTexture(Theme.color("surface2"))
-    elseif hover then
-      b.bg:SetColorTexture(Theme.color("surface2"))
-      tint = "text"
-    else
-      b.bg:SetColorTexture(0, 0, 0, 0)
-    end
-    b.label:SetTextColor(Theme.color(tint))
-    if b.icon then
-      if b.icon.SetColorToken then
-        b.icon:SetColorToken(tint)
-      else
-        b.icon:SetTint(tint)
-      end
-    end
-    if b.chevron then
-      b.chevron:SetTint(tint)
-    end
-    b.ringOn.show(state == true)
-    b.ringMixed.show(state == "mixed")
-    b.bar:SetColorTexture(ar, ag, ab, 1)
-    b.bar:SetShown(state == true)
-    b.dash:SetColorTexture(ar, ag, ab, 1)
-    b.dash:SetShown(state == "mixed")
-  end
-  ns.Bind(b, function()
-    b:SetHeight(ns.Desktop.scaled(size))
-    Theme.applyFont(b.label, "ui", "body")
-    paint()
-  end)
-  -- Only after the bind: a FontString without a font cannot take text in the client.
-  b.label:SetText(opts.glyph or "")
-  function b:SetState(state, glyph, icon)
-    if state ~= true and state ~= "mixed" then
-      state = false
-    end
-    self.fgState = state
-    if glyph then
-      self.label:SetText(glyph)
-    end
-    if icon and self.icon and self.icon.glyph ~= icon then
-      self.icon:Draw(icon)
-    end
-    paint()
-  end
-  b:SetScript("OnEnter", function(self)
-    hover = true
-    paint()
-    if opts.tooltip then
-      local key = self.fgState == true and "notes.tb.stateOn"
-        or (self.fgState == "mixed" and "notes.tb.stateMixed" or "notes.tb.stateOff")
-      local tip = opts.tooltipText and (L[opts.tooltipText] .. " ") or ""
-      ns.ShowTooltip(self, L[opts.tooltip] .. " (" .. L[key] .. ")", tip ~= "" and tip or nil)
-    end
-  end)
-  b:SetScript("OnLeave", function()
-    hover = false
-    paint()
-    ns.HideTooltip()
-  end)
-  b:SetScript(
-    "OnClick",
-    ns.Wrap("note-toggle", function()
+  local b = W.StateButton(parent, {
+    icon = opts.icon,
+    text = opts.glyph or "",
+    level = opts.level,
+    chevron = opts.chevron,
+    tooltip = opts.tooltip,
+    tooltipText = opts.tooltipText,
+    stateKeys = { on = "notes.tb.stateOn", off = "notes.tb.stateOff", mixed = "notes.tb.stateMixed" },
+    manual = true,
+    height = size,
+    width = opts.width or size,
+    scaled = true,
+    wrap = "note-toggle",
+    onClick = function()
       if opts.onClick then
         opts.onClick()
       end
-    end)
-  )
-  ns.Focus.register(b, function(self)
-    self:Click()
-  end)
+    end,
+  })
+  function b:SetState(state, glyph, icon)
+    if glyph then
+      self:SetLabel(glyph)
+    end
+    if icon then
+      self:SetIcon(icon)
+    end
+    self:SetChecked(state)
+  end
   return b
 end
 
@@ -517,15 +432,15 @@ local function buildSize()
     r:SetPoint("TOPRIGHT", -pad, -(pad + (i - 1) * rowH))
     r.hl = r:CreateTexture(nil, "BACKGROUND")
     r.hl:SetAllPoints()
-    r.hl:SetColorTexture(1, 1, 1, 0)
+    r.hl:SetColorTexture(ns.Theme.fillColor())
     r.text = W.Text(r, { text = tostring(n), role = "ui", justify = "CENTER" })
     r.text:SetPoint("CENTER")
     r.value = n
     r:SetScript("OnEnter", function()
-      r.hl:SetColorTexture(1, 1, 1, 0.08)
+      r.hl:SetColorTexture(Theme.fillColor("hover"))
     end)
     r:SetScript("OnLeave", function()
-      r.hl:SetColorTexture(1, 1, 1, 0)
+      r.hl:SetColorTexture(ns.Theme.fillColor())
     end)
     r:SetScript(
       "OnClick",
@@ -560,7 +475,7 @@ local function buildChoice(kind, name, rows)
     r:SetPoint("TOPRIGHT", -pad, -(pad + (i - 1) * rowH))
     r.hl = r:CreateTexture(nil, "BACKGROUND")
     r.hl:SetAllPoints()
-    r.hl:SetColorTexture(1, 1, 1, 0)
+    r.hl:SetColorTexture(ns.Theme.fillColor())
     r.mark = r:CreateTexture(nil, "ARTWORK")
     r.mark:SetPoint("TOPLEFT", 0, -3)
     r.mark:SetPoint("BOTTOMLEFT", 0, 3)
@@ -570,10 +485,10 @@ local function buildChoice(kind, name, rows)
     r.text:SetPoint("LEFT", 10, 0)
     r.value = def.value
     r:SetScript("OnEnter", function()
-      r.hl:SetColorTexture(1, 1, 1, 0.08)
+      r.hl:SetColorTexture(Theme.fillColor("hover"))
     end)
     r:SetScript("OnLeave", function()
-      r.hl:SetColorTexture(1, 1, 1, 0)
+      r.hl:SetColorTexture(ns.Theme.fillColor())
     end)
     r:SetScript(
       "OnClick",
@@ -654,46 +569,17 @@ end
 local GAP, GROUP_GAP = 2, 10 -- pixels between buttons / between groups
 local TOOLBAR_HEIGHT = 28
 
--- A bordered button with a label or icon for the size, color and class popups.
--- b.fgState true / "mixed" outlines it like the toggle buttons.
+-- A state button for the size, color and class popups; the caller adds its own content.
+-- b.fgState true / "mixed" marks it like the toggle buttons (set it, then b:Paint()).
 local function arrowButton(parent, width, tooltipKey, tipTextKey)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(width, ns.Desktop.scaled(24))
-  b.fgState = false
-  b.bg = b:CreateTexture(nil, "BACKGROUND")
-  b.bg:SetAllPoints()
-  b.edge = W.Border(b, "accentDim", 1, 1)
-  local hover = false
-  function b:Paint()
-    local on, mixed = self.fgState == true, self.fgState == "mixed"
-    if on then
-      self.bg:SetColorTexture(Theme.color("surface3"))
-    elseif mixed or hover then
-      self.bg:SetColorTexture(Theme.color("surface2"))
-    else
-      self.bg:SetColorTexture(0, 0, 0, 0)
-    end
-    self.edge.set(on and "accent2" or "accentDim", 1)
-    self.edge.show(on or mixed or hover)
-  end
-  b:SetScript("OnEnter", function(self)
-    hover = true
-    self:Paint()
-    ns.ShowTooltip(self, L[tooltipKey], tipTextKey and L[tipTextKey] or nil)
-  end)
-  b:SetScript("OnLeave", function(self)
-    hover = false
-    self:Paint()
-    ns.HideTooltip()
-  end)
-  ns.Bind(b, function(self)
-    self:SetHeight(ns.Desktop.scaled(24))
-    self:Paint()
-  end)
-  ns.Focus.register(b, function(self)
-    self:Click()
-  end)
-  return b
+  return W.StateButton(parent, {
+    tooltip = tooltipKey,
+    tooltipText = tipTextKey,
+    manual = true,
+    height = 24,
+    width = width,
+    scaled = true,
+  })
 end
 
 -- Items in toolbar order: group (a separator sits between groups) and rank (the item

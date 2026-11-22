@@ -22,7 +22,7 @@ ns.AddLocale("enUS", {
   ["dmap.icon.cross"] = "Cross",
   ["dmap.pick.title"] = "Set pin",
   ["dmap.pick.kind"] = "What do you want to place here?",
-  ["dmap.pick.boss"] = "Pick the boss (one pin per boss, a new one moves it)",
+  ["dmap.pick.boss"] = "Pick the boss. Each boss gets one pin, a new pin moves it.",
   ["dmap.pick.floor"] = "Pick the floor this passage leads to.",
   ["dmap.pick.icon"] = "Pick a symbol for the marker.",
   ["dmap.pick.markerBoss"] = "Does the marker belong to a boss? (optional)",
@@ -34,14 +34,14 @@ ns.AddLocale("enUS", {
   ["dmap.pick.set"] = "Set pin",
   ["dmap.pick.back"] = "Back",
   ["dmap.export.title"] = "Export pins",
-  ["dmap.export.hint"] = "For the website: selected, Ctrl+C copies",
+  ["dmap.export.hint"] = "For the website: the text is selected, Ctrl+C copies it",
   ["dmap.export.scopeInst"] = "This instance",
   ["dmap.export.scopeAll"] = "All own pins",
   ["dmap.import.title"] = "Import pins",
   ["dmap.import.hint"] = "Paste the exported text, then click Apply",
   ["dmap.import.apply"] = "Apply",
   ["dmap.import.preview"] = "%d new, %d replaced, %d rejected",
-  ["dmap.import.invalid"] = "The text can not be read: %s",
+  ["dmap.import.invalid"] = "The text cannot be read: %s",
   ["dmap.import.rejectedRow"] = "Pin %d: %s",
   ["dmap.import.done"] = "Pins imported: %d new, %d replaced.",
 })
@@ -60,7 +60,7 @@ ns.AddLocale("deDE", {
   ["dmap.icon.cross"] = "Kreuz",
   ["dmap.pick.title"] = "Pin setzen",
   ["dmap.pick.kind"] = "Was möchtest du hier setzen?",
-  ["dmap.pick.boss"] = "Boss wählen (ein Pin pro Boss, neuer verschiebt)",
+  ["dmap.pick.boss"] = "Boss wählen. Jeder Boss hat einen Pin, ein neuer verschiebt ihn.",
   ["dmap.pick.floor"] = "Wähle die Ebene, zu der dieser Übergang führt.",
   ["dmap.pick.icon"] = "Wähle ein Symbol für den Marker.",
   ["dmap.pick.markerBoss"] = "Gehört der Marker zu einem Boss? (optional)",
@@ -72,11 +72,11 @@ ns.AddLocale("deDE", {
   ["dmap.pick.set"] = "Pin setzen",
   ["dmap.pick.back"] = "Zurück",
   ["dmap.export.title"] = "Pins exportieren",
-  ["dmap.export.hint"] = "Für die Website: markiert, Strg+C kopiert",
+  ["dmap.export.hint"] = "Für die Website: Der Text ist markiert, Strg+C kopiert ihn",
   ["dmap.export.scopeInst"] = "Diese Instanz",
   ["dmap.export.scopeAll"] = "Alle eigenen Pins",
   ["dmap.import.title"] = "Pins importieren",
-  ["dmap.import.hint"] = "Exportierten Text einfügen, dann Übernehmen",
+  ["dmap.import.hint"] = "Füge den exportierten Text ein, dann klicke auf Übernehmen",
   ["dmap.import.apply"] = "Übernehmen",
   ["dmap.import.preview"] = "%d neu, %d ersetzt, %d abgelehnt",
   ["dmap.import.invalid"] = "Der Text lässt sich nicht lesen: %s",
@@ -304,7 +304,7 @@ local function createRow(parent)
   local hl = row:CreateTexture(nil, "HIGHLIGHT")
   hl:SetAllPoints()
   ns.Bind(row, function()
-    hl:SetColorTexture(1, 1, 1, 0.08)
+    hl:SetColorTexture(Theme.fillColor("hover"))
   end)
   row.icon = row:CreateTexture(nil, "ARTWORK")
   row.icon:SetSize(18, 18)

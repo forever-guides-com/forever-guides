@@ -24,6 +24,7 @@ ns.AddLocale("enUS", {
   ["wm.menu.barShow"] = "Show marker bar",
   ["wm.menu.barHide"] = "Hide marker bar",
   ["wm.noMarker"] = "No markers can be set on this map.",
+  ["wm.menu.here"] = "Set waypoint here",
   ["wm.bar.title"] = "Forever Guides",
   ["wm.bar.toggleTip"] = "Click: fold or unfold. Drag: move.",
   ["wm.corner.TOPLEFT"] = "Move to top left",
@@ -34,43 +35,30 @@ ns.AddLocale("enUS", {
   ["wm.tab.tip"] = "Opens the map area of the addon.",
   ["wm.place"] = "Set marker",
   ["wm.place.stop"] = "Stop setting markers",
-  ["wm.place.hint"] = "Click the map to set a marker.\nEsc or the button ends, {key:mapMarker} works anytime.",
+  ["wm.place.hint"] = "Click the map to set a marker.\nEsc or the button ends the mode, {key:mapMarker} always works.",
   ["wm.count"] = "%d marker(s) on this map",
   ["wm.count.part"] = "%d marker(s) on this map, %d shown",
   ["wm.empty"] = "No markers on this map yet.",
   ["wm.swap"] = "Swap",
-  ["wm.calc"] = "Calculate",
-  ["wm.search"] = "Search a place",
-  ["wm.noPlace"] = "No place found.",
-  ["wm.noData"] = "The travel data is not available.",
-  ["wm.route.show"] = "Show in addon",
-  ["wm.route.more"] = "+%d more leg(s) in the addon",
   ["wm.set.heading"] = "Blizzard world map",
   ["wm.set.button"] = "Button in the world map",
   ["wm.set.bar"] = "Marker and route bar in the world map",
   ["wm.set.pins"] = "Show own markers in the world map",
+  ["wm.set.rightClick"] = "Right click sets a waypoint (otherwise {mod:mapMenu} + right click)",
   ["wm.tip.tab.markers"] = "Your markers on this map: set new ones and pick them from the list.",
-  ["wm.tip.tab.route"] = "Plan a route between two known places. The fastest way shows as a short list of steps.",
-  ["wm.tip.tab.flights"] = "The flight points nearest to you with their distance. A click sets a waypoint.",
-  ["wm.tip.tab.gather"] = "Ore and herb spots on the map and the explored look of the map.",
-  ["wm.place.tip"] = "Switches the click on the map to setting markers. Click the map to set one, click here again to stop.",
-  ["wm.start.title"] = "Start",
-  ["wm.dest.title"] = "Destination",
-  ["wm.start.tip"] = "Choose where the route begins. Opens a search over the known places, click again to close it.",
-  ["wm.dest.tip"] = "Choose where the route ends. Opens a search over the known places, click again to close it.",
+  ["wm.tip.tab.flights"] = "Lists the flight points nearest to you with their distance. A click sets a waypoint.",
+  ["wm.tip.tab.gather"] = "Shows ore and herb spots on the map and the explored look of the map.",
+  ["wm.place.tip"] = "Switches clicks on the map to setting markers. Click the map to set one, click here again to stop.",
   ["wm.swap.tip"] = "Swaps start and destination.",
-  ["wm.calc.tip"] = "Calculates the fastest route from the start to the destination.",
-  ["wm.search.tip"] = "Type part of a name. Enter takes the first result, Esc closes the search.",
-  ["wm.pick.tip"] = "Click to use this place.",
-  ["wm.route.showTip"] = "Opens this route on the Map & Route page of the addon.",
 })
 
 ns.AddLocale("deDE", {
   ["wm.button"] = "Forever Guides: Karte & Route öffnen",
   ["wm.button.tip"] = "Öffnet Karte & Route bei dieser Zone.\nRechtsklick: Menü.",
-  ["wm.menu.barShow"] = "Marker-Leiste zeigen",
-  ["wm.menu.barHide"] = "Marker-Leiste ausblenden",
+  ["wm.menu.barShow"] = "Markerleiste anzeigen",
+  ["wm.menu.barHide"] = "Markerleiste ausblenden",
   ["wm.noMarker"] = "Auf dieser Karte können keine Marker gesetzt werden.",
+  ["wm.menu.here"] = "Wegpunkt hier setzen",
   ["wm.bar.title"] = "Forever Guides",
   ["wm.bar.toggleTip"] = "Klick: auf- oder zuklappen. Ziehen: verschieben.",
   ["wm.corner.TOPLEFT"] = "Nach oben links",
@@ -78,38 +66,24 @@ ns.AddLocale("deDE", {
   ["wm.corner.BOTTOMLEFT"] = "Nach unten links",
   ["wm.corner.BOTTOMRIGHT"] = "Nach unten rechts",
   ["wm.tab"] = "Forever Guides: Karte",
-  ["wm.tab.tip"] = "Öffnet den Karten-Bereich des Addons.",
+  ["wm.tab.tip"] = "Öffnet den Kartenbereich des Addons.",
   ["wm.place"] = "Marker setzen",
   ["wm.place.stop"] = "Marker setzen beenden",
-  ["wm.place.hint"] = "Karte anklicken setzt einen Marker.\nEsc oder Knopf beendet, {key:mapMarker} geht immer.",
+  ["wm.place.hint"] = "Klicke auf die Karte, um einen Marker zu setzen.\nEsc oder Knopf beendet den Modus, {key:mapMarker} geht immer.",
   ["wm.count"] = "%d Marker auf dieser Karte",
   ["wm.count.part"] = "%d Marker auf dieser Karte, %d angezeigt",
   ["wm.empty"] = "Auf dieser Karte gibt es noch keine Marker.",
   ["wm.swap"] = "Tauschen",
-  ["wm.calc"] = "Berechnen",
-  ["wm.search"] = "Ort suchen",
-  ["wm.noPlace"] = "Kein Ort gefunden.",
-  ["wm.noData"] = "Die Reisedaten sind nicht verfügbar.",
-  ["wm.route.show"] = "Im Addon anzeigen",
-  ["wm.route.more"] = "+%d weitere Etappe(n) im Addon",
   ["wm.set.heading"] = "Blizzard-Weltkarte",
-  ["wm.set.button"] = "Button in der Weltkarte",
-  ["wm.set.bar"] = "Marker und Routen-Leiste in der Weltkarte",
+  ["wm.set.button"] = "Knopf in der Weltkarte",
+  ["wm.set.bar"] = "Marker- und Routenleiste in der Weltkarte",
   ["wm.set.pins"] = "Eigene Marker in der Weltkarte anzeigen",
+  ["wm.set.rightClick"] = "Rechtsklick setzt Wegpunkt (sonst {mod:mapMenu} + Rechtsklick)",
   ["wm.tip.tab.markers"] = "Deine Marker auf dieser Karte: neue setzen und aus der Liste wählen.",
-  ["wm.tip.tab.route"] = "Plane eine Route zwischen zwei bekannten Orten. Der schnellste Weg erscheint als kurze Liste von Etappen.",
-  ["wm.tip.tab.flights"] = "Die nächsten Flugpunkte mit ihrer Entfernung. Ein Klick setzt einen Wegpunkt.",
-  ["wm.tip.tab.gather"] = "Fundorte von Erzen und Kräutern auf der Karte und die erkundete Darstellung der Karte.",
-  ["wm.place.tip"] = "Schaltet den Klick auf die Karte auf Marker setzen um. Karte anklicken setzt einen Marker, hier erneut klicken beendet es.",
-  ["wm.start.title"] = "Start",
-  ["wm.dest.title"] = "Ziel",
-  ["wm.start.tip"] = "Wähle, wo die Route beginnt. Öffnet eine Suche über die bekannten Orte, erneut klicken schließt sie.",
-  ["wm.dest.tip"] = "Wähle, wo die Route endet. Öffnet eine Suche über die bekannten Orte, erneut klicken schließt sie.",
+  ["wm.tip.tab.flights"] = "Listet die nächsten Flugpunkte mit ihrer Entfernung. Ein Klick setzt einen Wegpunkt.",
+  ["wm.tip.tab.gather"] = "Zeigt Fundorte von Erzen und Kräutern auf der Karte und die erkundete Darstellung der Karte.",
+  ["wm.place.tip"] = "Schaltet Klicks auf die Karte auf das Setzen von Markern um. Ein Klick auf die Karte setzt einen Marker, ein erneuter Klick hier beendet den Modus.",
   ["wm.swap.tip"] = "Tauscht Start und Ziel.",
-  ["wm.calc.tip"] = "Berechnet die schnellste Route vom Start zum Ziel.",
-  ["wm.search.tip"] = "Einen Teil des Namens tippen. Enter nimmt den ersten Treffer, Esc schließt die Suche.",
-  ["wm.pick.tip"] = "Klicken, um diesen Ort zu nehmen.",
-  ["wm.route.showTip"] = "Öffnet diese Route auf der Seite Karte & Route des Addons.",
 })
 
 local WML = {}
@@ -117,7 +91,7 @@ ns.WorldMapLinks = WML
 
 local LOGO = "Interface\\AddOns\\ForeverGuides\\Media\\Logo.png"
 local DISC = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
-local BUTTON = 28
+local BUTTON = 31
 local EDGE, GAP = 6, 4
 local TAB_INSET, TAB_DROP = 4, 64 -- side tab: outside the right edge, under the close button
 local RIGHT_ZONE = 0.25 -- overlays within this share of the canvas width at the right edge form the column
@@ -133,7 +107,7 @@ local LEVEL_CAP = 9990
 -- QuestPin 2740 to 2758, GroupMembersPin 2920.
 -- reveal stays far below the client's explored pieces on purpose: it only fills what the client has not drawn,
 -- and a piece drawn over it is the same picture. The pins lie over the exploration and the highlight (which
--- would take their mouse and tooltips) and under the quest pins: spots, then zone transition arrows (they sit
+-- would take their mouse and tooltips) and under the quest pins: spots, zone level labels, then zone transition arrows (they sit
 -- on the zone edge, flight points and instance markers win where they meet), flight points, instance markers,
 -- guild members, rare enemies (their card must not hide under other markers), and the waypoint pins on top, which count up per entry (room for about 500 before the quest
 -- pins). The controls clear the client's quest pins, stay under the dungeon panel (3000) and keep room for
@@ -141,6 +115,7 @@ local LEVEL_CAP = 9990
 local LEVELS = {
   reveal = 1,
   spots = 2020,
+  levels = 2080,
   arrows = 2090,
   flights = 2100,
   instances = 2110,
@@ -150,6 +125,7 @@ local LEVELS = {
   ui = 2850,
 }
 WML.LEVELS = LEVELS
+WML.LEVEL_CAP = LEVEL_CAP
 local PIN_RING = 4
 local CURSOR = "MAP_PIN_CURSOR"
 local HANDLER_PRIORITY = 100
@@ -158,6 +134,7 @@ local MENU_W, MENU_ROW = 214, 26
 
 local map, attached
 local button, tab, overlay, bar, keys
+local tabHost, tabRise = nil, 0 -- frame the side tab hangs on instead of the map (WML.SetTabHost)
 local pins = {}
 local placing = false
 local fieldCtl, markerMenu, buttonMenu
@@ -237,9 +214,32 @@ function WML.Lift(frame)
   end
 end
 
--- Frame level of the layer `key` of WML.LEVELS on the canvas.
+-- Frame level of the layer `key` of WML.LEVELS on the canvas. A map add-on that stitches its own art over the
+-- canvas moves every layer above that art (ns.StitchedMapCompat), else the layers count from the canvas.
 function WML.CanvasLevel(canvas, key)
-  return math.min(canvas:GetFrameLevel() + LEVELS[key], LEVEL_CAP)
+  local compat = ns.StitchedMapCompat
+  local lifted = compat and compat.Level(key)
+  return lifted or math.min(canvas:GetFrameLevel() + LEVELS[key], LEVEL_CAP)
+end
+
+-- Frames that get their level once (not on every paint), kept so a change of the art below can lift them again.
+local tracked = setmetatable({}, { __mode = "k" })
+
+local function applyLevel(frame, spec)
+  frame:SetFrameLevel(WML.CanvasLevel(spec.canvas, spec.key) + spec.extra)
+end
+
+-- Sets the level of `frame` to layer `key` (plus `extra`) and keeps it up to date with WML.ReapplyLevels.
+function WML.TrackLevel(frame, canvas, key, extra)
+  local spec = { canvas = canvas, key = key, extra = extra or 0 }
+  tracked[frame] = spec
+  applyLevel(frame, spec)
+end
+
+function WML.ReapplyLevels()
+  for frame, spec in pairs(tracked) do
+    applyLevel(frame, spec)
+  end
 end
 
 local function enabled(key)
@@ -477,10 +477,171 @@ local function placeMarker(nx, ny)
   openField({ kind = "new", map = id, x = nx, y = ny }, MM.DefaultName(WP.List()))
 end
 
--- Handler of the canvas: true only for the clicks we use (marker mode or the marker key held), so Blizzard's
--- own click handling (navigating into a zone) stays untouched for every other click. Idle in combat.
+-- "Set waypoint here" popup at the cursor. The waypoint is added directly (no name field, so nothing is
+-- parented to the map and the menu works in combat); rename it later from its own menu.
+local hereMenu, hereAnchor, herePoint
+
+local function setHere()
+  local p = herePoint
+  herePoint = nil
+  if not p or #WP.List() >= WL.MAX then
+    if p then
+      ns.Notify(string.format(L["wp.full"], WL.MAX), "warning")
+    end
+    return
+  end
+  local wp, status =
+    WP.Add({ map = p.map, x = p.x, y = p.y, title = MM.DefaultName(WP.List()), source = "map", pinned = true })
+  if wp then
+    WP.Activate(wp.id)
+    local key = status == "duplicate" and "wp.duplicate" or "wp.set"
+    ns.Notify(
+      status == "duplicate" and string.format(L[key], wp.title)
+        or string.format(L[key], wp.title, WL.coordText(wp.x, wp.y), WP.MapName(wp.map)),
+      status == "duplicate" and "info" or "success"
+    )
+  end
+end
+
+local function buildHereMenu()
+  local layer = ns.Desktop.Layer
+  local p = layer.newPopup("surface2")
+  local b = W.Button(p, {
+    key = "wm.menu.here",
+    variant = "ghost",
+    width = MENU_W - 4,
+    height = MENU_ROW,
+    onClick = function()
+      layer.close("select")
+      setHere()
+    end,
+  })
+  b.label:SetJustifyH("LEFT")
+  b:SetPoint("TOPLEFT", p, "TOPLEFT", 2, -2)
+  p.buttons = { b }
+  p:SetSize(MENU_W, MENU_ROW + 4)
+  p:EnableKeyboard(true)
+  p:SetScript("OnKeyDown", function(self, key)
+    local handled = true
+    if key == "ESCAPE" then
+      layer.close("escape")
+    elseif key == "ENTER" or key == "SPACE" then
+      ns.Focus.activate()
+    else
+      handled = false
+    end
+    ns.PropagateKeys(self, not handled)
+  end)
+  return p
+end
+
+local function openHereMenu(id, nx, ny)
+  if not (ns.Desktop and ns.Desktop.Layer) then
+    return
+  end
+  local layer = ns.Desktop.Layer
+  hereMenu = hereMenu or buildHereMenu()
+  if not hereAnchor then
+    hereAnchor = CreateFrame("Frame", nil, UIParent)
+    hereAnchor:SetSize(1, 1)
+  end
+  local cx, cy = GetCursorPosition()
+  local s = UIParent:GetEffectiveScale()
+  hereAnchor:ClearAllPoints()
+  hereAnchor:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s)
+  herePoint = { map = id, x = nx, y = ny }
+  layer.open({ frames = { hereMenu }, owner = hereAnchor, move = function() end })
+  layer.place(hereMenu, hereAnchor, "TOPLEFT", "BOTTOMLEFT", 0, 0)
+  hereMenu:Show()
+  ns.Focus.set(hereMenu.buttons[1])
+end
+
+-- Right click on an empty spot: the menu opens with the setting on, else with Alt held, so the client's own
+-- right click (zoom out) keeps working by default.
+local function onRightClick(nx, ny)
+  local s = ns.db and ns.db.settings
+  if not (s and s.worldMapRightClick == true) and not ns.Keys.Matches("mapMenu") then
+    return false
+  end
+  local id = WML.MapID()
+  if not id then
+    return false
+  end
+  if isCosmic(id) then
+    ns.Notify(L["wm.noMarker"], "info")
+    return true
+  end
+  if not (WL.readable(nx) and WL.readable(ny)) then
+    nx, ny = call(map, "GetNormalizedCursorPosition")
+  end
+  if not (WL.readable(nx) and WL.readable(ny)) then
+    return false
+  end
+  openHereMenu(id, nx, ny)
+  return true
+end
+
+-- The game's own pin of the user waypoint passes right clicks through to the canvas, where they would zoom
+-- out. When the cursor is on that pin and a waypoint of ours stands behind it, our marker menu opens instead.
+local USER_PIN = "WaypointLocationPinTemplate"
+
+local function userPinUnderCursor()
+  if type(field(map, "EnumeratePinsByTemplate")) ~= "function" then
+    return nil
+  end
+  local ok, iter, state, first = pcall(map.EnumeratePinsByTemplate, map, USER_PIN)
+  if not (ok and type(iter) == "function") then
+    return nil
+  end
+  local walked, found = pcall(function()
+    for a, b in iter, state, first do
+      local pin = type(a) == "table" and a or b
+      if type(pin) == "table" and call(pin, "IsShown") and call(pin, "IsMouseOver") then
+        return pin
+      end
+    end
+  end)
+  return walked and found or nil
+end
+
+local function onUserPinRightClick()
+  local pin = userPinUnderCursor()
+  if not pin then
+    return false
+  end
+  local id, x, y = WP.UserWaypoint()
+  local wp = id and WL.findDuplicate(WP.List(), id, x, y)
+  if not wp then
+    return false
+  end
+  WML.OpenMarkerMenu(wp, pin)
+  return true
+end
+
+-- Handler of the canvas: true only for the clicks we use (marker mode or the marker key held, the right-click
+-- menu), so Blizzard's own click handling (navigating into a zone, zooming out) stays untouched for every
+-- other click.
+local clickUses = {}
+
+-- Other modules (route planning) use clicks of the same handler: fn(mouse, nx, ny) answers true when it used
+-- the click. One handler keeps the list of Blizzard's handlers short.
+function WML.AddClickUse(fn)
+  clickUses[#clickUses + 1] = fn
+end
+
 local function onCanvasClick(_, mouse, nx, ny)
-  if ns.InCombat() or mouse ~= "LeftButton" or not enabled("worldMapPanel") then
+  for _, use in ipairs(clickUses) do
+    if use(mouse, nx, ny) then
+      return true
+    end
+  end
+  if not enabled("worldMapPanel") then
+    return false
+  end
+  if mouse == "RightButton" then
+    return onUserPinRightClick() or onRightClick(nx, ny)
+  end
+  if ns.CombatLocked() or mouse ~= "LeftButton" then
     return false
   end
   if not (placing or ns.Keys.Matches("mapMarker")) then
@@ -502,6 +663,15 @@ WML.Activate = activate
 
 local function markerEntries()
   return {
+    {
+      id = "next",
+      key = "map.marker.next",
+      run = function(wp)
+        if WP.MoveToTop(wp.id) then
+          ns.Notify(string.format(L["wp.activated"], wp.title), "info")
+        end
+      end,
+    },
     {
       id = "rename",
       key = "map.marker.rename",
@@ -840,6 +1010,13 @@ local function openButtonMenu()
   ns.Focus.set(buttonMenu.buttons[1])
 end
 
+-- Round map button in the client's own style (the art of the tracking and minimap buttons: dark disc, gold ring,
+-- glow on hover, icon sunk one pixel and dimmed while pressed).
+local RING_ART = "Interface\\Minimap\\MiniMap-TrackingBorder"
+local DISC_ART = "Interface\\Minimap\\UI-Minimap-Background"
+local GLOW_ART = "Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight"
+local ICON_SIZE = 18
+
 local function ensureButton()
   if button then
     return
@@ -861,12 +1038,60 @@ local function ensureButton()
   ns.Layer.Own(button)
   WML.Lift(button)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  button.icon:ClearAllPoints()
-  button.icon:SetPoint("TOPLEFT", 2, -2)
-  button.icon:SetPoint("BOTTOMRIGHT", -2, 2)
-  button.icon:SetTexCoord(0, 1, 0, 1)
-  W.Fill(button, "bg", 0.85)
-  W.Border(button, "accentDim", 1)
+  -- No flat fill or edge: the art below is the whole look.
+  button.fgPalette = { text = "text", textHover = "text" }
+  local back = button:CreateTexture(nil, "BACKGROUND")
+  back:SetTexture(DISC_ART)
+  back:SetSize(20, 20)
+  back:SetPoint("TOPLEFT", 6, -5)
+  local ring = button:CreateTexture(nil, "OVERLAY")
+  ring:SetTexture(RING_ART)
+  ring:SetSize(54, 54)
+  ring:SetPoint("TOPLEFT")
+  local glow = button:CreateTexture(nil, "OVERLAY", nil, 1)
+  glow:SetTexture(GLOW_ART)
+  glow:SetBlendMode("ADD")
+  glow:SetSize(BUTTON, BUTTON)
+  glow:SetPoint("TOPLEFT")
+  glow:Hide()
+  local icon = button.icon
+  icon:SetTexCoord(0, 1, 0, 1)
+  -- Round the square logo into the ring where the client supports masks.
+  if type(icon.SetMask) == "function" then
+    pcall(icon.SetMask, icon, DISC)
+  end
+  button.fgPlace = function(self)
+    local pressed = self.fgPressed == true
+    icon:ClearAllPoints()
+    icon:SetPoint("CENTER", self, "TOPLEFT", 16 + (pressed and 1 or 0), -15 + (pressed and -1 or 0))
+    icon:SetSize(ICON_SIZE, ICON_SIZE)
+    icon:SetVertexColor(pressed and 0.7 or 1, pressed and 0.7 or 1, pressed and 0.7 or 1)
+    back:SetVertexColor(pressed and 0.6 or 1, pressed and 0.6 or 1, pressed and 0.6 or 1)
+  end
+  button:HookScript("OnEnter", function()
+    glow:Show()
+  end)
+  button:HookScript("OnLeave", function()
+    glow:Hide()
+  end)
+  button:HookScript("OnHide", function()
+    glow:Hide()
+  end)
+  button.fgPlace(button)
+end
+
+-- Moves the side tab to the outer edge of `frame` (the route panel at the map edge), nil: back to the map.
+-- `rise`: how far the top of the frame lies below the top of the map, the tab keeps its height.
+function WML.SetTabHost(frame, rise)
+  rise = frame and rise or 0
+  if frame == tabHost and rise == tabRise then
+    return
+  end
+  tabHost, tabRise = frame, rise
+  if tab then
+    tab:ClearAllPoints()
+    tab:SetPoint("TOPLEFT", tabHost or map, "TOPRIGHT", TAB_INSET, rise - TAB_DROP)
+  end
 end
 
 local function ensureTab()
@@ -878,10 +1103,10 @@ local function ensureTab()
     tip = "wm.tab.tip",
     onClick = openPage,
     point = "TOPLEFT",
-    rel = map,
+    rel = tabHost or map,
     relPoint = "TOPRIGHT",
     x = TAB_INSET,
-    y = -TAB_DROP,
+    y = tabRise - TAB_DROP,
   })
 end
 
@@ -988,7 +1213,7 @@ local function addHandlers()
   end
   if type(field(map, "AddCursorHandler")) == "function" then
     pcall(map.AddCursorHandler, map, function()
-      if placing and not ns.InCombat() then
+      if placing and not ns.CombatLocked() then
         return CURSOR
       end
     end, HANDLER_PRIORITY)

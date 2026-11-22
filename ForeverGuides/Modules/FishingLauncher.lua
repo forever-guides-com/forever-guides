@@ -18,7 +18,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["binding.fishing"] = "Angelhilfe: Auswerfen und Einholen",
-  ["fishing.launch.off"] = "Die Angelhilfe ist aus. Einschalten unter Einstellungen > Angeln.",
+  ["fishing.launch.off"] = "Die Angelhilfe ist aus. Schalte sie unter Einstellungen > Angeln ein.",
   ["fishing.launch.usage"] = "/fg angeln [status|journal]",
 })
 

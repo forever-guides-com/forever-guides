@@ -38,13 +38,13 @@ ns.AddLocale("deDE", {
   ["chathistory.windows"] = "Fensterzeilen: %s",
   ["chathistory.windowsNone"] = "keine",
   ["chathistory.windowEntry"] = "%s: %d",
-  ["chathistory.whispers"] = "Flüster-Gespräche: %d, Zeilen: %d",
+  ["chathistory.whispers"] = "Flüstergespräche: %d, Zeilen: %d",
   ["chathistory.size"] = "Größe: etwa %d KB von %d KB (%s)",
   ["chathistory.level.ok"] = "ok",
   ["chathistory.level.warn"] = "fast voll",
   ["chathistory.level.over"] = "Limit überschritten",
   ["chathistory.clear.title"] = "Chat-Verlauf löschen",
-  ["chathistory.clear.text"] = "Den gesamten Chat-Verlauf löschen? Das betrifft alle Fenster dieses Charakters und alle Flüster-Gespräche des Accounts. Kontakte bleiben erhalten.",
+  ["chathistory.clear.text"] = "Den gesamten Chat-Verlauf löschen? Das betrifft alle Fenster dieses Charakters und alle Flüstergespräche des Accounts. Kontakte bleiben erhalten.",
   ["chathistory.cleared"] = "Chat-Verlauf gelöscht: %d Fensterzeilen, %d Flüsterzeilen",
 })
 
@@ -67,16 +67,7 @@ local function addOnLoaded(name)
 end
 
 local function realmName()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local fn = rawget(_G, name)
-    if type(fn) == "function" then
-      local ok, realm = pcall(fn)
-      if ok and type(realm) == "string" and realm ~= "" then
-        return realm
-      end
-    end
-  end
-  return nil
+  return ns.Realm.Get()
 end
 
 -- Own character as "Name-Realm" (a name that is not known yet gives "").

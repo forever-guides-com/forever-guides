@@ -45,7 +45,7 @@ ns.AddLocale("deDE", {
   ["rosterstats.tip.kills"] = "Ehrenhafte Kills: %s",
   ["rosterstats.tip.highest"] = "Höchster Rang: %d",
   ["rosterstats.tip.rating"] = "Wertung %d: %s",
-  ["rosterstats.tip.best"] = " (Beste %s)",
+  ["rosterstats.tip.best"] = " (Bestwert %s)",
   ["rosterstats.rep.known"] = "%d bekannt",
   ["rosterstats.rep.top"] = ", %d %s",
   ["rosterstats.tip.more"] = "+%d weitere",

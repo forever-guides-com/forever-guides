@@ -67,6 +67,10 @@ AL.REASONS = {
   "stopped",
   "clientNote",
   "clientRank",
+  "permission",
+  "rankTooHigh",
+  "rankTooLow",
+  "notInGuild",
 }
 
 local YES = { ok = true }

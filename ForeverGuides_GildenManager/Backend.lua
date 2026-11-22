@@ -1,11 +1,13 @@
 -- The one place of the add-on that changes the guild. Three ways, chosen per action:
 --   direct  calls the game function from add-on code (only when the player chose it by name)
---   macro   arms a secure button with a slash command, one click per member, never in combat
+--   macro   arms a secure button with slash commands, never in combat: one command per click (Arm) or
+--           several commands per click (ArmBatch, at most MACRO_MAX characters)
 --   copy    shows the command (or the note text) in the copy window, changes nothing
 -- Choice "auto" takes macro when the secure button template works and we are out of combat, else copy.
--- On a client that blocks guild changes from add-on code (Locked, WoW Forever) the way is always copy,
--- whatever the choice says: no game call and no secure button is ever made there, the player types the
--- command shown in the copy window.
+-- On a client that blocks guild changes from add-on code (Locked, WoW Forever) the add-on never calls a
+-- guild function: "direct" becomes copy, and the macro way only carries the commands the player could
+-- type (promote, demote, remove), never an invite and never a note. A measured block of the secure
+-- button (Caps "macro" = false) sends the player back to the copy window.
 -- Every game function is looked up at call time, nil safe and inside pcall: C_GuildInfo first, the older
 -- global name second. A static test keeps all other files free of these calls.
 local _, gm = ...
@@ -28,6 +30,10 @@ B.TYPED = { promote = "/gpromote", demote = "/gdemote", remove = "/gremove", inv
 B.NO_COMMAND = { editNote = "clientNote", editOfficerNote = "clientNote", setRank = "clientRank" }
 -- First line of every macro: the secure code itself refuses to run in combat.
 local GUARD_LINE = "/stopmacro [combat]"
+-- Longest macro text the game takes; a batch stops before a line that would not fit.
+B.MACRO_MAX = 255
+-- The actions whose slash command a secure button may carry on a locked client.
+local MACRO_LOCKED = { promote = true, demote = true, remove = true }
 local POOL_MAX = 4
 
 local function inCombat()
@@ -41,9 +47,14 @@ function B.Locked()
 end
 
 -- Why the action cannot be offered on this client, nil when it can: a locked client only has the typed
--- commands of B.TYPED. A note or a rank set directly has no command.
-function B.Unavailable(action)
+-- commands of B.TYPED. A note or a rank set directly has no command; a jump over several ranks is the
+-- same promote or demote command once per rank, so the secure button (choice given) can carry it.
+function B.Unavailable(action, choice)
   if not B.Locked() or B.TYPED[action] then
+    return nil
+  end
+  -- Combat is no reason here: the run waits for it, it never drops the step.
+  if action == "setRank" and choice ~= nil and B.Resolve(choice, action, { combat = false }) == "macro" then
     return nil
   end
   return B.NO_COMMAND[action] or "noApi"
@@ -83,12 +94,69 @@ function B.Command(action, step)
   end
 end
 
--- Macro text of an action, nil for an action without slash command or an unsafe name.
-function B.MacroText(action, step)
-  local slash, name = B.SLASH[action], safeName(type(step) == "table" and step.name)
-  if slash and name then
-    return GUARD_LINE .. "\n" .. slash .. " " .. name
+-- The slash command a secure button runs for the action, nil when it has none here. A jump over
+-- several ranks (setRank) is carried by the promote or demote command, see commandOf.
+local function macroSlash(action)
+  if action == "setRank" then
+    action = "promote"
   end
+  if B.Locked() then
+    return MACRO_LOCKED[action] and B.TYPED[action] or nil
+  end
+  return B.SLASH[action]
+end
+
+-- True when a secure button can carry the action on this client.
+function B.HasMacro(action)
+  return macroSlash(action) ~= nil
+end
+
+-- The command lines of a step ({ action, name, fromRank, toRank }): one line, or one per rank for a jump
+-- over several ranks. nil without command, with an unsafe name or without both ranks.
+local function commandLines(action, step)
+  step = type(step) == "table" and step or {}
+  local name, count = safeName(step.name), 1
+  if action == "setRank" then
+    local from, to = step.fromRank, step.toRank
+    if type(from) ~= "number" or type(to) ~= "number" or from == to then
+      return nil
+    end
+    action, count = to < from and "promote" or "demote", math.abs(from - to)
+  end
+  local slash = macroSlash(action)
+  if not (slash and name and count <= 9) then
+    return nil
+  end
+  local lines = {}
+  for i = 1, count do
+    lines[i] = slash .. " " .. name
+  end
+  return lines
+end
+
+-- Macro text of an action, nil for an action without slash command, an unsafe name or a text the game
+-- would cut.
+function B.MacroText(action, step)
+  local lines = commandLines(action, step)
+  local text = lines and GUARD_LINE .. "\n" .. table.concat(lines, "\n")
+  return text and #text <= B.MACRO_MAX and text or nil
+end
+
+-- Macro text for several steps ({ action, name, fromRank, toRank }), in order, as many as `limit`
+-- (default all) and B.MACRO_MAX allow. A step goes in with all its lines or not at all. Stops at the
+-- first step that has no command or an unsafe name, so the order of a run never changes. Answers the
+-- text and the number of steps in it (0: nothing fits, text nil).
+function B.BatchText(steps, limit)
+  local text, n = GUARD_LINE, 0
+  for _, step in ipairs(type(steps) == "table" and steps or {}) do
+    local lines = type(step) == "table" and commandLines(step.action, step)
+    local add = lines and "\n" .. table.concat(lines, "\n")
+    if not add or n >= (limit or math.huge) or #text + #add > B.MACRO_MAX then
+      break
+    end
+    text, n = text .. add, n + 1
+  end
+  return n > 0 and text or nil, n
 end
 
 -- Direct way ------------------------------------------------------------------------------------------
@@ -245,9 +313,6 @@ end
 
 -- True when the secure button template works here. The first call creates the first pool button.
 function B.SecureAvailable()
-  if B.Locked() then
-    return false
-  end
   if #pool > 0 then
     return true
   end
@@ -279,9 +344,6 @@ end
 -- Arms a pool button with the command of the action. onClick(button) runs after the click. Answers the
 -- button, or false and a reason code. Attributes only change out of combat.
 function B.Arm(action, step, onClick)
-  if B.Locked() then
-    return false, "noApi"
-  end
   if inCombat() then
     return false, "combat"
   end
@@ -295,6 +357,24 @@ function B.Arm(action, step, onClick)
   slot.button:SetAttribute("macrotext", text)
   slot.button.fgDone = onClick
   return slot.button
+end
+
+-- Arms a pool button with the commands of several steps ({ action, name }, see BatchText). One click
+-- runs them all. Answers the button and the number of steps it carries, or false and a reason code.
+function B.ArmBatch(steps, limit, onClick)
+  if inCombat() then
+    return false, "combat"
+  end
+  local text, n = B.BatchText(steps, limit)
+  local slot = text and take()
+  if not slot then
+    return false, "noApi"
+  end
+  slot.free = false
+  slot.button:SetAttribute("type", "macro")
+  slot.button:SetAttribute("macrotext", text)
+  slot.button.fgDone = onClick
+  return slot.button, n
 end
 
 -- Lays an armed button over `anchor` without anchoring it to it: the button stays a child of UIParent
@@ -346,13 +426,10 @@ end)
 -- Which way an action takes. env = { combat, secure } (read from the game when missing). Only the
 -- choice "direct" ever gives "direct"; a macro that cannot run gives "copy".
 function B.Resolve(choice, action, env)
-  if B.Locked() then
+  if choice == "copy" then
     return "copy"
-  end
-  if choice == "direct" then
-    return "direct"
-  elseif choice == "copy" then
-    return "copy"
+  elseif choice == "direct" then
+    return B.Locked() and "copy" or "direct"
   end
   env = env or {}
   local combat, secure = env.combat, env.secure
@@ -362,7 +439,7 @@ function B.Resolve(choice, action, env)
   if secure == nil then
     secure = B.SecureAvailable()
   end
-  if B.SLASH[action] and secure and not combat and gm.Caps.Get("macro") ~= false then
+  if macroSlash(action) and secure and not combat and gm.Caps.Get("macro") ~= false then
     return "macro"
   end
   return "copy"
@@ -409,7 +486,7 @@ function B.Do(action, step, opts)
   opts = opts or {}
   step = type(step) == "table" and step or {}
   local kind = B.Resolve(opts.choice, action, opts.env)
-  local unavailable = B.Unavailable(action)
+  local unavailable = B.Unavailable(action, opts.choice)
   if unavailable then
     return false, unavailable, kind
   end

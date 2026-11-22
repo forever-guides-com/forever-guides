@@ -20,16 +20,34 @@ end
 ns.AddLocale("enUS", {
   ["settings.buttonLabels"] = "Show text on icon buttons",
   ["settings.buttonLabelsHint"] = "Buttons show a short word next to their icon. Off: icons only, the tooltip names the action. Narrow places hide the text by themselves.",
-  ["settings.hostSkin"] = "Behavior with other UI add-ons",
+  ["settings.hostSkin"] = "Behavior with other UI addons",
+  ["settings.routeWalkStyle"] = "Walking route",
+  ["settings.routeWalkStyle.hint"] = "Cross-country is quickest, roads can take longer.",
+  ["settings.routeWalkStyle.fastest"] = "Cross-country",
+  ["settings.routeWalkStyle.balanced"] = "Balanced",
+  ["settings.routeWalkStyle.roads"] = "Mostly roads",
+  ["settings.routeLineStyle"] = "Line style",
+  ["settings.routeLineStyle.hint"] = "How walked routes look on the map.",
+  ["settings.routeLineStyle.line"] = "Line",
+  ["settings.routeLineStyle.dots"] = "Dots",
+  ["settings.routeLineStyle.dash"] = "Dashes",
+  ["settings.routeLineWidth"] = "Line width",
+  ["settings.routeLineWidth.hint"] = "Thickness of the route in pixels.",
+  ["settings.routeDotSpacing"] = "Dot spacing",
+  ["settings.routeDotSpacing.hint"] = "Gap between the dots, for the dot style.",
+  ["settings.routeLineAlpha"] = "Route opacity",
+  ["settings.routeMinimapLine"] = "Route on the minimap",
+  ["settings.routeMinimapLine.hint"] = "Draws the walking path as a line on the minimap.",
+  ["settings.routeLineAlpha.hint"] = "How solid the route looks.",
   ["settings.hostSkin.auto"] = "Automatic (follows the window)",
   ["settings.hostSkin.light"] = "Light (Blizzard's own look)",
   ["settings.hostSkin.dark"] = "Dark (own dark surface)",
-  ["settings.hostSkinHint"] = "Forever Guides adds panels to Blizzard windows, for example the learn list in the spellbook. Automatic reads whether the window is drawn light or a UI add-on has made it dark, and picks matching colors. If a panel is hard to read, choose Light or Dark.",
+  ["settings.hostSkinHint"] = "Forever Guides adds panels to Blizzard windows, for example the learn list in the spellbook. Automatic reads whether the window is drawn light or a UI addon has made it dark, and picks matching colors. If a panel is hard to read, choose Light or Dark.",
   ["settings.slotOverlays"] = "Avoid double display",
   ["settings.slotOverlays.auto"] = "Automatic",
   ["settings.slotOverlays.ours"] = "Always show ours",
   ["settings.slotOverlays.none"] = "Hide ours",
-  ["settings.slotOverlaysHint"] = "Some UI add-ons draw item level or enchants next to the slots of the character and inspect window themselves. Automatic hides our texts that show the same and keeps the gems and the warning for a missing enchant. Hide ours removes all of our slot texts.",
+  ["settings.slotOverlaysHint"] = "Some UI addons draw item level or enchants next to the slots of the character and inspect window themselves. Automatic hides our texts that show the same and keeps the gems and the warning for a missing enchant. Hide ours removes all of our slot texts.",
   ["settings.keys"] = "Key bindings",
   ["settings.keysHint"] = "Not preset. Set your keys under AddOns > Forever Guides. Current keys:",
   ["settings.keysOpen"] = "Open key bindings",
@@ -60,6 +78,8 @@ ns.AddLocale("enUS", {
   ["settings.toastReset"] = "Reset toast position",
   ["settings.roster"] = "Character list",
   ["settings.rosterSave"] = "Save character list",
+  ["settings.restedAlert"] = "Rested XP notice",
+  ["settings.restedAlertHint"] = "Tells you at login when another character became fully rested since its last logout, once per logout. Rested XP is estimated from the logout time and place, it stays on this computer.",
   ["settings.rosterHint"] = "Saves name, race, class, level, gold, zone, guild, item level and professions of each character you log in with.\nStays in your SavedVariables on this computer, never sent anywhere.\nShown on the start page.\nSwitching off stops saving. Stored entries stay until you remove them on the start page.",
   ["settings.pkg.professions"] = "Profession data",
   ["settings.pkg.recipes"] = "Recipes",
@@ -69,8 +89,26 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["settings.buttonLabels"] = "Beschriftung an Symbolknöpfen anzeigen",
-  ["settings.buttonLabelsHint"] = "Knöpfe zeigen ein kurzes Wort neben ihrem Symbol. Aus: nur Symbole, der Tooltip nennt die Aktion. Schmale Stellen blenden den Text selbst aus.",
+  ["settings.buttonLabelsHint"] = "Knöpfe zeigen ein kurzes Wort neben ihrem Symbol. Aus: nur Symbole, der Tooltip nennt die Aktion. Wo wenig Platz ist, blenden Knöpfe den Text selbst aus.",
   ["settings.hostSkin"] = "Verhalten mit anderen UI-Addons",
+  ["settings.routeWalkStyle"] = "Laufweg",
+  ["settings.routeWalkStyle.hint"] = "Querfeldein ist am schnellsten, Straßen dauern länger.",
+  ["settings.routeWalkStyle.fastest"] = "Querfeldein",
+  ["settings.routeWalkStyle.balanced"] = "Ausgewogen",
+  ["settings.routeWalkStyle.roads"] = "Vor allem Straßen",
+  ["settings.routeLineStyle"] = "Linienstil",
+  ["settings.routeLineStyle.hint"] = "So sehen gelaufene Routen auf der Karte aus.",
+  ["settings.routeLineStyle.line"] = "Linie",
+  ["settings.routeLineStyle.dots"] = "Punkte",
+  ["settings.routeLineStyle.dash"] = "Striche",
+  ["settings.routeLineWidth"] = "Linienbreite",
+  ["settings.routeLineWidth.hint"] = "Dicke der Route in Pixeln.",
+  ["settings.routeDotSpacing"] = "Punktabstand",
+  ["settings.routeDotSpacing.hint"] = "Abstand der Punkte beim Punktstil.",
+  ["settings.routeLineAlpha"] = "Deckkraft der Route",
+  ["settings.routeMinimapLine"] = "Route auf der Minimap",
+  ["settings.routeMinimapLine.hint"] = "Zeichnet den Laufweg als Linie auf die Minimap.",
+  ["settings.routeLineAlpha.hint"] = "Wie deckend die Route wirkt.",
   ["settings.hostSkin.auto"] = "Automatisch (folgt dem Fenster)",
   ["settings.hostSkin.light"] = "Hell (Original-Look von Blizzard)",
   ["settings.hostSkin.dark"] = "Dunkel (eigene dunkle Fläche)",
@@ -79,13 +117,13 @@ ns.AddLocale("deDE", {
   ["settings.slotOverlays.auto"] = "Automatisch",
   ["settings.slotOverlays.ours"] = "Immer unsere zeigen",
   ["settings.slotOverlays.none"] = "Unsere ausblenden",
-  ["settings.slotOverlaysHint"] = "Manche UI-Addons zeichnen Itemlevel oder Verzauberungen selbst neben die Slots im Charakter- und Betrachten-Fenster. Automatisch blendet dann unsere Texte aus, die dasselbe zeigen, und behält Sockel sowie die Warnung bei fehlender Verzauberung. Unsere ausblenden entfernt alle unsere Slot-Texte.",
+  ["settings.slotOverlaysHint"] = "Manche UI-Addons zeichnen Itemlevel oder Verzauberungen selbst neben die Slots im Charakter- und Betrachten-Fenster. Automatisch blendet dann unsere Texte aus, die dasselbe zeigen, und behält Sockel sowie die Warnung bei fehlender Verzauberung. Unsere ausblenden entfernt alle unsere Slottexte.",
   ["settings.keys"] = "Tastenbelegung",
   ["settings.keysHint"] = "Nicht vorbelegt. Eigene Tasten unter AddOns > Forever Guides. Aktuelle Tasten:",
   ["settings.keysOpen"] = "Tastenbelegung öffnen",
   ["settings.keysUnbound"] = "nicht belegt",
-  ["settings.keysFallback"] = "Öffne ESC > Optionen > Tastaturbelegung > Forever Guides",
-  ["settings.winStyle"] = "Fenster-Darstellung",
+  ["settings.keysFallback"] = "Öffne Esc > Optionen > Tastaturbelegung > Forever Guides",
+  ["settings.winStyle"] = "Fensterdarstellung",
   ["settings.winStyleHint"] = "Standard für schwebende Fenster. Jedes Fenster kann abweichen.",
   ["settings.winStyle.note"] = "Notizfenster",
   ["settings.winStyle.drawing"] = "Zeichnungsfenster",
@@ -94,7 +132,7 @@ ns.AddLocale("deDE", {
   ["settings.hudwindowsHint"] = "Die HUD-Fenster haben eine eigene Seite im Hauptmenü. Größe, Position und Inhalt stellst du dort ein.",
   ["settings.hudwindowsOpen"] = "HUD-Fenster öffnen",
   ["settings.feedback"] = "Rückmeldungen",
-  ["settings.feedbackHelp"] = "Aus (Standard): keine Bestätigungen, Fehler und Warnungen erscheinen weiter als Toast.\nToast: kleine Meldung oben rechts, verschwindet von selbst.\nBeispiel: „Zeichnung Haus gespeichert“.\nChat: Meldung als Zeile im Chatfenster.\nMaus darüber pausiert den Timer.\nKlick schließt ihn, Rechtsklick schließt alle.\nFehler und Warnungen können zusätzlich im Chat erscheinen.\nDie letzten 50 Meldungen, egal bei welcher Einstellung: „Letzte Meldungen“.\nNicht betroffen: Chat-Links geteilter Notizen und Zeichnungen.",
+  ["settings.feedbackHelp"] = "Aus (Standard): keine Bestätigungen, Fehler und Warnungen erscheinen weiter als Toast.\nToast: kleine Meldung oben rechts, verschwindet von selbst.\nBeispiel: „Zeichnung Haus gespeichert“.\nChat: Meldung als Zeile im Chatfenster.\nMit der Maus darüber pausiert der Timer.\nKlick schließt ihn, Rechtsklick schließt alle.\nFehler und Warnungen können zusätzlich im Chat erscheinen.\nDie letzten 50 Meldungen, egal bei welcher Einstellung: „Letzte Meldungen“.\nNicht betroffen: Chat-Links geteilter Notizen und Zeichnungen.",
   ["settings.feedbackModeLabel"] = "Wo sollen Rückmeldungen erscheinen?",
   ["settings.feedback.off"] = "Aus (nur Fehler und Warnungen als Toast)",
   ["settings.feedback.toast"] = "Toast (kleines Fenster oben rechts)",
@@ -106,11 +144,13 @@ ns.AddLocale("deDE", {
   ["settings.feedbackHistory"] = "Letzte Meldungen",
   ["settings.toastPosition"] = "Position anpassen",
   ["settings.toastPositionDone"] = "Anpassen beenden",
-  ["settings.toastPositionHint"] = "Zeigt einen Beispiel-Toast. Ziehen, dann Rechtsklick oder Knopf erneut drücken.",
-  ["settings.toastReset"] = "Toast-Position zurücksetzen",
+  ["settings.toastPositionHint"] = "Zeigt einen Beispieltoast. Ziehen, dann Rechtsklick oder Knopf erneut drücken.",
+  ["settings.toastReset"] = "Toastposition zurücksetzen",
   ["settings.roster"] = "Charakterliste",
   ["settings.rosterSave"] = "Charakterliste speichern",
-  ["settings.rosterHint"] = "Speichert Name, Volk, Klasse, Stufe, Gold, Zone, Gilde, Gegenstandsstufe und Berufe jedes angemeldeten Charakters.\nBleibt in deinen SavedVariables auf diesem Rechner, wird nirgendwohin gesendet.\nAnzeige auf der Startseite.\nAusschalten stoppt das Speichern. Gespeicherte Einträge bleiben, bis du sie auf der Startseite entfernst.",
+  ["settings.restedAlert"] = "Hinweis Voll erholt",
+  ["settings.restedAlertHint"] = "Meldet beim Einloggen, wenn ein anderer Charakter seit dem letzten Ausloggen voll erholt ist, einmal pro Ausloggen. Der Erholungsbonus wird aus Zeitpunkt und Ort des Ausloggens geschätzt und bleibt auf diesem Rechner.",
+  ["settings.rosterHint"] = "Speichert Name, Volk, Klasse, Stufe, Gold, Zone, Gilde, Itemlevel und Berufe jedes angemeldeten Charakters.\nBleibt in deinen SavedVariables auf diesem Rechner, wird nirgendwohin gesendet.\nAnzeige auf der Startseite.\nAusschalten stoppt das Speichern. Gespeicherte Einträge bleiben, bis du sie auf der Startseite entfernst.",
   ["settings.pkg.professions"] = "Berufsdaten",
   ["settings.pkg.recipes"] = "Rezepte",
   ["settings.pkg.loaded"] = "An",
@@ -441,6 +481,24 @@ local function rosterSection(view)
   roster.fgId = "roster-save"
   view.stack:Add(roster, { height = 24, gap = 6 })
   ns.AddParagraph(view, "settings.rosterHint", { role = "micro", color = "textMuted" })
+  local alert = W.Toggle(view.content, {
+    key = "settings.restedAlert",
+    get = ns.CharRoster.RestedAlertEnabled,
+    set = ns.CharRoster.SetRestedAlert,
+  })
+  alert.fgId = "rested-alert"
+  view.stack:Add(alert, { height = 24, gap = 6 })
+  ns.AddParagraph(view, "settings.restedAlertHint", { role = "micro", color = "textMuted" })
+end
+
+local function updatesSection(view)
+  ns.AddHeading(view, "settings.updates")
+  toggle(view, "versionNotice", "settings.versionNotice", nil, "settings.versionNoticeHint")
+  toggle(view, "changelogPopup", "settings.changelogPopup", nil, "settings.changelogPopupHint")
+  ns.AddParagraph(view, "settings.updatesShare", { role = "micro", color = "textMuted" })
+  button(view, "settings.updatesOpen", "settings.updatesOpen", "open", function()
+    ns.Router:navigate("settings/consents.versionCheck")
+  end, true)
 end
 
 local function keysSection(view)
@@ -509,6 +567,7 @@ local function windowSection(view)
     ns.Dock.Toggle()
   end)
   toggle(more, "combatHide", "settings.combatHide")
+  toggle(more, "combatLock", "settings.combatLock", nil, "settings.combatLockHint")
   toggle(more, "sidebarCollapsed", "settings.sidebarCollapsed", function()
     ns.Main.Relayout()
   end, "settings.sidebarCollapsedHint")
@@ -519,6 +578,7 @@ local function windowSection(view)
   toggle(more, "hideTalkingHead", "settings.hideTalkingHead", function()
     ns.TalkingHead.Apply()
   end, "settings.hideTalkingHeadHint", true)
+  toggle(more, "minimapCollect", "settings.minimapCollect", nil, "settings.minimapCollectHint")
   local hostSkin = W.Dropdown(more.content, {
     key = "settings.hostSkin",
     width = 280,
@@ -594,11 +654,83 @@ local function worldMapSection(view)
     { "worldMapButton", "wm.set.button" },
     { "worldMapPanel", "wm.set.bar" },
     { "worldMapPins", "wm.set.pins" },
+    { "worldMapRightClick", "wm.set.rightClick" },
   }) do
     toggle(view, item[1], item[2], function()
       ns.WorldMapLinks.Apply()
     end)
   end
+  toggle(view, "worldMapRoute", "wmr.set", function()
+    ns.WorldMapRoute.Apply()
+    ns.WorldMapRoutePanel.Apply()
+  end, "wmr.set.tip")
+  local walkStyle = W.Dropdown(view.content, {
+    key = "settings.routeWalkStyle",
+    tooltip = "settings.routeWalkStyle",
+    tooltipText = "settings.routeWalkStyle.hint",
+    width = 280,
+    options = {
+      { value = "fastest", key = "settings.routeWalkStyle.fastest" },
+      { value = "balanced", key = "settings.routeWalkStyle.balanced" },
+      { value = "roads", key = "settings.routeWalkStyle.roads" },
+    },
+    get = function()
+      return ns.WalkPathLogic.Style(ns.db.settings.routeWalkStyle)
+    end,
+    set = function(v)
+      Store.set("settings.routeWalkStyle", ns.WalkPathLogic.Style(v))
+    end,
+  })
+  walkStyle.fgId = "route-walk-style"
+  view.stack:Add(walkStyle, { height = 46, width = 280, gap = 4 })
+  local lineStyle = W.Dropdown(view.content, {
+    key = "settings.routeLineStyle",
+    tooltip = "settings.routeLineStyle",
+    tooltipText = "settings.routeLineStyle.hint",
+    width = 280,
+    options = {
+      { value = "line", key = "settings.routeLineStyle.line" },
+      { value = "dots", key = "settings.routeLineStyle.dots" },
+      { value = "dash", key = "settings.routeLineStyle.dash" },
+    },
+    get = function()
+      return ns.MapRouteStrokeLogic.Style(ns.db.settings.routeLineStyle)
+    end,
+    set = function(v)
+      Store.set("settings.routeLineStyle", ns.MapRouteStrokeLogic.Style(v))
+    end,
+  })
+  lineStyle.fgId = "route-line-style"
+  view.stack:Add(lineStyle, { height = 46, width = 280, gap = 4 })
+  local SLG = ns.MapRouteStrokeLogic
+  for _, item in ipairs({
+    { "routeLineWidth", SLG.WIDTH_MIN, SLG.WIDTH_MAX, 1, SLG.Width, "%d px" },
+    { "routeDotSpacing", SLG.SPACING_MIN, SLG.SPACING_MAX, 1, SLG.Spacing, "%d px" },
+    { "routeLineAlpha", SLG.ALPHA_MIN, SLG.ALPHA_MAX, 0.05, SLG.Alpha, "%d%%", 100 },
+  }) do
+    local name, lo, hi, step, clean, fmt, mult = item[1], item[2], item[3], item[4], item[5], item[6], item[7] or 1
+    local slider = W.Slider(view.content, {
+      key = "settings." .. name,
+      tooltipText = "settings." .. name .. ".hint",
+      min = lo,
+      max = hi,
+      step = step,
+      get = function()
+        return clean(ns.db.settings[name])
+      end,
+      set = function(v)
+        Store.set("settings." .. name, clean(v))
+      end,
+      format = function(v)
+        return string.format(fmt, math.floor(v * mult + 0.5))
+      end,
+    })
+    slider.fgId = "setting-" .. name
+    view.stack:Add(slider, { height = 42, width = 320 })
+  end
+  toggle(view, "routeMinimapLine", "settings.routeMinimapLine", function()
+    ns.MinimapRoute.Refresh()
+  end, "settings.routeMinimapLine.hint")
   toggle(view, "dungeonWorldMap", "dwm.set", function()
     ns.DungeonWorldMap.Apply()
   end)
@@ -625,6 +757,9 @@ local function worldMapSection(view)
   toggle(view, "mapZoneArrowsWorld", "zb.set.world", function()
     ns.WorldMapZoneArrows.Refresh()
   end)
+  toggle(view, "mapZoneLevels", "zl.set.labels", function()
+    ns.WorldMapZoneLevels.Refresh()
+  end, "zl.set.labelsTip")
   toggle(view, "mapZoneArrowsAddonMap", "zb.set.addon", function()
     ns.MapInstancePins.Refresh()
   end)
@@ -659,7 +794,6 @@ end
 local function flightSection(view)
   ns.AddHeading(view, "flightlabel.heading")
   toggle(view, "flightLabels", "flightlabel.enable")
-  toggle(view, "flightTooltip", "flightlabel.tooltip")
   toggle(view, "flightTimer", "flighttimer.enable")
   view.stack:Add(
     W.Slider(view.content, {
@@ -726,6 +860,7 @@ register("setup.tour", advancedSection)
 register("setup.addons", call("AddonSettings", "AddOverview"))
 register("language.main", languageSection)
 register("messages.feedback", feedbackSection)
+register("messages.updates", updatesSection)
 register("messages.errors", call("AutomationSettings", "AddErrors"))
 register("automation.control", call("AutomationSettings", "AddControl"))
 register("automation.overview", call("AutomationSettings", "AddOverview"))
@@ -762,6 +897,7 @@ register("items.itemlevel", call("ItemLevelSettings", "Add"))
 register("items.inspect", call("InspectPage", "AddSettings"))
 register("inventory.stock", call("InventorySettings", "Add"))
 register("loot.main", call("LootPage", "AddSettings"))
+register("loot.fast", call("FastLoot", "AddSettings"))
 register("foreverchat.enable", call("AddonSettings", "AddEnable", "chat"))
 register("foreverchat.lines", call("ConsentSettings", "AddChatLines"))
 register("party.summon", call("AutomationSettings", "AddSummon"))
@@ -998,6 +1134,11 @@ local function build(container)
     end
   end
 
+  -- Page link: the section on screen.
+  function page:ShareState()
+    return self.current and { self.current } or {}
+  end
+
   -- Values can change elsewhere (Ctrl+wheel, /fg scale, reset, the key bindings dialog).
   -- params[1] is a feature or card id of a route "settings/<id>" (a link of the changelog, kept by the history).
   function page:Show(params)
@@ -1009,9 +1150,9 @@ local function build(container)
     local jump = pending or {}
     pending = nil
     local feature = savedFeature()
-    local routed, routedCard = L.Target(params and params[1])
+    local routed, routedCard = L.Target(L.FromShare(params and params[1]))
     if routed then
-      feature, jump = routed, { card = routedCard }
+      feature, jump = routed, { card = routedCard, control = params[2] }
     end
     self:Select(feature, jump.card, jump.control)
   end
@@ -1025,8 +1166,11 @@ ns.RegisterPage({
   title = "page.settings",
   icon = ns.ICONS.settings,
   aliases = { "einstellungen", "optionen", "settings", "options" },
-  crumbLabel = function(param)
-    local feature = L.Target(param)
+  crumbLabel = function(param, index)
+    if index == 2 then
+      return param
+    end
+    local feature = L.Target(L.FromShare(param))
     return feature and ns.L["settings.feature." .. feature] or param
   end,
   build = build,

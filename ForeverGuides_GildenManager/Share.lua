@@ -47,8 +47,13 @@ end
 -- The categories and limits the player chose.
 function Share.Settings()
   local ctx = settings()
+  local function cats(bans)
+    return { J = SL.Get(ctx, "shareJoins"), M = SL.Get(ctx, "shareMarks"), N = SL.Get(ctx, "shareNotes"), B = bans }
+  end
   return {
-    cats = { J = SL.Get(ctx, "shareJoins"), M = SL.Get(ctx, "shareMarks"), N = SL.Get(ctx, "shareNotes") },
+    cats = cats(SL.Get(ctx, "shareBansSend")),
+    accept = cats(SL.Get(ctx, "shareBansReceive")),
+    bansRank = SL.Get(ctx, "shareBansRank"),
     channel = SL.Get(ctx, "shareChannel"),
     maxRank = SL.Get(ctx, "shareMinRank"),
   }
@@ -70,7 +75,7 @@ function Share.Active(dir)
 end
 
 local function anyOn(cats)
-  return cats.J == true or cats.M == true or cats.N == true
+  return cats.J == true or cats.M == true or cats.N == true or cats.B == true
 end
 
 -- Receiving ---------------------------------------------------------------------------------------------
@@ -126,7 +131,11 @@ local function onData(sender, value, info)
   end
   local row, idx, cfg = admitted(sender, info, true)
   local today, now = gm.History.Clock()
-  if not row or not cfg.cats[value.cat] or not today then
+  if not row or not cfg.accept[value.cat] or not today then
+    return
+  end
+  -- Bans only from the ranks chosen for them, on top of the rank of every sender.
+  if value.cat == "B" and not SH.RankAllowed(row.rank, cfg.bansRank) then
     return
   end
   local added = SH.Accept(gm.Guild(), value.cat, value.rows, {
@@ -191,6 +200,11 @@ local function buildRound()
   local today = gm.History.Clock()
   local idx = rosterIndex()
   queue = {}
+  -- Only officers of the chosen rank send bans.
+  local own = idx.rows[PN.Key(PN.Self())]
+  if cfg.cats.B and not SH.RankAllowed(own and own.rank, cfg.bansRank) then
+    cfg.cats.B = false
+  end
   if not today or not anyOn(cfg.cats) or not idx.snap.loaded then
     return
   end

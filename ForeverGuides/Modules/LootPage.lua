@@ -107,11 +107,12 @@ local function build(container)
   local view = ns.NewPageView(container)
   local s = view.stack
   local state = { instance = "all", search = "", sel = nil }
+  ns.PageState.Bind(view, state, { "instance", "search", "sel" })
   local refresh
 
-  ns.AddParagraph(view, "loot.intro")
-  local summary = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = 4 })
-  local fewKills = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 12 })
+  ns.AddIntro(view, "loot.intro")
+  local summary = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = Theme.space.xs })
+  local fewKills = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = Theme.space.md })
 
   local enable = W.Toggle(view.content, {
     key = "loot.enabled",
@@ -122,10 +123,21 @@ local function build(container)
     tooltip = "loot.enabled",
     tooltipText = "loot.enabledTip",
   })
-  s:Add(enable, { height = 24, gap = 10 })
+  s:Add(enable, { height = 24, gap = Theme.space.md })
 
   local options = {}
-  local instance = W.Dropdown(view.content, {
+  local searchBox
+  local filters = K.FilterBar(view.content, {
+    count = function()
+      return (state.instance ~= "all" and 1 or 0) + (state.search ~= "" and 1 or 0)
+    end,
+    reset = function()
+      state.instance, state.search = "all", ""
+      searchBox.edit:SetText("")
+      refresh()
+    end,
+  })
+  local instance = filters:AddDropdown({
     key = "loot.instance",
     width = 260,
     options = options,
@@ -137,20 +149,21 @@ local function build(container)
       refresh()
     end,
   })
-  s:Add(instance, { height = 46, gap = 8 })
-
-  local search = W.EditBox(view.content, {
+  searchBox = filters:AddSearch({
+    key = "loot.searchLabel",
+    text = state.search,
     placeholder = "loot.search",
-    clear = true,
+    width = 260,
     onChange = function(text)
       state.search = text
       refresh()
     end,
   })
-  s:Add(search, { height = 26, gap = 12 })
+  s:Add(filters, { gap = Theme.space.md })
 
-  local bossOpts = { gap = 12 }
+  local bossOpts = { gap = Theme.space.md }
   local bossList = K.NewList(view.content, {
+    look = "boxed",
     rowHeight = 44,
     bind = function(b)
       local sub = string.format(L["loot.boss.sub"], countKeys(b.e.items))
@@ -171,11 +184,14 @@ local function build(container)
   })
   s:Add(bossList, bossOpts)
 
-  local itemHead = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = 6 })
-  local itemOpts = { gap = 14 }
-  local itemList = K.NewList(view.content, { rowHeight = 44, bind = bindItem })
+  local itemHead = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = Theme.space.sm })
+  local itemOpts = { gap = Theme.space.lg }
+  local itemList = K.NewList(view.content, { look = "boxed", rowHeight = 44, bind = bindItem })
   s:Add(itemList, itemOpts)
-  local empty = ns.AddParagraph(view, "loot.empty", { gap = 14 })
+  local empty = view.stack:Add(
+    W.EmptyState(view.content, { text = "loot.empty", icon = "search", compact = true }),
+    { gap = Theme.space.lg }
+  )
 
   local actions = CreateFrame("Frame", nil, view.content)
   local copy = W.Action(actions, {
@@ -213,7 +229,7 @@ local function build(container)
     actions:SetHeight(h)
     return h
   end
-  s:Add(actions, { gap = 10 })
+  s:Add(actions, { gap = Theme.space.md })
 
   function refresh()
     local bosses, items = LC.Counts()
@@ -236,15 +252,20 @@ local function build(container)
     instance.Refresh()
 
     local has = bosses > 0
-    instance:SetShown(has)
-    search:SetShown(has)
-    bossList:SetShown(has)
-    itemHead:SetShown(has)
-    itemList:SetShown(has)
-    actions:SetShown(has)
-    empty:SetShown(not has)
-
     local rows = visibleBosses(state)
+    local anyBoss = has and #rows > 0
+    filters:Refresh()
+    filters:SetShown(has)
+    bossList:SetShown(anyBoss)
+    itemHead:SetShown(anyBoss)
+    itemList:SetShown(anyBoss)
+    actions:SetShown(has)
+    empty:SetTexts(has and "loot.noMatch" or "loot.empty")
+    empty:SetAction(has and W.EMPTY_RESET or nil, function()
+      filters:Reset()
+    end)
+    empty:SetShown(not anyBoss)
+
     local selected
     for _, b in ipairs(rows) do
       if bossKey(b) == state.sel then
@@ -306,7 +327,7 @@ function P.AddSettings(view)
         tooltip = item[2],
         tooltipText = item[3],
       }),
-      { height = 24, gap = 6 }
+      { height = 24, gap = Theme.space.sm }
     )
   end
   local qualities = {}
@@ -323,7 +344,7 @@ function P.AddSettings(view)
         Store.set("settings.lootMinQuality", v)
       end,
     }),
-    { height = 46, gap = 10 }
+    { height = 46, gap = Theme.space.md }
   )
 end
 

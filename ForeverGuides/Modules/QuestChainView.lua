@@ -1,12 +1,11 @@
--- Quests tab of the instances page: the quest list on the left like the quest log (level in the difficulty color,
--- name, faction mark, dungeon or raid label, the objectives below and a hint to the prequests) and the detail
--- panel of the chosen quest on the right (Modules/InstanceQuestPanel.lua). Under PANEL_MIN px the panel sits under
--- the list. Only the direct quests of the instance are rows, a chain link is reached through the prequest hint
--- of its quest and the chain window. The row model is in Modules/QuestListLogic.lua, the chains in
--- Modules/QuestChainLogic.lua.
--- All rows come from one pool in display order, so the keyboard order of the pooled frames always follows the
--- page. Up and down move the focus through the list (the page does that), a focused quest is the chosen one,
--- Enter moves the focus to the panel.
+-- Quests tab of the instances page: the quest list on the left (boxed two-line rows: the title in the color of its
+-- state, a muted line with level, faction, kind, start place and chain, map, waypoint and share icons on the
+-- right) and the detail of the chosen quest on the right (Modules/InstanceQuestPanel.lua), both in a
+-- K.MasterDetail: side by side from 640 px, below it one of them with a back button. Only the direct quests of the
+-- instance are rows, a chain link is reached through the chain card of its quest and the chain window. The row
+-- model is in Modules/QuestListLogic.lua, the chains in Modules/QuestChainLogic.lua.
+-- Up and down move the focus through the list (the page does that), a focused quest is the chosen one, Enter moves
+-- the focus to the detail.
 local _, ns = ...
 local W, L, Theme, R, K, QC, QW, QL =
   ns.W, ns.L, ns.Theme, ns.RefLogic, ns.PageKit, ns.QuestChainLogic, ns.QuestChainWindow, ns.QuestListLogic
@@ -27,8 +26,15 @@ ns.AddLocale("enUS", {
   ["questlist.group.other"] = "%d variants",
   ["questlist.kind.dungeon"] = "Dungeon",
   ["questlist.kind.raid"] = "Raid",
+  ["questlist.level"] = "Level %s",
+  ["questlist.state.log"] = "In your quest log",
+  ["questlist.state.done"] = "Completed",
+  ["questlist.state.locked"] = "Not available yet",
+  ["questlist.state.open"] = "Available",
   ["questlist.start.in"] = "Start: inside",
   ["questlist.start.out"] = "Start: outside",
+  ["questlist.start.outZone"] = "Start: outside (%s)",
+  ["questlist.start.zone"] = "Start: %s",
 })
 
 ns.AddLocale("deDE", {
@@ -38,7 +44,7 @@ ns.AddLocale("deDE", {
   ["questchain.pre.hint"] = "Quests, die nur zu einer anderen Quest dieser Liste führen.",
   ["questchain.chainLen"] = "Kette mit %d Schritten",
   ["questchain.empty"] = "Keine Quest passt zu diesem Filter.",
-  ["questchain.openTip"] = "Öffnet die Reihe der Vorquests mit Marker und Karte.",
+  ["questchain.openTip"] = "Öffnet die Reihe der Vorquests mit Wegpunkten und Karte.",
   ["questchain.selectTip"] = "Zeigt die Details dieser Quest.",
   ["questchain.selected"] = "Ausgewählt",
   ["questlist.pre.one"] = "1 Vorquest",
@@ -46,25 +52,26 @@ ns.AddLocale("deDE", {
   ["questlist.group.sparklematic"] = "%d Maschinen",
   ["questlist.group.other"] = "%d Varianten",
   ["questlist.kind.dungeon"] = "Dungeon",
-  ["questlist.kind.raid"] = "Schlachtzug",
+  ["questlist.kind.raid"] = "Raid",
+  ["questlist.level"] = "Stufe %s",
+  ["questlist.state.log"] = "Im Questlog",
+  ["questlist.state.done"] = "Abgeschlossen",
+  ["questlist.state.locked"] = "Noch nicht verfügbar",
+  ["questlist.state.open"] = "Verfügbar",
   ["questlist.start.in"] = "Start: drinnen",
   ["questlist.start.out"] = "Start: draußen",
+  ["questlist.start.outZone"] = "Start: draußen (%s)",
+  ["questlist.start.zone"] = "Start: %s",
 })
 
 local QV = {}
 ns.QuestChainView = QV
 
-local PAD = 8
 -- The faction switch is shared with the instance page (one choice for both).
 local FILTER_PATH = "settings.instancesQuestFilter"
-local GAP = 12
-local PANEL_MIN = 560
-local LIST_MIN, LIST_MAX = 220, 340
-local LEVEL_W = 26
-
-local function ceil(fs)
-  return math.ceil(fs:GetStringHeight())
-end
+local ROW_HEIGHT = 58
+local ROW_ACTION_SIZE = 20
+local WIDE_FROM = 640
 
 local function playerLevel()
   local fn = rawget(_G, "UnitLevel")
@@ -111,204 +118,129 @@ function QV.HintText(row)
   return nil
 end
 
--- Texts of one list row: { level (colored), title, meta (faction, kind and where it starts), label (plain, for the keyboard and
--- readers) }.
+-- Where the quest starts as a short text: "inside", "outside" with the zone, or just the zone. nil when unknown.
+function QV.StartText(row)
+  local zone = row.entry and row.entry.zone and ns.T(row.entry.zone)
+  if zone == "" then
+    zone = nil
+  end
+  if row.start == "out" and zone then
+    return string.format(L["questlist.start.outZone"], zone)
+  end
+  if row.start then
+    return L["questlist.start." .. row.start]
+  end
+  return zone and string.format(L["questlist.start.zone"], zone) or nil
+end
+
+-- State of a quest for the player: "log" (in the quest log), "done", "locked" (the player is below its minimum
+-- level) or "open".
+function QV.State(entry)
+  local id = entry and entry.id
+  local P = ns.InstanceQuestPanel
+  if type(id) == "number" and P then
+    if P.InLog(id) then
+      return "log"
+    elseif P.Done(id) then
+      return "done"
+    end
+  end
+  local avail = entry and entry.avail
+  local level = playerLevel()
+  if avail and avail.kind ~= "hint" and type(avail.level) == "number" and level and level < avail.level then
+    return "locked"
+  end
+  return "open"
+end
+
+-- Look of a state: the token of the title color and the status dot (a shape of its own, so the word and the
+-- shape carry the state, not the color). The dot has no look for "open".
+QV.STATES = {
+  log = { token = "info", dot = { state = "info", shape = "ring" } },
+  done = { token = "success", dot = { state = "ok", shape = "filled" } },
+  locked = { token = "textMuted", dot = { state = "warn", shape = "dash" } },
+  open = {},
+}
+
+-- Texts of one list row: { level (colored), title, meta (level, faction, kind, start place, chain), label (plain,
+-- for the keyboard and readers), hint (the chain or prequest line, nil without one) }.
 function QV.Describe(row)
   local entry = row.entry
   local title = entry.name ~= "" and entry.name or (entry.quest and ns.T(entry.quest.n)) or "?"
   local number = row.level and tostring(row.level) or "-"
   local meta = {}
+  if row.level then
+    meta[#meta + 1] = string.format(L["questlist.level"], row.level)
+  end
   if row.faction then
-    meta[#meta + 1] = QW.FactionText(row.faction)
+    meta[#meta + 1] = L["kit.faction." .. row.faction]
   end
   meta[#meta + 1] = L["questlist.kind." .. row.kind]
-  if row.start then
-    meta[#meta + 1] = L["questlist.start." .. row.start]
+  local start = QV.StartText(row)
+  if start then
+    meta[#meta + 1] = start
   end
   if row.repeatable then
-    meta[#meta + 1] = QW.RepeatText()
+    meta[#meta + 1] = L["questchain.repeatable"]
   end
-  local class, classPlain = QW.ClassText(row.class), QW.ClassPlain(row.class)
-  if class then
-    meta[#meta + 1] = class
-  end
-  local plain = { title, row.level and string.format(L["questchain.level"], row.level) or nil }
-  if row.faction then
-    plain[#plain + 1] = L["kit.faction." .. row.faction]
-  end
-  plain[#plain + 1] = L["questlist.kind." .. row.kind]
-  if row.start then
-    plain[#plain + 1] = L["questlist.start." .. row.start]
-  end
-  if row.repeatable then
-    plain[#plain + 1] = L["questchain.repeatable"]
-  end
+  -- The row shows the class with icon and color, readers and the keyboard name get the plain words.
+  local classPlain = QW.ClassPlain(row.class)
+  local classAt
   if classPlain then
-    plain[#plain + 1] = classPlain
+    meta[#meta + 1] = classPlain
+    classAt = #meta
   end
   local hint = QV.HintText(row)
   if hint then
-    plain[#plain + 1] = hint
+    meta[#meta + 1] = hint
+  end
+  local shown = { unpack(meta) }
+  if classAt then
+    shown[classAt] = QW.ClassText(row.class)
+  end
+  local state = QV.State(entry)
+  local plain = { title, row.level and string.format(L["questchain.level"], row.level) or nil }
+  for i = (row.level and 2 or 1), #meta do
+    plain[#plain + 1] = meta[i]
+  end
+  if state ~= "open" then
+    plain[#plain + 1] = L["questlist.state." .. state]
   end
   return {
     hint = hint,
+    state = state,
     level = row.level and string.format("|cff%s%s|r", QV.LevelHex(row.level, row.bucket):sub(2), number) or number,
     title = title,
-    meta = table.concat(meta, " · "),
+    meta = table.concat(shown, " · "),
     label = table.concat(plain, ", "),
   }
 end
 
--- Registers a pooled frame for Tab and the arrow keys and keeps it behind the frames of the view that came
--- before it (the pool is in display order), not at the end of the page.
-local function register(view, frame, activate)
-  local items = ns.Focus.items
-  ns.Focus.register(frame, activate)
-  table.remove(items)
-  local at = #items + 1
-  for i = #items, 1, -1 do
-    if items[i] == view.lastFocus then
-      at = i + 1
-      break
-    end
+-- Page link of a quest row: instances/<slug>/quests/<questId>, nil without an id.
+function QV.SharePayload(inst, entry)
+  local id = entry and entry.id
+  if not (inst and type(id) == "number") then
+    return nil
   end
-  table.insert(items, at, frame)
-  view.lastFocus = frame
+  return "instances/" .. R.InstanceSlug(inst) .. "/quests/" .. id
 end
 
-local function paintBackground(e)
-  if e.fgSelected then
-    local r, g, b = Theme.color("accent2")
-    e.bg:SetColorTexture(r, g, b, 0.2)
-  else
-    e.bg:SetColorTexture(Theme.color("surface", 0))
+-- "rrggbb" of the title color of a state, lifted until it reads on the row background; nil leaves the default.
+local function stateHex(state)
+  local token = QV.STATES[state].token
+  if not token then
+    return nil
   end
-  e.mark:SetShown(e.fgSelected == true)
+  return (Theme.readable(Theme.hex(token), Theme.hex("surface2")):sub(2))
 end
 
-local function makeEntry(view)
-  local e = CreateFrame("Button", nil, view)
-  e.bg = e:CreateTexture(nil, "BACKGROUND")
-  e.bg:SetAllPoints()
-  e.hover = e:CreateTexture(nil, "HIGHLIGHT")
-  e.hover:SetAllPoints()
-  e.hover:SetColorTexture(1, 1, 1, 0.06)
-  e.line = e:CreateTexture(nil, "ARTWORK")
-  e.line:SetPoint("BOTTOMLEFT")
-  e.line:SetPoint("BOTTOMRIGHT")
-  e.line:SetHeight(1)
-  e.mark = e:CreateTexture(nil, "OVERLAY")
-  e.mark:SetPoint("TOPLEFT")
-  e.mark:SetPoint("BOTTOMLEFT")
-  e.mark:SetWidth(3)
-  ns.Bind(e, function()
-    e.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
-    e.mark:SetColorTexture(Theme.color("accent2"))
-    paintBackground(e)
-  end)
-  e.level = W.Text(e, { role = "ui", color = "text" })
-  e.title = W.Text(e, { role = "ui", color = "accent2", wrap = true })
-  e.meta = W.Text(e, { role = "ui", color = "textSecondary", wrap = true })
-  e.objectives = W.Text(e, { role = "ui", color = "textSecondary", wrap = true })
-  -- The prequest hint is a button of its own inside the row (the keyboard reaches the chain through the panel).
-  e.hint = CreateFrame("Button", nil, e)
-  e.hint.text = W.Text(e.hint, { role = "ui", color = "accent2" })
-  e.hint.text:SetPoint("LEFT", e.hint, "LEFT", 0, 0)
-  e.hint:SetScript(
-    "OnClick",
-    ns.Wrap("questchain-prehint", function()
-      if e.fgEntry and view.inst then
-        QW.Open(view.inst, e.fgEntry.quest, { byId = view.byId })
-      end
-    end)
-  )
-  e.hint:SetScript("OnEnter", function()
-    ns.ShowTooltip(e.hint, e.hint.text:GetText() or "", L["questchain.openTip"])
-  end)
-  e.hint:SetScript("OnLeave", ns.HideTooltip)
-
-  e:SetScript(
-    "OnClick",
-    ns.Wrap("questchain-entry", function(self)
-      view:Activate(self)
-    end)
-  )
-  local function show()
-    view:Select(e.fgEntry)
-    ns.ShowTooltip(e, e.label or "", L["questchain.selectTip"])
-  end
-  e:HookScript("OnEnter", function()
-    ns.ShowTooltip(e, e.label or "", L["questchain.selectTip"])
-  end)
-  e:HookScript("OnLeave", ns.HideTooltip)
-  e.fgOnFocus, e.fgOnBlur = show, ns.HideTooltip
-  e.fgName = function()
-    return e.label
-  end
-  e.fgDescription = function()
-    return e.fgSelected and L["questchain.selected"] or nil
-  end
-  -- Enter on a quest moves on to its panel.
-  register(view, e, function(self)
-    view:Select(self.fgEntry)
-    view.panel:FocusFirst()
-  end)
-
-  function e:fgLayout(width)
-    local textX = PAD + LEVEL_W
-    local textW = math.max(40, width - textX - PAD)
-    self.level:ClearAllPoints()
-    self.level:SetPoint("TOPLEFT", self, "TOPLEFT", PAD, -PAD)
-    local y = PAD
-    local first = true
-    for _, fs in ipairs({ self.title, self.meta, self.objectives }) do
-      if fs:IsShown() then
-        fs:ClearAllPoints()
-        fs:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
-        fs:SetWidth(textW)
-        y = y + math.max(ceil(fs), first and ceil(self.level) or 0) + 2
-        first = false
-      end
-    end
-    if self.hint:IsShown() then
-      self.hint:ClearAllPoints()
-      self.hint:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -y)
-      local h = ceil(self.hint.text) + 4
-      self.hint:SetSize(math.min(textW, math.ceil(self.hint.text:GetStringWidth()) + 4), h)
-      y = y + h
-    end
-    return y + PAD - 2
-  end
-  return e
-end
-
-local function paintEntry(e, row, view)
-  e.fgItem, e.fgMode = row, "quest"
-  e.fgEntry = row.entry
-  e.fgSelected = view:Owns(row.entry) or nil
-  local text = QV.Describe(row)
-  e.label = text.label
-  e.level:SetText(text.level)
-  e.title:SetText(text.title)
-  e.meta:SetText(text.meta)
-  local lines = row.objectives
-  e.objectives:SetText(table.concat(lines, "\n"))
-  e.objectives:SetShown(#lines > 0)
-  e.hint:SetShown(text.hint ~= nil)
-  if text.hint then
-    e.hint.text:SetText(text.hint)
-  end
-  paintBackground(e)
-end
-
--- The list and the panel. :SetInstance(inst, faction) takes the instance (the faction sets the start value of the
+-- The list and the detail. :SetInstance(inst, faction) takes the instance (the faction sets the start value of the
 -- faction switch once), .count is the number of quests of the instance (before the filter of the list),
 -- .onChange(): asks the page for a layout.
 function QV.Create(parent)
   local f = CreateFrame("Frame", nil, parent)
   f.fgQuestView = true
   f.count = 0
-  f.pool, f.used = {}, 0
   f.entries = {}
 
   f.toolbar = K.FactionButtons(f, {
@@ -321,25 +253,109 @@ function QV.Create(parent)
       f:SetFilter(id)
     end,
   })
-  -- The list rows follow the last button of the switch in the keyboard order.
-  f.lastFocus = ns.Focus.items[#ns.Focus.items]
   f.empty = W.Text(f, { key = "questchain.empty", role = "ui", color = "textSecondary", wrap = true })
-  f.panel = ns.InstanceQuestPanel.Create(f)
+
+  -- Rows read the chosen quest from the view, so the list can repaint itself after a choice.
+  local function bind(row)
+    local text = QV.Describe(row)
+    local look = QV.STATES[text.state]
+    return {
+      title = text.title,
+      titleHex = stateHex(text.state),
+      sub = text.meta,
+      wrapSub = true,
+      dot = look.dot and { state = look.dot.state, shape = look.dot.shape, tip = L["questlist.state." .. text.state] }
+        or nil,
+      selected = f:Owns(row.entry),
+      cursor = f:Owns(row.entry),
+      tooltip = text.label,
+    }
+  end
+
+  -- Moves the stops of the icons right behind their row, so Tab visits a row and then its buttons.
+  local function behind(row)
+    local items = ns.Focus.items
+    local buttons = { row.qa.map, row.qa.marker, row.qa.share }
+    for _, b in ipairs(buttons) do
+      for i = #items, 1, -1 do
+        if items[i] == b then
+          table.remove(items, i)
+        end
+      end
+    end
+    for i, item in ipairs(items) do
+      if item == row then
+        for n, b in ipairs(buttons) do
+          table.insert(items, i + n, b)
+        end
+        return
+      end
+    end
+  end
+
+  -- Wires the pooled row once: keyboard name, the choice on focus, Enter to the detail, the icons at its right.
+  local function wire(row)
+    row.qa = W.MapActionButtons(row, { size = ROW_ACTION_SIZE, share = true })
+    behind(row)
+    row.fgName = function()
+      return row.label
+    end
+    row.fgDescription = function()
+      return row.fgSelected and L["questchain.selected"] or nil
+    end
+    local focused = row.fgOnFocus
+    row.fgOnFocus = function(self)
+      if focused then
+        focused(self)
+      end
+      f:Select(self.fgEntry)
+    end
+    row.fgActivate = function(self)
+      f:Select(self.fgEntry, true)
+      f.panel:FocusFirst()
+    end
+  end
+
+  f.list = K.NewList(f, {
+    look = "boxed",
+    rowHeight = ROW_HEIGHT,
+    bind = bind,
+    onClick = function(row)
+      f:Select(row.entry, true)
+    end,
+    onBindRow = function(row, item)
+      if not row.qa then
+        wire(row)
+      end
+      row.fgItem, row.fgMode, row.fgEntry = item, "quest", item.entry
+      row.fgSelected = f:Owns(item.entry) or nil
+      row.label = QV.Describe(item).label
+      row.qa:SetPlace(item.entry and QW.Place(item.entry) or nil)
+      row.qa:SetShare(QV.SharePayload(f.inst, item.entry))
+      row.trailing = row.qa
+    end,
+  })
+
+  f.split = K.MasterDetail(f, {
+    list = f.list,
+    wideFrom = WIDE_FROM,
+    backKey = "instances.split.back",
+    backTip = "instances.split.back.tip",
+    backFit = true,
+    onToggle = function(on)
+      if not f.syncing then
+        f.detailOpen = on
+      end
+    end,
+    detail = function(width)
+      return f.panel:fgGridLayout(width)
+    end,
+  })
+  f.panel = ns.InstanceQuestPanel.Create(f.split.content)
   f.panel.onChange = function()
     if f.onChange then
       f.onChange()
     end
-  end
-
-  local function take()
-    f.used = f.used + 1
-    local frame = f.pool[f.used]
-    if not frame then
-      frame = makeEntry(f)
-      f.pool[f.used] = frame
-    end
-    frame:Show()
-    return frame
   end
 
   local function context()
@@ -361,17 +377,7 @@ function QV.Create(parent)
     }
   end
 
-  local function objectiveText(entry)
-    local live = ns.InstanceQuestPanel.Goal(entry.id)
-    if live then
-      return live
-    end
-    local _, goal = ns.QuestText.Get(entry.id)
-    return goal
-  end
-
   local function sync()
-    f.used = 0
     -- A row with follow-up steps shows its chain (the prequests are part of it), any other the prequests.
     local pre, chain = {}, {}
     for _, entry in ipairs(f.all) do
@@ -384,7 +390,7 @@ function QV.Create(parent)
         end
       end
     end
-    local rows = QL.Rows(f.all, f.filter, { player = playerLevel(), pre = pre, chain = chain, text = objectiveText })
+    local rows = QL.Rows(f.all, f.filter, { player = playerLevel(), pre = pre, chain = chain })
     f.rows = rows
     -- The chosen quest stays while its row is in the list (a follow-up step sits in the row of its head) and the
     -- faction filter lets it through, else the first row is chosen.
@@ -399,21 +405,20 @@ function QV.Create(parent)
       f.selected = seen and seen.quest or nil
     end
     f.selectedEntry = seen
-    f.entries = {}
-    for _, row in ipairs(rows) do
-      local frame = take()
-      paintEntry(frame, row, f)
-      f.entries[#f.entries + 1] = { frame = frame }
-    end
-    for i = f.used + 1, #f.pool do
-      f.pool[i]:Hide()
-    end
+    f.entries = rows
+    f.list:SetData(rows)
     f.empty:SetShown(#f.all > 0 and #rows == 0)
-    f.toolbar:SetShown(#f.all > 0)
-    f.panel:SetShown(#f.all > 0)
+    -- The instance page shows the faction switch in its own tab row.
+    f.toolbar:SetShown(#f.all > 0 and not f.hideToolbar)
+    f.split:SetShown(#rows > 0)
     f.toolbar.Refresh()
     f.shown = #rows
     f.panel:SetQuest(f.selectedEntry, context())
+    -- Narrow pages stay on the list until a quest is asked for.
+    f.syncing = true
+    f.split:SetSelected(f.selectedEntry)
+    f.split:ShowDetail(f.detailOpen == true)
+    f.syncing = false
   end
 
   local function changed()
@@ -458,27 +463,27 @@ function QV.Create(parent)
     return self.selectedEntry ~= nil and self:RowOwns(rowEntry, self.selectedEntry)
   end
 
-  -- A click on a row makes its quest the chosen one.
-  function f:Activate(frame)
-    self:Select(frame.fgEntry)
-  end
-
-  -- Chooses a quest and shows it in the panel.
-  function f:Select(entry)
-    if not entry or self.selected == entry.quest then
+  -- Chooses a quest and shows it in the detail; `open` also leaves the list in narrow mode (a click, Enter).
+  function f:Select(entry, open)
+    if not entry then
       return
     end
-    self.selected, self.selectedEntry = entry.quest, entry
-    for _, e in ipairs(self.entries) do
-      local frame = e.frame
-      frame.fgSelected = self:Owns(frame.fgEntry) or nil
-      paintBackground(frame)
+    if open then
+      self.detailOpen = true
     end
-    self.panel:SetQuest(entry, context())
-    changed()
+    if self.selected ~= entry.quest then
+      self.selected, self.selectedEntry = entry.quest, entry
+      self.list:SetData(self.rows)
+      self.panel:SetQuest(entry, context())
+      self.split:SetSelected(entry)
+      changed()
+    end
+    if open then
+      self.split:ShowDetail(true)
+    end
   end
 
-  -- A link of the panel: a row of this instance is chosen (the filter opens for it), a chain link or a quest of
+  -- A link of the detail: a row of this instance is chosen (the filter opens for it), a chain link or a quest of
   -- another instance opens its chain window.
   function f:Go(ref)
     local target
@@ -498,8 +503,25 @@ function QV.Create(parent)
       ns.Store.set(FILTER_PATH, "all")
     end
     self.selected = target.quest
+    self.detailOpen = true
     sync()
     changed()
+  end
+
+  -- Id of the chosen quest, nil without one.
+  function f:SelectedId()
+    return self.selectedEntry and self.selectedEntry.id or nil
+  end
+
+  -- Chooses a quest of this instance by its id (a page link). False when the list has no such quest.
+  function f:SelectId(id)
+    for _, entry in ipairs(self.all or {}) do
+      if entry.id == id and (entry.direct or entry.step) then
+        self:Go({ kind = "select", quest = entry.quest })
+        return true
+      end
+    end
+    return false
   end
 
   function f:SetFilter(id)
@@ -526,6 +548,7 @@ function QV.Create(parent)
     self.filter = ns.InstanceListLogic.Faction(ns.db.settings.instancesQuestFilter, faction)
     if self.inst ~= inst then
       self.selected = nil
+      self.detailOpen = false
     end
     self.inst = inst
     self.byId = inst and QC.Index(inst) or nil
@@ -536,7 +559,13 @@ function QV.Create(parent)
     sync()
   end
 
-  function f:fgGridLayout(width)
+  -- Esc and the back key: true when a narrow detail went back to the list.
+  function f:CloseDetail()
+    return self.split:IsShown() and self.split:CloseDetail()
+  end
+
+  -- room: what the page tells (top, viewHeight, pad). The shell below the faction switch fills the rest.
+  function f:fgGridLayout(width, room)
     local y = 0
     if self.toolbar:IsShown() then
       self.toolbar:ClearAllPoints()
@@ -544,32 +573,22 @@ function QV.Create(parent)
       self.toolbar:SetWidth(width)
       y = self.toolbar:fgGridLayout(width) + 10
     end
-    local wide = width >= PANEL_MIN
-    local listW = wide and math.min(LIST_MAX, math.max(LIST_MIN, math.floor(width * 0.38))) or width
-    local top = y
     if self.empty:IsShown() then
       self.empty:ClearAllPoints()
       self.empty:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-      self.empty:SetWidth(math.max(40, listW))
-      y = y + ceil(self.empty) + 8
+      self.empty:SetWidth(math.max(40, width))
+      y = y + math.ceil(self.empty:GetStringHeight()) + 8
     end
-    for _, e in ipairs(self.entries) do
-      local frame = e.frame
-      frame:ClearAllPoints()
-      frame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-      frame:SetWidth(listW)
-      local h = frame:fgLayout(listW)
-      frame:SetHeight(h)
-      y = y + h
-    end
-    if self.panel:IsShown() then
-      local panelW = wide and (width - listW - GAP) or width
-      local px, py = wide and (listW + GAP) or 0, wide and top or (y + GAP)
-      self.panel:ClearAllPoints()
-      self.panel:SetPoint("TOPLEFT", self, "TOPLEFT", px, -py)
-      self.panel:SetWidth(panelW)
-      local ph = self.panel:fgGridLayout(panelW)
-      y = wide and math.max(y, py + ph) or (py + ph)
+    if self.split:IsShown() then
+      self.split:ClearAllPoints()
+      self.split:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+      self.split:SetWidth(width)
+      local below = room and { top = room.top + y, viewHeight = room.viewHeight, pad = room.pad, gap = room.gap } or nil
+      if below and room.fill then
+        local fill = room.fill
+        below.fill = { height = math.max(1, fill.height - y), mode = fill.mode, listW = fill.listW }
+      end
+      y = y + self.split:fgGridLayout(width, below)
     end
     self:SetHeight(math.max(1, y))
     return y

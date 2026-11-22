@@ -17,7 +17,7 @@ WL.DUPLICATE_DISTANCE = 0.0005
 WL.MAX_TITLE = 40
 WL.MAX_NOTE = 200
 WL.MAX_LINES = 300
-WL.RADIUS_MIN, WL.RADIUS_MAX, WL.RADIUS_DEFAULT = 5, 40, 15
+WL.RADIUS_MIN, WL.RADIUS_MAX, WL.RADIUS_DEFAULT = 5, 40, 10
 -- Running speed in yards per second for the walking time estimate.
 WL.WALK_SPEED = 7
 WL.PALETTE = { "accent2", "actionHi", "success", "warning", "danger", "info", "accent", "textSecondary" }
@@ -524,6 +524,17 @@ function WL.cycle(list, id, delta)
   return list[(i - 1 + delta) % n + 1]
 end
 
+-- Moves a waypoint to the front of the list. Returns wp, or nil for an unknown id.
+function WL.moveToTop(list, id)
+  local i = WL.indexOf(list, id)
+  if not i then
+    return nil
+  end
+  local wp = table.remove(list, i)
+  table.insert(list, 1, wp)
+  return wp
+end
+
 -- After an arrival: the next waypoint in list order that was not reached yet.
 function WL.nextAfterArrival(list, id)
   local i = WL.indexOf(list, id) or 0
@@ -757,4 +768,117 @@ function WL.formatEta(seconds)
     return string.format("%d min", minutes)
   end
   return string.format("%d h %d min", math.floor(minutes / 60), minutes % 60)
+end
+
+-- Measured speed --------------------------------------------------------------------------------
+
+-- Start values until real samples exist: walking, and mounted (ground mount bonus).
+WL.MOUNT_SPEED = 11.2
+WL.SPEED_ALPHA = 0.2
+-- Samples outside this band are standing still, moving away or a teleport, not travel.
+WL.SPEED_MIN, WL.SPEED_MAX = 1, 60
+-- Samples closer than SAMPLE_GAP are skipped, farther than SAMPLE_STALE start over.
+WL.SAMPLE_GAP, WL.SAMPLE_STALE = 0.05, 2
+
+function WL.newSpeed()
+  return { avg = {} }
+end
+
+local function speedKey(mounted)
+  return mounted and "mounted" or "walk"
+end
+
+-- Feeds one distance reading (yards to the target at time now). The average follows the
+-- approach speed, kept apart for mounted and on foot.
+function WL.speedSample(tr, yards, now, mounted)
+  mounted = mounted == true
+  if not (finite(yards) and finite(now)) then
+    tr.yards, tr.at = nil, nil
+    return
+  end
+  if tr.at and now - tr.at < WL.SAMPLE_GAP and tr.mounted == mounted then
+    return
+  end
+  local prevYards, prevAt, prevMounted = tr.yards, tr.at, tr.mounted
+  tr.yards, tr.at, tr.mounted = yards, now, mounted
+  if not (prevYards and prevMounted == mounted) then
+    return
+  end
+  local dt = now - prevAt
+  if dt <= 0 or dt > WL.SAMPLE_STALE then
+    return
+  end
+  local speed = (prevYards - yards) / dt
+  if speed < WL.SPEED_MIN or speed > WL.SPEED_MAX then
+    return
+  end
+  local key = speedKey(mounted)
+  local avg = tr.avg[key] or (mounted and WL.MOUNT_SPEED or WL.WALK_SPEED)
+  tr.avg[key] = avg + WL.SPEED_ALPHA * (speed - avg)
+end
+
+function WL.speedFor(tr, mounted)
+  return tr.avg[speedKey(mounted == true)] or (mounted and WL.MOUNT_SPEED or WL.WALK_SPEED)
+end
+
+-- Forgets the last reading (new target), keeps the averages.
+function WL.speedReset(tr)
+  tr.yards, tr.at, tr.mounted = nil, nil, nil
+end
+
+-- Seconds to the target at the measured speed.
+function WL.etaMeasured(tr, yards, mounted)
+  return WL.etaSeconds(yards, WL.speedFor(tr, mounted))
+end
+
+-- Screen navigation: "marker" when the native navigation frame can carry our marker, else "arrow".
+function WL.navMode(state)
+  if state and state.enabled == true and state.hasFrame == true then
+    return "marker"
+  end
+  return "arrow"
+end
+
+-- What the marker on the native frame points at: our own waypoint first, else the quest the client
+-- super-tracks (only while the replace switch is on), else nothing. A quest id counts when it is a number > 0.
+function WL.navTarget(state)
+  if not (state and state.enabled == true and state.hasFrame == true) then
+    return "none"
+  end
+  if state.hasWaypoint == true then
+    return "waypoint"
+  end
+  local id = state.questId
+  if state.replaceQuest == true and type(id) == "number" and id > 0 then
+    return "quest"
+  end
+  return "none"
+end
+
+-- Near-target behaviour of the marker. Modes: "keep" (nothing changes), "marker" (beam off close to the target),
+-- "native" (we draw nothing close to the target, the client marker shows).
+WL.NEAR_MIN, WL.NEAR_MAX, WL.NEAR_DEFAULT = 5, 200, 30
+local NEAR_HYSTERESIS = 1.1
+
+function WL.clampNear(v)
+  if type(v) == "number" and finite(v) then
+    return math.floor(U.clamp(v, WL.NEAR_MIN, WL.NEAR_MAX) + 0.5)
+  end
+end
+
+-- state: mode, limit (yards), yards (nil = unknown, counts as far), near (result of the last call). Returns
+-- what to draw ("full", "noBeam", "native") and whether the target counts as near now. Once near, the
+-- target stays near until 10 percent beyond the limit, so the border does not flicker.
+function WL.nearMode(state)
+  local mode = type(state) == "table" and state.mode or nil
+  local yards = type(state) == "table" and state.yards or nil
+  if (mode ~= "marker" and mode ~= "native") or type(yards) ~= "number" or not finite(yards) then
+    return "full", false
+  end
+  local limit = WL.clampNear(state.limit) or WL.NEAR_DEFAULT
+  local near = yards <= limit or (state.near == true and yards <= limit * NEAR_HYSTERESIS)
+  if not near then
+    return "full", false
+  end
+  return mode == "native" and "native" or "noBeam", true
 end

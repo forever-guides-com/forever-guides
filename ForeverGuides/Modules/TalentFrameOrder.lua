@@ -24,7 +24,7 @@ TFO.HOOK_DELAY = 0.5
 TFO.REDRAW_DELAY = 0.1
 TFO.RETRIES = 3
 TFO.WIDTH = 300
-TFO.BAR_WIDTH = 24
+TFO.BAR_WIDTH = 28
 TFO.WATCH_DELAY = 0.5
 -- Methods of the game's talent view that rebuild or refresh it; only those that exist are hooked.
 TFO.METHODS = { "UpdateTreeInfo", "SetConfigID", "SetTalentTreeID", "CommitConfig", "RollbackConfig" }
@@ -32,64 +32,61 @@ TFO.METHODS = { "UpdateTreeInfo", "SetConfigID", "SetTalentTreeID", "CommitConfi
 -- group of the character is the fallback.
 TFO.GROUP_METHODS = { "GetActiveSpecGroup", "GetSelectedSpecGroup", "GetSpecGroup", "GetTalentGroup" }
 
-local HEADER_H, PAD, ROW_BASE, ICON = 28, 8, 36, 22
+local HEADER_H, PAD, ROW_BASE = 28, 8, 36
 local LIST_ROWS = 10
-local SIDE_ROOM = 52 -- room right of the panel for the side tab of the add-on (Modules/BlizzardLinks.lua)
 local BUTTON, GAP = 24, 4
 local MARK_W, MARK_H = 22, 14
 local BORDER = 3
 
 ns.AddLocale("enUS", {
   ["talentframe.title"] = "Skill order",
-  ["talentframe.titleBuild"] = "Skill order: %s",
   ["talentframe.tip"] = "The skill order of your active build for this talent group. Click to expand or collapse this section.",
   ["talentframe.progress"] = "%d of %d steps learned",
-  ["talentframe.open"] = "Open in the add-on",
+  ["talentframe.open"] = "Open in addon",
   ["talentframe.hideDone"] = "Hide learned steps",
   ["talentframe.hideDoneTip"] = "Hides the steps you have already learned, so the list starts with the next one.",
   ["talentframe.showDone"] = "Show learned steps",
   ["talentframe.showDoneTip"] = "Shows all steps of the build again.",
   ["talentframe.openTip"] = "Opens the active build in the talent editor.",
-  ["talentframe.openNoneTip"] = "Opens the talents page of the add-on.",
+  ["talentframe.openNoneTip"] = "Opens the talents page of the addon.",
   ["talentframe.state.done"] = "learned",
   ["talentframe.state.next"] = "next",
   ["talentframe.sub"] = "Level %d · %s",
   ["talentframe.row"] = "Step %d, level %d, %s, rank %d of %d, %s",
   ["talentframe.rowOpen"] = "open",
-  ["talentframe.rowTip"] = "Level %d, rank %d/%d\nHover it or press Enter to mark the talent in the tree.",
+  ["talentframe.rowTip"] = "Level %d, rank %d/%d\nHover over it or press Enter to mark the talent in the tree.",
   ["talentframe.steps"] = "Skill order, steps: %s",
   ["talentframe.set.heading"] = "Talent window",
-  ["talentframe.set.hint"] = "Shows the skill order of your active build at the talent window of the game, for your own class and the talent group the window shows. The numbers and the side panel are drawn by the add-on, the talent window itself stays untouched.",
+  ["talentframe.set.hint"] = "Shows the skill order of your active build next to the game's talent window, for your own class and the talent group the window shows. The addon draws the numbers and the side panel. The talent window itself stays untouched.",
   ["talentframe.set.numbers"] = "Numbers in the talent tree",
   ["talentframe.set.numbersTip"] = "Shows the number of the next open step on every talent of the build, for example 10+ when more ranks follow. The tooltip of the talent lists all steps.",
   ["talentframe.set.panel"] = "Skill order at the talent window",
-  ["talentframe.set.panelTip"] = "Shows a side panel with the steps of the active build next to the talent window. It starts collapsed, hovering a step marks the talent in the tree.",
+  ["talentframe.set.panelTip"] = "Shows a side panel with the steps of the active build next to the talent window. It starts collapsed. Hovering over a step marks the talent in the tree.",
 })
 ns.AddLocale("deDE", {
   ["talentframe.title"] = "Skillreihenfolge",
-  ["talentframe.titleBuild"] = "Skillreihenfolge: %s",
   ["talentframe.tip"] = "Die Skillreihenfolge deiner aktiven Skillung für diese Talentgruppe. Klicken klappt den Bereich auf oder zu.",
   ["talentframe.progress"] = "%d von %d Schritten gelernt",
   ["talentframe.open"] = "Im Addon öffnen",
   ["talentframe.hideDone"] = "Gelernte Schritte ausblenden",
-  ["talentframe.hideDoneTip"] = "Blendet die bereits gelernten Schritte aus, die Liste beginnt dann mit dem nächsten.",
+  ["talentframe.hideDoneTip"] = "Blendet bereits gelernte Schritte aus. Die Liste beginnt dann mit dem nächsten.",
   ["talentframe.showDone"] = "Gelernte Schritte einblenden",
   ["talentframe.showDoneTip"] = "Zeigt wieder alle Schritte der Skillung.",
-  ["talentframe.openTip"] = "Öffnet die aktive Skillung im Talent-Editor.",
+  ["talentframe.openTip"] = "Öffnet die aktive Skillung im Talenteditor.",
   ["talentframe.openNoneTip"] = "Öffnet die Talentseite des Addons.",
   ["talentframe.state.done"] = "gelernt",
   ["talentframe.state.next"] = "als Nächstes",
   ["talentframe.sub"] = "Stufe %d · %s",
   ["talentframe.row"] = "Schritt %d, Stufe %d, %s, Rang %d von %d, %s",
   ["talentframe.rowOpen"] = "offen",
-  ["talentframe.rowTip"] = "Stufe %d, Rang %d/%d\nMit der Maus darüber oder mit Enter markierst du das Talent im Baum.",
+  ["talentframe.rowTip"] = "Stufe %d, Rang %d/%d\nFahre mit der Maus darüber oder drücke Enter, um das Talent im Baum zu markieren.",
   ["talentframe.steps"] = "Skillreihenfolge, Schritte: %s",
   ["talentframe.set.heading"] = "Talentfenster",
-  ["talentframe.set.hint"] = "Zeigt die Skillreihenfolge deiner aktiven Skillung am Talentfenster des Spiels, für deine eigene Klasse und die Talentgruppe, die das Fenster zeigt. Die Zahlen und der Seitenbereich werden vom Addon gezeichnet, das Talentfenster selbst bleibt unberührt.",
+  ["talentframe.set.hint"] = "Zeigt die Skillreihenfolge deiner aktiven Skillung am Talentfenster des Spiels, für deine eigene Klasse und die gezeigte Talentgruppe. Das Addon zeichnet die Zahlen und den Seitenbereich, das Talentfenster selbst bleibt unverändert.",
   ["talentframe.set.numbers"] = "Zahlen im Talentbaum",
-  ["talentframe.set.numbersTip"] = "Zeigt an jedem Talent der Skillung die Nummer des nächsten offenen Schritts, zum Beispiel 10+ wenn weitere Ränge folgen. Der Tooltip des Talents nennt alle Schritte.",
-  ["talentframe.set.panel"] = "Reihenfolge am Talentfenster",
-  ["talentframe.set.panelTip"] = "Zeigt neben dem Talentfenster einen Seitenbereich mit den Schritten der aktiven Skillung. Er startet zugeklappt, ein Schritt unter der Maus markiert das Talent im Baum.",
+  ["talentframe.set.numbersTip"] = "Zeigt an jedem Talent der Skillung die Nummer des nächsten offenen Schritts, zum Beispiel 10+, wenn weitere Ränge folgen. Der Tooltip des Talents nennt alle Schritte.",
+  ["talentframe.set.panel"] = "Skillreihenfolge am Talentfenster",
+  ["talentframe.set.panelTip"] = "Zeigt neben dem Talentfenster einen Seitenbereich mit den Schritten der aktiven Skillung. Er startet zugeklappt. Fährst du mit der Maus über einen Schritt, wird das Talent im Baum markiert.",
 })
 
 -- Settings and stored state --------------------------------------------------------------------------
@@ -289,7 +286,7 @@ local function mark(i, window)
   m:EnableMouse(false)
   m.bg = m:CreateTexture(nil, "BACKGROUND")
   m.bg:SetAllPoints()
-  m.bg:SetColorTexture(0, 0, 0, 0.8)
+  m.bg:SetColorTexture(ns.Theme.scrim(0.8))
   m.text = W.Text(m, { role = "small", color = "accent2", justify = "CENTER" })
   m.text:SetPoint("CENTER")
   m:Hide()
@@ -350,10 +347,7 @@ end
 local function paintRow(row)
   local item = row.item
   local lit = item ~= nil and item.node ~= nil and item.node == (S.hoverNode or S.pinNode)
-  row.bg:SetColorTexture(1, 1, 1, lit and 0.14 or (row.hover and 0.06 or 0))
-  row.mark:SetColorTexture(Theme.color("accent"))
-  row.mark:SetShown(item ~= nil and item.next == true)
-  row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+  ns.SidePanel.PaintRow(row, lit, item ~= nil and item.next == true)
 end
 
 local function pin(node)
@@ -365,32 +359,10 @@ local function pin(node)
 end
 
 local function createRow(parent)
-  local row = CreateFrame("Button", nil, parent)
-  row.bg = row:CreateTexture(nil, "BACKGROUND")
-  row.bg:SetAllPoints()
-  row.mark = row:CreateTexture(nil, "ARTWORK")
-  row.mark:SetPoint("TOPLEFT")
-  row.mark:SetPoint("BOTTOMLEFT")
-  row.mark:SetWidth(3)
-  row.line = row:CreateTexture(nil, "ARTWORK")
-  row.line:SetPoint("BOTTOMLEFT")
-  row.line:SetPoint("BOTTOMRIGHT")
-  row.line:SetHeight(1)
-  row.num = W.Text(row, { role = "ui", color = "accent2", justify = "RIGHT" })
-  row.num:SetPoint("LEFT", 6, 0)
-  row.num:SetWidth(26)
-  row.spell = row:CreateTexture(nil, "ARTWORK")
-  row.spell:SetSize(ICON, ICON)
-  row.spell:SetPoint("LEFT", 38, 0)
-  row.spell:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  row.check = W.Glyph(row, "check", 14, "success")
-  row.check:SetPoint("RIGHT", -8, 0)
-  row.title = W.Text(row, { role = "ui" })
-  row.title:SetPoint("TOPLEFT", row.spell, "TOPRIGHT", 8, 3)
-  row.title:SetPoint("RIGHT", row.check, "LEFT", -6, 0)
-  row.sub = W.Text(row, { role = "small", color = "textSecondary" })
-  row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -2)
-  row.sub:SetPoint("RIGHT", row.check, "LEFT", -6, 0)
+  local row = ns.SidePanel.Row(parent, function(r)
+    r.check = W.Glyph(r, "check", 14, "success")
+    return r.check
+  end)
   ns.Bind(row, function()
     paintRow(row)
   end)
@@ -568,37 +540,15 @@ local function listHeight(window, used)
   return math.max(1, rows) * rowH
 end
 
-local function chevronOf(p)
-  local toRight = TFO.IsOpen() == (p.mirrored == true)
-  return toRight and "chevron-right" or "chevron-left"
-end
-
--- Lays the panel out for its state: a slim bar (collapsed), or header, controls and the list (expanded).
--- The height of the panel itself follows its two anchors (the window's edge, top to bottom).
-local function layoutPanel(p, window)
-  local open = TFO.IsOpen()
-  p:SetWidth(open and TFO.WIDTH or TFO.BAR_WIDTH)
-  p.header:ClearAllPoints()
-  p.header:SetPoint("TOPLEFT")
-  p.header:SetPoint("TOPRIGHT")
-  p.chevron:ClearAllPoints()
-  p.chevron:SetIcon(chevronOf(p))
-  p.label:SetShown(open)
-  p.vlabel:SetShown(not open)
-  -- Set on every layout so a language switch reaches the bar.
-  p.vlabel:SetText(F.Vertical(L["talentframe.title"]))
-  p.state:SetShown(open)
-  p.body:SetShown(open)
-  if not open then
-    p.header:SetPoint("BOTTOMLEFT")
-    p.header:SetPoint("BOTTOMRIGHT")
-    p.chevron:SetPoint("TOP", 0, -8)
+-- The content of the expanded panel (the shared panel lays out header and strip): note, controls and the
+-- list. The height of the panel itself follows its two anchors (the window's edge, top to bottom).
+local function layoutPanel(p, open)
+  -- Called by the shared panel while it builds, before the list below exists.
+  if not open or not p.list then
     return
   end
+  local window = p.host
   local headerH = K.scaledHeight(HEADER_H)
-  p.header:SetHeight(headerH)
-  p.chevron:SetPoint("LEFT", 8, 0)
-  p.state:SetText(L["talents.order.open"])
   local inner = TFO.WIDTH - PAD * 2
   local hasBuild = S.view ~= nil
   p.note:SetWidth(inner)
@@ -633,21 +583,22 @@ local function paintHideDone(p)
 end
 
 function TFO.Toggle(open)
-  if open == nil then
-    open = not TFO.IsOpen()
+  if S.panel then
+    S.panel:SetOpen(open)
+  else
+    Store.setChar("talentOrderUi.frameOpen", (open == nil and not TFO.IsOpen() or open) == true)
   end
-  Store.setChar("talentOrderUi.frameOpen", open and true or false)
+end
+
+-- The shared panel changed its state and width at once, even in combat (our own frame); the rest waits for it.
+local function toggled(open)
   if open then
     S.reveal = true
   end
-  if S.panel then
-    -- Our own frame only: the bar changes its width at once, even in combat; the rest waits for it.
-    layoutPanel(S.panel, S.window)
-    if ns.InCombat() then
-      S.pending = true
-    else
-      TFO.Draw()
-    end
+  if ns.InCombat() then
+    S.pending = true
+  else
+    TFO.Draw()
   end
 end
 
@@ -658,56 +609,29 @@ local function toggleHideDone()
 end
 
 local function buildPanel(window)
-  local p = CreateFrame("Frame", nil, window)
-  ns.Layer.Own(p)
-  p:EnableMouse(true)
-  W.Fill(p, "surface", 1)
-  W.Border(p, "white")
+  local p = ns.SidePanel.Attach(window, {
+    key = "talentframe",
+    title = function()
+      return L["talentframe.title"]
+    end,
+    tip = "talentframe.tip",
+    width = TFO.WIDTH,
+    store = "talentOrderUi.frameOpen",
+    fallback = "left",
+    onLayout = layoutPanel,
+    onToggle = toggled,
+  })
   p.data = {}
   p.pos = {}
   p.rows = {}
-
-  local header = CreateFrame("Button", nil, p)
-  header:SetPoint("TOPLEFT")
-  header:SetPoint("TOPRIGHT")
-  W.Fill(header, "surface2")
-  p.header = header
-  p.chevron = W.Glyph(header, "chevron-right", 12, "textSecondary")
-  p.chevron:SetPoint("LEFT", 8, 0)
-  p.state = W.Text(header, { role = "small", color = "textSecondary" })
-  p.state:SetPoint("RIGHT", -8, 0)
-  p.label = W.Text(header, { key = "talentframe.title", role = "ui", color = "text" })
-  p.label:SetPoint("LEFT", p.chevron, "RIGHT", 6, 0)
-  p.label:SetPoint("RIGHT", p.state, "LEFT", -6, 0)
-  -- Title of the collapsed bar, stacked below the chevron.
-  p.vlabel = W.Text(header, { role = "small", color = "textSecondary", justify = "CENTER" })
-  p.vlabel:SetPoint("TOP", p.chevron, "BOTTOM", 0, -8)
-  header.fgName = function()
-    return p.label:GetText() or L["talentframe.title"]
-  end
-  header:SetScript("OnClick", function()
-    TFO.Toggle()
-  end)
-  header:HookScript("OnEnter", function(self)
-    ns.ShowTooltip(self, p.label:GetText(), L["talentframe.tip"])
+  local header = p.header
+  header:HookScript("OnEnter", function()
     TFO.Keys(true)
   end)
   header:HookScript("OnLeave", function()
-    ns.HideTooltip()
     TFO.Keys(false)
   end)
-  ns.Focus.register(header, function()
-    TFO.Toggle()
-  end)
-  function header:fgArrow(step)
-    if (step > 0) ~= TFO.IsOpen() then
-      TFO.Toggle(step > 0)
-    end
-  end
 
-  p.body = CreateFrame("Frame", nil, p)
-  p.body:SetPoint("TOPLEFT", header, "BOTTOMLEFT")
-  p.body:SetPoint("BOTTOMRIGHT")
   p.note = W.Text(p.body, { role = "small", color = "textSecondary", wrap = true })
   p.numbers = W.Toggle(p.body, {
     key = "talentframe.set.numbers",
@@ -808,38 +732,19 @@ function TFO.Keys(on)
   end
 end
 
--- Directly at the edge of the window over its whole height: right, or mirrored to the left when the screen
--- has no room for the panel and the side tab of the add-on.
-local function placePanel(p, window)
-  p:ClearAllPoints()
-  local width = TFO.IsOpen() and TFO.WIDTH or TFO.BAR_WIDTH
-  local right, limit = ask(window, "GetRight"), ask(UIParent, "GetRight")
-  p.mirrored = type(right) == "number" and type(limit) == "number" and right + width + SIDE_ROOM > limit
-  if p.mirrored then
-    p:SetPoint("TOPRIGHT", window, "TOPLEFT", 0, 0)
-    p:SetPoint("BOTTOMRIGHT", window, "BOTTOMLEFT", 0, 0)
-  else
-    p:SetPoint("TOPLEFT", window, "TOPRIGHT", 0, 0)
-    p:SetPoint("BOTTOMLEFT", window, "BOTTOMRIGHT", 0, 0)
-  end
-  ns.Layer.SetTreeLevel(p, math.min((ask(window, "GetFrameLevel") or 0) + 20, ns.Layer.CAP))
-end
-
 local function drawPanel(window)
   local p = S.panel or buildPanel(window)
   adopt(p, window)
+  p.host = window
   local view = S.view
   p.data, p.pos = F.Visible(view and view.rows or {}, TFO.HideDone())
   if view then
-    p.label:SetText(string.format(L["talentframe.titleBuild"], view.entry.name))
     p.note:SetText(string.format(L["talentframe.progress"], F.Progress(view.rows)))
   else
-    p.label:SetText(L["talentframe.title"])
     p.note:SetText(string.format(L["talents.active.lineNone"], TA.GroupName(S.group)))
   end
   W.SetColor(p.note, "textSecondary")
-  placePanel(p, window)
-  layoutPanel(p, window)
+  p:Refresh()
   paintHideDone(p)
   p.numbers.Refresh()
   p.list:SetData(p.data)
@@ -861,7 +766,7 @@ end
 -- is none or it sits on the left (Modules/BlizzardLinks.lua then keeps the tab at the window).
 function TFO.EdgeFrame()
   local p = S.panel
-  if p and p:IsShown() and not p.mirrored then
+  if p and p:IsShown() and p.mode == "right" then
     return p
   end
 end

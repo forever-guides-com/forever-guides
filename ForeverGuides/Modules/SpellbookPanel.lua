@@ -4,16 +4,18 @@
 -- spell content; while it is shown that content is faded out with SetAlpha (never
 -- Hide, so Blizzard's own show/hide logic and secure frames stay untouched) and
 -- faded back in when the panel hides. BlizzardLinks owns the tab button and
--- calls Create once per spellbook view.
+-- calls Create once per spellbook view. Create also attaches the side panel (Modules/SpellbookSide.lua).
 local _, ns = ...
 local W, Theme, K, Scan, HostSkin = ns.W, ns.Theme, ns.PageKit, ns.BlizzardScan, ns.HostSkin
 
 ns.AddLocale("enUS", {
+  ["spellbook.title"] = "Learn list",
   ["spellbook.open"] = "Open in addon",
   ["spellbook.open.tip"] = "Opens the learn list in the Forever Guides window.",
 })
 
 ns.AddLocale("deDE", {
+  ["spellbook.title"] = "Lernliste",
   ["spellbook.open"] = "Im Addon öffnen",
   ["spellbook.open.tip"] = "Öffnet die Lernliste im Forever-Guides-Fenster.",
 })
@@ -23,18 +25,15 @@ ns.SpellbookPanel = S
 
 -- Estimated parchment page inside the view when the paged content is not found.
 local INSET = { left = 10, right = 14, top = 72, bottom = 14 }
--- Layout of Blizzard's own spell page (SpellBookHeaderTemplate, PagedSpellsView1Template):
--- the spell grid starts 85 px from the page edge and 45 px below the paged frame, the
--- heading sits 8 px left of the grid, the divider 32 px left of it. No bar behind our
--- header, title and button share one center line.
-local CONTENT_LEFT = 85
-local CONTENT_RIGHT = 44 -- keeps content and button off the scrollbar column and the page edge
+-- The list uses the full page width with one small side padding. The header starts 45 px below
+-- the paged frame (Blizzard's heading line). No bar behind our header, title and button share
+-- one center line.
+local SIDE_PAD = 16
 local HEADER_TOP = 45
 local HEADER_ROW = 36 -- height of the title/button row
-local TITLE_SHIFT = -8
 local TITLE_GAP = 12 -- the title ends this far before the button
+local BUTTON_WIDTH = 150
 local DIVIDER_ATLAS = "spellbook-divider" -- atlas of Blizzard's divider under the heading
-local DIVIDER_SHIFT = -32 -- the divider starts left of the grid, where its curl ornament sits
 local DIVIDER_GAP = 6
 local DIVIDER_H = 11
 local DIVIDER_FALLBACK_H = 2
@@ -194,9 +193,10 @@ function S.Create(book, opts)
   panel.header = header
 
   -- Both anchors bound the width, so on a narrow panel the title ellipsizes instead of reaching the button.
-  panel.title = W.Text(header, { key = "blizz.learn", role = HEADING_ROLE, family = "display", color = HEADER_TEXT })
+  panel.title =
+    W.Text(header, { key = "spellbook.title", role = HEADING_ROLE, family = "display", color = HEADER_TEXT })
   panel.title:SetMaxLines(1)
-  panel.title:SetPoint("LEFT", header, "LEFT", TITLE_SHIFT, 0)
+  panel.title:SetPoint("LEFT", header, "LEFT", 0, 0)
   -- Blizzard's heading font when the client has it, the theme display font otherwise.
   ns.Bind(panel.title, function(fs)
     local object = _G[HEADING_FONT]
@@ -207,7 +207,7 @@ function S.Create(book, opts)
 
   -- Divider under the heading: Blizzard's atlas, else a plain brown line.
   local divider = frame:CreateTexture(nil, "ARTWORK")
-  divider:SetPoint("TOPLEFT", header, "BOTTOMLEFT", DIVIDER_SHIFT, -DIVIDER_GAP)
+  divider:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -DIVIDER_GAP)
   divider:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", 0, -DIVIDER_GAP)
   panel.divider = divider
   local function paintDivider(t)
@@ -230,7 +230,7 @@ function S.Create(book, opts)
   panel.openButton = W.Button(header, {
     key = "spellbook.open",
     variant = "gold",
-    width = 170,
+    width = BUTTON_WIDTH,
     height = 24,
     tooltip = "spellbook.open",
     tooltipText = "spellbook.open.tip",
@@ -258,11 +258,11 @@ function S.Create(book, opts)
   -- Header row and list hang `offset` below the panel top.
   local function setHeaderTop(offset)
     header:ClearAllPoints()
-    header:SetPoint("TOPLEFT", CONTENT_LEFT, -offset)
-    header:SetPoint("TOPRIGHT", -CONTENT_RIGHT, -offset)
+    header:SetPoint("TOPLEFT", SIDE_PAD, -offset)
+    header:SetPoint("TOPRIGHT", -SIDE_PAD, -offset)
     panel.body:ClearAllPoints()
-    panel.body:SetPoint("TOPLEFT", CONTENT_LEFT, -(offset + HEADER_BELOW))
-    panel.body:SetPoint("BOTTOMRIGHT", -CONTENT_RIGHT, 0)
+    panel.body:SetPoint("TOPLEFT", SIDE_PAD, -(offset + HEADER_BELOW))
+    panel.body:SetPoint("BOTTOMRIGHT", -SIDE_PAD, 0)
     panel.headerTop = offset
   end
   setHeaderTop(HEADER_TOP)
@@ -416,6 +416,9 @@ function S.Create(book, opts)
     bookHooked[book] = true
     pcall(book.HookScript, book, "OnHide", panel.Hide)
   end
+  -- The side panel with the next spells, in addition to this page; it gives way while the page shows.
+  local _, side = ns.Safe("spellbook-side", ns.SpellbookSide.Attach, book, frame, opts.onOpen)
+  panel.side = side
   return panel
 end
 

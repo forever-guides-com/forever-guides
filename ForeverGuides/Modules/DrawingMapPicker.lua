@@ -34,7 +34,7 @@ ns.AddLocale("enUS", {
   ["draw.map.missing"] = "Map not available here: %s",
   ["draw.group.map"] = "Map",
   ["draw.map.choose"] = "Choose map...",
-  ["draw.map.choose.tip"] = "Pick a zone, dungeon or raid map as the background to draw on.",
+  ["draw.map.choose.tip"] = "Picks a zone, dungeon or raid map as the drawing background.",
   ["draw.map.remove"] = "Remove map",
   ["draw.map.hardEdges"] = "Over a map the pen draws hard edges",
   ["draw.map.fitNone"] = "This map is not available here.",
@@ -56,7 +56,7 @@ ns.AddLocale("deDE", {
   ["draw.map.missing"] = "Karte hier nicht verfügbar: %s",
   ["draw.group.map"] = "Karte",
   ["draw.map.choose"] = "Karte wählen...",
-  ["draw.map.choose.tip"] = "Wähle eine Gebiets-, Dungeon- oder Raidkarte als Hintergrund zum Zeichnen.",
+  ["draw.map.choose.tip"] = "Wählt eine Gebiets-, Dungeon- oder Raidkarte als Zeichenhintergrund.",
   ["draw.map.remove"] = "Karte entfernen",
   ["draw.map.hardEdges"] = "Über einer Karte zeichnet der Stift mit harten Kanten",
   ["draw.map.fitNone"] = "Diese Karte ist hier nicht verfügbar.",
@@ -258,7 +258,7 @@ local function build()
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     ns.Bind(row, function()
-      hl:SetColorTexture(1, 1, 1, 0.08)
+      hl:SetColorTexture(Theme.fillColor("hover"))
       row.sel:SetColorTexture(Theme.color("action", 0.5))
     end)
     row.line = row:CreateTexture(nil, "ARTWORK")
@@ -266,7 +266,7 @@ local function build()
     row.line:SetPoint("BOTTOMRIGHT", 0, 0)
     row.line:SetHeight(1)
     ns.Bind(row.line, function(t)
-      t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+      t:SetColorTexture(Theme.fillColor("line"))
     end)
     row.current = W.Text(row, { key = "draw.map.current", role = "micro", color = "accent2", justify = "RIGHT" })
     row.current:SetPoint("RIGHT", -8, 0)

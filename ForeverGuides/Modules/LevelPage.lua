@@ -3,10 +3,12 @@
 -- website's "Stufenliste" view, without talents and weapons).
 -- Data: ns.Data.Abilities, LevelSources. Logic: ns.LevelLogic.
 local _, ns = ...
+local Theme = ns.Theme
 local R, K = ns.RefLogic, ns.PageKit
 
 ns.AddLocale("enUS", {
-  ["levels.intro"] = "What your class gets at which level: new abilities and ranks you can learn at your class trainer. Talents and the weapons of the weapon masters are not listed here, weapon skills have their own page. Abilities marked as quest abilities are taught by the trainer too, you just need a quest first. Ranks marked 'needs talent' belong to a talent ability: the trainer offers them only once you know the talent.",
+  ["levels.intro"] = "What your class gets at which level: new abilities and ranks you can learn at your class trainer. Talents and the weapons of the weapon masters are not listed here, weapon skills have their own page. Abilities marked \"via quest\" are taught by the trainer too, after you finish a quest first. Ranks marked \"needs talent\" belong to a talent ability: the trainer offers them only once you know the talent.",
+  ["page.levels.sub"] = "What your class learns at each level",
   ["levels.basis"] = "Levels from website data (Classic values, not all confirmed for Forever)\nNo trainer costs in the data",
   ["levels.search"] = "Search (ability)",
   ["levels.fromMe"] = "From level",
@@ -14,7 +16,7 @@ ns.AddLocale("enUS", {
   ["levels.fromPlaceholder"] = "1",
   ["levels.mine"] = "My level",
   ["levels.count"] = "Level list: %d entries on %d levels for %s",
-  ["levels.hint"] = "Hover an entry for its tooltip",
+  ["levels.hint"] = "Hover an entry to see its tooltip",
   ["levels.level"] = "Level %d",
   ["levels.rank"] = "rank %d",
   ["levels.viaQuest"] = "via quest",
@@ -32,7 +34,8 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["levels.intro"] = 'Was deine Klasse bei welcher Stufe bekommt: neue Fähigkeiten und Ränge, die du beim Klassenlehrer lernen kannst. Talente und die Waffen der Waffenmeister stehen hier nicht, Waffenfertigkeiten haben eine eigene Seite. Fähigkeiten mit dem Hinweis "über Quest" lehrt der Lehrer ebenfalls, dafür brauchst du vorher eine Quest. Ränge mit dem Hinweis "braucht Talent" gehören zu einer Talentfähigkeit: der Lehrer bietet sie erst an, wenn du das Talent gelernt hast.',
+  ["levels.intro"] = 'Was deine Klasse bei welcher Stufe bekommt: neue Fähigkeiten und Ränge, die du beim Klassenlehrer lernen kannst. Talente und die Waffen der Waffenmeister stehen hier nicht, Waffenfertigkeiten haben eine eigene Seite. Fähigkeiten mit dem Hinweis „über Quest“ lehrt der Lehrer ebenfalls, dafür brauchst du vorher eine Quest. Ränge mit dem Hinweis „braucht Talent“ gehören zu einer Talentfähigkeit: der Lehrer bietet sie erst an, wenn du das Talent gelernt hast.',
+  ["page.levels.sub"] = "Was deine Klasse bei welcher Stufe lernt",
   ["levels.basis"] = "Stufen aus Website-Daten (Classic-Werte, nicht alle für Forever bestätigt)\nKeine Lehrerkosten in den Daten",
   ["levels.search"] = "Suchen (Fähigkeit)",
   ["levels.fromMe"] = "Ab Stufe",
@@ -40,7 +43,7 @@ ns.AddLocale("deDE", {
   ["levels.fromPlaceholder"] = "1",
   ["levels.mine"] = "Meine Stufe",
   ["levels.count"] = "Stufenliste: %d Einträge auf %d Stufen für %s",
-  ["levels.hint"] = "Maus über einen Eintrag zeigt den Tooltip",
+  ["levels.hint"] = "Fahre mit der Maus über einen Eintrag, um den Tooltip zu sehen",
   ["levels.level"] = "Stufe %d",
   ["levels.rank"] = "Rang %d",
   ["levels.viaQuest"] = "über Quest",
@@ -63,7 +66,7 @@ local function build(container)
   local state = { class = K.PlayerClass() or "WARRIOR" }
   local learnList
 
-  ns.AddParagraph(view, "levels.intro")
+  ns.AddIntro(view, "levels.intro")
   ns.AddParagraph(view, "levels.basis", { role = "micro", color = "textMuted" })
 
   local classFrame
@@ -78,7 +81,7 @@ local function build(container)
     end,
   })
   K.Anchor("FG.Levels.Class", classFrame)
-  s:Add(classFrame, { gap = 12 })
+  s:Add(classFrame, { gap = Theme.space.md })
 
   learnList = ns.LevelView.Create(view, {
     anchor = "FG.Levels",
@@ -86,6 +89,11 @@ local function build(container)
       return state.class
     end,
   })
+
+  -- Page link: the class.
+  function view:ShareState()
+    return { state.class }
+  end
 
   function view:Show(params)
     local p1 = params and params[1]
@@ -103,6 +111,7 @@ ns.RegisterPage({
   order = 330,
   group = "learn",
   title = "page.levels",
+  subtitle = "page.levels.sub",
   icon = ns.ICONS.levels,
   aliases = { "levels", "stufen", "level", "stufe", "lernliste" },
   crumbLabel = function(param)

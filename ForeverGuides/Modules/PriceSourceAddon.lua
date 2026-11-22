@@ -20,6 +20,12 @@ function P.Available()
   return api() ~= nil
 end
 
+-- True when the API table has a function of that name (existence only, nothing is called).
+function P.HasCall(name)
+  local v1 = api()
+  return v1 ~= nil and type(v1[name]) == "function"
+end
+
 -- True when shopping lists can be created.
 function P.ListReady()
   local v1 = api()
@@ -60,6 +66,39 @@ function P.CreateList(name, lines)
   return "ok"
 end
 
+-- The saved list of that name as an object, nil when there is none or the lookup is not possible. Reads
+-- the list manager of the add-on, which is not part of its public API, so every step is guarded.
+local function findList(name)
+  local a = rawget(_G, "Auctionator")
+  local manager = type(a) == "table" and type(a.Shopping) == "table" and a.Shopping.ListManager or nil
+  if type(manager) ~= "table" or type(manager.GetByName) ~= "function" then
+    return nil
+  end
+  local ok, list = pcall(manager.GetByName, manager, name)
+  return ok and type(list) == "table" and list or nil
+end
+
+-- True when a list of that name exists (CreateList would overwrite it).
+function P.ListExists(name)
+  return findList(name) ~= nil
+end
+
+-- Adds searches to the existing list of that name. Returns "noApi" (no such list or no insert call),
+-- "failed" or "ok".
+function P.AppendToList(name, lines)
+  local list = findList(name)
+  if not (list and type(list.InsertItem) == "function") then
+    return "noApi"
+  end
+  for _, line in ipairs(lines) do
+    local ok, err = pcall(list.InsertItem, list, line)
+    if not ok then
+      return "failed", err
+    end
+  end
+  return "ok"
+end
+
 -- Starts an exact search for one name in the open auction house window. Returns "noApi" (no search
 -- call), "failed" (the call raised, with the error as second value) or "ok". The exact variant keeps
 -- similar names out of the result; older versions only know the multi search.
@@ -70,6 +109,23 @@ function P.Search(name)
     return "noApi"
   end
   local ok, err = pcall(multi, CALLER, { name })
+  if not ok then
+    return "failed", err
+  end
+  return "ok"
+end
+
+-- Starts an exact search with a preselected quantity. "noApi" when the add-on lacks the search string
+-- converter or the advanced multi search (callers use another way), "failed" (with the error) or "ok".
+function P.SearchItem(name, quantity)
+  local v1 = api()
+  if not (v1 and type(v1.ConvertToSearchString) == "function" and type(v1.MultiSearchAdvanced) == "function") then
+    return "noApi"
+  end
+  local ok, err = pcall(function()
+    local term = v1.ConvertToSearchString(CALLER, { searchString = name, isExact = true, quantity = quantity })
+    v1.MultiSearchAdvanced(CALLER, { term })
+  end)
   if not ok then
     return "failed", err
   end

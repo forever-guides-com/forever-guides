@@ -23,6 +23,8 @@ GLG.SPEC = {
   maxLevel = { "guildMapMaxLevel", 100, 1, 100 },
   rankFilter = { "guildMapRankFilter", -1, -1, 9 },
   onlineOnly = { "guildMapOnlineOnly", true },
+  hideInstances = { "guildMapHideInstances", false },
+  friendZones = { "guildMapFriendZones", true },
 }
 
 GLG.MAX_CLIMB = 4
@@ -179,6 +181,45 @@ function GLG.Label(opts, name, level)
     parts[#parts + 1] = tostring(level)
   end
   return table.concat(parts, " ")
+end
+
+-- Opacity of a pin for a report of `age` seconds: full while current, fading to a floor at the end of the
+-- old window, so a member that went quiet drifts away instead of vanishing.
+GLG.FADE_FLOOR = 0.35
+function GLG.Fade(age)
+  local C = ns.GuildSyncLogic.CONFIG.store
+  if not finite(age) or age <= C.fresh then
+    return 1
+  end
+  if age >= C.old then
+    return GLG.FADE_FLOOR
+  end
+  return 1 - (1 - GLG.FADE_FLOOR) * (age - C.fresh) / (C.old - C.fresh)
+end
+
+-- Smooth movement: a new position slides from the displayed one over GLIDE seconds instead of jumping.
+-- A change of map or a leap over JUMP of the map width is a jump and snaps.
+GLG.GLIDE = 2
+GLG.JUMP = 0.25
+
+-- `state` is the table the caller keeps (nil start: {}). Returns the place to draw now and whether the
+-- glide still runs. `id` is the shown map: a new one resets the member.
+function GLG.Glide(state, key, id, nx, ny, now)
+  local s = state[key]
+  if not s or s.id ~= id or math.abs(nx - s.tx) + math.abs(ny - s.ty) > GLG.JUMP then
+    s = { id = id, fx = nx, fy = ny, tx = nx, ty = ny, t0 = now }
+    state[key] = s
+    return nx, ny, false
+  end
+  if nx ~= s.tx or ny ~= s.ty then
+    local cx, cy = GLG.Glide(state, key, id, s.tx, s.ty, now)
+    s.fx, s.fy, s.tx, s.ty, s.t0 = cx, cy, nx, ny, now
+  end
+  local f = math.min(1, math.max(0, (now - s.t0) / GLG.GLIDE))
+  if f >= 1 then
+    return s.tx, s.ty, false
+  end
+  return s.fx + (s.tx - s.fx) * f, s.fy + (s.ty - s.fy) * f, true
 end
 
 -- Groups items { key, px, py } (pixels on the screen) whose symbols would touch: an item joins the first

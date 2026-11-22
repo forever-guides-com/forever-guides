@@ -47,14 +47,14 @@ ns.AddLocale("deDE", {
   ["chars.hidden.title"] = "Ausgeblendete Charaktere",
   ["chars.restore"] = "Zurückholen",
   ["chars.purge"] = "Löschen",
-  ["chars.purge.current"] = "Aktueller bleibt",
+  ["chars.purge.current"] = "Aktueller Charakter bleibt",
   ["chars.purge.title"] = "Charakter löschen",
   ["chars.purge.text"] = "%s endgültig löschen?",
   ["chars.todos"] = "Todos",
   ["chars.todo.new"] = "Neues Todo",
   ["chars.todo.note"] = "Notiz (Enter speichert)",
   ["chars.todo.add"] = "Hinzufügen",
-  ["chars.todo.show"] = "In Liste zeigen",
+  ["chars.todo.show"] = "In Liste anzeigen",
   ["chars.todo.up"] = "Hoch",
   ["chars.todo.down"] = "Runter",
   ["chars.todo.del"] = "Löschen",
@@ -65,16 +65,16 @@ ns.AddLocale("deDE", {
   ["chars.todo.reset.never"] = "Nie",
   ["chars.todo.reset.daily"] = "Täglich",
   ["chars.todo.reset.weekly"] = "Wöchentlich",
-  ["chars.todo.time"] = "Reset-Zeit",
-  ["chars.todo.day"] = "Reset-Tag (wöchentlich)",
+  ["chars.todo.time"] = "Resetzeit",
+  ["chars.todo.day"] = "Resettag (wöchentlich)",
   ["chars.todo.clock"] = "Täglich und wöchentlich, HH:MM",
   ["chars.todo.server"] = "Serverzeit",
   ["chars.todo.empty"] = "Noch keine Todos",
   ["chars.todo.err.empty"] = "Name eingeben",
   ["chars.todo.err.long"] = "Höchstens 40 Zeichen",
-  ["chars.todo.err.dup"] = "Name existiert schon",
+  ["chars.todo.err.dup"] = "Name schon vergeben",
   ["chars.todo.err.full"] = "Liste ist voll",
-  ["chars.todo.err.time"] = "Format HH:MM, z. B. 07:00",
+  ["chars.todo.err.time"] = "Nutze HH:MM, z. B. 07:00",
 })
 
 local P = {}
@@ -255,7 +255,7 @@ function P.Hidden(host)
     r.line:SetPoint("BOTTOMLEFT")
     r.line:SetPoint("BOTTOMRIGHT")
     r.line:SetHeight(1)
-    r.line:SetColorTexture(1, 1, 1, 0.08)
+    r.line:SetColorTexture(ns.Theme.fillColor("line"))
     r.purge = W.Action(r, {
       label = "act.delete",
       icon = "trash",

@@ -28,7 +28,10 @@ gm.SettingsPages = {
     id = "actions",
     cards = {
       { id = "safety", options = { "dryRun", "removeNoPreview" }, fixed = true },
-      { id = "run", options = { "actionBackend", "runMode", "pauseSec", "longPauseSec", "maxTotal" } },
+      {
+        id = "run",
+        options = { "actionBackend", "runMode", "macroMode", "batchSize", "pauseSec", "longPauseSec", "maxTotal" },
+      },
       { id = "after", options = { "undoDays", "notifyDone" } },
     },
   },
@@ -54,7 +57,7 @@ gm.SettingsPages = {
     cards = {
       {
         id = "share",
-        options = { "shareChannel", "shareMinRank", "shareJoins", "shareMarks", "shareNotes" },
+        options = { "shareChannel", "shareMinRank", "shareJoins", "shareMarks", "shareNotes", "shareBansSend", "shareBansReceive", "shareBansRank" },
         build = function(card, api)
           gm.ShareTab.Build(card, api)
         end,

@@ -8,13 +8,14 @@ local DA = ns.InstanceDataAccess
 
 ns.AddLocale("enUS", {
   ["instances.intro"] = "Dungeons and raids: levels, entrance, bosses, quests",
+  ["page.instances.sub"] = "All dungeons and raids",
   ["instances.search"] = "Filter by instance or boss name",
   ["instances.unknown"] = "?",
   ["instances.sort.label"] = "Sort by",
   ["instances.sort.name"] = "Name",
   ["instances.sort.level"] = "Level",
   ["instances.back"] = "All instances",
-  ["instances.back.tip"] = "Back to the overview of all instances (Backspace).",
+  ["instances.back.tip"] = "Returns to the overview of all instances (Backspace).",
   ["instances.status.announced"] = "announced",
   ["instances.dtab.info"] = "Info",
   ["instances.dtab.bosses"] = "Bosses",
@@ -63,13 +64,14 @@ ns.AddLocale("enUS", {
 
 ns.AddLocale("deDE", {
   ["instances.intro"] = "Dungeons und Raids: Stufen, Eingang, Bosse, Quests",
+  ["page.instances.sub"] = "Alle Dungeons und Raids",
   ["instances.search"] = "Nach Instanz- oder Bossname filtern",
   ["instances.unknown"] = "?",
   ["instances.sort.label"] = "Sortieren nach",
   ["instances.sort.name"] = "Name",
   ["instances.sort.level"] = "Stufe",
   ["instances.back"] = "Alle Instanzen",
-  ["instances.back.tip"] = "Zurück zur Übersicht aller Instanzen (Rücktaste).",
+  ["instances.back.tip"] = "Kehrt zur Übersicht aller Instanzen zurück (Rücktaste).",
   ["instances.status.announced"] = "angekündigt",
   ["instances.dtab.info"] = "Info",
   ["instances.dtab.bosses"] = "Bosse",
@@ -79,12 +81,12 @@ ns.AddLocale("deDE", {
   ["instances.info.level"] = "Stufe: %s",
   ["instances.info.group"] = "Gruppengröße: %s",
   ["instances.info.faction"] = "Fraktion: %s",
-  ["instances.info.location"] = "Lage: %s",
+  ["instances.info.location"] = "Ort: %s",
   ["instances.info.status"] = "Status: %s",
   ["instances.info.entrance"] = "Eingang: Karte %s, Position %s",
   ["instances.info.entranceNone"] = "Keine Eingangsposition in den Daten.",
   ["instances.info.counts"] = "%d Boss(e), %d Quest(s) in den Daten.",
-  ["instances.info.noId"] = "Diese Instanz hat in den Daten keine Spiel-Instanz-ID.",
+  ["instances.info.noId"] = "Diese Instanz hat in den Daten keine Instanz-ID des Spiels.",
   ["instances.bosses.none"] = "Für diese Instanz sind noch keine Bosse erfasst.",
   ["instances.bosses.optional"] = "optional",
   ["instances.bosses.heroic"] = "heroisch",
@@ -94,7 +96,7 @@ ns.AddLocale("deDE", {
   ["instances.quests.none"] = "Für diese Instanz sind keine Quests erfasst. Das heißt nicht, dass es keine gibt.",
   ["instances.quests.noneDirect"] = "Keine Instanz-Quests bekannt.",
   ["instances.quests.noneFaction"] = "Keine Quests für diese Fraktion in den Daten.",
-  ["instances.quest.head"] = "%s (Quest-Stufe %s, ab Stufe %s)",
+  ["instances.quest.head"] = "%s (Queststufe %s, ab Stufe %s)",
   ["instances.quest.start"] = "Beginnt bei: %s",
   ["instances.quest.startIn"] = "in %s",
   ["instances.quest.end"] = "Abgabe: %s",
@@ -113,7 +115,7 @@ ns.AddLocale("deDE", {
   ["tour.instances.list.title"] = "Instanzkarten",
   ["tour.instances.list.text"] = "Pfeiltasten wechseln die Karte, Enter öffnet die Details.",
   ["tour.instances.detail.title"] = "Details",
-  ["tour.instances.detail.text"] = "Ladebild, Eckdaten und Karten-Knopf, darunter Bosse, Quests, Items, Zugang und Karte.",
+  ["tour.instances.detail.text"] = "Ladebild, Eckdaten und Kartenknopf, darunter Bosse, Quests, Items, Zugang und Karte.",
 })
 
 local plural, dual = IV.Plural, IV.Dual
@@ -255,6 +257,14 @@ end
 local TAB_ALIAS = { loot = "items" }
 -- One faction choice for the cards, the header, the loot quests and the quest tab (see QuestChainView).
 local FACTION_PATH = "settings.instancesQuestFilter"
+-- Where the overview keeps its choices (see InstanceCards opts.onPersist).
+local PERSIST_PATH = {
+  view = "settings.instancesView",
+  sort = "settings.instancesSortBy",
+  desc = "settings.instancesSortDesc",
+  bracket = "settings.instancesBracket",
+  closed = "settings.instancesCollapsed",
+}
 
 local function build(container)
   local FL = ns.FlowLayout
@@ -273,19 +283,8 @@ local function build(container)
     return choice ~= "all" and choice or nil
   end
 
-  -- The intro and the reset row belong to the cards; the detail level has the reset beside its back button.
-  local intro = ns.AddParagraph(view, "instances.intro", { role = "micro", gap = 6 })
-
-  -- The reset of the instances (chat command of the game).
-  local resetRow = CreateFrame("Frame", nil, view.content)
-  local resetBtn = ns.InstanceReset.Button(resetRow)
-  resetBtn:SetPoint("TOPLEFT")
-  function resetRow:fgGridLayout(width)
-    resetBtn:SetWidth(resetBtn:Fit(width))
-    self:SetHeight(resetBtn:GetHeight())
-    return resetBtn:GetHeight()
-  end
-  s:Add(resetRow, { gap = 8 })
+  -- The intro belongs to the cards; the instance reset is part of their first bar row.
+  local intro = ns.AddIntro(view, "instances.intro", { gap = Theme.space.sm })
 
   -- Decides what the page shows before anything below it is placed: the cards, or the chosen tab of the
   -- instance. The tab row stays at every width, a narrow page wraps it instead of stacking the sections.
@@ -298,11 +297,24 @@ local function build(container)
   s:Add(probe, { height = 0, gap = 0 })
 
   -- Level one: the card grid ----------------------------------------------------------------------------
+  local saved = ns.db.settings
   local cards = ns.InstanceCards.Create(view.content, {
+    corner = ns.InstanceReset.Button,
     faction = K.PlayerFaction(),
-    filter = { faction = faction() },
-    onOpen = function(inst)
-      ns.Router:navigate("instances/" .. R.InstanceSlug(inst))
+    filter = {
+      faction = faction(),
+      sort = IL.NormalizeSort(saved.instancesSortBy),
+      desc = saved.instancesSortDesc == true,
+      bracket = ns.InstanceBracketLogic.Normalize(saved.instancesBracket),
+    },
+    view = IL.NormalizeView(saved.instancesView),
+    closed = saved.instancesCollapsed,
+    onOpen = function(inst, tab)
+      state.cameFrom = R.InstanceSlug(inst)
+      ns.Router:navigate("instances/" .. R.InstanceSlug(inst) .. (tab and ("/" .. tab) or ""))
+    end,
+    onPersist = function(key, value)
+      ns.Store.set(PERSIST_PATH[key], value)
     end,
     onFaction = function(choice)
       ns.Store.set(FACTION_PATH, choice)
@@ -316,134 +328,143 @@ local function build(container)
   s:Add(cards, { gap = 0 })
 
   -- Level two: the chosen instance ----------------------------------------------------------------------
-  local back = W.Action(view.content, {
-    key = "instances.back",
-    icon = "chevron-left",
-    variant = "ghost",
-    height = 26,
-    opens = false,
-    tooltip = "instances.back",
-    tooltipText = "instances.back.tip",
-    onClick = function()
+  -- The page never scrolls as a whole here (unless the window is below the minimum height): a fixed head (banner, tab
+  -- row) and a body that takes the rest. Which layout applies comes from Modules/InstanceLayoutLogic.lua.
+  local ILL = ns.InstanceLayoutLogic
+  local head = CreateFrame("Frame", nil, view.content)
+  head.layoutCount, head.applyCount = 0, 0
+  local header = IV.Header(head, {
+    onBack = function()
       ns.Router:navigate("instances")
     end,
   })
-  local detailReset = ns.InstanceReset.Button(view.content)
-  detailReset:SetVariant("ghost")
-  -- Back and reset share one row, the reset wraps below the back button when the row is too narrow.
-  local backRow = CreateFrame("Frame", nil, view.content)
-  back:SetParent(backRow)
-  detailReset:SetParent(backRow)
-  function backRow:fgGridLayout(width)
-    local gap = 8
-    local bw, rw = back:Fit(width), detailReset:Fit(width)
-    back:SetWidth(bw)
-    detailReset:SetWidth(rw)
-    back:ClearAllPoints()
-    back:SetPoint("TOPLEFT")
-    detailReset:ClearAllPoints()
-    local h = math.max(back:GetHeight(), detailReset:GetHeight())
-    if bw + gap + rw <= width then
-      detailReset:SetPoint("TOPLEFT", back, "TOPRIGHT", gap, 0)
-    else
-      detailReset:SetPoint("TOPLEFT", back, "BOTTOMLEFT", 0, -gap)
-      h = back:GetHeight() + gap + detailReset:GetHeight()
-    end
-    self:SetHeight(h)
-    return h
-  end
-  s:Add(backRow, { gap = 8 })
-
-  local header = IV.Header(view.content)
   K.Anchor("FG.Instances.Detail", header)
-  s:Add(header, { gap = 12 })
 
-  -- The tab row wraps instead of cutting off, a selected tab has a bar (and its own color).
   local tabDefs = {}
   for _, id in ipairs(TABS) do
-    tabDefs[#tabDefs + 1] = {
-      id = id,
-      key = "instances.dtab." .. id,
-      variant = "ghost",
-      onClick = function()
-        state.dtab = id
-        refresh()
-      end,
-    }
+    tabDefs[#tabDefs + 1] = { id = id, key = "instances.dtab." .. id }
   end
-  local tabRow = FL.ButtonRow(view.content, tabDefs)
-  s:Add(tabRow, { gap = 10 })
+  local tabRow = W.Tabs(head, {
+    tabs = tabDefs,
+    onSelect = function(id)
+      state.dtab = id
+      refresh()
+    end,
+  })
+  -- "More" (last resort of a narrow tab row): a list of all tabs, reachable by Tab and Enter like any choice field.
+  local moreOptions = {}
+  for i, id in ipairs(TABS) do
+    moreOptions[i] = { value = id, key = "instances.dtab." .. id }
+  end
+  local more = W.Dropdown(head, {
+    compact = true,
+    key = "instances.tabs.more",
+    width = 140,
+    options = moreOptions,
+    get = function()
+      return state.dtab
+    end,
+    set = function(id)
+      tabRow:Select(id)
+    end,
+  })
+  -- The faction switch is shared with the cards (FACTION_PATH); it sits right of the tabs and only on tabs it filters.
+  local FACTION_TABS = { quests = true, items = true, access = true }
+  local factionRow = K.FactionButtons(head, {
+    withAll = true,
+    allKey = "questchain.filter.all",
+    labelKey = false,
+    get = faction,
+    set = function(id)
+      ns.Store.set(FACTION_PATH, id)
+    end,
+  })
   local function paintTabs()
-    for _, id in ipairs(TABS) do
-      local b = tabRow:GetButton(id)
-      local on = id == state.dtab
-      b.bar:SetShown(on)
-      W.SetColor(b.label, on and "accent" or "textSecondary")
+    tabRow:SetSelected(state.dtab)
+  end
+
+  local function tabWidths(pad)
+    local out = {}
+    for i, id in ipairs(TABS) do
+      out[i] = math.ceil(tabRow.buttons[id].label:GetStringWidth()) + pad
     end
-  end
-  for _, id in ipairs(TABS) do
-    local b = tabRow:GetButton(id)
-    b.bar = b:CreateTexture(nil, "ARTWORK")
-    b.bar:SetPoint("BOTTOMLEFT", 4, 0)
-    b.bar:SetPoint("BOTTOMRIGHT", -4, 0)
-    b.bar:SetHeight(2)
-    ns.Bind(b.bar, function(t)
-      t:SetColorTexture(Theme.color("accent2"))
-    end)
-    b:HookScript("OnEnter", paintTabs)
-    b:HookScript("OnLeave", paintTabs)
+    return out
   end
 
-  -- A section is the parts of one tab. A part with fgOn == false stays hidden.
-  local order = {}
-  local function newSection(id)
-    local sec = { id = id, parts = {} }
-    order[#order + 1] = sec
-    return sec
-  end
-  local function part(sec, item, opts)
-    s:Add(item, opts or { gap = 10 })
-    sec.parts[#sec.parts + 1] = item
-    return item
-  end
-  local function note(sec)
-    return part(sec, W.Text(view.content, { role = "ui", color = "textSecondary", wrap = true }))
-  end
+  -- Measures, asks the layout logic and places banner, tabs and faction switch. Returns the height of the head.
+  function head:fgGridLayout(width, room)
+    self.layoutCount = self.layoutCount + 1
+    local opts = header:Measure()
+    opts.tabWidths, opts.tabCompactWidths = tabWidths(32), tabWidths(16)
+    opts.moreW = 140
+    opts.factionW = FACTION_TABS[state.dtab] and factionRow.NaturalWidth() or nil
+    opts.factionH = opts.factionW and factionRow:fgGridLayout(width) or nil
+    local layout = ILL.Compute(view.area:GetWidth(), room.viewHeight - 2 * room.pad, opts)
+    local same = self.layout and ILL.Equal(self.layout, layout) and self.appliedWidth == width and not self.dirty
+    self.layout = layout
+    if same then
+      return self:GetHeight()
+    end
+    self.dirty, self.appliedWidth = false, width
+    self.applyCount = self.applyCount + 1
+    header:ClearAllPoints()
+    header:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    header:Apply(width, layout)
 
-  local bosses = newSection("bosses")
-  local bossNote = note(bosses)
-  local bossList = part(bosses, ns.InstanceBossPanel.Create(view.content), { gap = 14 })
-  bossList.onChange = function()
-    relayout()
+    local rowY = layout.bannerH + ILL.ROW_GAP
+    tabRow:ClearAllPoints()
+    tabRow:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -rowY)
+    tabRow:SetSize(width, ILL.TAB_ROW_H)
+    tabRow:SetShown(layout.tabsMode ~= "more")
+    more:SetShown(layout.tabsMode == "more")
+    more:ClearAllPoints()
+    more:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -rowY)
+    if layout.tabsMode ~= "more" then
+      local widths = layout.tabsMode == "compact" and opts.tabCompactWidths or opts.tabWidths
+      local x = 0
+      for i, id in ipairs(TABS) do
+        local b = tabRow.buttons[id]
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", tabRow, "TOPLEFT", x, 0)
+        b:SetWidth(widths[i])
+        x = x + widths[i] + ILL.TAB_GAP
+      end
+    end
+    local on = opts.factionW ~= nil
+    factionRow:SetShown(on)
+    if on then
+      local own = layout.factionRow == "own"
+      local fw = math.min(opts.factionW, width)
+      local fh = factionRow:fgGridLayout(fw)
+      factionRow:SetWidth(fw)
+      factionRow:ClearAllPoints()
+      local y = own and (rowY + ILL.TAB_ROW_H + ILL.ROW_GAP) or rowY
+      factionRow:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -(y + math.max(0, math.floor((ILL.TAB_ROW_H - fh) / 2))))
+    end
+    self:SetHeight(layout.headH)
+    return layout.headH
   end
+  s:Add(head, { gap = ILL.ROW_GAP })
 
-  local quests = newSection("quests")
-  local questNote = note(quests)
-  local questList = part(quests, ns.QuestChainView.Create(view.content), { gap = 14 })
-  questList.onChange = function()
-    relayout()
+  -- Parts of one tab. A tab is `frame` (a panel that lays itself out with fgGridLayout(width, room)), an optional
+  -- one-line `note` above it, and whether it can fill the whole height (list and detail scroll on their own) or flows
+  -- at its natural height inside one scroll area of the body.
+  local body = CreateFrame("Frame", nil, view.content)
+  body.scroll = W.ScrollArea(body)
+  local GUTTER = 12
+  local function newNote()
+    return W.Text(body, { role = "ui", color = "textSecondary", wrap = true })
   end
+  local bossNote, questNote = newNote(), newNote()
+  local bossList = ns.InstanceBossPanel.Create(body)
+  local questList = ns.QuestChainView.Create(body)
+  questList.hideToolbar = true
+  local itemsView = ns.InstanceItemsView.Create(body)
+  local access = ns.AccessView.Create(body)
+  local mapView = ns.DungeonMapView.Create(body)
 
-  local items = newSection("items")
-  local itemsView = part(items, ns.InstanceItemsView.Create(view.content), { gap = 14 })
-  itemsView.onChange = function()
-    relayout()
-  end
-
-  local accessSec = newSection("access")
-  local access = part(accessSec, ns.AccessView.Create(view.content), { gap = 14 })
-  access.onChange = function()
-    relayout()
-  end
-
-  local mapSec = newSection("map")
-  local mapView = part(mapSec, ns.DungeonMapView.Create(view.content), { gap = 14 })
-  mapView.onChange = function()
-    relayout()
-  end
-
-  local infoSec = newSection("info")
-  local infoText = part(infoSec, W.Text(view.content, { role = "ui", color = "text", wrap = true }), { gap = 10 })
+  local infoPanel = CreateFrame("Frame", nil, body)
+  local infoText = W.Text(infoPanel, { role = "ui", color = "text", wrap = true })
   -- Buttons an extension registers for the open instance (slot "instances"), none without an extension.
   local infoButtons = {}
   for _, tool in ipairs(ns.DevTools.Slot("instances")) do
@@ -460,24 +481,118 @@ local function build(container)
       end,
     }
   end
-  if #infoButtons > 0 then
-    part(infoSec, FL.ButtonRow(view.content, infoButtons), { gap = 14 })
+  local infoRow = #infoButtons > 0 and FL.ButtonRow(infoPanel, infoButtons) or nil
+  function infoPanel:fgGridLayout(width)
+    infoText:ClearAllPoints()
+    infoText:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    infoText:SetWidth(math.max(1, width))
+    local h = math.ceil(infoText:GetStringHeight())
+    if infoRow then
+      infoRow:ClearAllPoints()
+      infoRow:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -(h + Theme.space.lg))
+      h = h + Theme.space.lg + infoRow:fgGridLayout(width)
+    end
+    self:SetSize(math.max(1, width), math.max(1, h))
+    return h
   end
+
+  local panels = {
+    bosses = { frame = bossList, fill = true, note = bossNote },
+    quests = { frame = questList, fill = true, note = questNote },
+    items = {
+      frame = itemsView,
+      fill = function()
+        return itemsView:CanFill()
+      end,
+    },
+    access = { frame = access },
+    map = { frame = mapView },
+    info = { frame = infoPanel },
+  }
+  for _, panel in pairs(panels) do
+    panel.frame.onChange = function()
+      relayout()
+    end
+  end
+
+  local function adopt(frame, parent)
+    if frame:GetParent() ~= parent then
+      frame:SetParent(parent)
+    end
+  end
+
+  -- Takes the height the page has left (viewport minus what lies above) and places the panel of the open tab.
+  function body:fgGridLayout(width, room)
+    local layout = head.layout or ILL.Compute(view.area:GetWidth(), room.viewHeight - 2 * room.pad, {})
+    local free = math.max(1, math.floor(room.viewHeight - room.top - room.pad))
+    local active = panels[state.dtab]
+    local frame = active.frame
+    local noteH = 0
+    for _, other in pairs(panels) do
+      if other.note then
+        other.note:SetShown(other == active and other.note.fgOn ~= false and state.inst ~= nil)
+      end
+    end
+    if active.note and active.note:IsShown() then
+      active.note:ClearAllPoints()
+      active.note:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+      active.note:SetWidth(math.max(1, width))
+      noteH = math.ceil(active.note:GetStringHeight()) + Theme.space.sm
+    end
+    local canFill = active.fill == true or (type(active.fill) == "function" and active.fill())
+    local scrollWhole = layout.pageScroll
+    local below = { top = room.top + noteH, viewHeight = room.viewHeight, pad = room.pad, gap = room.gap }
+    local out
+    if canFill and (not scrollWhole or state.dtab == "quests") then
+      -- Fills: the panel gets exactly the height and scrolls its list and detail by itself.
+      local height = scrollWhole and ILL.BODY_MIN_H or math.max(1, free - noteH)
+      below.fill = { height = height, mode = layout.mode, listW = layout.listW }
+      body.scroll:Hide()
+      adopt(frame, self)
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -noteH)
+      frame:SetWidth(width)
+      frame:fgGridLayout(width, below)
+      out = scrollWhole and (noteH + height) or free
+    elseif scrollWhole then
+      -- Below the minimum height: no inner scroll area, the page scrolls as a whole.
+      body.scroll:Hide()
+      adopt(frame, self)
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -noteH)
+      frame:SetWidth(width)
+      out = noteH + frame:fgGridLayout(width, below)
+    else
+      -- One scroll area for the whole panel.
+      local scroll = body.scroll
+      scroll:Show()
+      scroll:ClearAllPoints()
+      scroll:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -noteH)
+      scroll:SetSize(width, math.max(1, free - noteH))
+      local inner = math.max(1, width - GUTTER)
+      scroll.content:SetWidth(inner)
+      adopt(frame, scroll.content)
+      frame:ClearAllPoints()
+      frame:SetPoint("TOPLEFT", scroll.content, "TOPLEFT", 0, 0)
+      frame:SetWidth(inner)
+      scroll:SetContentHeight(frame:fgGridLayout(inner, below))
+      out = free
+    end
+    self:SetSize(math.max(1, width), math.max(1, out))
+    return out
+  end
+  s:Add(body, { gap = 0 })
 
   function showSections()
     local inst = state.inst
     cards:SetShown(inst == nil)
-    intro:SetShown(inst == nil)
-    resetRow:SetShown(inst == nil)
-    backRow:SetShown(inst ~= nil)
+    intro:SetAvailable(inst == nil)
+    head:SetShown(inst ~= nil)
+    body:SetShown(inst ~= nil)
     header:SetShown(inst ~= nil)
-    for _, sec in ipairs(order) do
-      local on = inst ~= nil and state.dtab == sec.id
-      for _, item in ipairs(sec.parts) do
-        item:SetShown(on and item.fgOn ~= false)
-      end
+    for id, panel in pairs(panels) do
+      panel.frame:SetShown(inst ~= nil and state.dtab == id)
     end
-    tabRow:SetShown(inst ~= nil)
     -- The map holds tile textures, so it only has an instance while it is on screen.
     local mapOn = inst ~= nil and state.dtab == "map"
     if mapOn then
@@ -501,6 +616,8 @@ local function build(container)
     state.inst = inst
     local choice = detailFaction()
     header:SetInstance(inst, choice)
+    head.dirty = true
+    factionRow.Refresh()
     if inst then
       bossList:SetInstance(inst)
       questList:SetInstance(inst, choice)
@@ -523,6 +640,7 @@ local function build(container)
       infoText:SetText(ns.InstanceInfoText(inst))
     end
     paintTabs()
+    showSections()
     relayout()
   end
 
@@ -547,11 +665,19 @@ local function build(container)
     end
   end)
 
+  -- A client title for a quest arrived: the open page shows it (one message per burst of answers).
+  ns.On("FG_QUEST_NAMES", function()
+    if state.inst and view.area:IsVisible() then
+      refresh()
+    end
+  end)
+
   -- A kill or a reset: the header count and the marks of the boss rows follow while the page is open.
   ns.On("FG_BOSS_PROGRESS", function()
     local inst = state.inst
     if inst and view.area:IsVisible() then
       header:SetInstance(inst, detailFaction())
+      head.dirty = true
       bossList:SetInstance(inst)
       relayout()
     end
@@ -608,6 +734,50 @@ local function build(container)
     end
   end)
 
+  -- Back on the overview: the card of the instance that was opened takes the focus (see PageState.Restore).
+  function view:TakeFocusKey()
+    local slug = state.cameFrom
+    state.cameFrom = nil
+    return slug
+  end
+
+  function view:FocusEntry(slug)
+    if state.inst then
+      return false
+    end
+    for i, card in ipairs(cards.cards) do
+      if card.inst and R.InstanceSlug(card.inst) == slug then
+        cards:SetCursor(i)
+        ns.Focus.set(cards.proxy)
+        return true
+      end
+    end
+    return false
+  end
+
+  -- Esc and the back key: a narrow detail (quest, boss, loot) goes back to its list first. True when it did.
+  function view:HandleBack()
+    if not state.inst then
+      return false
+    end
+    if state.dtab == "quests" then
+      return questList:CloseDetail()
+    elseif state.dtab == "bosses" then
+      return ns.InstanceBossView.CloseDetail(bossList)
+    elseif state.dtab == "items" then
+      return ns.InstanceBossView.CloseDetail(itemsView.bossView)
+    end
+    return false
+  end
+
+  -- Page link of the header: the instance and its tab. The selected boss or quest has its own share button.
+  function view:ShareState()
+    if not state.slug then
+      return {}
+    end
+    return { state.slug, state.dtab }
+  end
+
   -- A slug (and a tab) of the route: that instance, an unknown slug shows the cards. No slug: the instance the
   -- player stands in, else the cards. An explicit move to "instances" from inside the page (back button, back
   -- key, breadcrumb, sidebar) always shows the cards and keeps the current instance from opening again until
@@ -639,8 +809,37 @@ local function build(container)
     end
     state.onPage = true
     showState()
+    -- instances/<slug>/bosses/<encounterId> and instances/<slug>/quests/<questId> choose that entry.
+    local id = state.inst and tonumber(params and params[3])
+    if id and tab == "bosses" then
+      bossList:SelectBossId(id)
+    elseif id and tab == "quests" then
+      questList:SelectId(id)
+    end
   end
   return view
+end
+
+-- Name of the boss or quest in a page link (instances/<slug>/bosses/<id>), nil when the data does not know it.
+local function shareEntryName(slug, tab, param)
+  local inst, id = slug and R.FindInstance(slug), tonumber(param)
+  if not (inst and id) then
+    return nil
+  end
+  if tab == "bosses" then
+    for _, boss in ipairs(inst.bo or {}) do
+      if boss.eid == id then
+        return ns.T(boss.n)
+      end
+    end
+  elseif tab == "quests" then
+    DA.Ensure()
+    for _, q in ipairs(inst.q or {}) do
+      if q.id == id then
+        return ns.QuestNames and ns.QuestNames.Name(q) or ns.T(q.n)
+      end
+    end
+  end
 end
 
 ns.RegisterPage({
@@ -648,12 +847,16 @@ ns.RegisterPage({
   order = 130,
   group = "world",
   title = "page.instances",
+  subtitle = "page.instances.sub",
   icon = ns.ICONS.instances,
   aliases = { "instanzen", "raids", "instances", "dungeons" },
-  crumbLabel = function(param, index)
+  crumbLabel = function(param, index, params)
     if index == 1 then
       local inst = R.FindInstance(param)
       return inst and ns.T(inst.n) or param
+    end
+    if index == 3 then
+      return shareEntryName(params and params[1], params and params[2], param) or param
     end
     local key = "instances.dtab." .. (TAB_ALIAS[param] or param)
     return L[key] ~= key and L[key] or param

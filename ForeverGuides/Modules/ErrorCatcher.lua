@@ -13,7 +13,7 @@ ns.AddLocale("enUS", {
   ["errcatch.foreign"] = "Include other addons",
   ["errcatch.hideBlizzard"] = "Hide Blizzard error window",
   ["errcatch.hideHint"] = "Only while the catcher is on. The errors are in the error list.",
-  ["errcatch.hint"] = "Errors are collected silently. Chat and sound announce each new error once. Off for other addons: only Forever Guides errors are listed.",
+  ["errcatch.hint"] = "The addon collects errors silently. Chat and sound announce each new error once. With \"Include other addons\" switched off, the list shows only Forever Guides errors.",
   ["errcatch.openList"] = "Open error list",
   ["errcatch.chat.error"] = "Error in %s: %s",
   ["errcatch.chat.blocked"] = "Blocked action in %s: %s",
@@ -42,7 +42,7 @@ ns.AddLocale("deDE", {
   ["errcatch.foreign"] = "Fremde Addons einbeziehen",
   ["errcatch.hideBlizzard"] = "Blizzard-Fehlerfenster ausblenden",
   ["errcatch.hideHint"] = "Nur bei aktivem Fehlerfänger. Die Fehler stehen in der Fehlerliste.",
-  ["errcatch.hint"] = "Fehler werden still gesammelt. Chat und Ton melden jeden neuen Fehler einmal. Aus bei fremden Addons: nur Fehler von Forever Guides stehen in der Liste.",
+  ["errcatch.hint"] = "Das Addon sammelt Fehler still. Chat und Ton melden jeden neuen Fehler einmal. Ist „Fremde Addons einbeziehen“ ausgeschaltet, zeigt die Liste nur Fehler von Forever Guides.",
   ["errcatch.openList"] = "Fehlerliste öffnen",
   ["errcatch.chat.error"] = "Fehler in %s: %s",
   ["errcatch.chat.blocked"] = "Blockierte Aktion in %s: %s",
@@ -136,7 +136,8 @@ function EC.Capture(kind, msg, stack, addon, source)
     ops = Logic.OpsText(ns.MapOps.Last())
   end
   local info = (kind == "blocked" or kind == "forbidden") and EC.ContextOf(addon) or nil
-  stack = Logic.CleanStack(stack)
+  local action = kind == "blocked" or kind == "forbidden"
+  stack = Logic.CleanStack(stack, action and Logic.ACTION_LINES + 1 or nil)
   addon = addon or Logic.AddonOf(msg, stack)
   if not Logic.IsOwn(addon) and not flag("errorForeign") then
     return nil
@@ -265,7 +266,7 @@ end
 function EC.ActionStack()
   local raw = ""
   if type(debugstack) == "function" then
-    local ok, text = pcall(debugstack, 1, 20, 0)
+    local ok, text = pcall(debugstack, 1, Logic.ACTION_LINES + 10, 0)
     raw = ok and text or ""
   end
   local stack = Logic.ActionStack(raw)
@@ -319,7 +320,13 @@ local function onAction(kind, text)
 end
 ns.On("ADDON_ACTION_BLOCKED", onAction("blocked", "Blocked call to protected function "))
 ns.On("ADDON_ACTION_FORBIDDEN", onAction("forbidden", "Forbidden call to protected function "))
-ns.On("LUA_WARNING", function(_, _, text)
+-- The payload is (warnType, text) in most clients and the text alone in some; a warning without any text says
+-- nothing and is not stored (it filled the list with empty entries).
+ns.On("LUA_WARNING", function(_, a, b)
+  local text = type(b) == "string" and b or type(a) == "string" and a or nil
+  if not text or not text:find("%S") then
+    return
+  end
   pcall(EC.Capture, "warning", text, "", nil, "event")
 end)
 

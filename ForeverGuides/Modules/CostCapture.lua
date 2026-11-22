@@ -37,7 +37,7 @@ ns.AddLocale("deDE", {
   ["cc.clear.title"] = "Erfasste Preise löschen",
   ["cc.clear.text"] = "Erfasste Preise löschen?\nBis zum nächsten Lehrerbesuch gelten Classic-Preise (nicht rückgängig).",
   ["cc.export.title"] = "Erfasste Preise",
-  ["cc.export.hint"] = "Eine Zeile pro Preis, für die Website-Daten",
+  ["cc.export.hint"] = "Eine Zeile pro Preis, für die Websitedaten",
   ["cc.export.header"] = '# Forever Guides: im Spiel gesehene Lehrerpreise. Felder: spellId Kupfer Mindeststufe npc "Name" Rang Klasse Build Daten-Kupfer (Preis der mitgelieferten Daten, - = keiner). Kupfer: 10000 = 1 Gold, 100 = 1 Silber.',
 })
 
@@ -258,6 +258,24 @@ end
 local function idByLink(i)
   local link = try(GetTrainerServiceItemLink, i)
   return type(link) == "string" and tonumber(link:match("|Hspell:(%d+)")) or nil
+end
+
+-- Spell id of a trainer service (index i, nil for a chat line) by tooltip, name and rank, or link.
+function CC.ResolveId(i, name, rank, texture, class)
+  local id = (i and idByTooltip(i)) or idByName(name, rank, texture, class) or (i and idByLink(i))
+  if id or rank then
+    return id
+  end
+  -- Recipe-type entries carry the rank in the name ("Instant Poison II"), the sub text stays empty.
+  local hit
+  for r = 1, 12 do
+    local found = idByName(name, r, texture, class)
+    if found and hit and found ~= hit then
+      return nil
+    end
+    hit = found or hit
+  end
+  return hit
 end
 
 -- Capture ------------------------------------------------------------------------------

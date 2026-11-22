@@ -1,7 +1,7 @@
--- The group "Fishing" in the tab "Gather" of the panel on Blizzard's world map (WorldMapGatherTab.lua): a
--- section that lists the fish of the zone the window shows with chance per cast (bar and percent), the
--- lowest skill to cast and the skill without failed casts, plus a button that opens the window of all
--- fishing places. The switch for the fishing schools on the map is in the category row of the tab
+-- The group "Fishing" in the tab "Gather" of the panel on Blizzard's world map (WorldMapGatherTab.lua): one
+-- row with a button that opens a small window with the fish of the zone the map shows (chance per cast as
+-- bar and percent, the lowest skill to cast and the skill without failed casts), plus a button that opens
+-- the window of all fishing places. The switch for the fishing schools on the map is in the category row of the tab
 -- (ns.GatherFilterUI), the same one as in the settings. The data and the rows come from the
 -- fishing helper (ForeverGuides_Fishing, only through ns.FishingLauncher while it runs); without it the
 -- section offers to switch it on. The numbers are in WorldMapFishingLogic.lua.
@@ -9,15 +9,18 @@ local _, ns = ...
 local W, L, Theme = ns.W, ns.L, ns.Theme
 local B = ns.BlizzardLinks
 local FL = ns.WorldMapFishingLogic
+local K = ns.PageKit
 
 local F = {}
 ns.WorldMapFishing = F
 
 ns.AddLocale("enUS", {
   ["wm.fish.head"] = "Fishing",
-  ["wm.fish.show"] = "Show fishing places of this zone",
-  ["wm.fish.hide"] = "Hide fishing places of this zone",
-  ["wm.fish.showTip"] = "Lists the fish of the zone this map shows with their chance per cast, the lowest skill to cast and the skill without failed casts. Values of the base game, they can differ in the Forever client.",
+  ["wm.fish.zone"] = "Fish of this zone",
+  ["wm.fish.count"] = "%d fish",
+  ["wm.fish.countNone"] = "none",
+  ["wm.fish.win"] = "Fish of this zone",
+  ["wm.fish.showTip"] = "Opens a small window with the fish of the zone this map shows, with their chance per cast, the lowest skill to cast and the skill without failed casts. Values of the base game. They can differ in the Forever client.",
   ["wm.fish.all"] = "All fishing places",
   ["wm.fish.allTip"] = "Opens the window with every fishing place and its fish.",
   ["wm.fish.detail"] = "%s: cast from skill %d, no failed casts from skill %d",
@@ -32,9 +35,11 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["wm.fish.head"] = "Angeln",
-  ["wm.fish.show"] = "Angelplätze dieser Zone zeigen",
-  ["wm.fish.hide"] = "Angelplätze dieser Zone ausblenden",
-  ["wm.fish.showTip"] = "Listet die Fische der Zone, die diese Karte zeigt, mit Chance pro Wurf, Mindest-Skill zum Auswerfen und Skill ohne Fehlwürfe. Werte des Basisspiels, im Forever-Client können sie abweichen.",
+  ["wm.fish.zone"] = "Fische dieser Zone",
+  ["wm.fish.count"] = "%d Fische",
+  ["wm.fish.countNone"] = "keine",
+  ["wm.fish.win"] = "Fische dieser Zone",
+  ["wm.fish.showTip"] = "Öffnet ein kleines Fenster mit den Fischen der Zone, die diese Karte zeigt, mit Chance pro Wurf, Mindest-Skill zum Auswerfen und Skill ohne Fehlwürfe. Werte des Basisspiels. Im Forever-Client können sie abweichen.",
   ["wm.fish.all"] = "Alle Angelplätze",
   ["wm.fish.allTip"] = "Öffnet das Fenster mit allen Angelplätzen und ihren Fischen.",
   ["wm.fish.detail"] = "%s: Auswerfen ab Skill %d, ohne Fehlwürfe ab Skill %d",
@@ -43,13 +48,16 @@ ns.AddLocale("deDE", {
   ["wm.fish.chance"] = "Chance pro Wurf: %s",
   ["wm.fish.enable"] = "Angelhilfe einschalten",
   ["wm.fish.enableTip"] = "Die Angelplätze gehören zur Angelhilfe. Schaltet sie für diesen Charakter ein.",
-  ["wm.fish.copy"] = "Download-Link kopieren",
-  ["wm.fish.copyTip"] = "Die Angelhilfe ist nicht installiert. Kopiert den Download-Link.",
+  ["wm.fish.copy"] = "Downloadlink kopieren",
+  ["wm.fish.copyTip"] = "Die Angelhilfe ist nicht installiert. Kopiert den Downloadlink.",
   ["wm.fish.noteTip"] = "Die Angelplätze gehören zur Angelhilfe. Siehe Einstellungen > Addons.",
 })
 
 local BTN_H, GAP, ROW_H, ICON, BAR_H = 24, 4, 26, 18, 3
 local PERCENT_W = 52
+local WIN_W, SIDE, TITLE_H = 380, 16, 48
+local WIN_H = 400
+local BAR_MAX = WIN_W - 2 * SIDE - 24 - ICON - 10
 
 local function plain(frame)
   B.LeaveFocusRing(frame)
@@ -64,26 +72,18 @@ local function places()
   return type(p) == "table" and type(p.ForNames) == "function" and p or nil
 end
 
-function F.IsOpen()
-  return ns.Store.get("settings.gather.placesOpen") == true
-end
-
 -- Opens the map on a zone for the fishing places: Blizzard's world map with the panel on the tab Gather and
--- the section "Fishing places of this zone" open, which lists the fish there; without Blizzard's map the map
--- page of the add-on. Blizzard's map is never touched in combat (docs/TAINT-AUDIT.md). Returns "opened",
--- "page" or "combat".
+-- the window of the fish of this zone open; without Blizzard's map, and in combat, the map
+-- page of the add-on. Blizzard's map is never touched in combat (docs/TAINT-AUDIT.md). Returns "opened"
+-- or "page".
 function F.ShowZone(mapId)
-  if ns.InCombat() then
-    return "combat"
-  end
-  local blizzard = rawget(_G, "OpenWorldMap") or rawget(_G, "WorldMapFrame")
+  local blizzard = not ns.InCombat() and (rawget(_G, "OpenWorldMap") or rawget(_G, "WorldMapFrame"))
   if not blizzard or not (ns.WorldMapLinks and ns.WorldMapLinks.Map()) then
     ns.MapRequest.Open({ map = mapId })
     return "page"
   end
   ns.Store.set("settings.worldMapPanelOpen", true)
   ns.Store.set("settings.worldMapPanelTab", "gather")
-  ns.Store.set("settings.gather.placesOpen", true)
   if rawget(_G, "OpenWorldMap") then
     ns.MapOps.Record("OpenWorldMap", mapId)
     pcall(OpenWorldMap, mapId)
@@ -96,6 +96,7 @@ function F.ShowZone(mapId)
       end
     end)
   end
+  F.OpenWindow()
   return "opened"
 end
 
@@ -104,7 +105,7 @@ function F.MapFor(names)
   return ns.GatheringLogic.MapIdForName(names)
 end
 
--- The button of the fishing places window: shows the area on the map. Returns "opened", "page", "combat" or
+-- The button of the fishing places window: shows the area on the map. Returns "opened", "page" or
 -- "nomap" (no zone map carries the name of the area).
 function F.ShowArea(names)
   local mapId = F.MapFor(names)
@@ -114,6 +115,174 @@ function F.ShowArea(names)
   return F.ShowZone(mapId)
 end
 
+-- The fishing area of the zone the map shows. Returns the area, or nil and why: "helper" (it does not run),
+-- "zone" (the map shows no zone) or "none" (no area is known for it).
+function F.Area()
+  local p = places()
+  if not p then
+    return nil, "helper"
+  end
+  local mapId = ns.WorldMapLinks and ns.WorldMapLinks.MapID()
+  if type(mapId) ~= "number" or mapId <= 0 then
+    return nil, "zone"
+  end
+  local area = p.ForNames(FL.Names(mapId))
+  if area then
+    return area
+  end
+  return nil, "none"
+end
+
+-- Text of the button of the zone row, "7 fish" or "none".
+function F.CountText(area)
+  local n = area and math.min(#area.fish, FL.MAX_ROWS) or 0
+  return n > 0 and string.format(L["wm.fish.count"], n) or L["wm.fish.countNone"]
+end
+
+-- The window with the fish of the zone ----------------------------------------------------------------------
+
+local win
+
+local function createRow(parent)
+  local row = CreateFrame("Button", nil, parent)
+  row:SetClipsChildren(true)
+  K.RowHover(row)
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(ICON, ICON)
+  row.icon:SetPoint("LEFT", 4, 1)
+  row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  row.percent = W.Text(row, { role = "ui", color = "accent2", justify = "RIGHT" })
+  row.percent:SetPoint("RIGHT", -4, 1)
+  row.percent:SetWidth(PERCENT_W)
+  row.name = W.Text(row, { role = "ui", color = "text" })
+  row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+  row.name:SetPoint("RIGHT", row.percent, "LEFT", -6, 0)
+  row.bar = row:CreateTexture(nil, "ARTWORK")
+  row.bar:SetHeight(BAR_H)
+  row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", ICON + 10, 1)
+  ns.Bind(row, function()
+    row.bar:SetColorTexture(Theme.color("accent"))
+  end)
+  row:SetScript("OnEnter", function(self)
+    local p = places()
+    if p and self.item then
+      p.ShowItem(self, self.item.id, self.item.name)
+    end
+  end)
+  row:SetScript("OnLeave", ns.HideTooltip)
+  return row
+end
+
+local function bindRow(row, item)
+  local p = places()
+  row.item = item
+  local icon = p and p.Icon and p.Icon(item.id)
+  if icon then
+    row.icon:SetTexture(icon)
+  end
+  local name = item.name or ("#" .. tostring(item.id))
+  row.name:SetText(p and p.ColorName and p.ColorName(name, item.id) or name)
+  row.percent:SetText(p and p.Percent and p.Percent(item.chance) or "")
+  row.bar:SetWidth(math.max(1, FL.BarWidth(item.share, BAR_MAX)))
+  row.paintHover()
+end
+
+local function build()
+  local f = ns.Dialogs.Create("ForeverGuidesFishZoneWindow", WIN_W, WIN_H)
+  win = { frame = f }
+  win.detail = W.Text(f, { role = "micro", color = "textSecondary", wrap = true })
+  win.detail:SetWidth(WIN_W - 2 * SIDE)
+  local host = CreateFrame("Frame", nil, f)
+  W.Fill(host, "surface", 1)
+  win.host = host
+  win.list = W.ScrollList(host, { rowHeight = K.scaledHeight(ROW_H), createRow = createRow, bindRow = bindRow })
+  win.list:SetAllPoints(host)
+  win.empty = W.Text(host, { role = "ui", color = "textMuted", wrap = true })
+  win.empty:SetPoint("TOPLEFT", 8, -8)
+  win.empty:SetPoint("TOPRIGHT", -8, -8)
+  local done = W.Action(f, {
+    label = "act.close",
+    icon = "close",
+    tooltip = "common.close",
+    variant = "primary",
+    width = 110,
+    onClick = function()
+      f:Hide()
+    end,
+  })
+  done:SetPoint("BOTTOMRIGHT", -SIDE, 14)
+
+  -- Reads the zone of the map again: the window follows it while it is open.
+  function win.Refresh()
+    local area, why = F.Area()
+    if why == "helper" then
+      f:Hide()
+      return
+    end
+    W.SetText(f.title, "wm.fish.win")
+    local top = TITLE_H
+    win.detail:ClearAllPoints()
+    local shown = {}
+    if area then
+      win.detail:SetText(string.format(L["wm.fish.detail"], area.name, area.cast, area.clean))
+      win.detail:SetPoint("TOPLEFT", f, "TOPLEFT", SIDE, -TITLE_H)
+      top = top + math.ceil(win.detail:GetStringHeight()) + GAP * 2
+      for i = 1, math.min(#area.fish, FL.MAX_ROWS) do
+        shown[i] = area.fish[i]
+      end
+    else
+      win.detail:SetText("")
+      win.empty:SetText(L[why == "zone" and "wm.fish.noZone" or "wm.fish.none"])
+    end
+    win.empty:SetShown(#shown == 0)
+    win.host:ClearAllPoints()
+    win.host:SetPoint("TOPLEFT", f, "TOPLEFT", SIDE, -top)
+    win.host:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SIDE, 52)
+    win.list:SetData(shown)
+  end
+
+  ns.On("FG_WORLDMAP_VIEW", function(_, kind)
+    if kind == "map" and f:IsShown() then
+      win.Refresh()
+    end
+  end)
+  ns.On("FG_SUBADDON_CHANGED", function(_, id)
+    if id == FL.ID and f:IsShown() then
+      win.Refresh()
+    end
+  end)
+  return win
+end
+
+-- Opens the window of the fish of the zone the map shows (nothing while the fishing helper does not run).
+function F.OpenWindow()
+  if not places() then
+    return
+  end
+  if not win then
+    build()
+  end
+  win.frame:Show()
+  win.Refresh()
+end
+
+function F.CloseWindow()
+  if win then
+    win.frame:Hide()
+  end
+end
+
+function F.WindowShown()
+  return win ~= nil and win.frame:IsShown()
+end
+
+-- The window object (tests).
+function F.Window()
+  return win
+end
+
+-- The section in the panel ----------------------------------------------------------------------------------
+
 -- parent: the tab, width: inner width, opts.relayout(): the tab lays out again.
 -- Returns the frame with Layout(width) -> height, Update() and the parts.
 function F.Build(parent, width, opts)
@@ -122,54 +291,19 @@ function F.Build(parent, width, opts)
   local f = CreateFrame("Frame", nil, parent)
 
   local head = W.Text(f, { key = "wm.fish.head", role = "ui", family = "heading", color = "accent2" })
+  local zoneLabel = W.Text(f, { key = "wm.fish.zone", role = "ui", color = "text", wrap = true })
   local zone = plain(W.Button(f, {
-    key = "wm.fish.show",
+    text = "",
+    width = 64,
     height = BTN_H,
-    tooltip = "wm.fish.show",
+    tooltip = "wm.fish.zone",
     tooltipText = "wm.fish.showTip",
-    onClick = function()
-      ns.Store.set("settings.gather.placesOpen", not F.IsOpen())
-      relayout()
-    end,
+    opens = true,
+    onClick = F.OpenWindow,
   }))
   zone.fgId = "wm-fish-zone"
 
-  -- The body of the section while the helper runs: the line of the area, the fish, the button for all places.
-  local detail = W.Text(f, { role = "micro", color = "textSecondary", wrap = true })
   local empty = W.Text(f, { role = "micro", color = "textMuted", wrap = true })
-  local rows = {}
-  local function createRow(i)
-    local row = CreateFrame("Button", nil, f)
-    row.icon = row:CreateTexture(nil, "ARTWORK")
-    row.icon:SetSize(ICON, ICON)
-    row.icon:SetPoint("TOPLEFT", 0, -2)
-    row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    row.percent = W.Text(row, { role = "ui", color = "accent2", justify = "RIGHT" })
-    row.percent:SetPoint("TOPRIGHT", 0, -3)
-    row.percent:SetWidth(PERCENT_W)
-    row.name = W.Text(row, { role = "ui", color = "text" })
-    row.name:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 6, -1)
-    row.name:SetPoint("RIGHT", row.percent, "LEFT", -6, 0)
-    row.bar = row:CreateTexture(nil, "ARTWORK")
-    row.bar:SetHeight(BAR_H)
-    row.bar:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", ICON + 6, 1)
-    ns.Bind(row, function()
-      row.bar:SetColorTexture(Theme.color("accent"))
-    end)
-    row:SetScript("OnEnter", function(self)
-      local p = places()
-      if p and self.item then
-        p.ShowItem(self, self.item.id, self.item.name)
-      end
-    end)
-    row:SetScript("OnLeave", ns.HideTooltip)
-    row.fgId = "wm-fish-row-" .. i
-    return plain(row)
-  end
-  for i = 1, FL.MAX_ROWS do
-    rows[i] = createRow(i)
-    rows[i]:Hide()
-  end
   local all = plain(W.Button(f, {
     key = "wm.fish.all",
     height = BTN_H,
@@ -218,27 +352,18 @@ function F.Build(parent, width, opts)
   note.fgId = "wm-fish-note"
   plain(note)
 
-  local mode, area, shown = "ready", nil, 0
+  local mode = "ready"
 
   local function hideBody()
-    for _, part in ipairs({ detail, empty, all, enable, copy, note }) do
+    for _, part in ipairs({ zoneLabel, zone, empty, all, enable, copy, note }) do
       part:Hide()
-    end
-    for _, row in ipairs(rows) do
-      row:Hide()
     end
   end
 
   -- Reads the state of the helper and the map again and fills the parts. Returns nothing, Layout places them.
   function f:Update()
-    local open = F.IsOpen()
-    W.SetText(zone.label, open and "wm.fish.hide" or "wm.fish.show")
     hideBody()
-    area, shown = nil, 0
     mode = FL.Mode(ns.SubAddons.State(FL.ID))
-    if not open then
-      return
-    end
     if mode == "enable" then
       enable:Show()
     elseif mode == "download" then
@@ -247,27 +372,20 @@ function F.Build(parent, width, opts)
       note.text:SetText((ns.AddonSettings.StatusText(FL.ID)))
       note:Show()
     else
-      local p = places()
-      if not p then
+      local area, why = F.Area()
+      if why == "helper" then
         mode = "note"
         note.text:SetText(L["addons.state.outdated"])
         note:Show()
         return
       end
-      local mapId = ns.WorldMapLinks and ns.WorldMapLinks.MapID()
-      if type(mapId) ~= "number" or mapId <= 0 then
+      W.SetText(zone.label, nil, F.CountText(area))
+      zone:SetEnabled(area ~= nil)
+      zoneLabel:Show()
+      zone:Show()
+      if why == "zone" then
         empty:SetText(L["wm.fish.noZone"])
         empty:Show()
-      else
-        area = p.ForNames(FL.Names(mapId))
-        if area then
-          detail:SetText(string.format(L["wm.fish.detail"], area.name, area.cast, area.clean))
-          detail:Show()
-          shown = math.min(#area.fish, FL.MAX_ROWS)
-        else
-          empty:SetText(L["wm.fish.none"])
-          empty:Show()
-        end
       end
       all:Show()
     end
@@ -284,46 +402,29 @@ function F.Build(parent, width, opts)
       y = y + height + (gap or GAP)
     end
     put(head, 16)
-    put(zone, BTN_H)
-    if F.IsOpen() then
-      if mode == "enable" then
-        put(enable, BTN_H)
-      elseif mode == "download" then
-        put(copy, BTN_H)
-      elseif mode == "note" then
-        note.text:SetWidth(w)
-        put(note, math.max(1, math.ceil(note.text:GetStringHeight())))
-        note:SetHeight(math.max(1, math.ceil(note.text:GetStringHeight())))
-      else
-        if detail:IsShown() then
-          put(detail, math.ceil(detail:GetStringHeight()))
-        end
-        if empty:IsShown() then
-          put(empty, math.ceil(empty:GetStringHeight()))
-        end
-        for i, row in ipairs(rows) do
-          if i <= shown then
-            local item = area.fish[i]
-            row.item = item
-            row:Show()
-            local p = places()
-            local icon = p and p.Icon and p.Icon(item.id)
-            if icon then
-              row.icon:SetTexture(icon)
-            end
-            local name = item.name or ("#" .. tostring(item.id))
-            row.name:SetText(p and p.ColorName and p.ColorName(name, item.id) or name)
-            row.percent:SetText(p and p.Percent and p.Percent(item.chance) or "")
-            row:SetHeight(ROW_H)
-            put(row, ROW_H, 0)
-            row.bar:SetWidth(math.max(1, FL.BarWidth(item.share, w - ICON - 6)))
-          end
-        end
-        if shown > 0 then
-          y = y + GAP
-        end
-        put(all, BTN_H)
+    if mode == "enable" then
+      put(enable, BTN_H)
+    elseif mode == "download" then
+      put(copy, BTN_H)
+    elseif mode == "note" then
+      note.text:SetWidth(w)
+      put(note, math.max(1, math.ceil(note.text:GetStringHeight())))
+      note:SetHeight(math.max(1, math.ceil(note.text:GetStringHeight())))
+    else
+      -- One row: the label takes what the button leaves and wraps instead of being cut.
+      local buttonW = zone:Fit(math.floor(w * 0.6))
+      zone:ClearAllPoints()
+      zone:SetWidth(buttonW)
+      zoneLabel:ClearAllPoints()
+      zoneLabel:SetWidth(math.max(1, w - buttonW - GAP * 2))
+      local rowH = math.max(BTN_H, math.ceil(zoneLabel:GetStringHeight()))
+      zone:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -(y + math.floor((rowH - BTN_H) / 2)))
+      zoneLabel:SetPoint("LEFT", f, "TOPLEFT", 0, -(y + rowH / 2))
+      y = y + rowH + GAP
+      if empty:IsShown() then
+        put(empty, math.ceil(empty:GetStringHeight()))
       end
+      put(all, BTN_H)
     end
     local height = math.max(0, y - GAP)
     f:SetSize(w, height)
@@ -337,7 +438,7 @@ function F.Build(parent, width, opts)
     end
   end)
   ns.On("FG_WORLDMAP_VIEW", function(_, kind)
-    if kind == "map" and f:IsVisible() and F.IsOpen() then
+    if kind == "map" and f:IsVisible() then
       f:Update()
       relayout()
     end
@@ -345,10 +446,9 @@ function F.Build(parent, width, opts)
 
   f.parts = {
     head = head,
+    zoneLabel = zoneLabel,
     zone = zone,
-    detail = detail,
     empty = empty,
-    rows = rows,
     all = all,
     enable = enable,
     copy = copy,

@@ -66,6 +66,9 @@ function RP.New(parent, hooks)
   panel.nextBtn = K.Button(panel, "gm.rules.next", function()
     panel:Next()
   end, "primary", "gm-run-next")
+  panel.dropBtn = K.Button(panel, "gm.rules.drop", function()
+    panel:Drop()
+  end, nil, "gm-run-drop")
   panel.againBtn = K.Button(panel, "gm.rules.again", function()
     panel:Again()
   end, nil, "gm-run-again")
@@ -75,7 +78,7 @@ function RP.New(parent, hooks)
   panel.closeBtn = K.Button(panel, "gm.rules.closeRun", function()
     panel:Close()
   end, nil, "gm-run-close")
-  panel.flow = K.Flow(panel, { panel.confirmBtn, panel.nextBtn, panel.againBtn, panel.stopBtn, panel.closeBtn })
+  panel.flow = K.Flow(panel, { panel.confirmBtn, panel.nextBtn, panel.dropBtn, panel.againBtn, panel.stopBtn, panel.closeBtn })
   panel.flow.fgId = "gm-run-buttons"
 
   local elapsed = 0
@@ -84,6 +87,11 @@ function RP.New(parent, hooks)
     if elapsed >= 0.5 then
       elapsed = 0
       if self.run and self:IsVisible() then
+        -- The combat ended: arm the button for the next click again (the click itself stays the player's).
+        if self.run.resumed then
+          self.run.resumed = nil
+          self:Next()
+        end
         self:Refresh()
       end
     end
@@ -163,6 +171,20 @@ function RP.New(parent, hooks)
     self.hooks.ctx.Refresh()
   end
 
+  -- Drops the step (or the batch) the button waits for and goes on with the next one.
+  function panel:Drop()
+    local run = self.run
+    if run and run:SkipClick() then
+      if self.armed then
+        B.Disarm(self.armed)
+        self.armed = nil
+      end
+      self.msg:SetText("")
+      self:Refresh()
+      self.hooks.ctx.Refresh()
+    end
+  end
+
   function panel:Stop()
     if self.run then
       self.run:Abort()
@@ -215,10 +237,14 @@ function RP.New(parent, hooks)
       self.status:SetText(
         string.format(L["gm.rules.runDone"], c.sent + c.dry + c.copy, c.skipped, c.failed)
           .. (run.reason and (" " .. reasonText(run.reason)) or "")
+          .. (c.refused > 0 and (" " .. string.format(L["gm.rules.runRefused"], c.refused)) or "")
       )
     else
       self.status:SetText(
-        string.format(L["gm.rules.runStep"], math.min(run.i, total), total) .. " " .. reasonText(run.why)
+        string.format(L["gm.rules.runStep"], math.min(run.i, total), total)
+          .. " "
+          .. reasonText(run.why)
+          .. (run.pendingGroup and #run.pendingGroup > 1 and (" " .. string.format(L["gm.rules.batchNote"], #run.pendingGroup)) or "")
       )
     end
     local removals = 0
@@ -253,12 +279,15 @@ function RP.New(parent, hooks)
     -- The button stays under the secure overlay of the macro way, which has its own place on the screen.
     self.nextBtn:SetShown(waiting)
     self.againBtn:SetShown(waiting and run.awaitingChange ~= nil)
+    self.dropBtn:SetShown(clicking)
     self.stopBtn:SetShown(waiting or state == "ready")
     self.closeBtn:SetShown(finished or state == "ready")
     if run.awaitingChange then
       W.SetText(self.nextBtn.label, "gm.rules.skip")
     elseif run.series and waiting then
       W.SetText(self.nextBtn.label, "gm.rules.startSeries")
+    elseif run.awaitingClick or run.batch then
+      W.SetText(self.nextBtn.label, "gm.rules.exec")
     else
       W.SetText(self.nextBtn.label, "gm.rules.next")
     end

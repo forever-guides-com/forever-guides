@@ -5,8 +5,9 @@
 -- (nothing is written into Blizzard's frame besides its own fields results and totalResults), the filtered ids go
 -- into those two fields and LFGBrowseFrame:UpdateResults() draws them. The redraw clears the selection of the list,
 -- so it runs only when the ids changed, and a flag stops the hook from filtering its own redraw.
+-- The redraw itself is off (H.REDRAW): writing those fields from add-on code taints the group finder's search.
 --
--- Taint rules, learned from the add-on LFG Filter Forever: the hook is installed 0.5 s after PLAYER_LOGIN or after
+-- Taint rules, learned in game: the hook is installed 0.5 s after PLAYER_LOGIN or after
 -- the load of Blizzard_GroupFinder_VanillaStyle, never while a file loads (that tainted the category dropdown and
 -- its search then hit ADDON_ACTION_BLOCKED). The Blizzard add-on is never a dependency of ours. Only post hooks, no
 -- Blizzard function is replaced. Nothing is redrawn in combat (it waits for the end), a redraw that raises pauses
@@ -252,6 +253,11 @@ local function drawable(browse)
   return type(browse.IsVisible) ~= "function" or browse:IsVisible() == true
 end
 
+-- Writing results/totalResults and running UpdateResults from our code taints those fields; the group finder
+-- later reads them on the path of its own search (LFGBrowse_DoSearch) and the client then refuses Search().
+-- So the game's list stays untouched: the rules still run (counts, panel), the redraw is off.
+H.REDRAW = false
+
 local function redraw(browse, ids)
   browse.results = ids
   browse.totalResults = #ids
@@ -313,7 +319,7 @@ function H.Apply()
     ids, counts = live, { shown = #live, total = #live }
   end
   changed()
-  if not drawable(browse) or LB.Same(ids, browse.results) then
+  if not H.REDRAW or not drawable(browse) or LB.Same(ids, browse.results) then
     return
   end
   applying = true
@@ -339,7 +345,7 @@ function H.Clear()
   end
   dirty = false
   changed()
-  if not drawable(browse) or LB.Same({}, browse.results) then
+  if not H.REDRAW or not drawable(browse) or LB.Same({}, browse.results) then
     return
   end
   applying = true

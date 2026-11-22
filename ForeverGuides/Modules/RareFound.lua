@@ -1,17 +1,21 @@
 -- Find window of a rare enemy: centered low on the screen with the name, level, a 3D model of the creature
 -- above it, the known loot (the item row of Modules/RareCard.lua), a close button and arrows to page through
--- the last rares found. It never takes the keyboard. A click on the window targets the creature: the body and the model area are secure
--- buttons with a macro, so the attributes only change outside of combat. A find in combat waits for
--- PLAYER_REGEN_ENABLED; closing hides the window through ns.SafeHide. Dragging with the key of rareFoundMove
--- (Shift by default, ns.Keys) moves the window, the position is saved. The list, the macro and the decisions
--- are in Modules/RareFoundLogic.lua.
+-- the last rares found. It never takes the keyboard. The window itself is plain: it shows, hides, repaints, pages
+-- and moves in combat too. A click on the window targets the creature through two secure buttons (the body and
+-- the model area) that hang on UIParent over the window (Core/SecureOverlay.lua), never anchored to it. Only
+-- their macro waits for the end of combat: until then the hint says so, a right click still closes, and the
+-- controls (close, arrows, loot) lie above the overlays. There is no Esc: see build(). Dragging with the key of
+-- rareFoundMove (Shift by default, ns.Keys) moves the window, the position is saved. The list, the macro and the
+-- decisions are in Modules/RareFoundLogic.lua.
 --
 -- API (ns.RareFound):
 --   Show(id, rare, unitName)  a rare was found (npc id, its data entry, the name of the unit when known)
---   Page(dir)                 -1 or 1, the next entry of the list (not in combat)
+--   Page(dir)                 -1 or 1, the next entry of the list
 --   Close()                   empties the list and hides the window
 --   ResetPosition()           back to the default place
---   Frame()                   the window, nil until the first find
+--   Prebuild()                builds the hidden window out of combat (login, switch on)
+--   Frame()                   the window, nil until built
+--   Targets()                 the secure target buttons over it (tests, diagnostics)
 local _, ns = ...
 local L, RL, RFL, W = ns.L, ns.RareLogic, ns.RareFoundLogic, ns.W
 
@@ -20,11 +24,13 @@ ns.RareFound = RF
 
 ns.AddLocale("enUS", {
   ["rare.found.target"] = "Click to target, right click to close",
+  ["rare.found.wait"] = "Targeting works after the fight, right click closes",
   ["rare.found.prev"] = "Previous rare",
   ["rare.found.next"] = "Next rare",
 })
 ns.AddLocale("deDE", {
   ["rare.found.target"] = "Klicken zum Anvisieren, Rechtsklick schließt",
+  ["rare.found.wait"] = "Anvisieren geht nach dem Kampf, Rechtsklick schließt",
   ["rare.found.prev"] = "Vorheriger Seltener",
   ["rare.found.next"] = "Nächster Seltener",
 })
@@ -36,6 +42,9 @@ local TICK = 1
 local entries, index = {}, 1
 local pending = false
 local frame
+-- The secure target buttons over the window ({ overlay, anchor } pairs), made out of combat. wantMacro is the macro
+-- of the entry on show, armed on the buttons when the combat allows it.
+local overlays, wantMacro, armed
 
 local function call(fn, ...)
   if type(fn) ~= "function" then
@@ -109,12 +118,16 @@ end
 
 -- Build --------------------------------------------------------------------------------------------------
 
-local function wireHit(btn)
-  -- Both edges: the secure handler acts on the press or the release, depending on the client setting for
-  -- action keys, and drops the other one.
-  btn:RegisterForClicks("AnyUp", "AnyDown")
-  -- Right click closes: a type without an action keeps the secure handler idle for that button.
-  btn:SetAttribute("type2", "close")
+-- secure: an overlay button (both edges, the secure handler acts on the press or the release depending on the
+-- client setting for action keys). The plain buttons under the window answer the same way in combat.
+local function wireHit(btn, secure)
+  if secure then
+    btn:RegisterForClicks("AnyUp", "AnyDown")
+    -- Right click closes: a type without an action keeps the secure handler idle for that button.
+    btn:SetAttribute("type2", "close")
+  else
+    btn:RegisterForClicks("AnyUp")
+  end
   btn:HookScript("OnClick", function(_, button)
     if button == "RightButton" then
       RF.Close()
@@ -122,7 +135,7 @@ local function wireHit(btn)
   end)
   btn:RegisterForDrag("LeftButton")
   btn:HookScript("OnDragStart", function()
-    if ns.Keys.Matches("rareFoundMove") and not ns.InCombat() then
+    if ns.Keys.Matches("rareFoundMove") then
       frame:StartMoving()
       frame.moving = true
     end
@@ -132,6 +145,7 @@ local function wireHit(btn)
       frame.moving = nil
       pcall(frame.StopMovingOrSizing, frame)
       savePosition()
+      RF.Sync()
     end
   end)
   btn:HookScript("OnEnter", function()
@@ -142,10 +156,30 @@ local function wireHit(btn)
   end)
 end
 
-local function secureButton(parent)
-  local btn = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
-  wireHit(btn)
+local function plainButton(parent)
+  local btn = CreateFrame("Button", nil, parent)
+  wireHit(btn, false)
   return btn
+end
+
+-- The secure buttons: made once, out of combat only (nil in combat, the next sync tries again).
+local function makeOverlays()
+  if overlays or ns.InCombat() then
+    return overlays
+  end
+  local list = {}
+  for _, key in ipairs({ "body", "modelHit" }) do
+    if frame[key] then
+      local overlay = ns.SecureOverlay.New()
+      if not overlay then
+        return nil
+      end
+      wireHit(overlay.frame, true)
+      list[#list + 1] = { overlay = overlay, anchor = frame[key] }
+    end
+  end
+  overlays = list
+  return overlays
 end
 
 local function expire(self, dt)
@@ -182,10 +216,10 @@ local function build()
     model:Hide()
   end
 
-  frame.body = secureButton(frame)
+  frame.body = plainButton(frame)
   frame.body:SetAllPoints(frame)
   if frame.model then
-    frame.modelHit = secureButton(frame)
+    frame.modelHit = plainButton(frame)
     frame.modelHit:SetAllPoints(frame.model)
   end
 
@@ -228,30 +262,46 @@ local function build()
     end,
   })
 
-  -- The target buttons cover the whole window: the controls sit above them, or their clicks would target.
-  local top = frame.body:GetFrameLevel() + 2
+  -- The target buttons cover the whole window: the controls sit above them (the overlays lie two levels over the
+  -- window), or their clicks would target.
+  local top = frame:GetFrameLevel() + 4
   for _, child in ipairs({ frame.row, frame.prev, frame.next, frame.close }) do
     child:SetFrameLevel(top)
   end
 
   frame:SetScript("OnUpdate", expire)
-  -- No Esc: a keyboard handler on a frame with secure children can swallow every key (walking, bars),
-  -- and the window pops up unasked. It closes with its button or runs out by itself.
+  -- No Esc: a keyboard handler can swallow every key (walking, bars) and the window pops up unasked, also in
+  -- combat. It closes with its button or runs out by itself.
   frame:Hide()
+  makeOverlays()
   return frame
 end
 
 -- Content -------------------------------------------------------------------------------------------------
 
-local function setTarget(macro)
-  for _, btn in ipairs({ frame.body, frame.modelHit }) do
-    btn:SetAttribute("type", macro and "macro" or nil)
-    btn:SetAttribute("macrotext", macro)
+-- Arms the target buttons with the macro of the entry on show and lays them over the window, or takes them off
+-- when there is nothing to target. Out of combat only: in combat the state driver has hidden them and the sync
+-- waits for PLAYER_REGEN_ENABLED. The hint under the window follows what a click does.
+function RF.Sync()
+  if not frame then
+    return
   end
-  frame.hint:SetShown(macro ~= nil)
+  if RFL.Route(ns.InCombat()) == "queue" then
+    pending = true
+    armed = false
+  elseif makeOverlays() then
+    pending = false
+    armed = false
+    local macro = frame:IsShown() and wantMacro or nil
+    for _, item in ipairs(overlays) do
+      armed = item.overlay:Sync(item.anchor, macro) or armed
+    end
+  end
+  frame.hint:SetShown(wantMacro ~= nil)
+  W.SetText(frame.hint, armed and "rare.found.target" or "rare.found.wait")
 end
 
--- Texts, loot, target and size of the entry on show; only called outside of combat.
+-- Texts, loot, model and size of the entry on show; works in combat.
 local function render()
   local entry = entries[index]
   local rare = entry and ns.DataApi.Rare(entry.id)
@@ -274,34 +324,43 @@ local function render()
     height = height + 8 + rowHeight
   end
   frame:SetHeight(height + 8 + 14 + PAD)
-  setTarget(RFL.Macro(RFL.TargetName(entry.unitName, name)))
+  wantMacro = RFL.Macro(RFL.TargetName(entry.unitName, name))
   setModel(entry.id)
   frame.count:SetText(#entries > 1 and (index .. "/" .. #entries) or "")
   frame.prev:SetShown(#entries > 1)
   frame.next:SetShown(#entries > 1)
   applyPosition()
   frame:Show()
+  RF.Sync()
 end
 
--- Brings the window in line with the list: hides it when the list is empty, otherwise paints now or after
--- the combat.
+-- Brings the window in line with the list: hides it when the list is empty, otherwise paints it, in combat too.
 function RF.Update()
   RFL.Prune(entries, clock())
   index = RFL.Clamp(index, #entries)
   if #entries == 0 then
-    pending = false
+    wantMacro = nil
     if frame then
-      ns.SafeHide(frame)
+      frame:Hide()
+      RF.Sync()
     end
     return
   end
   frame = frame or build()
-  if RFL.Route(ns.InCombat()) == "queue" then
-    pending = true
+  render()
+end
+
+-- Builds the hidden window ahead of time out of combat, so a find only has to show it (creating the frames in a
+-- fight would cost a hitch). Nothing heavy happens here: the model gets its creature in render().
+local function wanted()
+  return RL.Active() and ns.Store.get("settings.rareWindow") ~= false
+end
+
+function RF.Prebuild()
+  if frame or not wanted() or ns.InCombat() then
     return
   end
-  pending = false
-  render()
+  build()
 end
 
 function RF.Show(id, rare, unitName)
@@ -314,7 +373,7 @@ function RF.Show(id, rare, unitName)
 end
 
 function RF.Page(dir)
-  if RFL.Route(ns.InCombat()) == "queue" or #entries < 2 then
+  if #entries < 2 then
     return
   end
   index = RFL.Step(index, #entries, dir)
@@ -334,7 +393,6 @@ function RF.ResetPosition()
     ns.db.frames.rareFound = nil
   end
   if frame and frame:IsShown() then
-    pending = true
     RF.Update()
   end
 end
@@ -343,10 +401,27 @@ function RF.Frame()
   return frame
 end
 
--- For tests and diagnostics: the list and whether a repaint waits for the end of combat.
+-- The secure target buttons (body, model area), empty until the first sync out of combat.
+function RF.Targets()
+  local out = {}
+  for _, item in ipairs(overlays or {}) do
+    out[#out + 1] = item.overlay.frame
+  end
+  return out
+end
+
+-- For tests and diagnostics: the list and whether the arming of the target buttons waits for the end of combat.
 function RF.State()
   return entries, index, pending
 end
+
+ns.On("PLAYER_LOGIN", RF.Prebuild)
+ns.On("PLAYER_ENTERING_WORLD", RF.Prebuild)
+ns.On("FG_SETTING_CHANGED", function(_, path)
+  if path == "settings.rares" or path == "settings.rareWindow" then
+    RF.Prebuild()
+  end
+end)
 
 ns.On("PLAYER_REGEN_ENABLED", function()
   if pending then

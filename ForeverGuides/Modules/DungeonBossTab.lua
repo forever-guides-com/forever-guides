@@ -10,14 +10,14 @@ ns.AddLocale("enUS", {
   ["bosstab.defeated"] = "Defeated",
   ["bosstab.likely"] = "Probably defeated",
   ["bosstab.open"] = "Open",
-  ["bosstab.unavailable"] = "Progress is not available for this instance.",
+  ["bosstab.unavailable"] = "No progress is available for this instance.",
 })
 
 ns.AddLocale("deDE", {
   ["bosstab.defeated"] = "Besiegt",
   ["bosstab.likely"] = "Wahrscheinlich besiegt",
   ["bosstab.open"] = "Offen",
-  ["bosstab.unavailable"] = "Fortschritt für diese Instanz nicht verfügbar.",
+  ["bosstab.unavailable"] = "Für diese Instanz gibt es keinen Fortschritt.",
 })
 
 local DBT = {}
@@ -57,7 +57,7 @@ local function makeRow(parent, owner)
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, ns.Theme.lineAlpha())
+    row.line:SetColorTexture(ns.Theme.fillColor("line"))
   end)
   -- The row is a stop of the keyboard walk and brings itself into view; Enter opens the model of a boss that has one.
   ns.Focus.register(row, function(self)

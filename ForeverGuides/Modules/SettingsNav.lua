@@ -24,23 +24,11 @@ ns.AddLocale("deDE", {
   ["settings.nav.tooltip"] = "%s, %s (%d von %d)",
 })
 
--- The selected button has a bar below its text, color alone never marks it.
-local function addBar(button)
-  button.bar = button:CreateTexture(nil, "ARTWORK")
-  button.bar:SetPoint("BOTTOMLEFT", 4, 0)
-  button.bar:SetPoint("BOTTOMRIGHT", -4, 0)
-  button.bar:SetHeight(2)
-  ns.Bind(button.bar, function(t)
-    t:SetColorTexture(ns.Theme.color("accent2"))
-  end)
-end
-
 local function paintRow(row, defs, current)
   for _, def in ipairs(defs) do
     local b = row:GetButton(def.id)
     local on = def.id == current
-    b.bar:SetShown(on)
-    W.SetColor(b.label, on and "accent" or "textSecondary")
+    b:SetSelected(on)
   end
 end
 
@@ -98,7 +86,7 @@ function SN.New(parent, opts)
     groupDefs[#groupDefs + 1] = {
       id = g,
       key = "settings.group." .. g,
-      variant = "ghost",
+      variant = "tab",
       fgId = "settings-group-" .. g,
       tooltip = "settings.group." .. g .. ".long",
       onClick = function()
@@ -116,7 +104,7 @@ function SN.New(parent, opts)
       defs[#defs + 1] = {
         id = f.id,
         key = "settings.feature." .. f.id,
-        variant = "ghost",
+        variant = "tab",
         fgId = "settings-feature-" .. f.id,
         onClick = function()
           choose(f.id)
@@ -144,18 +132,10 @@ function SN.New(parent, opts)
     end
   end
 
-  for _, row in ipairs({ nav.groupRow }) do
-    for _, def in ipairs(groupDefs) do
-      addBar(row:GetButton(def.id))
-    end
-  end
   wireKeys(nav.groupRow, groupDefs, function(g)
     choose(firstOf(g))
   end)
   for g, row in pairs(nav.rows) do
-    for _, def in ipairs(nav.featureDefs[g]) do
-      addBar(row:GetButton(def.id))
-    end
     wireKeys(row, nav.featureDefs[g], choose)
   end
 

@@ -49,7 +49,7 @@ ns.AddLocale("deDE", {
   ["xpbar.chat.sayBlocked"] = "Sagen ist im Spiel hier gesperrt, die Aufstiegszeile siehst nur du.",
   ["xpbar.report.time"] = "Stufe %d bis %d dauerte %s.",
   ["xpbar.report.missing"] = "Für Stufe %s ist keine Zeit gespeichert.",
-  ["xpbar.report.range"] = "Zwei Stufen angeben, die erste kleiner als die zweite.",
+  ["xpbar.report.range"] = "Gib zwei Stufen an, die erste kleiner als die zweite.",
 })
 
 -- A factor within this share of 1 counts as no difference between the table and the client.

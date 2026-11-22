@@ -102,13 +102,13 @@ function LR.Create(parent, register)
   row.mark = W.Text(row, { role = "micro", color = "accent2", justify = "RIGHT" })
   local hover = row:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.06)
+  hover:SetColorTexture(Theme.fillColor("hover"))
   row.line = row:CreateTexture(nil, "ARTWORK")
   row.line:SetPoint("BOTTOMLEFT")
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
     if row.entry then
       row.edge:SetColorTexture(qualityEdge(row.quality))
     end
@@ -131,9 +131,21 @@ function LR.Create(parent, register)
   row.fgDescription = function()
     return row.description
   end
-  register(row, function() end)
+  -- Enter previews the item, like Ctrl+click.
+  register(row, function()
+    ns.ItemActions.Preview(row.entry and row.entry.id)
+  end)
+  ns.ItemActions.Bind(row, function()
+    return row.entry and row.entry.id
+  end)
+  row.star = ns.WishlistStar.Create(row, function()
+    return row.entry and row.entry.id
+  end, register)
 
   function row:fgLayout(width)
+    local starW = ns.WishlistStar.SIZE + 4
+    self.star:ClearAllPoints()
+    self.star:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -PAD)
     local rightW = 0
     if self.rate:IsShown() then
       local rateW = math.ceil(self.rate:GetStringWidth())
@@ -141,7 +153,7 @@ function LR.Create(parent, register)
       rightW = math.min(math.floor(width * RATE_SHARE), math.max(RATE_MIN, rateW, markW))
     end
     local textX = EDGE + ICON + EDGE + GAP
-    local nameW = math.max(40, width - textX - (rightW > 0 and rightW + GAP or 0))
+    local nameW = math.max(40, width - textX - starW - (rightW > 0 and rightW + GAP or 0))
     self.edge:ClearAllPoints()
     self.edge:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -PAD)
     self.icon:ClearAllPoints()
@@ -159,17 +171,17 @@ function LR.Create(parent, register)
     local side = 0
     if rightW > 0 then
       self.rate:ClearAllPoints()
-      self.rate:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -PAD)
+      self.rate:SetPoint("TOPRIGHT", self, "TOPRIGHT", -starW, -PAD)
       self.rate:SetWidth(rightW)
       side = PAD + ceil(self.rate)
       if self.mark:IsShown() then
         self.mark:ClearAllPoints()
-        self.mark:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -(side + 2))
+        self.mark:SetPoint("TOPRIGHT", self, "TOPRIGHT", -starW, -(side + 2))
         self.mark:SetWidth(rightW)
         side = side + 2 + ceil(self.mark)
       end
     end
-    return math.max(ICON + 2 * EDGE + 2 * PAD, y + PAD, side + PAD)
+    return math.max(ICON + 2 * EDGE + 2 * PAD, y + PAD, side + PAD, PAD + ns.WishlistStar.SIZE + PAD)
   end
   return row
 end
@@ -177,6 +189,8 @@ end
 -- item: an entry of IL.Build (boss loot, recorded loot or a quest reward).
 function LR.Paint(row, item)
   row.entry = item
+  row.star:SetShown(item.id ~= nil)
+  row.star:Refresh()
   local name = IV.ItemName(item)
   row.itemName = name
   local label = name

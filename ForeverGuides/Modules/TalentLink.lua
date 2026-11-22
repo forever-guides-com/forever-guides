@@ -54,19 +54,19 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["talentlink.label"] = "Talente",
-  ["talentlink.untitled"] = "Talent-Build",
+  ["talentlink.untitled"] = "Talentskillung",
   ["talentlink.from"] = "Von %s",
   ["talentlink.load"] = "In den Editor laden",
   ["talentlink.copyCode"] = "Code kopieren",
-  ["talentlink.copyLink"] = "Web-Link kopieren",
+  ["talentlink.copyLink"] = "Weblink kopieren",
   ["talentlink.otherClass"] = "Andere Klasse: nur Planung",
   ["talentlink.shareHint"] = "Sendet nur einen Link.\nMit Forever Guides öffnet ihn ein Klick.",
-  ["talentlink.loading"] = "Frage den Build bei %s an ...",
+  ["talentlink.loading"] = "Frage die Skillung bei %s an ...",
   ["talentlink.timeout"] = "Keine Antwort von %s (offline, andere Fraktion, ohne Addon).",
-  ["talentlink.gone"] = "%s bietet ihn nicht mehr an (nur bis /reload oder Logout).",
-  ["talentlink.badData"] = "Der Build von %s konnte nicht gelesen werden.",
-  ["talentlink.tooLarge"] = "Der Build von %s ist zu groß.",
-  ["talentlink.err.unreadable"] = "Build nicht lesbar, Teilen nicht möglich.",
+  ["talentlink.gone"] = "%s bietet sie nicht mehr an (nur bis /reload oder Logout).",
+  ["talentlink.badData"] = "Die Skillung von %s konnte nicht gelesen werden.",
+  ["talentlink.tooLarge"] = "Die Skillung von %s ist zu groß.",
+  ["talentlink.err.unreadable"] = "Skillung nicht lesbar, Teilen nicht möglich.",
   ["talentlink.err.tooLarge"] = "Zu groß zum Teilen im Chat.",
 })
 

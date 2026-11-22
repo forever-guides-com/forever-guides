@@ -689,7 +689,7 @@ local function newRow(view)
       chat.LineActions.Copy(item)
     end
   end)
-  -- Built with the row, never in combat: a card needs its icons the moment its message appears.
+  -- Built with the row: a card needs its icons the moment its message appears.
   ensureActions(view, row)
   row.actResend:Hide()
   row.actTake:Hide()
@@ -1095,10 +1095,6 @@ function Thread.Create(parent, win, shape)
     end
   end
 
-  function view:NeedsFrames()
-    return TL.PoolSize(view.viewH, scaled(TL.SPEC.minLine)) > #view.pool
-  end
-
   function view:Reading()
     return view.conv ~= nil and win.Reading()
   end
@@ -1433,12 +1429,11 @@ function Thread.Create(parent, win, shape)
     for i = first, last do
       slot = slot + 1
       local row = view.pool[slot]
-      if not row and slot <= TL.POOL_MAX and not FG.InCombat() then
+      if not row and slot <= TL.POOL_MAX then
         row = newRow(view)
         view.pool[slot] = row
       end
       if not row then
-        view.pending = true
         break
       end
       paintRow(view, row, view.items[i], width)

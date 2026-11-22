@@ -18,6 +18,8 @@ local function metadata(field)
 end
 
 ns.version = metadata("Version") or "dev"
+-- Only the release build writes this TOC field (tools/build_release.py); see Modules/VersionCheck.lua.
+ns.releaseMark = metadata("X-Release-Build")
 
 local U = {}
 ns.U = U

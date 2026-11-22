@@ -4,6 +4,82 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [1.0.0] - 2026-11-22
+
+### Added
+
+- New design: Pages and lists show cards with icons, levels and status.
+- News: After an update a window shows the news of the new version and below everything Forever Guides can do, any time with /fg news.
+- Fishing: The catch journal is its own page in the menu, the small window still opens from there.
+- Sharing: Almost every page has a share button, including the settings. Send a link or an FG-... code to chat, and others open it with one click or with /fg open.
+- Dungeon map: Routes through the dungeon with legs, room names as labels, plus maps for the five new dungeons, Upper Blackrock Spire and the Dalaran Underbelly.
+- Gear planner: World quests and world drops show up as sources, plus far more quest rewards. The list only shows what fits your level, class and faction, and the character model stands still.
+- Instance quests: Every dungeon quest shows reputation, notes and prequests, the hand-in place with map and waypoint buttons and the places of the quest objectives with a waypoint.
+- Instance quests: About 200 more quests and chain links of the 5-man dungeons, 24 of them confirmed in game, plus missing giver places, rewards and prequests.
+- Instances: More boss and instance loot (unconfirmed entries are marked), measured drop chances, more rare enemies and German names for bosses and items.
+- Access: The Access tab shows keys and routes for eleven instances. Only the Scarlet Key and the Skeleton Key are confirmed, all others carry the note "not confirmed".
+- Spellbook: Pick the class whose spells you want to see in the side panel.
+- Walking routes: Paths follow the real terrain including bridges, caves and floors. The new setting Walking route picks cross-country, balanced or mostly roads.
+- Minimap: The planned walking path shows as a line on the minimap (setting Route on the minimap, on by default).
+- Guides: A new area in the side bar with three guides. Values that are not confirmed are marked.
+- Lockpicking: Skill ranges with targets per faction, lockboxes with their sources and the rogue quests, chests can be shown on the map.
+- Comprehension: The guide for mages with stages, scrolls and results, plus the 39 library books in four sets with a status per book, counts and the library rewards.
+- Reputation: All factions with your own standing, the best ways per standing, rewards and vendors, plus filters.
+- Gathering: One filter window per area for ores, herbs, chests and fishing schools, with search, select all, select none and only what I can gather.
+- Gathering: Locked chests have their own lock icon, the tooltip names the lockpicking skill you need.
+- Farm HUD: Hovering an ore or herb symbol shows its name, hold Alt to see the game's own tooltips for tracked nodes. The key can be changed and the feature can be switched off in the settings.
+- World map: Hovering a zone shows its level range under the zone name, optionally every zone on the continent maps shows its range in the middle. The color follows your level.
+- Professions: 79 more vendors and 56 more profession trainers, including Alterac Mountains, Zephras Isle, Riverglades and the starter zones.
+- Recipes: The detail view names the tools, station, specialization and cooldown of a recipe, missing learn levels and two enchants are added.
+- Characters: Level, XP and rested XP per character on the start page and in the overview, estimated from the logout time and place, with a notice when another character is fully rested.
+- Items: Hover shows the item tooltip, Shift+click links it in chat, Ctrl+click previews it. A preview window shows items, whole sets and creatures on a 3D model.
+- Auction house prices: The new setting Show prices of other auction houses also lists the neutral houses and the other faction's house in the item tooltip, short and with the age of the scan.
+- Minimap and farm HUD: Spots show subtly as a small faint ring in the item color, a spot with several possible items carries a dot. The "Item symbol" style brings the old look back.
+- Map: Share your position with guild, friends and Battle.net friends, pick See and Send per group.
+
+### Changed
+
+- Interface: Loot, reputation, legendaries, talent builds and waypoints now use framed rows with icons like the other pages.
+- Map and route: One route for the page and the world map. Search a goal, add stops, calculate and start the route, plus "Use hearthstone" and "Back to start".
+- Map and route: The route drawer sits at the right edge of the world map with the card and the leg list. "Swap" and "Add waypoint" are in the route card, "Start at my position" uses where you stand.
+- Look: WoW Forever is the default window style (a stored Flat switches once with a notice). It uses the game's own art for cards, buttons, tabs, search box and dropdowns and the game font in the title.
+- Look: Headings in game gold, warm text colors, one shared hover and selection, tabs with hover and focus, dark select fields with readable text, opacity and zoom behind the View button.
+- Side bar: No hard lines under the groups, drawn chevrons, one hover and focus look and a width that follows the names. Ctrl+K opens the search.
+- Vendors and talents: The vendor list shows the chosen vendor's offer on the right, each talent tree has its background, Items & BiS is hidden for now.
+- Shopping lists: list, ticks, profession, target skill and stock are per character, the first character takes the old ones.
+- Filters: One filter row per list page with a count of active filters and a Reset filters button. Empty lists show an icon and offer the button too.
+- Page header: A subtitle under the title, the help text as a strip below it that is open on the first visit, collapses per page with Hide help and comes back with the ? in the header.
+- Interface: Density Normal or Compact in the settings, classes and profession route as card grid, reputation with progress bars, filters and tabs remembered per page, a first-start hint for Ctrl+K.
+- Lockpicking and Comprehension: Your skill with a bar and the next step with its waypoint at the top, collapsible sections below with progress and state per row, the section for your skill is open.
+- Ores and herbs: Every area is a card, a wide window shows up to three side by side, the filters sit in the window of the area. The page shows the areas without long scrolling.
+- Ores and herbs: All spots checked again, in Mulgore, Stormwind, Eastern Plaguelands and Redridge they now sit at the right places, Mount Hyjal is new.
+- Ores and herbs: A spawn point with several possible ores or herbs shows all possibilities. The tooltip lists them all, a colored rim and a number mark the spot, switchable in the settings.
+- Places: Vendors, profession trainers, class trainers and dungeon entrances in Mulgore, Stormwind, Eastern Plaguelands and Redridge now point to the right places.
+- Farm HUD: It opens and closes in combat on the player's own switch. On the HUD the tooltip shows the item, all possibilities and the distance, and the HUD stays click-through.
+- Map: The zone border arrows switch the map area in combat too, as long as the map is open and not protected.
+- Windows: The game windows can be dragged in combat too, including the world map as long as it is not protected. Position and zoom still wait for the end of the fight.
+- Sharing: Chat links read as [Addon Forever Guides: ...] without a code. Sharing sends that line with its data and received lines become links, both can be switched off. Say and similar send the code.
+- Instances: Level ranges of 11 dungeons from the game's group finder (Scarlet Monastery, Dire Maul, Maraudon and more), Mount Hyjal shows its levels 55-60 on the world map.
+- Auction house prices: Prices are stored per auction house for every character. Tooltips, shopping list and profession routes use your faction's house, else a neutral house (marked ~).
+
+### Fixed
+
+- Characters: Inventory and character data are saved again when the game reports no realm name.
+- Owned: The tooltip shows the active character's stock straight from the game, and the /fg inventory command says whether bags and worn items were readable at the last capture.
+- Spellbook: The learn list next to the spellbook opens without an error again when it was left open last time.
+- Error list: Empty warnings without text are no longer stored, and the list keeps the full trace.
+- Map panel: Tabs, check boxes and the All/None buttons show their full text, also at a large font size. The panel widens when needed, long labels wrap onto the next line.
+- Sharing: Chat messages contain only links the game accepts, otherwise the name stands in square brackets. Sharing a quest by whisper no longer fails, and the preview shows exactly the sent text.
+- Farm HUD: No more stutter with many add-ons, the icon search is spread over several frames.
+- Minimap: The pins run smoother while riding.
+- Combat: Rare find window, guild invites, chat, crafters list, tour, shopping tracker and popups open and close in combat too, the targeting and invite buttons arm after the fight.
+- Instances: Krol'dok Stronghold shows 5 players, and a few entries that do not exist in the game are removed (one dungeon item and three reputation factions).
+- Share icon: It no longer stays visible after the mouse has left the row, and it shows again when hovering any row in the side bar and the recipe list.
+- Interface: The main window refreshes the menu icons again when it opens, dialogs come to the front, and the pressed look in the group finder filter goes away when the pointer leaves.
+- World map: Ore and herb symbols, markers and routes also lie above the stitched world map, keep their size at every zoom and show the zones of the map view.
+- Group finder: The game's list stays untouched, so searching and listing are no longer reported as blocked, and two errors in chat and buttons are fixed.
+- Ownership in the tooltip: The block no longer goes missing when the tooltip of an item is refilled after it was built.
+
 ## [0.10.2] - 2026-11-16
 
 ### Fixed
@@ -731,6 +807,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[1.0.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.2...v1.0.0
 [0.10.2]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.9.0...v0.10.0

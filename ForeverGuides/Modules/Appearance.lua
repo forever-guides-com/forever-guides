@@ -32,6 +32,9 @@ ns.AddLocale("enUS", {
   ["settings.theme.mage"] = "Mage",
   ["settings.theme.warlock"] = "Warlock",
   ["settings.theme.druid"] = "Druid",
+  ["settings.density"] = "Density",
+  ["settings.density.normal"] = "Normal",
+  ["settings.density.compact"] = "Compact",
   ["settings.accent"] = "Accent color",
   ["settings.accentDefault"] = "Theme accent",
   ["settings.accentOk"] = "Contrast OK",
@@ -40,7 +43,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["settings.look"] = "Aussehen",
-  ["settings.alpha"] = "Fenster-Deckkraft",
+  ["settings.alpha"] = "Deckkraft des Fensters",
   ["settings.alphaHint"] = "Nur Hintergründe, Text bleibt",
   ["settings.alphaLow"] = "Fast unsichtbar. Footer: Deckkraft, /fg reset",
   ["settings.theme"] = "Farbschema",
@@ -60,6 +63,9 @@ ns.AddLocale("deDE", {
   ["settings.theme.mage"] = "Magier",
   ["settings.theme.warlock"] = "Hexenmeister",
   ["settings.theme.druid"] = "Druide",
+  ["settings.density"] = "Dichte",
+  ["settings.density.normal"] = "Normal",
+  ["settings.density.compact"] = "Kompakt",
   ["settings.accent"] = "Akzentfarbe",
   ["settings.accentDefault"] = "Akzent des Schemas",
   ["settings.accentOk"] = "Kontrast OK",
@@ -78,6 +84,17 @@ function A.SetSkin(id)
   ns.RefreshUI()
 end
 
+-- Spacing density: unknown ids fall back to normal. Pages are built again so every gap is read anew.
+function A.SetDensity(id)
+  id = Theme.DENSITY[id] and id or Theme.DENSITY_DEFAULT
+  local changed = Theme.density() ~= id
+  Store.set("settings.density", id)
+  ns.RefreshUI()
+  if changed and ns.Main.frame then
+    ns.Main.InvalidateViews()
+  end
+end
+
 -- hex: "rrggbb" or "#rrggbb", anything else clears the accent (theme accent). `live` is
 -- for a picker that reports every step: the restyle then waits for a pause.
 function A.SetAccent(hex, live)
@@ -93,6 +110,7 @@ function A.Reset()
   ns.Main.SetAlpha(Theme.ALPHA_DEFAULT)
   Store.set("settings.theme", "default")
   Store.set("settings.skin", Skins.DEFAULT)
+  A.SetDensity(Theme.DENSITY_DEFAULT)
   A.SetAccent(nil)
 end
 
@@ -223,6 +241,18 @@ function A.AddSettings(view)
   })
   theme.fgId = "look-theme"
   s:Add(theme, { height = 46, width = 240 })
+  local density = W.Dropdown(view.content, {
+    key = "settings.density",
+    width = 240,
+    options = {
+      { value = "normal", key = "settings.density.normal" },
+      { value = "compact", key = "settings.density.compact" },
+    },
+    get = Theme.density,
+    set = A.SetDensity,
+  })
+  density.fgId = "look-density"
+  s:Add(density, { height = 46, width = 240 })
   -- The accent color and the reset are touched rarely: behind "More settings".
   local more = W.Accordion(view, { id = view.id or "window.look" })
   addAccentButton(more)

@@ -91,14 +91,10 @@ function F.Visible(rows, hideDone)
   return list, pos
 end
 
--- Text for the collapsed bar: one capital letter per line, a space becomes an empty line. The client cannot
--- rotate a font string, stacked letters read top to bottom.
+-- The collapsed strip as one text: one capital letter per line, a space becomes an empty line (the strip
+-- itself draws one font string per letter, see Modules/SidePanel.lua).
 function F.Vertical(text)
-  local out = {}
-  for ch in tostring(text or ""):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
-    out[#out + 1] = ch == " " and "" or ch:upper()
-  end
-  return table.concat(out, "\n")
+  return table.concat(ns.SidePanel.Letters(text), "\n")
 end
 
 -- Counts of the rows: done steps and all steps.

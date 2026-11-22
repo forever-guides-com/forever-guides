@@ -21,7 +21,7 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["flightpanel.open"] = "Forever Guides: Einstellungen",
   ["flightpanel.tab"] = "Forever Guides: Karte",
-  ["flightpanel.tab.tip"] = "Öffnet den Karten-Bereich des Addons.",
+  ["flightpanel.tab.tip"] = "Öffnet den Kartenbereich des Addons.",
   ["flightpanel.settings"] = "Einstellungen",
   ["flightpanel.title"] = "Flugdauer",
   ["flightpanel.all"] = "Alle Einstellungen",
@@ -74,7 +74,7 @@ function P.Toggle()
 end
 
 -- The side tab opens the map page of the addon; the settings panel stays with the button.
-function P.OpenMap()
+function P.ShowMap()
   if built and ns.Main and ns.Main.Show then
     ns.Main.Show("map")
     ns.BlizzardLinks.RaiseMain(built.taxi)
@@ -135,7 +135,7 @@ local function onKey(self, key)
       handled = true
     elseif focus and (key == "ENTER" or key == "SPACE") then
       if focus == built.tab then
-        P.OpenMap()
+        P.ShowMap()
       elseif focus.Click and focus ~= built.slider then
         focus:Click()
       end
@@ -168,7 +168,7 @@ local function build(taxi)
   local tab = ns.BlizzardLinks.CreateSideTab(taxi, {
     key = "flightpanel.tab",
     tip = "flightpanel.tab.tip",
-    onClick = P.OpenMap,
+    onClick = P.ShowMap,
     x = TAB_INSET,
     y = -TAB_DROP,
   })

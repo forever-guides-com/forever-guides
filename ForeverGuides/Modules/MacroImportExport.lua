@@ -41,7 +41,7 @@ function IO.Build(P)
   local view = P.view
   local imp = { items = {}, picked = {}, focus = nil }
   local exp = { picked = {}, format = "string" }
-  local importList, exportList, paste, status, preview, output, webNote, importButtons, exportButtons
+  local importList, exportList, paste, status, preview, output, webNote, webLinks, importButtons, exportButtons
   local refreshExport, updateImport
 
   local split = FL.TwoPane(P.content, {
@@ -82,6 +82,7 @@ function IO.Build(P)
   left:Add(status, { gap = 6 })
 
   importList = K.NewList(lc, {
+    look = "flat", -- picker list in a dialog
     rowHeight = 44,
     onClick = function(item)
       if item.empty then
@@ -250,6 +251,7 @@ function IO.Build(P)
   )
 
   exportList = K.NewList(rc, {
+    look = "flat", -- picker list in a dialog
     rowHeight = 44,
     onClick = function(item)
       if item.empty then
@@ -335,6 +337,9 @@ function IO.Build(P)
   right:Add(formatDd, { height = Kit.scaled(46), gap = 6 })
   webNote = W.Text(rc, { key = "macros.io.webHint", role = "ui", color = "warning", wrap = true })
   right:Add(webNote, { gap = 6 })
+  webLinks = W.WebLinks(rc)
+  webLinks:Set(L["macros.io.webHint"])
+  right:Add(webLinks, { gap = 6 })
   output = W.TextArea(rc, { height = 110, readOnly = true })
   right:Add(output, { height = 110, gap = 6 })
   exportButtons = Kit.ActionRow(rc, {
@@ -403,6 +408,7 @@ function IO.Build(P)
     local text = IO.build(items, exp.format)
     output:SetValue(text or "")
     webNote:SetShown(exp.format == "web")
+    webLinks:SetShown(exp.format == "web")
     exportButtons:SetItemEnabled("copy", text ~= nil)
     local all = Lib.list({})
     exportList:SetData(#all > 0 and all or { { empty = "macros.list.empty" } })

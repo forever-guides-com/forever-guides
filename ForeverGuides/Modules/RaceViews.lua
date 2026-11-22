@@ -33,13 +33,13 @@ ns.AddLocale("enUS", {
   ["classes.over.matrix"] = "Races and classes",
   ["classes.over.matrixHint"] = "Check = available, green square = new in Forever",
   ["classes.over.new"] = "New in Forever",
-  ["classes.over.newHint"] = "Pick a class to see races that newly play it",
+  ["classes.over.newHint"] = "Pick a class to see which races can newly play it",
   ["classes.over.newNone"] = "No race gets this class as a new option.",
 })
 
 ns.AddLocale("deDE", {
   ["classes.race.classes"] = "Klassen",
-  ["classes.race.abilities"] = "Rassenfähigkeiten",
+  ["classes.race.abilities"] = "Volksfähigkeiten",
   ["classes.race.removed"] = "Entfernte Fähigkeiten",
   ["classes.race.role"] = "Rolle",
   ["classes.race.classAbilities"] = "Volksspezifische Klassenfähigkeiten",
@@ -61,13 +61,10 @@ ns.AddLocale("deDE", {
   ["classes.over.matrix"] = "Völker und Klassen",
   ["classes.over.matrixHint"] = "Haken = verfügbar, grünes Quadrat = neu in Forever",
   ["classes.over.new"] = "Neu in Forever",
-  ["classes.over.newHint"] = "Klasse wählen: zeigt Völker, die sie neu spielen können",
+  ["classes.over.newHint"] = "Wähle eine Klasse, um Völker zu sehen, die sie neu spielen können",
   ["classes.over.newNone"] = "Kein Volk bekommt diese Klasse neu.",
 })
 
-local GAP = 8
-local SECTION_GAP = 16
-local CARD_PAD = 10
 local CARD_ICON = 36
 
 -- Helpers -------------------------------------------------------------------------------
@@ -107,7 +104,7 @@ local function stackEntries(host, entries, width)
         h = textHeight(item, w)
       end
       y = y + h
-      gap = e.gap or GAP
+      gap = e.gap or Theme.space.sm
     end
   end
   y = math.max(1, y)
@@ -290,12 +287,12 @@ local function newChipGrid(parent)
     for _, chip in ipairs(self.chips) do
       local w, h = chip:Fit(width)
       if x > 0 and x + w > width then
-        x, y, rowH = 0, y + rowH + GAP, 0
+        x, y, rowH = 0, y + rowH + Theme.space.sm, 0
       end
       chip:ClearAllPoints()
       chip:SetPoint("TOPLEFT", self, "TOPLEFT", x, -y)
       chip:SetSize(w, h)
-      x = x + w + GAP
+      x = x + w + Theme.space.sm
       rowH = math.max(rowH, h)
     end
     self:SetHeight(math.max(1, y + rowH))
@@ -307,7 +304,7 @@ end
 local function newAbilityCard(parent)
   local card = W.Card(parent, {})
   card.icon = newAbilityIcon(card, CARD_ICON)
-  card.icon:SetPoint("TOPLEFT", CARD_PAD, -CARD_PAD)
+  card.icon:SetPoint("TOPLEFT", Theme.space.md, -Theme.space.md)
   card.name = W.Text(card, { role = "h3", family = "heading", color = "text", wrap = true })
   card.dot = newDot(card, 8)
   card.meta = W.Text(card, { role = "ui", color = "textSecondary", wrap = true })
@@ -324,29 +321,29 @@ local function newAbilityCard(parent)
   end
   -- Sets the content positions for `width` and returns the card height.
   function card:Fit(width)
-    local textX = CARD_PAD + CARD_ICON + 8
-    local nameW = width - textX - CARD_PAD
+    local textX = Theme.space.md + CARD_ICON + 8
+    local nameW = width - textX - Theme.space.md
     local nameH = textHeight(self.name, nameW)
     local metaH = textHeight(self.meta, nameW - 12)
     self.name:ClearAllPoints()
-    self.name:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -CARD_PAD)
+    self.name:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -Theme.space.md)
     self.dot:ClearAllPoints()
-    self.dot:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(CARD_PAD + nameH + 2 + 3))
+    self.dot:SetPoint("TOPLEFT", self, "TOPLEFT", textX, -(Theme.space.md + nameH + 2 + 3))
     self.meta:ClearAllPoints()
-    self.meta:SetPoint("TOPLEFT", self, "TOPLEFT", textX + 12, -(CARD_PAD + nameH + 2))
-    local y = CARD_PAD + math.max(CARD_ICON, nameH + 2 + metaH) + GAP
-    local innerW = width - CARD_PAD * 2
+    self.meta:SetPoint("TOPLEFT", self, "TOPLEFT", textX + 12, -(Theme.space.md + nameH + 2))
+    local y = Theme.space.md + math.max(CARD_ICON, nameH + 2 + metaH) + Theme.space.sm
+    local innerW = width - Theme.space.md * 2
     local textH = textHeight(self.text, innerW)
     self.text:ClearAllPoints()
-    self.text:SetPoint("TOPLEFT", self, "TOPLEFT", CARD_PAD, -y)
+    self.text:SetPoint("TOPLEFT", self, "TOPLEFT", Theme.space.md, -y)
     y = y + textH
     if self.classic:IsShown() then
       local classicH = textHeight(self.classic, innerW)
       self.classic:ClearAllPoints()
-      self.classic:SetPoint("TOPLEFT", self, "TOPLEFT", CARD_PAD, -(y + 6))
+      self.classic:SetPoint("TOPLEFT", self, "TOPLEFT", Theme.space.md, -(y + 6))
       y = y + 6 + classicH
     end
-    return y + CARD_PAD
+    return y + Theme.space.md
   end
   return card
 end
@@ -372,8 +369,8 @@ local function newCardGrid(parent, makeCard, minWidth, maxCols)
     self.shownCount = count
   end
   function grid:fgGridLayout(width)
-    local cols = math.max(1, math.min(maxCols, math.floor((width + GAP) / (minWidth + GAP))))
-    local cw = math.floor((width - GAP * (cols - 1)) / cols)
+    local cols = math.max(1, math.min(maxCols, math.floor((width + Theme.space.sm) / (minWidth + Theme.space.sm))))
+    local cw = math.floor((width - Theme.space.sm * (cols - 1)) / cols)
     local y = 0
     for first = 1, self.shownCount, cols do
       local rowH = 0
@@ -383,12 +380,12 @@ local function newCardGrid(parent, makeCard, minWidth, maxCols)
       for i = first, math.min(first + cols - 1, self.shownCount) do
         local card = self.cards[i]
         card:ClearAllPoints()
-        card:SetPoint("TOPLEFT", self, "TOPLEFT", (i - first) * (cw + GAP), -y)
+        card:SetPoint("TOPLEFT", self, "TOPLEFT", (i - first) * (cw + Theme.space.sm), -y)
         card:SetSize(cw, rowH)
       end
-      y = y + rowH + GAP
+      y = y + rowH + Theme.space.sm
     end
-    y = math.max(1, y - GAP)
+    y = math.max(1, y - Theme.space.sm)
     self:SetHeight(y)
     return y
   end
@@ -483,20 +480,20 @@ function RV.Detail(parent)
   local classAbilities = W.Text(f, { role = "text", color = "text", wrap = true })
 
   local entries = {
-    { head, gap = GAP },
-    { summary, gap = SECTION_GAP },
-    { classesHead, gap = 6 },
-    { chips, gap = SECTION_GAP },
-    { abilitiesHead, gap = 4 },
-    { abilitiesNote, gap = 6 },
-    { cards, gap = SECTION_GAP },
-    { roleHead, gap = 4 },
-    { roleNote, gap = 6 },
-    { role, gap = SECTION_GAP },
-    { removedHead, gap = 6 },
-    { removed, gap = SECTION_GAP },
-    { classAbilitiesHead, gap = 6 },
-    { classAbilities, gap = SECTION_GAP },
+    { head, gap = Theme.space.sm },
+    { summary, gap = Theme.space.lg },
+    { classesHead, gap = Theme.space.sm },
+    { chips, gap = Theme.space.lg },
+    { abilitiesHead, gap = Theme.space.xs },
+    { abilitiesNote, gap = Theme.space.sm },
+    { cards, gap = Theme.space.lg },
+    { roleHead, gap = Theme.space.xs },
+    { roleNote, gap = Theme.space.sm },
+    { role, gap = Theme.space.lg },
+    { removedHead, gap = Theme.space.sm },
+    { removed, gap = Theme.space.lg },
+    { classAbilitiesHead, gap = Theme.space.sm },
+    { classAbilities, gap = Theme.space.lg },
   }
 
   function f:SetRace(slug)
@@ -579,10 +576,10 @@ local function newRaceCard(parent, race, onClick)
   card.border = W.Border(card, factionColor(race.f), 0.6)
   local hover = card:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.06)
+  hover:SetColorTexture(Theme.fillColor("hover"))
   card.slug = race.slug
   card.icon = K.IconSlot(card, K.RaceIconSpec(race.slug, race.f, ns.T(race.n)))
-  card.icon:SetPoint("TOPLEFT", CARD_PAD, -CARD_PAD)
+  card.icon:SetPoint("TOPLEFT", Theme.space.md, -Theme.space.md)
   card.name = W.Text(card, { role = "h3", family = "heading", color = "text", wrap = true })
   card.count = W.Text(card, { role = "ui", color = "textSecondary" })
   card.abilities = {}
@@ -614,20 +611,20 @@ local function newRaceCard(parent, race, onClick)
     W.SetText(self.count, nil, string.format(L["classes.over.count"], RL.ClassCount(race.slug)))
   end
   function card:Fit(width)
-    local nameX = CARD_PAD + 20 + 6
-    local nameH = textHeight(self.name, width - nameX - CARD_PAD)
+    local nameX = Theme.space.md + 20 + 6
+    local nameH = textHeight(self.name, width - nameX - Theme.space.md)
     self.name:ClearAllPoints()
-    self.name:SetPoint("TOPLEFT", self, "TOPLEFT", nameX, -CARD_PAD)
-    local y = CARD_PAD + math.max(20, nameH) + GAP
+    self.name:SetPoint("TOPLEFT", self, "TOPLEFT", nameX, -Theme.space.md)
+    local y = Theme.space.md + math.max(20, nameH) + Theme.space.sm
     for i, icon in ipairs(self.abilities) do
       icon:ClearAllPoints()
-      icon:SetPoint("TOPLEFT", self, "TOPLEFT", CARD_PAD + (i - 1) * 30, -y)
+      icon:SetPoint("TOPLEFT", self, "TOPLEFT", Theme.space.md + (i - 1) * 30, -y)
     end
-    y = y + 24 + GAP
+    y = y + 24 + Theme.space.sm
     self.count:ClearAllPoints()
-    self.count:SetPoint("TOPLEFT", self, "TOPLEFT", CARD_PAD, -y)
+    self.count:SetPoint("TOPLEFT", self, "TOPLEFT", Theme.space.md, -y)
     y = y + math.ceil(self.count:GetStringHeight())
-    return y + CARD_PAD
+    return y + Theme.space.md
   end
   return card
 end
@@ -661,13 +658,13 @@ local function newMatrix(parent, races, onClick)
     row.label = CreateFrame("Button", nil, inner)
     row.hover = row.label:CreateTexture(nil, "HIGHLIGHT")
     row.hover:SetAllPoints()
-    row.hover:SetColorTexture(1, 1, 1, 0.08)
+    row.hover:SetColorTexture(Theme.fillColor("hover"))
     row.icon = K.IconSlot(row.label, K.RaceIconSpec(race.slug, race.f, ns.T(race.n)))
     row.icon:SetPoint("LEFT", 4, 0)
     row.text = W.Text(row.label, { role = "ui", color = "text", wrap = true })
     row.line = inner:CreateTexture(nil, "BACKGROUND")
     ns.Bind(row.line, function(t)
-      t:SetColorTexture(1, 1, 1, 0.07)
+      t:SetColorTexture(Theme.fillColor("hover"))
     end)
     row.label:SetScript(
       "OnClick",
@@ -707,7 +704,7 @@ local function newMatrix(parent, races, onClick)
   local track = bar:CreateTexture(nil, "BACKGROUND")
   track:SetAllPoints()
   ns.Bind(track, function(t)
-    t:SetColorTexture(1, 1, 1, 0.12)
+    t:SetColorTexture(Theme.fillColor("selected"))
   end)
   local thumb = bar:CreateTexture(nil, "ARTWORK")
   thumb:SetHeight(8)
@@ -804,8 +801,8 @@ end
 local function newFlow(parent, cards, minWidth)
   local flow = CreateFrame("Frame", nil, parent)
   function flow:fgGridLayout(width)
-    local cols = math.max(1, math.min(#cards, math.floor((width + GAP) / (minWidth + GAP))))
-    local cw = math.floor((width - GAP * (cols - 1)) / cols)
+    local cols = math.max(1, math.min(#cards, math.floor((width + Theme.space.sm) / (minWidth + Theme.space.sm))))
+    local cw = math.floor((width - Theme.space.sm * (cols - 1)) / cols)
     local y = 0
     for first = 1, #cards, cols do
       local rowH = 0
@@ -814,12 +811,12 @@ local function newFlow(parent, cards, minWidth)
       end
       for i = first, math.min(first + cols - 1, #cards) do
         cards[i]:ClearAllPoints()
-        cards[i]:SetPoint("TOPLEFT", self, "TOPLEFT", (i - first) * (cw + GAP), -y)
+        cards[i]:SetPoint("TOPLEFT", self, "TOPLEFT", (i - first) * (cw + Theme.space.sm), -y)
         cards[i]:SetSize(cw, rowH)
       end
-      y = y + rowH + GAP
+      y = y + rowH + Theme.space.sm
     end
-    y = math.max(1, y - GAP)
+    y = math.max(1, y - Theme.space.sm)
     self:SetHeight(y)
     return y
   end
@@ -834,7 +831,7 @@ function RV.Overview(parent, opts)
   local state = { class = R.CLASSES[1] }
 
   local hint = W.Text(f, { key = "classes.over.hint", role = "ui", color = "textSecondary", wrap = true })
-  local entries = { { hint, gap = SECTION_GAP } }
+  local entries = { { hint, gap = Theme.space.lg } }
   local cards, flows = {}, {}
   for _, side in ipairs({ "A", "H" }) do
     local sideHead = newFactionHead(f, side)
@@ -848,16 +845,16 @@ function RV.Overview(parent, opts)
     end
     local flow = newFlow(f, list, 230)
     flows[#flows + 1] = flow
-    entries[#entries + 1] = { sideHead, gap = 6 }
-    entries[#entries + 1] = { flow, gap = SECTION_GAP }
+    entries[#entries + 1] = { sideHead, gap = Theme.space.sm }
+    entries[#entries + 1] = { flow, gap = Theme.space.lg }
     flow.head = sideHead
   end
 
   local matrix = newMatrix(f, races, opts.onSelect)
-  entries[#entries + 1] = { heading(f, "classes.over.matrix"), gap = 4 }
+  entries[#entries + 1] = { heading(f, "classes.over.matrix"), gap = Theme.space.xs }
   entries[#entries + 1] =
-    { W.Text(f, { key = "classes.over.matrixHint", role = "ui", color = "textSecondary", wrap = true }), gap = 8 }
-  entries[#entries + 1] = { matrix, gap = SECTION_GAP }
+    { W.Text(f, { key = "classes.over.matrixHint", role = "ui", color = "textSecondary", wrap = true }), gap = Theme.space.sm }
+  entries[#entries + 1] = { matrix, gap = Theme.space.lg }
 
   local classButtons, raceButtons
   classButtons = K.ClassButtons(f, {
@@ -884,11 +881,11 @@ function RV.Overview(parent, opts)
     end,
   })
   local none = W.Text(f, { key = "classes.over.newNone", role = "ui", color = "textSecondary", wrap = true })
-  entries[#entries + 1] = { heading(f, "classes.over.new"), gap = 4 }
+  entries[#entries + 1] = { heading(f, "classes.over.new"), gap = Theme.space.xs }
   entries[#entries + 1] =
-    { W.Text(f, { key = "classes.over.newHint", role = "ui", color = "textSecondary", wrap = true }), gap = 8 }
-  entries[#entries + 1] = { classButtons, gap = 10 }
-  entries[#entries + 1] = { raceButtons, gap = 6 }
+    { W.Text(f, { key = "classes.over.newHint", role = "ui", color = "textSecondary", wrap = true }), gap = Theme.space.sm }
+  entries[#entries + 1] = { classButtons, gap = Theme.space.md }
+  entries[#entries + 1] = { raceButtons, gap = Theme.space.sm }
   entries[#entries + 1] = { none, gap = 0 }
 
   function f:Paint()

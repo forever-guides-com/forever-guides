@@ -21,7 +21,7 @@ ns.AddLocale(
     ["areas.set.newTip"] = "Creates a {window} with an empty layout of its own. You can rename it at once.",
     ["areas.set.newChars"] = "New characters: show {windows}",
     ["areas.set.newCharsShow"] = "Show",
-    ["areas.set.newCharsTip"] = "Whether a {window} shows on a character that has no entry for it yet. A character that already knows the window keeps its choice.",
+    ["areas.set.newCharsTip"] = "Sets whether a {window} shows on a character that has no entry for it yet. A character that already knows the window keeps its choice.",
     ["areas.set.shown"] = "Show window",
     ["areas.set.shownTip"] = "Shows or hides the window on this character. The window itself and its layout belong to the account.",
     ["areas.set.locked"] = "Lock position",
@@ -36,7 +36,7 @@ ns.AddLocale(
     ["areas.page.delete"] = "Delete window",
     ["areas.page.deleteTip"] = "Deletes the window and its layout after asking.",
     ["areas.page.rules"] = "When active",
-    ["areas.page.rulesTip"] = "Conditions under which this window is there: combat, instance, group, mount, vehicle, target, class, specialization, character.",
+    ["areas.page.rulesTip"] = "Sets when this window appears: combat, instance, group, mount, vehicle, target, class, specialization, character.",
   })
 )
 ns.AddLocale(
@@ -48,11 +48,11 @@ ns.AddLocale(
     ["areas.set.newTip"] = "Legt ein {window} mit einem eigenen, leeren Layout an. Du kannst es gleich umbenennen.",
     ["areas.set.newChars"] = "Neue Charaktere: {windows} anzeigen",
     ["areas.set.newCharsShow"] = "Anzeigen",
-    ["areas.set.newCharsTip"] = "Ob ein {window} auf einem Charakter erscheint, der noch keinen Eintrag dafür hat. Ein Charakter, der das Fenster schon kennt, behält seine Wahl.",
+    ["areas.set.newCharsTip"] = "Legt fest, ob ein {window} auf einem Charakter erscheint, der noch keinen Eintrag dafür hat. Ein Charakter, der das Fenster schon kennt, behält seine Wahl.",
     ["areas.set.shown"] = "Fenster anzeigen",
-    ["areas.set.shownTip"] = "Zeigt oder versteckt das Fenster auf diesem Charakter. Das Fenster selbst und sein Layout gehören zum Account.",
+    ["areas.set.shownTip"] = "Zeigt das Fenster auf diesem Charakter oder blendet es aus. Das Fenster selbst und sein Layout gehören zum Account.",
     ["areas.set.locked"] = "Position sperren",
-    ["areas.set.lockedTip"] = "Fixiert die Position des Fensters auf diesem Charakter und blendet den Skalierungsgriff aus. Maus und Kamera gehen durch das Fenster, mit {mod:windowGear} erscheint das Zahnrad. Ein angepinntes Fenster wird im Layout-Editor oder im Zahnrad-Menü des Fensters entsperrt.",
+    ["areas.set.lockedTip"] = "Fixiert die Position des Fensters auf diesem Charakter und blendet den Skalierungsgriff aus. Maus und Kamera gehen durch das Fenster, mit {mod:windowGear} erscheint das Zahnrad. Ein angepinntes Fenster wird im Layout-Editor oder im Zahnradmenü des Fensters entsperrt.",
     ["areas.page.empty"] = "Noch kein {window}. Ein {window} zeigt Abklingzeiten, Auren und mehr irgendwo auf dem Bildschirm. Neues Fenster legt eines mit leerem Layout an, du füllst es im Editor.",
     ["areas.page.visible"] = "Sichtbar",
     ["areas.page.locked"] = "Gesperrt",
@@ -63,15 +63,15 @@ ns.AddLocale(
     ["areas.page.delete"] = "Fenster löschen",
     ["areas.page.deleteTip"] = "Löscht das Fenster und sein Layout nach einer Rückfrage.",
     ["areas.page.rules"] = "Wann aktiv",
-    ["areas.page.rulesTip"] = "Bedingungen, unter denen dieses Fenster da ist: Kampf, Instanz, Gruppe, Reittier, Fahrzeug, Ziel, Klasse, Spezialisierung, Charakter.",
+    ["areas.page.rulesTip"] = "Legt fest, wann dieses Fenster erscheint: Kampf, Instanz, Gruppe, Reittier, Fahrzeug, Ziel, Klasse, Spezialisierung, Charakter.",
   })
 )
 
 -- Sizes in px at font factor 1: padding in a card, gap between controls, icon buttons, the rows of controls.
-local PAD, GAP, ICON, CARD_GAP = 10, 6, 24, 8
+local GAP, ICON, CARD_GAP = 6, 24, 8
 local NAME_H, CHECK_H, TOGGLE_H, BAR_H = 26, 22, 24, 28
 -- A page that reports no usable width yet must not squeeze the cards below what their controls need.
-local MIN_CARD_W = 2 * PAD + 160
+local MIN_CARD_W = 2 * 16 + 160
 local AUDIENCE_W = 260
 
 -- The views that were built (weak): a change anywhere repaints every one of them.
@@ -125,7 +125,7 @@ end
 local function placeIcons(row, buttons, y)
   for i, button in ipairs(buttons) do
     button:ClearAllPoints()
-    button:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(PAD + (i - 1) * (ICON + GAP)), -(y + 1))
+    button:SetPoint("TOPRIGHT", row, "TOPRIGHT", -(row.pad + (i - 1) * (ICON + GAP)), -(y + 1))
   end
   return #buttons * ICON + (#buttons - 1) * GAP
 end
@@ -156,12 +156,17 @@ local function buildWindowCard(list)
       S.duplicate(row.id)
     end
   end)
-  row.share = iconButton(row, "share", "layoutshare.btn", "layoutshare.tip.layout", function()
-    local layout = row.id and ns.Areas.Library().Layout(row.id, ns.Areas.ActiveLayout(row.id))
-    if layout then
-      ns.LayoutShare.ShareLayout(layout, "area")
-    end
-  end)
+  row.share = ns.PageShare.Button(row, {
+    size = ICON,
+    tooltip = "layoutshare.btn",
+    tooltipText = "layoutshare.tip.layout",
+    onClick = function()
+      local layout = row.id and ns.Areas.Library().Layout(row.id, ns.Areas.ActiveLayout(row.id))
+      if layout then
+        ns.LayoutShare.ShareLayout(layout, "area")
+      end
+    end,
+  })
   row.delete = iconButton(row, "trash", "areas.page.delete", "areas.page.deleteTip", function()
     if row.id then
       ns.Areas.ConfirmDelete(row.id)
@@ -245,6 +250,7 @@ end
 
 -- Places the controls for a card `width` wide and returns its height.
 local function layoutWindowCard(row, width)
+  local PAD = row.pad
   local inner = width - 2 * PAD
   local y = PAD
   local rowH = scaled(NAME_H)

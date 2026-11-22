@@ -43,10 +43,11 @@ ns.AddLocale("enUS", {
   ["map.marker.pin"] = "Pin",
   ["map.marker.unpin"] = "Unpin",
   ["map.marker.arrow"] = "Make arrow",
+  ["map.marker.next"] = "Next",
   ["map.marker.asStart"] = "Set as start",
   ["map.marker.asDest"] = "Set as destination",
   ["map.marker.remove"] = "Remove",
-  ["map.marker.empty"] = "No markers: use Markers mode or hold {mod:mapMarker}, then click.",
+  ["map.marker.empty"] = "No markers yet. Use Markers mode or hold {mod:mapMarker}, then click.",
   ["map.marker.removeAll"] = "Remove all markers",
   ["map.marker.window"] = "Waypoint window",
   ["map.marker.confirm.title"] = "Remove all markers",
@@ -75,14 +76,15 @@ ns.AddLocale("deDE", {
   ["map.marker.pin"] = "Anheften",
   ["map.marker.unpin"] = "Lösen",
   ["map.marker.arrow"] = "Zum Pfeil machen",
+  ["map.marker.next"] = "Als Nächstes",
   ["map.marker.asStart"] = "Als Start",
   ["map.marker.asDest"] = "Als Ziel",
   ["map.marker.remove"] = "Entfernen",
-  ["map.marker.empty"] = "Keine Marker: Modus Marker oder {mod:mapMarker} halten, dann klicken.",
+  ["map.marker.empty"] = "Keine Marker. Wähle den Modus Marker oder halte {mod:mapMarker}, dann klicke.",
   ["map.marker.removeAll"] = "Alle Marker entfernen",
-  ["map.marker.window"] = "Wegpunkt-Fenster",
+  ["map.marker.window"] = "Wegpunktfenster",
   ["map.marker.confirm.title"] = "Alle Marker entfernen",
-  ["map.marker.confirm.text"] = "Alle Marker entfernen?\nEndgültig. Fremde Wegpunkte bleiben.",
+  ["map.marker.confirm.text"] = "Alle Marker entfernen?\nEndgültig. Andere Wegpunkte bleiben.",
   ["map.marker.noneToRemove"] = "Es gibt keine Karten-Marker zum Entfernen.",
 })
 
@@ -698,7 +700,7 @@ function MM.Attach(ctx)
         ctl.SetRouteMode(true)
       end,
     },
-  }, { gap = 4 })
+  }, { gap = 4, onResize = ctx.resized })
   for _, id in ipairs({ "places", "markers", "route" }) do
     local b = ctl.modeRow:GetButton(id)
     b.bar = b:CreateTexture(nil, "OVERLAY")
@@ -737,6 +739,15 @@ function MM.Attach(ctx)
       end,
       run = function(wp)
         WP.SetPinned(wp.id, not wp.pinned)
+      end,
+    },
+    {
+      id = "next",
+      key = "map.marker.next",
+      run = function(wp)
+        if WP.MoveToTop(wp.id) then
+          ns.Notify(string.format(L["wp.activated"], wp.title), "info")
+        end
       end,
     },
     {
@@ -949,7 +960,7 @@ function MM.Attach(ctx)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row.hl = row:CreateTexture(nil, "BACKGROUND")
     row.hl:SetAllPoints()
-    row.hl:SetColorTexture(1, 1, 1, 0)
+    row.hl:SetColorTexture(ns.Theme.fillColor())
     row.dot = row:CreateTexture(nil, "ARTWORK")
     row.dot:SetSize(10, 10)
     row.dot:SetPoint("LEFT", 6, 0)
@@ -959,14 +970,14 @@ function MM.Attach(ctx)
     row.name:SetPoint("LEFT", 22, 0)
     row.name:SetPoint("RIGHT", row.zone, "LEFT", -6, 0)
     row:SetScript("OnEnter", function(self)
-      self.hl:SetColorTexture(1, 1, 1, 0.08)
+      self.hl:SetColorTexture(Theme.fillColor("hover"))
       local wp = self.wpId and WP.Get(self.wpId)
       if wp then
         ns.ShowTooltip(self, wp.title, tipFor(wp))
       end
     end)
     row:SetScript("OnLeave", function(self)
-      self.hl:SetColorTexture(1, 1, 1, 0)
+      self.hl:SetColorTexture(ns.Theme.fillColor())
       ns.HideTooltip()
     end)
     row:SetScript(

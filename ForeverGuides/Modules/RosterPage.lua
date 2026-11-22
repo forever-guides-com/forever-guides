@@ -14,6 +14,7 @@ ns.AddLocale("enUS", {
   ["chars.sort.level"] = "Level",
   ["chars.sort.ilvl"] = "Item level",
   ["chars.sort.gold"] = "Gold",
+  ["chars.sort.rested"] = "Rested XP",
   ["chars.sort.custom"] = "Custom",
   ["chars.rows"] = "Rows",
   ["chars.rows.all"] = "All on",
@@ -22,7 +23,7 @@ ns.AddLocale("enUS", {
   ["chars.hide"] = "Hide",
   ["chars.move.left"] = "Move left",
   ["chars.move.right"] = "Move right",
-  ["chars.empty"] = "No characters. Log in with each once.",
+  ["chars.empty"] = "No characters yet. Log in with each one once.",
   ["chars.off"] = "List is off. Switch it on in the settings.",
 })
 
@@ -35,16 +36,17 @@ ns.AddLocale("deDE", {
   ["chars.sort.level"] = "Stufe",
   ["chars.sort.ilvl"] = "Itemlevel",
   ["chars.sort.gold"] = "Gold",
+  ["chars.sort.rested"] = "Erholt",
   ["chars.sort.custom"] = "Eigene",
   ["chars.rows"] = "Zeilen",
   ["chars.rows.all"] = "Alle an",
   ["chars.rows.none"] = "Alle aus",
-  ["chars.hint"] = "Namen ziehen sortiert. Rad scrollt, Umschalt+Rad seitlich",
+  ["chars.hint"] = "Sortieren: Namen ziehen. Rad scrollt, Umschalt+Rad seitlich",
   ["chars.hide"] = "Ausblenden",
   ["chars.move.left"] = "Nach links",
   ["chars.move.right"] = "Nach rechts",
-  ["chars.empty"] = "Keine Charaktere. Jeden einmal anmelden.",
-  ["chars.off"] = "Liste aus. Einschalten in den Einstellungen.",
+  ["chars.empty"] = "Keine Charaktere. Melde dich mit jedem einmal an.",
+  ["chars.off"] = "Liste ausgeschaltet. Schalte sie in den Einstellungen ein.",
 })
 
 local LABEL_W, COL_W = 150, 130
@@ -65,7 +67,7 @@ local DRAG_SPEED = 450
 local WHEEL_X = 60
 local REDRAW_BUCKET = 2
 local KEY_STRIDE = 1024
-local SORTS = { "recent", "name", "class", "level", "ilvl", "gold", "custom" }
+local SORTS = { "recent", "name", "class", "level", "ilvl", "gold", "rested", "custom" }
 
 -- Frames, pooled per canvas. A pooled frame is hidden when it scrolls out and reused.
 local function newPool(parent, create)
@@ -164,9 +166,9 @@ local function paintBackground(tex, row, current, index)
   elseif current then
     tex:SetColorTexture(Theme.color("accent", 0.12))
   elseif index % 2 == 0 then
-    tex:SetColorTexture(1, 1, 1, 0.04)
+    tex:SetColorTexture(Theme.fillColor("hover"))
   else
-    tex:SetColorTexture(0, 0, 0, 0)
+    tex:SetColorTexture(ns.Theme.fillColor())
   end
 end
 
@@ -290,7 +292,7 @@ local function build(container)
     host:SetFrameLevel(base + 6)
     local track = host:CreateTexture(nil, "BACKGROUND")
     track:SetAllPoints()
-    track:SetColorTexture(1, 1, 1, 0.06)
+    track:SetColorTexture(Theme.fillColor("hover"))
   end
   local bodyCanvas = CreateFrame("Frame", nil, body)
   local labelCanvas = CreateFrame("Frame", nil, labelView)
@@ -402,7 +404,7 @@ local function build(container)
       end)
     )
     f:SetScript("OnEnter", function(self)
-      self.bg:SetColorTexture(1, 1, 1, 0.1)
+      self.bg:SetColorTexture(Theme.fillColor("selected"))
     end)
     f:SetScript("OnLeave", function(self)
       paintBackground(self.bg, self.fgRow, false, self.fgR)
@@ -571,6 +573,27 @@ local function build(container)
       f.line:Show()
     elseif f.line then
       f.line:Hide()
+    end
+    -- A thin bar at the foot of the cell (cell.bar = fraction 0..1), e.g. the XP of the level.
+    if cell.bar then
+      if not f.barBack then
+        f.barBack = f:CreateTexture(nil, "ARTWORK")
+        f.barBack:SetHeight(3)
+        f.barBack:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 8, 3)
+        f.barBack:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -8, 3)
+        f.barFill = f:CreateTexture(nil, "OVERLAY")
+        f.barFill:SetHeight(3)
+        f.barFill:SetPoint("BOTTOMLEFT", f.barBack, "BOTTOMLEFT", 0, 0)
+      end
+      local frac = math.max(0, math.min(1, cell.bar))
+      f.barBack:SetColorTexture(Theme.fillColor("line"))
+      f.barFill:SetColorTexture(Theme.color("accent"))
+      f.barFill:SetWidth(math.max(1, (COL_W - 16) * frac))
+      f.barBack:Show()
+      f.barFill:SetShown(frac > 0)
+    elseif f.barBack then
+      f.barBack:Hide()
+      f.barFill:Hide()
     end
     -- A small square in the corner: the cell has a note (the tooltip shows it).
     if cell.note then

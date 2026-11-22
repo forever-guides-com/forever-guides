@@ -16,7 +16,7 @@ ns.AddLocale("enUS", {
   ["crest.tip.community"] = "Community: %s",
   ["crest.kind.guild"] = "Guild",
   ["crest.kind.community"] = "Community",
-  ["crest.tip.addon"] = "Uses the Forever Guides add-on",
+  ["crest.tip.addon"] = "Uses the Forever Guides addon",
 })
 ns.AddLocale("deDE", {
   ["crest.tip.guild"] = "Gilde: %s",

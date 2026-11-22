@@ -1,0 +1,21 @@
+## Interface: 16001
+## Title: Forever Guides: Reputation data
+## Title-deDE: Forever Guides: Rufdaten
+## Notes: Reputation guide data: the best ways per standing and the rewards of every faction. Loads by itself when a feature needs it.
+## Notes-deDE: Daten der Ruf-Anleitung: die besten Wege je Rufstufe und die Belohnungen jeder Fraktion. Wird von selbst geladen, sobald eine Funktion sie braucht.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 1.0.0
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+Meta.lua
+Data1.lua
+Data2.lua
+Data3.lua
+Data4.lua

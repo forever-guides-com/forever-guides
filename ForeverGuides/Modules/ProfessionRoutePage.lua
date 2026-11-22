@@ -26,9 +26,9 @@ ns.AddLocale("enUS", {
   ["profroute.shop"] = "Shopping list",
   ["profroute.shopTip"] = "Opens the shopping list window.",
   ["profroute.addRange"] = "Start to target to the list",
-  ["profroute.addRangeTip"] = "Start to target on the list, empty fields: whole route.",
-  ["profroute.addPicked"] = "Selected to the list (%d)",
-  ["profroute.addPickedTip"] = "Materials of the picked steps on the list.",
+  ["profroute.addRangeTip"] = "Adds start to target. Empty fields: whole route.",
+  ["profroute.addPicked"] = "Selection to list (%d)",
+  ["profroute.addPickedTip"] = "Adds the materials of the picked steps.",
   ["profroute.pick"] = "Pick steps",
   ["profroute.pickOff"] = "Stop picking",
   ["profroute.pickTip"] = "Shows a switch in front of every step.",
@@ -68,16 +68,16 @@ ns.AddLocale("deDE", {
   ["page.professionroute"] = "Berufsroute",
   ["profroute.intro"] = "Skillroute je Beruf, Schritt für Schritt.",
   ["profroute.profession"] = "Beruf",
-  ["profroute.target"] = "Ziel-Skill",
+  ["profroute.target"] = "Zielskill",
   ["profroute.targetPh"] = "Maximum",
-  ["profroute.from"] = "Start-Skill",
+  ["profroute.from"] = "Startskill",
   ["profroute.fromPh"] = "Automatisch",
   ["profroute.shop"] = "Einkaufsliste",
   ["profroute.shopTip"] = "Öffnet das Fenster der Einkaufsliste.",
   ["profroute.addRange"] = "Start bis Ziel zur Einkaufsliste",
-  ["profroute.addRangeTip"] = "Start bis Ziel auf die Liste, leer: ganze Route.",
+  ["profroute.addRangeTip"] = "Fügt Start bis Ziel hinzu. Leere Felder: ganze Route.",
   ["profroute.addPicked"] = "Ausgewählte zur Einkaufsliste (%d)",
-  ["profroute.addPickedTip"] = "Materialien der gewählten Schritte auf die Liste.",
+  ["profroute.addPickedTip"] = "Fügt die Materialien der gewählten Schritte hinzu.",
   ["profroute.pick"] = "Schritte auswählen",
   ["profroute.pickOff"] = "Auswahl beenden",
   ["profroute.pickTip"] = "Zeigt vor jedem Schritt einen Schalter.",
@@ -89,10 +89,10 @@ ns.AddLocale("deDE", {
   ["profroute.trainersHeading"] = "Lehrer",
   ["profroute.state.current"] = "Aktuell",
   ["profroute.state.done"] = "Erledigt",
-  ["profroute.area.before"] = "Vor dem Start-Skill",
-  ["profroute.area.after"] = "Nach dem Ziel-Skill",
+  ["profroute.area.before"] = "Vor dem Startskill",
+  ["profroute.area.after"] = "Nach dem Zielskill",
   ["profroute.area.alternatives"] = "Alternativen",
-  ["profroute.alt.intro"] = "Diese Wege ersetzen den angegebenen Bereich der Hauptroute.",
+  ["profroute.alt.intro"] = "Diese Routen ersetzen den genannten Bereich der Hauptroute.",
   ["profroute.alt.intro2"] = "Lohnt sich, wenn die Materialien günstiger sind.",
   ["profroute.alt.head"] = "%d bis %d: %s",
   ["profroute.crafts"] = "%dx",
@@ -101,7 +101,7 @@ ns.AddLocale("deDE", {
   ["profroute.itemIcon"] = "Fertiges Item",
   ["profroute.src.trainer"] = "Lehrer (%s): %s",
   ["profroute.src.trainerNone"] = "Lehrer (%s)",
-  ["profroute.src.item"] = "Rezept-Item",
+  ["profroute.src.item"] = "Rezeptitem",
   ["profroute.rankHead"] = "%s (bis %d)",
   ["profroute.mapTip"] = "Zeigt den Ort auf der Karte.",
   ["profroute.markerTip"] = "Setzt einen Wegpunkt mit Pfeil.",
@@ -203,7 +203,7 @@ local function newIconButton(parent, nameKey, id)
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   local hover = b:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints(b.icon)
-  hover:SetColorTexture(1, 1, 1, 0.15)
+  hover:SetColorTexture(Theme.fillColor("selected"))
   W.Border(b, "accentDim", 1)
   b.fgNameKey, b.fgId = nameKey, id
   function b.fgName()
@@ -272,6 +272,7 @@ local function newAreaHead(row)
   head.bg:SetAllPoints()
   local hover = head:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
+  -- Lightens the light area color, the black text only gains contrast.
   hover:SetColorTexture(1, 1, 1, 0.3)
   head.label = W.Text(head, { role = "h3", family = "heading", color = "sectionText" })
   head.label:SetPoint("LEFT", 8, 0)
@@ -298,16 +299,16 @@ local function newStepRow(parent)
   local row = CreateFrame("Button", nil, parent)
   row.bg = row:CreateTexture(nil, "BACKGROUND")
   row.bg:SetAllPoints()
-  row.bg:SetColorTexture(1, 1, 1, 0)
+  row.bg:SetColorTexture(ns.Theme.fillColor())
   row.mark = row:CreateTexture(nil, "ARTWORK")
   row.mark:SetPoint("TOPLEFT")
   row.mark:SetPoint("BOTTOMLEFT")
   row.mark:SetWidth(3)
-  row.mark:SetColorTexture(1, 1, 1, 0)
+  row.mark:SetColorTexture(ns.Theme.fillColor())
   row.range = W.Text(row, { role = "ui", family = "heading" })
   row.state = W.Text(row, { role = "micro", justify = "RIGHT" })
   row.title = W.Text(row, { role = "ui", wrap = true })
-  row.sub = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
+  row.sub = W.Meta(row, { wrap = true })
   row.chips = K.ChipRow(row)
   row.src = W.Text(row, { role = "micro", color = "textMuted", wrap = true })
   row.head = newAreaHead(row)
@@ -469,15 +470,15 @@ local function paintStep(row, item)
     row.crafters:SetSpell(nil)
     row.sub:SetText(item.note)
     W.SetColor(row.sub, "textSecondary")
-    row.bg:SetColorTexture(1, 1, 1, 0)
-    row.mark:SetColorTexture(1, 1, 1, 0)
+    row.bg:SetColorTexture(ns.Theme.fillColor())
+    row.mark:SetColorTexture(ns.Theme.fillColor())
     return
   end
   if row.isHead then
     row.spell, row.recipe, row.onToggle = nil, nil, item.onToggle
     row.crafters:SetSpell(nil)
-    row.bg:SetColorTexture(1, 1, 1, 0)
-    row.mark:SetColorTexture(1, 1, 1, 0)
+    row.bg:SetColorTexture(ns.Theme.fillColor())
+    row.mark:SetColorTexture(ns.Theme.fillColor())
     row.head.bg:SetColorTexture(Theme.color(AREA_COLORS[item.area]))
     row.head.label:SetText(item.text)
     return
@@ -539,11 +540,11 @@ local function paintStep(row, item)
   W.SetColor(row.src, status == "done" and "textMuted" or "textSecondary")
   row.state:SetText(status == "open" and "" or L["profroute.state." .. status])
   W.SetColor(row.state, colors.state)
-  row.bg:SetColorTexture(1, 1, 1, status == "current" and 0.06 or 0)
+  row.bg:SetColorTexture(Theme.fillColor(status == "current" and "hover" or nil))
   if status == "current" then
     row.mark:SetColorTexture(Theme.color("accent2"))
   else
-    row.mark:SetColorTexture(1, 1, 1, 0)
+    row.mark:SetColorTexture(ns.Theme.fillColor())
   end
 end
 
@@ -604,7 +605,49 @@ local function paintTrainer(row, item)
   row.paintHover()
 end
 
--- The trainers of every rank of a route: { { head } or { trainer } } rows, the trainers of the rank
+-- A rank is one card (W.Panel) holding its head line and one line per trainer; the cards flow into columns.
+local function newTrainerBlock(parent)
+  local card = W.Panel(parent)
+  card.lines, card.used = {}, 0
+  function card:fgLayout(width)
+    local inset = Theme.space.xs
+    local inner = math.max(40, width - inset * 2)
+    local y = inset
+    for i = 1, self.used do
+      local line = self.lines[i]
+      line:ClearAllPoints()
+      line:SetPoint("TOPLEFT", self, "TOPLEFT", inset, -y)
+      line:SetWidth(inner)
+      local h = line:fgLayout(inner)
+      line:SetHeight(h)
+      y = y + h
+    end
+    return y + inset
+  end
+  return card
+end
+
+local function paintTrainerBlock(card, block)
+  local items = { { head = block.head } }
+  for _, t in ipairs(block.trainers) do
+    items[#items + 1] = { trainer = t }
+  end
+  for i, item in ipairs(items) do
+    local line = card.lines[i]
+    if not line then
+      line = newTrainerRow(card)
+      card.lines[i] = line
+    end
+    paintTrainer(line, item)
+    line:Show()
+  end
+  for i = #items + 1, #card.lines do
+    card.lines[i]:Hide()
+  end
+  card.used = #items
+end
+
+-- The trainers of every rank of a route: { { head, trainers } } blocks, the trainers of the rank
 -- sorted by faction, place and name. The trainer data file (when loaded) adds trainers and positions.
 local function trainerRows(slug, data)
   local PL = ns.ProfessionTrainersLogic
@@ -612,10 +655,10 @@ local function trainerRows(slug, data)
     PL.Sort(PL.Collect({ { slug = slug, data = data, name = R.PROFESSIONS[slug] } }, rawget(ns, "ProfessionTrainers")))
   local list = {}
   for _, r in ipairs(type(data.ranks) == "table" and data.ranks or {}) do
-    list[#list + 1] = { head = string.format(L["profroute.rankHead"], rankName(r.rank), tonumber(r.max) or 0) }
-    for _, t in ipairs(PL.Filter(entries, { rank = r.rank })) do
-      list[#list + 1] = { trainer = t }
-    end
+    list[#list + 1] = {
+      head = string.format(L["profroute.rankHead"], rankName(r.rank), tonumber(r.max) or 0),
+      trainers = PL.Filter(entries, { rank = r.rank }),
+    }
   end
   return list
 end
@@ -627,7 +670,7 @@ local function build(container)
   local s = view.stack
   local refresh
 
-  ns.AddParagraph(view, "profroute.intro")
+  ns.AddIntro(view, "profroute.intro")
 
   -- Controls: profession, start, target, shopping list button, wrapped to the width.
   local options = {}
@@ -702,9 +745,10 @@ local function build(container)
       if PICK.on then
         local set, n = pickedSteps()
         if n > 0 then
-          ns.ProfessionList.AddRouteFromPage(S.Slug(), set)
-          PICK.on, PICK.steps = false, {}
-          refresh()
+          ns.ProfessionList.AddRouteFromPage(S.Slug(), set, function()
+            PICK.on, PICK.steps = false, {}
+            refresh()
+          end)
         end
       else
         ns.ProfessionList.AddRouteFromPage(S.Slug())
@@ -752,10 +796,10 @@ local function build(container)
     self:SetHeight(h)
     return h
   end
-  s:Add(controls, { gap = 12 })
-  s:Add(ns.ProfessionTracker.NewToggle(view.content), { height = 24, gap = 12 })
+  s:Add(controls, { gap = Theme.space.md })
+  s:Add(ns.ProfessionTracker.NewToggle(view.content), { height = 24, gap = Theme.space.md })
 
-  local progress = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = 6 })
+  local progress = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = Theme.space.sm })
   local bar = CreateFrame("Frame", nil, view.content)
   bar:SetHeight(BAR_H)
   bar.back = bar:CreateTexture(nil, "BACKGROUND")
@@ -772,9 +816,9 @@ local function build(container)
     self.fill:SetWidth(math.max(1, math.floor(width * self.frac)))
     return BAR_H
   end
-  s:Add(bar, { gap = 14 })
+  s:Add(bar, { gap = Theme.space.lg })
 
-  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = 12 })
+  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = Theme.space.md })
   -- Instead of the hint while the data add-on is off or missing: the button that switches it on.
   local banner = ns.PackageUI.Banner(view.content, Data.ADDON, {
     onLoaded = function()
@@ -784,13 +828,13 @@ local function build(container)
       view:Layout()
     end,
   })
-  s:Add(banner, { gap = 12 })
+  s:Add(banner, { gap = Theme.space.md })
   local routeHead = ns.AddHeading(view, "profroute.routeHeading")
   local steps = K.RowPool(view.content, newStepRow)
-  s:Add(steps, { gap = 12 })
+  s:Add(steps, { gap = Theme.space.md })
   local trainerHead = ns.AddHeading(view, "profroute.trainersHeading")
-  local trainers = K.RowPool(view.content, newTrainerRow)
-  s:Add(trainers, { gap = 12 })
+  local trainers = K.RowPool(view.content, newTrainerBlock, { cards = { minWidth = 300, gap = Theme.space.md } })
+  s:Add(trainers, { gap = Theme.space.md })
 
   local function fillOptions(own)
     for i = #options, 1, -1 do
@@ -827,7 +871,7 @@ local function build(container)
       hint:SetText(Data.Hint(status))
       progress:SetText(skill and string.format("%s: %d/%d", name, skill, max or 0) or "")
       steps:Sync({}, paintStep)
-      trainers:Sync({}, paintTrainer)
+      trainers:Sync({}, paintTrainerBlock)
       view:Layout()
       return
     end
@@ -933,7 +977,9 @@ local function build(container)
       hint:SetShown(true)
     end
     steps:Sync(rows, paintStep)
-    trainers:Sync(trainerRows(slug, data), paintTrainer)
+    local trainerList = trainerRows(slug, data)
+    W.SetCount(trainerHead, #trainerList)
+    trainers:Sync(trainerList, paintTrainerBlock)
     view:Layout()
   end
 
@@ -941,6 +987,11 @@ local function build(container)
   local function syncFields()
     target.edit.edit:SetText(S.Option("target") and tostring(S.Option("target")) or "")
     from.edit.edit:SetText(S.Option("from") and tostring(S.Option("from")) or "")
+  end
+
+  -- Page link: the profession of the route.
+  function view:ShareState()
+    return { S.Slug() }
   end
 
   -- params[1] = profession slug (deep link from the search and other pages), unknown ones are ignored.

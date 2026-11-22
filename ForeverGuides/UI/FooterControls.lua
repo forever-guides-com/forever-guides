@@ -1,8 +1,9 @@
--- Footer controls of the main window, the same look as the bar under game windows: "Opacity
--- - 75 % + [slider]" and "Zoom - 100 % +  [slider]". Values live in settings.mainAlpha and
--- settings.scale (Main.SetAlpha, Main.SetScale). group:Fit(roomFull, roomMin) picks the level
--- from the room the footer leaves: with sliders, numbers and buttons only, then without the
--- captions. The controls are never cut, the data status in the footer gives way instead.
+-- Footer controls of the main window: one small "View" button in the footer opens a popover with
+-- "Opacity - 75 % + [slider]" and "Zoom - 100 % +  [slider]". Values live in settings.mainAlpha and
+-- settings.scale (Main.SetAlpha, Main.SetScale).
+--   group = FC.Build(footer)   the popover (a child of the footer, hidden until opened, same controls as ever)
+--   group.button               the footer button; group:Toggle(), group:Close(), group:IsOpen()
+-- The popover closes on a click outside, on Esc, when the footer hides and when its button is clicked again.
 local _, ns = ...
 local W, Theme, U, L = ns.W, ns.Theme, ns.U, ns.L
 
@@ -17,6 +18,8 @@ FC.VALUE_WIDTH, FC.SLIDER_WIDTH = 32, 76
 FC.PAD, FC.GAP, FC.SEPARATE = 4, 2, 4
 
 ns.AddLocale("enUS", {
+  ["footer.view"] = "View",
+  ["footer.viewTip"] = "Opacity and zoom of the window",
   ["footer.opacity"] = "Opacity",
   ["footer.opacityTip"] = "Backgrounds only\n0 % = invisible",
   ["footer.opacityOut"] = "Less opaque",
@@ -29,6 +32,8 @@ ns.AddLocale("enUS", {
   ["footer.slider"] = "Drag or mouse wheel",
 })
 ns.AddLocale("deDE", {
+  ["footer.view"] = "Ansicht",
+  ["footer.viewTip"] = "Deckkraft und Zoom des Fensters",
   ["footer.opacity"] = "Deckkraft",
   ["footer.opacityTip"] = "Nur Hintergründe\n0 % = unsichtbar",
   ["footer.opacityOut"] = "Weniger deckend",
@@ -62,9 +67,16 @@ end
 function FC.Build(footer)
   local group = CreateFrame("Frame", nil, footer)
   group:SetSize(FC.PAD, FC.HEIGHT)
-  -- Own plate and edge: the controls stay visible on a fully transparent window.
-  W.Fill(group, "surface2", 0.9)
-  W.Border(group, "white", 0.3)
+  group:SetFrameStrata("DIALOG")
+  group:EnableMouse(true)
+  -- Own plate and edge: the controls stay visible on a fully transparent window. Forever: the dark tooltip plate.
+  local plate = W.Fill(group, "surface2", 0.97)
+  local border = W.Border(group, "accentDim", 1)
+  ns.Bind(group, function()
+    local art = ns.Skins.Apply(group, "popover")
+    plate:SetShown(art == nil)
+    border.show(art == nil)
+  end)
 
   local function label(key)
     return W.Text(group, { key = key, role = "micro", color = "textSecondary" })
@@ -83,7 +95,7 @@ function FC.Build(footer)
   local function divider()
     local line = group:CreateTexture(nil, "ARTWORK")
     line:SetSize(1, FC.HEIGHT - 6)
-    line:SetColorTexture(1, 1, 1, 0.25)
+    line:SetColorTexture(Theme.fillColor("lineStrong"))
     return line
   end
 
@@ -158,14 +170,21 @@ function FC.Build(footer)
     end
   end
 
-  -- Widest number "100 %" in the current font; keeps the value buttons wide enough.
-  local probe = W.Text(group, { role = "micro", text = "100 %" })
-  probe:Hide()
+  -- Widest number "100 %" in the value button's own font (the button label, not a caption face) plus the
+  -- button's inner padding; a smaller probe cut the number to "7...".
+  local function widestValue()
+    local text = group.alphaValue.text
+    local current = text:GetText()
+    text:SetText("100 %")
+    local width = math.ceil(text:GetStringWidth()) + 12
+    text:SetText(current)
+    return width
+  end
 
-  -- Places everything left to right and returns the width. withLabels / withSliders pick the level.
+  -- Places everything left to right and returns the width.
   local function layout(withLabels, withSliders)
     local x = FC.PAD
-    local valueWidth = math.max(FC.VALUE_WIDTH, math.ceil(probe:GetStringWidth()) + 4)
+    local valueWidth = math.max(FC.VALUE_WIDTH, widestValue())
     local function put(widget, width)
       widget:ClearAllPoints()
       widget:SetPoint("LEFT", group, "LEFT", x, 0)
@@ -199,18 +218,9 @@ function FC.Build(footer)
     return width
   end
 
-  -- roomFull: width the controls may take while the data status stays whole; roomMin: width
-  -- left when the data status is cut to its minimum. nil: no limit.
-  function group:Fit(roomFull, roomMin)
-    local full = roomFull or math.huge
-    local least = roomMin or math.huge
-    if layout(true, true) <= full then
-      return group:GetWidth()
-    end
-    if layout(true, false) <= least then
-      return group:GetWidth()
-    end
-    return layout(false, false)
+  -- The popover has the room it needs: captions and sliders always.
+  function group:Fit()
+    return layout(true, true)
   end
 
   local function paint()
@@ -233,5 +243,62 @@ function FC.Build(footer)
     end
   end)
   group:Fit()
+
+  -- The footer button and the popover behaviour.
+  local button = W.Action(footer, {
+    key = "footer.view",
+    icon = "gear",
+    variant = "secondary",
+    height = FC.HEIGHT,
+    tooltip = "footer.view",
+    tooltipText = "footer.viewTip",
+    onClick = function()
+      group:Toggle()
+    end,
+  })
+  button.fgManaged = true
+  button.fgId = "footer-view"
+  button:SetWidth(button:Fit())
+  group.button = button
+  group:Hide()
+
+  function group:IsOpen()
+    return group:IsShown()
+  end
+  function group:Close()
+    group:Hide()
+  end
+  function group:Toggle()
+    group:SetShown(not group:IsShown())
+  end
+  -- Outside clicks close it through the client's global click event. A full-screen catcher frame lost
+  -- the order against the popover whenever the window re-levelled its children (raise on click), and
+  -- then swallowed every click meant for the sliders.
+  local watcher = CreateFrame("Frame")
+  local watching = pcall(watcher.RegisterEvent, watcher, "GLOBAL_MOUSE_DOWN")
+  watcher:SetScript(
+    "OnEvent",
+    ns.Wrap("footer-popover", function()
+      if group:IsShown() and not group:IsMouseOver() and not button:IsMouseOver() then
+        group:Hide()
+      end
+    end)
+  )
+  group:SetScript("OnShow", function()
+    group:ClearAllPoints()
+    group:SetPoint("BOTTOMRIGHT", button, "TOPRIGHT", 0, 4)
+    group:SetFrameLevel(footer:GetFrameLevel() + 20)
+    group:Fit()
+  end)
+  if not watching then
+    watcher:SetScript("OnEvent", nil)
+  end
+  footer:HookScript("OnHide", function()
+    group:Hide()
+  end)
+  ns.WindowShell.RegisterEsc(group, function()
+    group:Hide()
+    return true
+  end)
   return group
 end

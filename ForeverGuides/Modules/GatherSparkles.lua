@@ -14,8 +14,8 @@ local G = {}
 ns.GatherSparkles = G
 
 ns.AddLocale("enUS", {
-  ["sparkles.notice"] = "Gathering sparkles are on. Turn them off in the settings.",
-  ["sparkles.noModel"] = "The original sparkle model does not load here, own particles are used.",
+  ["sparkles.notice"] = "Gathering sparkles are on. Switch them off in the settings.",
+  ["sparkles.noModel"] = "The original sparkle model does not load here. The addon uses its own particles.",
   ["sparkles.diag.heading"] = "Gathering spots:",
   ["sparkles.diag.yes"] = "yes",
   ["sparkles.diag.no"] = "no",
@@ -24,8 +24,8 @@ ns.AddLocale("enUS", {
   ["sparkles.measure.chatOne"] = "Gathering spots: detection from %d yards (at most %d, %d measurement).",
 })
 ns.AddLocale("deDE", {
-  ["sparkles.notice"] = "Sammelpunkte funkeln ist aktiv. Abschalten unter Einstellungen.",
-  ["sparkles.noModel"] = "Das Original-Modell lässt sich hier nicht laden, eigene Partikel werden genutzt.",
+  ["sparkles.notice"] = "Funkelnde Sammelpunkte sind eingeschaltet. Schalte sie in den Einstellungen aus.",
+  ["sparkles.noModel"] = "Das Originalmodell lässt sich hier nicht laden. Das Addon nutzt eigene Partikel.",
   ["sparkles.diag.heading"] = "Sammelpunkte:",
   ["sparkles.diag.yes"] = "ja",
   ["sparkles.diag.no"] = "nein",

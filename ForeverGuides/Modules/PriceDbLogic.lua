@@ -22,6 +22,9 @@ PL.SCAN_COOLDOWN = 900
 PL.SCAN_TIMEOUT = 30
 -- Rows of one browse event that are read at most.
 PL.MAX_PASSIVE_ROWS = 1000
+-- Rows of one page of the classic auction list, and the pages a sell-slot query reads at most.
+PL.PAGE_SIZE = 50
+PL.MAX_QUERY_PAGES = 10
 -- Rough size of one entry in the saved variables file, for the size estimate of the diagnostics.
 PL.BYTES_PER_ITEM = 60
 
@@ -150,6 +153,47 @@ function PL.Passive(items, itemId, price, now)
   return false
 end
 
+-- Merge rule of the live capture (browse pages, sell-slot query). A complete snapshot of an item (the
+-- whole result set was seen) replaces its values like a scan does (PL.ApplyScan). A partial one (one
+-- page of many) only merges: the lowest price drops when the sample is lower, the highest rises when
+-- the sample is higher, the median stays (a page is no fair sample). A lowest price older than a day
+-- is replaced by the sample, since the old offer may be sold. mx may be nil (a single known price).
+function PL.MergePartial(items, itemId, mn, mx, now)
+  local e = items[itemId]
+  if not PL.Valid(e) then
+    items[itemId] = { mn = mn, tn = now }
+    return
+  end
+  if mn < e.mn or now - e.tn > PL.DAY then
+    e.mn, e.tn = mn, now
+  end
+  if finite(e.md) and finite(e.mx) and finite(e.ts) then
+    if mx and mx > e.mx then
+      e.mx = mx
+    end
+    e.md = max(e.md, e.mn)
+    e.mx = max(e.mx, e.mn)
+  end
+end
+
+-- Aggregates every item of the buckets (PL.Aggregate) and writes it: complete = the buckets hold the
+-- whole result set of these items. Returns the number of items written.
+function PL.Capture(items, buckets, complete, now)
+  local n = 0
+  for _, id in ipairs(PL.Ids(buckets)) do
+    local mn, md, mx = PL.Aggregate(buckets.items[id])
+    if mn then
+      if complete then
+        PL.ApplyScan(items, id, mn, md, mx, now)
+      else
+        PL.MergePartial(items, id, mn, mx, now)
+      end
+      n = n + 1
+    end
+  end
+  return n
+end
+
 -- The result of a scan for one item. A lowest price seen passively after the scan data stays.
 function PL.ApplyScan(items, itemId, mn, md, mx, now)
   local e = items[itemId]
@@ -248,16 +292,150 @@ function PL.CooldownLeft(requested, now)
   return math.min(PL.SCAN_COOLDOWN, max(0, floor(requested + PL.SCAN_COOLDOWN - now)))
 end
 
--- The house name from a faction group: Horde, Alliance or Neutral (any other answer).
-function PL.House(faction)
-  if faction == "Horde" or faction == "Alliance" then
-    return faction
+-- Houses ---------------------------------------------------------------------------------------------------
+-- A house key names one auction house: "alliance" and "horde" (the faction houses, whatever city the
+-- auctioneer stands in), one key per neutral house and "legacy:<tag>" for the data of older versions.
+-- Stored per realm as "<realm>-<key>" (PL.HouseKey).
+
+PL.ALLIANCE, PL.HORDE = "alliance", "horde"
+PL.FACTION_KEYS = { Alliance = PL.ALLIANCE, Horde = PL.HORDE }
+
+-- The neutral houses, found by the map of the zone (uiMapId, parents of a sub map included) or, when
+-- the client reports no known map, by a part of the zone or sub zone text (lower case). The key of a
+-- house is the only thing that decides what is kept apart: to merge the neutral houses, give them the
+-- same key in NEUTRAL_KEY (stored data follows through KEY_ALIAS and PL.MigrateHouses).
+PL.NEUTRAL_HOUSES = {
+  { site = "gadgetzan", mapId = 1446, names = { "gadgetzan" } },
+  { site = "booty", mapId = 1434, names = { "booty bay", "beutebucht" } },
+  { site = "everlook", mapId = 1452, names = { "everlook", "ewige warte" } },
+}
+PL.NEUTRAL_KEY = {
+  gadgetzan = "neutral:gadgetzan",
+  booty = "neutral:booty",
+  everlook = "neutral:everlook",
+}
+-- Stored key -> key it is read as (set when two houses become one).
+PL.KEY_ALIAS = {}
+
+-- The keys of the neutral houses, each once, in the order of PL.NEUTRAL_HOUSES.
+function PL.NeutralKeys()
+  local keys, seen = {}, {}
+  for _, h in ipairs(PL.NEUTRAL_HOUSES) do
+    local key = PL.NEUTRAL_KEY[h.site]
+    if key and not seen[key] then
+      seen[key] = true
+      keys[#keys + 1] = key
+    end
   end
-  return "Neutral"
+  return keys
 end
 
-function PL.HouseKey(realm, house)
-  return string.format("%s-%s", type(realm) == "string" and realm ~= "" and realm or "unknown", PL.House(house))
+-- "alliance" or "horde" for a faction group, nil for any other answer.
+function PL.FactionKey(group)
+  return PL.FACTION_KEYS[group]
+end
+
+function PL.OtherFaction(key)
+  return key == PL.ALLIANCE and PL.HORDE or key == PL.HORDE and PL.ALLIANCE or nil
+end
+
+function PL.IsNeutral(key)
+  return type(key) == "string" and key:find("^neutral") ~= nil
+end
+
+function PL.IsLegacy(key)
+  return type(key) == "string" and key:find("^legacy:") ~= nil
+end
+
+-- The legacy key that belongs to a house key: the faction of the scan, "unknown" for the rest.
+function PL.LegacyKey(key)
+  return "legacy:" .. ((key == PL.ALLIANCE or key == PL.HORDE) and key or "unknown")
+end
+
+-- The house of one visit. group: faction group of the auctioneer (nil = no faction), mapIds: the map
+-- of the player and its parents, texts: zone and sub zone text. Returns the house key and how it was
+-- decided ("faction", "map" or "text"), nil when the house cannot be told.
+function PL.ChooseKey(group, mapIds, texts)
+  local faction = PL.FactionKey(group)
+  if faction then
+    return faction, "faction"
+  end
+  for _, id in ipairs(type(mapIds) == "table" and mapIds or {}) do
+    for _, h in ipairs(PL.NEUTRAL_HOUSES) do
+      if h.mapId == id then
+        return PL.NEUTRAL_KEY[h.site], "map"
+      end
+    end
+  end
+  for _, text in ipairs(type(texts) == "table" and texts or {}) do
+    if type(text) == "string" and text ~= "" then
+      local low = text:lower()
+      for _, h in ipairs(PL.NEUTRAL_HOUSES) do
+        for _, name in ipairs(h.names) do
+          if low:find(name, 1, true) then
+            return PL.NEUTRAL_KEY[h.site], "text"
+          end
+        end
+      end
+    end
+  end
+  return nil
+end
+
+function PL.HouseKey(realm, key)
+  return string.format("%s-%s", type(realm) == "string" and realm ~= "" and realm or "unknown", key)
+end
+
+-- Version 1 stored "<realm>-Horde", "-Alliance" and "-Neutral" (all neutral houses in one).
+local OLD_HOUSES = { Horde = "legacy:horde", Alliance = "legacy:alliance", Neutral = "legacy:unknown" }
+
+-- Puts the items of src into dst: per item the entry with the newer time stays, per house the newer scan.
+function PL.MergeHouse(dst, src)
+  for id, e in pairs(src.items) do
+    local mine = dst.items[id]
+    if not mine or PL.Stamp(e) > PL.Stamp(mine) then
+      dst.items[id] = e
+    end
+  end
+  local a, b = dst.scan, src.scan
+  if type(b) == "table" and (type(a) ~= "table" or (finite(b.at) and b.at > (finite(a.at) and a.at or 0))) then
+    dst.scan = b
+  end
+end
+
+-- Brings the saved houses to the current keys: the houses of version 1 become legacy houses (tagged with
+-- the faction of the scan, neutral = unknown) and aliased keys move into their target. Nothing is
+-- dropped, houses that meet are merged. Safe to run again. Returns the number of houses moved.
+function PL.MigrateHouses(prices)
+  local houses = type(prices) == "table" and prices.houses
+  if type(houses) ~= "table" then
+    return 0
+  end
+  local keys = {}
+  for key in pairs(houses) do
+    keys[#keys + 1] = key
+  end
+  table.sort(keys, function(a, b)
+    return tostring(a) < tostring(b)
+  end)
+  local moved = 0
+  for _, key in ipairs(keys) do
+    local realm, suffix = tostring(key):match("^(.*)%-([^%-]+)$")
+    local target = realm and (OLD_HOUSES[suffix] or PL.KEY_ALIAS[suffix])
+    local h = houses[key]
+    if target and type(h) == "table" then
+      local to = PL.HouseKey(realm, target)
+      local mine = houses[to]
+      if type(mine) ~= "table" or type(mine.items) ~= "table" then
+        houses[to] = h
+      elseif type(h.items) == "table" then
+        PL.MergeHouse(mine, h)
+      end
+      houses[key] = nil
+      moved = moved + 1
+    end
+  end
+  return moved
 end
 
 -- Browse -------------------------------------------------------------------------------------------

@@ -115,7 +115,7 @@ end
 -- Simulation sources: features that can be previewed without a fight (GCD, cast, swing, health, trail)
 -- register one source each; the single "Simulate" tool of the editor drives all of them together.
 ns.AddLocale("enUS", { ["cursor.sim.play"] = "Simulate" })
-ns.AddLocale("deDE", { ["cursor.sim.play"] = "Simulation" })
+ns.AddLocale("deDE", { ["cursor.sim.play"] = "Simulieren" })
 
 local STEP = 0.05
 local sources = {} -- id -> { reset, step }

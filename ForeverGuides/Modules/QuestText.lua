@@ -78,3 +78,9 @@ function QT.Get(id, who)
   who = who or QT.Player()
   return QT.Fill(field(id, "d"), who), QT.Fill(field(id, "o"), who)
 end
+
+-- Note and warning of a quest (facts the goal text does not carry), language as in Get, each nil when there is none.
+-- Same data and same loading as Get.
+function QT.Notes(id)
+  return field(id, "nt"), field(id, "wn")
+end

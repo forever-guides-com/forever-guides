@@ -10,28 +10,28 @@ ns.AddLocale("enUS", {
   ["help.feedbackWeb"] = "Contact page on forever-guides.com, link for copying only.\nThe addon never connects.",
   ["help.feedbackWebButton"] = "Copy website feedback link",
   ["help.errorsLink"] = "Full list: errors page.",
-  ["help.copyHint"] = "Selected and ready, press Ctrl+C to copy.",
+  ["help.copyHint"] = "Selected. Press Ctrl+C to copy.",
   ["help.credits"] = "Created by Wosande",
-  ["help.aboutPrivacy"] = "The addon makes no internet connections and has no server. Nothing goes to other addon users until you switch it on per function under Settings > Consents. Then the data travels through the chat servers of Blizzard to addon users in your group, guild or chat, and everyone in that channel can read it. Switching off works at once, copies others stored stay with them. The setup (/fg setup) asks about it in the step Share with others, everything there starts off. Share buttons for notes and drawings send only after your click.",
+  ["help.aboutPrivacy"] = "The addon makes no internet connections and has no server. Nothing goes to other addon users until you switch it on per function under Settings > Consents. Then the data travels through the chat servers of Blizzard to addon users in your group, guild or chat. Everyone in that channel can read it. Switching off works at once. Copies that others stored stay with them. The setup (/fg setup) asks about it in the step Share with others, and everything there starts off. Share buttons for notes and drawings send only after your click.",
   ["tour.help.title"] = "Help & feedback",
   ["tour.help.intro.title"] = "Help",
   ["tour.help.intro.text"] = "First steps, shortcuts, diagnostics and feedback.",
   ["tour.help.feedback.title"] = "Feedback",
-  ["tour.help.feedback.text"] = "Write feedback or copy the link, nothing is sent.",
+  ["tour.help.feedback.text"] = "Write feedback or copy the link. Nothing is sent.",
 })
 
 ns.AddLocale("deDE", {
   ["help.feedbackWeb"] = "Kontaktseite auf forever-guides.com, Link nur zum Kopieren.\nDas Addon verbindet sich nie.",
-  ["help.feedbackWebButton"] = "Feedback-Link der Website kopieren",
+  ["help.feedbackWebButton"] = "Feedbacklink der Website kopieren",
   ["help.errorsLink"] = "Komplette Liste: Fehlerseite.",
-  ["help.copyHint"] = "Markiert und bereit, Strg+C zum Kopieren drücken.",
+  ["help.copyHint"] = "Markiert. Drücke Strg+C zum Kopieren.",
   ["help.credits"] = "Erstellt von Wosande",
-  ["help.aboutPrivacy"] = "Das Addon baut keine Internetverbindungen auf und hat keinen Server. An andere Addon-Nutzer geht nichts, bevor du es pro Funktion unter Einstellungen > Zustimmungen einschaltest. Dann laufen die Daten über die Chat-Server von Blizzard an Addon-Nutzer in deiner Gruppe, Gilde oder im Chat, und alle in diesem Kanal können sie mitlesen. Ausschalten wirkt sofort, Kopien, die andere gespeichert haben, bleiben bei ihnen. Die Einrichtung (/fg setup) fragt im Schritt Mit anderen teilen danach, dort steht alles auf Aus. Teilen-Schaltflächen für Notizen und Zeichnungen senden nur nach deinem Klick.",
+  ["help.aboutPrivacy"] = "Das Addon baut keine Internetverbindungen auf und hat keinen Server. An andere Addonnutzer geht nichts, bevor du es pro Funktion unter Einstellungen > Zustimmungen einschaltest. Dann laufen die Daten über die Chatserver von Blizzard zu Addonnutzern in deiner Gruppe, Gilde oder im Chat. Alle in diesem Kanal können sie mitlesen. Ausschalten wirkt sofort. Kopien, die andere gespeichert haben, bleiben bei ihnen. Die Einrichtung (/fg setup) fragt im Schritt Mit anderen teilen danach, dort steht alles auf Aus. Die Knöpfe zum Teilen von Notizen und Zeichnungen senden nur nach deinem Klick.",
   ["tour.help.title"] = "Hilfe & Feedback",
   ["tour.help.intro.title"] = "Hilfe",
   ["tour.help.intro.text"] = "Erste Schritte, Tastenkürzel, Diagnose und Feedback.",
   ["tour.help.feedback.title"] = "Feedback",
-  ["tour.help.feedback.text"] = "Feedback schreiben oder Link kopieren, gesendet wird nichts.",
+  ["tour.help.feedback.text"] = "Schreibe Feedback oder kopiere den Link. Das Addon sendet nichts.",
 })
 
 local function feedbackUrl()
@@ -110,17 +110,7 @@ local CREDIT_GAP, CREDIT_BUTTON_H, CREDIT_LABEL_H = 6, 26, 18
 local function creditsBlock(parent)
   local f = CreateFrame("Frame", nil, parent)
   local label = W.Text(f, { key = "help.credits", role = "ui", color = "text" })
-  local website = W.Button(f, {
-    text = "forever-guides.com",
-    variant = "ghost",
-    width = 160,
-    height = CREDIT_BUTTON_H,
-    tooltip = "help.websiteButton",
-    opens = true,
-    onClick = function()
-      ns.Dialogs.Copy("help.websiteButton", WEBSITE, "help.copyHint")
-    end,
-  })
+  local website = W.WebLink(f, WEBSITE, { text = "forever-guides.com", width = 160, height = CREDIT_BUTTON_H })
   f.label, f.website = label, website
   function f:fgGridLayout(width)
     label:ClearAllPoints()
@@ -164,6 +154,7 @@ local function build(container)
       { id = "about", key = "help.section.about" },
     },
     onSelect = showTab,
+    wrap = true,
   })
   K.Anchor("FG.Help.Tabs", tabs)
   s:Add(tabs, { height = 28, gap = 14 })
@@ -222,6 +213,7 @@ local function build(container)
   -- Keys and commands ------------------------------------------------------
   para("keys", "help.keys", { role = "ui" })
   local commandList = K.NewList(view.content, {
+    look = "flat", -- inert group headers, a boxed header would read as a row
     rowHeight = 50,
     bind = function(c)
       if c.header then

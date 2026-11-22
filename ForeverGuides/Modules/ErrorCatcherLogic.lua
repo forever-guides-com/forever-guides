@@ -59,12 +59,14 @@ function Logic.ShortPath(text)
 end
 
 -- At most STACK_LINES lines, our own handler frames and empty lines dropped, paths shortened.
-function Logic.CleanStack(stack)
+-- limit: other than STACK_LINES (a blocked action keeps its whole stack, its cause sits at the bottom).
+function Logic.CleanStack(stack, limit)
+  limit = limit or Logic.STACK_LINES
   local lines = {}
   for line in tostring(stack or ""):gmatch("[^\r\n]+") do
     if line:find("%S") and not line:find("ErrorCatcher", 1, true) then
       lines[#lines + 1] = Logic.ShortPath(line)
-      if #lines >= Logic.STACK_LINES then
+      if #lines >= limit then
         break
       end
     end
@@ -72,9 +74,10 @@ function Logic.CleanStack(stack)
   return table.concat(lines, "\n")
 end
 
--- The call stack of a blocked-action event is short: the event fires inside the blocked call, so the lines
--- under our own dispatch name the code that made it.
-Logic.ACTION_LINES = 8
+-- The call stack of a blocked-action event: the event fires inside the blocked call, so the lines under our
+-- own dispatch name the code that made it. A map refresh is about 15 Blizzard frames deep before the first
+-- frame of an add-on shows up, so the stack is kept long.
+Logic.ACTION_LINES = 40
 
 -- Frames of the event dispatch, the protected-call wrappers and this catcher say nothing about the cause.
 local function isNoise(line)

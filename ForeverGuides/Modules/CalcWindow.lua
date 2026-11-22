@@ -38,9 +38,9 @@ ns.AddLocale("deDE", {
   ["calcui.win.close"] = "Rechner schließen",
   ["calcui.win.open"] = "Im Addon öffnen",
   ["calcui.win.scaleTip"] = "Ziehen verschiebt, {key:windowScale} ändert die Größe.",
-  ["calcui.win.grip"] = "Zum Ändern der Größe ziehen",
+  ["calcui.win.grip"] = "Ziehen ändert die Größe",
   ["calcui.win.history"] = "Verlauf und Speicher",
-  ["calcui.win.historyTip"] = "Zeigt oder versteckt das Feld.",
+  ["calcui.win.historyTip"] = "Zeigt oder blendet das Feld aus.",
   ["binding.calc"] = "Rechner ein oder aus",
 })
 

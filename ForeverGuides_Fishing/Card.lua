@@ -117,7 +117,7 @@ function Card.AddSound(view)
   toggle(more, "autoLoot")
 end
 
--- The catch journal: recording and the way to the window.
+-- The catch journal: recording and the way to its page.
 function Card.AddJournal(view)
   Controller.Bootstrap()
   FG.AddHeading(view, "settings.card.fishing.journal")
@@ -127,7 +127,7 @@ function Card.AddJournal(view)
     width = 220,
     opens = true,
     onClick = function()
-      fish.JournalView.Open()
+      FG.Main.Show("fishing")
     end,
   })
   open.fgId = "fishing-journal"

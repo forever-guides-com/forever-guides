@@ -27,7 +27,7 @@ ns.AddLocale("enUS", {
   ["talents.editor.resetTitle"] = "Reset talents",
   ["talents.editor.resetConfirm"] = "Remove all points from all three talent trees?",
   ["talents.editor.apply"] = "Apply",
-  ["talents.editor.applyTip"] = "Apply this build to your character\nOwn class only",
+  ["talents.editor.applyTip"] = "Applies this build to your character.\nOwn class only.",
   ["talents.editor.applyTitle"] = "Apply talents",
   ["talents.editor.applyConfirm"] = "Apply these talents to your character?\nYour current talents will change.",
   ["talents.editor.otherClass"] = "This build is for another class",
@@ -48,12 +48,12 @@ ns.AddLocale("enUS", {
   ["talents.editor.exportTitle"] = "Export build",
   ["talents.editor.exportInfo"] = "Valid for %s, level %d, %d points",
   ["talents.editor.share"] = "Share",
-  ["talents.editor.shareTip"] = "Send this build as a chat link",
+  ["talents.editor.shareTip"] = "Sends this build as a chat link.",
   ["talents.editor.loadTitle"] = "Load build",
   ["talents.editor.loadConfirm"] = "Replace the current build?",
   ["talents.editor.loadEmpty"] = "Paste a build link first.",
   ["talents.editor.loadGame"] = "Load current talents from game",
-  ["talents.editor.loadGameTip"] = "Load your character's talents\nOwn class only",
+  ["talents.editor.loadGameTip"] = "Loads your character's talents.\nOwn class only.",
   ["talents.editor.loadedGame"] = "Current talents loaded: %d points, level %d.",
   ["talents.editor.loadUnmapped"] = "%d point(s) match no talent, left out",
   ["talents.editor.loadDropped"] = "%d point(s) break the rules, left out",
@@ -70,9 +70,9 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["talents.editor.title"] = "Talent-Editor",
+  ["talents.editor.title"] = "Talenteditor",
   ["talents.editor.info"] = "Bedienung",
-  ["talents.editor.intro"] = "Linksklick: Punkt vergeben\nRechtsklick: Punkt zurücknehmen\nStufe bestimmt das Punktebudget\nBuild-Link wie im Talentrechner der Website",
+  ["talents.editor.intro"] = "Linksklick: Punkt vergeben\nRechtsklick: Punkt zurücknehmen\nStufe bestimmt das Punktebudget\nSkillungslink wie im Talentrechner der Website",
   ["talents.editor.hint"] = "Tab wählt, Enter vergibt, Umschalt+Enter nimmt zurück",
   ["talents.editor.level"] = "Stufe",
   ["talents.editor.levelFormat"] = "Stufe %d (%d Punkte)",
@@ -84,33 +84,33 @@ ns.AddLocale("deDE", {
   ["talents.editor.resetTitle"] = "Talente zurücksetzen",
   ["talents.editor.resetConfirm"] = "Alle Punkte in allen drei Talentbäumen entfernen?",
   ["talents.editor.apply"] = "Anwenden",
-  ["talents.editor.applyTip"] = "Build auf deinen Charakter anwenden\nNur für deine eigene Klasse",
+  ["talents.editor.applyTip"] = "Wendet die Skillung auf deinen Charakter an.\nNur für deine eigene Klasse.",
   ["talents.editor.applyTitle"] = "Talente anwenden",
   ["talents.editor.applyConfirm"] = "Diese Talente auf deinen Charakter anwenden?\nDeine aktuellen Talente werden geändert.",
-  ["talents.editor.otherClass"] = "Build gehört zu einer anderen Klasse",
+  ["talents.editor.otherClass"] = "Skillung gehört zu einer anderen Klasse",
   ["talents.editor.noPoints"] = "Vergib zuerst mindestens einen Punkt.",
   ["talents.editor.import"] = "Importieren",
-  ["talents.editor.importTip"] = "Build-Link von forever-guides.com einfügen",
-  ["talents.editor.importTitle"] = "Build importieren",
-  ["talents.editor.importHint"] = "Build-Link oder Code nach b= einfügen",
+  ["talents.editor.importTip"] = "Skillungslink von forever-guides.com einfügen",
+  ["talents.editor.importTitle"] = "Skillung importieren",
+  ["talents.editor.importHint"] = "Skillungslink oder Code nach b= einfügen",
   ["talents.editor.importDamaged"] = "Link beschädigt oder andere Klasse, nichts importiert",
   ["talents.editor.importOver"] = "%d Punkte, nur %d regelkonform (%d fielen weg): nichts importiert",
-  ["talents.editor.imported"] = "Build importiert: %d Punkte",
-  ["talents.editor.importedClass"] = "Build importiert: %d Punkte, Klasse %s",
+  ["talents.editor.imported"] = "Skillung importiert: %d Punkte",
+  ["talents.editor.importedClass"] = "Skillung importiert: %d Punkte, Klasse %s",
   ["talents.editor.blank"] = "Neue leere Skillung (%s). Vergib deine Punkte und speichere sie dann im Fenster Skillungen.",
   ["talents.editor.hotfixDropped"] = "Talent durch Hotfix ersetzt, Punkte entfernt: %s",
   ["talents.editor.hotfixFollow"] = "(%d abhängige Punkte ebenfalls entfernt)",
   ["talents.editor.export"] = "Exportieren",
-  ["talents.editor.exportTip"] = "Zeigt den Link dieses Builds, damit du ihn kopieren kannst.",
-  ["talents.editor.exportTitle"] = "Build exportieren",
+  ["talents.editor.exportTip"] = "Zeigt den Link dieser Skillung zum Kopieren.",
+  ["talents.editor.exportTitle"] = "Skillung exportieren",
   ["talents.editor.exportInfo"] = "Gilt für %s, Stufe %d, %d Punkte",
   ["talents.editor.share"] = "Teilen",
-  ["talents.editor.shareTip"] = "Build als Chat-Link senden",
-  ["talents.editor.loadTitle"] = "Build laden",
-  ["talents.editor.loadConfirm"] = "Aktuellen Build ersetzen?",
-  ["talents.editor.loadEmpty"] = "Füge zuerst einen Build-Link ein.",
+  ["talents.editor.shareTip"] = "Sendet die Skillung als Chatlink.",
+  ["talents.editor.loadTitle"] = "Skillung laden",
+  ["talents.editor.loadConfirm"] = "Aktuelle Skillung ersetzen?",
+  ["talents.editor.loadEmpty"] = "Füge zuerst einen Skillungslink ein.",
   ["talents.editor.loadGame"] = "Skillung aus dem Spiel laden",
-  ["talents.editor.loadGameTip"] = "Talente deines Charakters laden\nNur für deine eigene Klasse",
+  ["talents.editor.loadGameTip"] = "Lädt die Talente deines Charakters.\nNur für deine eigene Klasse.",
   ["talents.editor.loadedGame"] = "Aktuelle Skillung geladen: %d Punkte, Stufe %d.",
   ["talents.editor.loadUnmapped"] = "%d Punkt(e) passen zu keinem Talent, weggelassen",
   ["talents.editor.loadDropped"] = "%d Punkt(e) verletzen die Regeln, weggelassen",
@@ -316,6 +316,10 @@ local function gridGeometry(treeW)
   local x0 = math.max(0, math.floor((treeW - (COLS * node + (COLS - 1) * gap)) / 2))
   return node, gap, U.clamp(gap, 6, 14), x0
 end
+
+local ART_PIECES = 4
+-- Opacity of the surface veil over the background art: the art stays visible, the node rings and numbers stay readable.
+local ART_VEIL = 0.72
 
 local function iconPath(name)
   return name and ("Interface\\Icons\\" .. name) or nil
@@ -627,8 +631,8 @@ function TE.Build(view)
     },
     {
       id = "share",
-      label = "act.share",
       icon = "share",
+      boxed = true,
       tooltip = "talents.editor.share",
       opens = true,
       onClick = shareBuild,
@@ -1025,20 +1029,20 @@ function TE.Build(view)
     b.pick = W.Border(pick, "accent", 1, 3)
     b.pick.show(false)
     b.numBg = b:CreateTexture(nil, "ARTWORK", nil, 1)
-    b.numBg:SetColorTexture(0, 0, 0, 0.75)
+    b.numBg:SetColorTexture(ns.Theme.scrim(0.75))
     b.num = W.Text(b, { role = "micro", justify = "LEFT" })
     b.num:SetPoint("TOPLEFT", 3, -3)
     b.numBg:SetPoint("TOPLEFT", b.num, "TOPLEFT", -2, 1)
     b.numBg:SetPoint("BOTTOMRIGHT", b.num, "BOTTOMRIGHT", 2, -1)
     b.rankBg = b:CreateTexture(nil, "ARTWORK", nil, 1)
-    b.rankBg:SetColorTexture(0, 0, 0, 0.75)
+    b.rankBg:SetColorTexture(ns.Theme.scrim(0.75))
     b.rank = W.Text(b, { role = "micro", justify = "RIGHT" })
     b.rank:SetPoint("BOTTOMRIGHT", -3, 3)
     b.rankBg:SetPoint("TOPLEFT", b.rank, "TOPLEFT", -2, 1)
     b.rankBg:SetPoint("BOTTOMRIGHT", b.rank, "BOTTOMRIGHT", 1, -1)
     local hl = b:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.12)
+    hl:SetColorTexture(Theme.fillColor("hover"))
 
     function b:fgPaint()
       local talent = b.talent
@@ -1091,6 +1095,16 @@ function TE.Build(view)
     tree.frame = f
     W.Fill(f, "surface", 1)
     W.Border(f, "white")
+    -- The art of the default talent frame behind the nodes (above the fill, below the links), dimmed by a veil.
+    tree.art = {}
+    for i = 1, ART_PIECES do
+      tree.art[i] = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+    end
+    tree.veil = f:CreateTexture(nil, "BACKGROUND", nil, 2)
+    tree.veil:SetAllPoints()
+    ns.Bind(tree.veil, function(t)
+      t:SetColorTexture(Theme.color("bg", ART_VEIL))
+    end)
     tree.icon = f:CreateTexture(nil, "ARTWORK")
     tree.icon:SetSize(24, 24)
     tree.icon:SetPoint("TOPLEFT", PAD, -PAD)
@@ -1109,6 +1123,7 @@ function TE.Build(view)
     tree.links = {}
     tree.icon:SetTexture(iconPath(spec.i))
     tree.name:SetText(ns.T(spec.n))
+    tree.background = TL.Background(spec)
     for i, talent in ipairs(spec.talents) do
       local node = tree.nodes[i]
       if not node then
@@ -1214,6 +1229,19 @@ function TE.Build(view)
       tree.frame:ClearAllPoints()
       tree.frame:SetPoint("TOPLEFT", trees, "TOPLEFT", x, -y)
       tree.frame:SetSize(treeW, treeH)
+      local pieces = TL.BackgroundPieces(tree.background, treeW, treeH)
+      for k, tex in ipairs(tree.art) do
+        local piece = pieces[k]
+        tex:SetShown(piece ~= nil)
+        if piece then
+          tex:SetTexture(piece.path)
+          tex:SetTexCoord(piece.left, piece.right, piece.top, piece.bottom)
+          tex:ClearAllPoints()
+          tex:SetPoint("TOPLEFT", tree.frame, "TOPLEFT", piece.x, -piece.y)
+          tex:SetSize(piece.width, piece.height)
+        end
+      end
+      tree.veil:SetShown(#pieces > 0)
       tree.name:SetWidth(math.max(40, treeW - PAD * 2 - 30))
       tree.info:SetWidth(math.max(40, treeW - PAD * 2 - 30))
       for _, n in ipairs(tree.nodes) do
@@ -1229,7 +1257,7 @@ function TE.Build(view)
       for j, link in ipairs(tree.links) do
         local tex = tree.lines[j]
         if not tex then
-          tex = tree.frame:CreateTexture(nil, "BACKGROUND", nil, 1)
+          tex = tree.frame:CreateTexture(nil, "BACKGROUND", nil, 3)
           tree.lines[j] = tex
         end
         placeLink(tree, link, tex, node, gap, vgap, x0)

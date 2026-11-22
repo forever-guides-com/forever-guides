@@ -16,7 +16,9 @@
 --   raids = { lock } (RaidLockLogic), raidsAt (server time of that reading), todos = { values = { [todoId] = { done, at } } },
 --   order (position in the custom sort), hidden (true: not shown in the overview),
 --   kills = { [raidKey] = { week, ends, bosses } } (raid boss kills of the week, RaidWeekLogic),
---   access = { [instanceKey] = { done, total, at } } (last instance access state, AccessView)
+--   access = { [instanceKey] = { done, total, at } } (last instance access state, AccessView),
+--   rested = { xp, xpMax, exhaustion, resting, at, maxLevel, alerted } (RestedLogic: XP and rested XP at the last
+--   reading, restamped at logout; stays local, never part of what is shared)
 -- }
 local _, ns = ...
 local U = ns.U
@@ -220,6 +222,7 @@ function Roster.Clean(raw)
     todos = cleanTodos(raw.todos),
     kills = ns.RaidWeekLogic.CleanKills(raw.kills),
     access = ns.AccessLogic.CleanSaved(raw.access),
+    rested = ns.RestedLogic.Clean(raw.rested),
     order = number(raw.order, 1, 1e4),
     hidden = raw.hidden == true or nil,
   }
@@ -406,7 +409,7 @@ local function try(fn, ...)
 end
 
 local function realmName()
-  return text(try(GetNormalizedRealmName)) or text(try(GetRealmName))
+  return text(ns.Realm.Get())
 end
 
 local function playerName()
@@ -476,6 +479,39 @@ local function readItemLevel(at)
   remember("ilvl", firstPositive(equipped, average), at)
 end
 
+-- XP and rested XP of the character now, nil while the client does not answer (no level size) or the
+-- level is older than the last one seen (a level-up event can arrive before the new values do).
+-- `at` is the server time of the reading. Not the cache: Roster.Live uses it for the logged-in character.
+local function readRested(at)
+  local level = try(UnitLevel, "player")
+  local known = cache.level and cache.level.v
+  if type(level) == "number" and type(known) == "number" and level < known then
+    return nil
+  end
+  if try(IsPlayerAtEffectiveMaxLevel) == true then
+    return { xp = 0, xpMax = 1, exhaustion = 0, resting = false, maxLevel = true, at = at }
+  end
+  local xpMax = try(UnitXPMax, "player")
+  if type(xpMax) ~= "number" or xpMax <= 0 then
+    return nil
+  end
+  return {
+    xp = try(UnitXP, "player"),
+    xpMax = xpMax,
+    exhaustion = try(GetXPExhaustion),
+    resting = try(IsResting) == true,
+    at = at,
+  }
+end
+
+-- Keeps the reading in the cache for the entry (the game saves the file at logout).
+local function rememberRested(at)
+  local snap = ns.RestedLogic.Clean(readRested(at))
+  if snap then
+    cache.rested = snap
+  end
+end
+
 local function readGuild(at)
   if try(IsInGuild) == false then
     cache.guild = { v = false, at = at }
@@ -494,6 +530,7 @@ function Roster.Refresh()
   local at = Roster.Now()
   readMoney(at)
   readItemLevel(at)
+  rememberRested(at)
   remember("level", try(UnitLevel, "player"), at)
   local zone = text(try(GetZoneText))
   if zone then
@@ -570,6 +607,7 @@ local function write()
     todos = old.todos,
     kills = old.kills,
     access = old.access,
+    rested = cache.rested or old.rested,
     order = old.order,
     hidden = old.hidden,
   }
@@ -589,8 +627,12 @@ function Roster.Capture()
   return write()
 end
 
--- Writes the entry from the cache alone, no new reading. For logout.
+-- Writes the entry from the cache alone, no new reading. For logout: the rested snapshot is restamped
+-- with the logout time, from there on the other characters measure the time offline.
 function Roster.Flush()
+  if cache.rested then
+    cache.rested.at = Roster.Now()
+  end
   return write()
 end
 
@@ -663,6 +705,22 @@ end
 
 -- Reading for the UI ----------------------------------------------------------
 
+-- XP and rested XP of the logged-in character from the game, nil without an answer.
+function Roster.Live()
+  return ns.RestedLogic.Clean(readRested(Roster.Now()))
+end
+
+-- The rested estimate of a list entry (RestedLogic.Estimate): the logged-in character shows the live
+-- values, the others the stored snapshot brought forward to `now`. nil at the maximum level or
+-- without a snapshot.
+function Roster.Rested(entry, now)
+  if entry.current then
+    local live = Roster.Live() or entry.rested
+    return ns.RestedLogic.Estimate(live, now, true)
+  end
+  return ns.RestedLogic.Estimate(entry.rested, now or Roster.Now())
+end
+
 -- Clean entries (with .key and .current). Without opts: all, unsorted. With opts:
 -- the shown ones (hidden ones only with opts.all), sorted by opts.sort or the saved
 -- sort mode.
@@ -687,6 +745,12 @@ function Roster.List(opts)
     Roster.Sort(out, opts.sort or Roster.SortMode())
   end
   return out
+end
+
+-- Fraction of the rested cap that is filled, -1 without an estimate.
+function Roster.Fill(entry)
+  local est = Roster.Rested(entry)
+  return est and est.rested / est.cap or -1
 end
 
 local function byRecent(a, b)
@@ -715,6 +779,10 @@ local SORTS = {
   ilvl = function(a, b)
     return (a.ilvl or 0) > (b.ilvl or 0)
   end,
+  -- Fullest rested bonus first (full characters on top), without a value last.
+  rested = function(a, b)
+    return Roster.Fill(a) > Roster.Fill(b)
+  end,
   -- Characters without a position (never moved) follow the placed ones, newest first.
   custom = function(a, b)
     if a.order and b.order then
@@ -727,10 +795,10 @@ local SORTS = {
 }
 SORTS.recent = SORTS.seen
 
-local SORT_MODES = { "recent", "name", "class", "level", "ilvl", "gold", "custom" }
+local SORT_MODES = { "recent", "name", "class", "level", "ilvl", "gold", "rested", "custom" }
 
 -- mode: "seen" or "recent" (default, current character first), "name", "class", "level",
--- "ilvl", "gold" or "custom" (the saved order). Ties fall back to name and key, so the
+-- "ilvl", "gold", "rested" or "custom" (the saved order). Ties fall back to name and key, so the
 -- order is stable.
 function Roster.Sort(list, mode)
   local primary = SORTS[mode] or SORTS.seen
@@ -949,6 +1017,18 @@ for _, event in ipairs({
   ns.On(event, schedule)
 end
 
+-- The rested snapshot follows the XP events into the cache, the write comes with the capture or at logout.
+for _, event in ipairs({
+  "PLAYER_XP_UPDATE",
+  "UPDATE_EXHAUSTION",
+  "PLAYER_UPDATE_RESTING",
+  "PLAYER_LEAVING_WORLD",
+}) do
+  ns.On(event, function()
+    rememberRested(Roster.Now())
+  end)
+end
+
 -- Gold, item level and guild take their reading into the cache at once, so the logout finds the
 -- last one. The entry is written by the capture or at logout (the game saves the file then).
 ns.On("PLAYER_MONEY", function()
@@ -984,4 +1064,48 @@ end)
 -- no longer answers reliably.
 ns.On("PLAYER_LOGOUT", function()
   Roster.Flush()
+end)
+
+-- Alert ------------------------------------------------------------------------------------
+
+-- Off only when the setting is explicitly false (on by default).
+function Roster.RestedAlertEnabled()
+  local s = ns.db and ns.db.settings
+  return not (type(s) == "table" and s.restedAlert == false)
+end
+
+function Roster.SetRestedAlert(on)
+  ns.Store.set("settings.restedAlert", on and true or false)
+end
+
+-- One notice for the other characters that became fully rested since their last logout, each snapshot
+-- once (`alerted` carries the snapshot time). Returns the names it announced.
+function Roster.CheckRestedAlert()
+  local t = Roster.Enabled() and Roster.RestedAlertEnabled() and store(false)
+  if not t then
+    return {}
+  end
+  local now, current = Roster.Now(), Roster.CurrentKey()
+  local names, raws = {}, {}
+  for key, raw in pairs(t) do
+    local entry = key ~= current and type(key) == "string" and Roster.Clean(raw)
+    if entry and not entry.hidden and ns.RestedLogic.NeedsAlert(entry.rested, now) then
+      names[#names + 1] = entry.display
+      raws[#raws + 1] = raw
+    end
+  end
+  table.sort(names)
+  for _, raw in ipairs(raws) do
+    raw.rested.alerted = raw.rested.at
+  end
+  if #names > 0 then
+    ns.Notify(string.format(ns.L["rested.alert"], table.concat(names, ", ")), "info")
+  end
+  return names
+end
+
+ns.On("PLAYER_ENTERING_WORLD", function(_, isLogin, isReload)
+  if isLogin or isReload then
+    ns.Debounce("rested-alert", 8, Roster.CheckRestedAlert)
+  end
 end)

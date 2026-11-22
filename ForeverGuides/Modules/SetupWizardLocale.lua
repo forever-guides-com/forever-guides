@@ -26,7 +26,7 @@ ns.AddLocale("enUS", {
   ["setup.cancelTitle"] = "Close setup",
   ["setup.cancelText"] = "Really close the setup? Your progress stays saved.",
   ["setup.resetTitle"] = "Reset all",
-  ["setup.resetText"] = "Set all options to default? Sharing is switched off.",
+  ["setup.resetText"] = "Reset all settings to default? Sharing is switched off.",
   ["setup.copy"] = "Copy",
   ["setup.open"] = "Open",
   ["setup.info.tutorials"] = "Tutorials: page in the left navigation (group Addon)",
@@ -81,11 +81,11 @@ ns.AddLocale("enUS", {
   ["setup.step.helpers"] = "Helpers and trade",
   ["setup.step.helpers.text"] = "Quests, selling, item level and loot. Risky options stay in the settings.",
   ["setup.feature.quests.text"] = "Accept and turn in quests automatically.",
-  ["setup.feature.selling.text"] = "Sell gray items at the merchant.",
+  ["setup.feature.selling.text"] = "Sell gray items at the vendor.",
   ["setup.feature.items.text"] = "Show item level and enchants.",
   ["setup.feature.inventory.text"] = "The tooltip shows what your characters own.",
   ["setup.feature.loot.text"] = "Record boss loot. Off also hides its menu page.",
-  ["setup.ctl.autoRepair"] = "Repair at the merchant",
+  ["setup.ctl.autoRepair"] = "Repair at the vendor",
   ["setup.ctl.autoRepairHint"] = "Repairs when it opens, with enough gold.",
   ["setup.ctl.sellNote"] = "Selling every white, green, blue or epic item: Settings.",
 
@@ -119,7 +119,7 @@ ns.AddLocale("enUS", {
 
   -- Step sharing
   ["setup.step.sharing"] = "Share with others",
-  ["setup.step.sharing.text"] = "Everything here is off until you switch it on.",
+  ["setup.step.sharing.text"] = "Map location is preset, the rest stays off.",
   ["setup.sharing.privacy"] = "Where the data goes, how to withdraw.",
   ["setup.sharing.more"] = "More info",
   ["setup.sharing.all.text"] = "More audiences and all functions.",
@@ -151,7 +151,7 @@ ns.AddLocale("deDE", {
   ["setup.cancelTitle"] = "Einrichtung schließen",
   ["setup.cancelText"] = "Einrichtung wirklich schließen? Dein Fortschritt bleibt gespeichert.",
   ["setup.resetTitle"] = "Alles auf Standard",
-  ["setup.resetText"] = "Alle Optionen auf Standard? Teilen wird ausgeschaltet.",
+  ["setup.resetText"] = "Alle Einstellungen auf Standard? Teilen wird ausgeschaltet.",
   ["setup.copy"] = "Kopieren",
   ["setup.open"] = "Öffnen",
   ["setup.info.tutorials"] = "Tutorials: Seite in der Navigation links (Gruppe Addon)",
@@ -163,7 +163,7 @@ ns.AddLocale("deDE", {
   -- Step start
   ["setup.step.start"] = "Willkommen bei Forever Guides",
   ["setup.step.start.text"] = "Du entscheidest, was das Addon für dich tut. Features schaltest du an oder aus. Was aus ist, läuft nicht und steht nicht im Menü.",
-  ["setup.start.how1"] = "Schalter: Das Feature an- oder ausschalten.",
+  ["setup.start.how1"] = "Schalter: Schaltet das Feature ein oder aus.",
   ["setup.start.how2"] = "Optionen: Öffnet alle Einstellungen des Bereichs in einem neuen Fenster.",
   ["setup.start.how3"] = "Stift über dem Menü: Bereiche aus- und wieder einblenden.",
 
@@ -184,7 +184,7 @@ ns.AddLocale("deDE", {
   ["setup.step.display.text"] = "Ring, Erfahrungsleiste, Haltbarkeit und eigene Fenster.",
   ["setup.feature.cursor.text"] = "Ein Ring um den Mauszeiger. Aus: Ring läuft nicht.",
   ["setup.feature.xpbar.text"] = "Eigene Erfahrungsleiste. Aus: Leiste zu.",
-  ["setup.feature.durability.text"] = "Zustand der Ausrüstung. Aus blendet nur das Menü aus.",
+  ["setup.feature.durability.text"] = "Haltbarkeit der Ausrüstung. Aus blendet nur das Menü aus.",
   ["setup.feature.hudwindows.text"] = "Eigene Fenster. Aus blendet nur das Menü aus.",
 
   -- Step world
@@ -200,7 +200,7 @@ ns.AddLocale("deDE", {
   ["setup.ctl.rareAlert"] = "Hinweis bei Fund",
   ["setup.ctl.mapReveal"] = "Alle Kartengebiete in Farbe zeigen",
   ["setup.ctl.mapRevealHint"] = "Aus: nur erkundete Gebiete, der Rest dunkel.",
-  ["setup.ctl.sparklesHint"] = "Setzt Spiel-Grafik, Aus stellt sie zurück (mit Neustart).",
+  ["setup.ctl.sparklesHint"] = "Setzt Spielgrafik, Aus stellt sie zurück (mit Neustart).",
 
   -- Step helpers
   ["setup.step.helpers"] = "Helfer und Handel",
@@ -218,8 +218,8 @@ ns.AddLocale("deDE", {
   ["setup.step.chat"] = "Chat",
   ["setup.step.chat.text"] = "Namen, Verlauf und Logos im Chat. Vieles ist erst nach Zustimmung aktiv.",
   ["setup.feature.chatname.text"] = "Setzt deinen Namen vor deine Nachrichten.",
-  ["setup.feature.foreverchat.text"] = "Messenger-Fenster. Aus wirkt nach /reload.",
-  ["setup.feature.chathistory.text"] = "Verlauf des Chat-Fensters speichern.",
+  ["setup.feature.foreverchat.text"] = "Messengerfenster. Aus wirkt nach /reload.",
+  ["setup.feature.chathistory.text"] = "Verlauf des Chatfensters speichern.",
   ["setup.feature.logos.text"] = "Logo vor den Namen erkannter Spieler.",
 
   -- Step party
@@ -244,7 +244,7 @@ ns.AddLocale("deDE", {
 
   -- Step sharing
   ["setup.step.sharing"] = "Mit anderen teilen",
-  ["setup.step.sharing.text"] = "Alles hier ist aus, bis du es einschaltest.",
+  ["setup.step.sharing.text"] = "Der Kartenstandort ist voreingestellt, der Rest bleibt aus.",
   ["setup.sharing.privacy"] = "Wohin die Daten gehen, wie du widerrufst.",
   ["setup.sharing.more"] = "Mehr dazu",
   ["setup.sharing.all.text"] = "Weitere Zielgruppen und alle Funktionen.",

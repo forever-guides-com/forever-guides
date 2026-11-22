@@ -93,6 +93,7 @@ function Templates.Build(P)
   categoryDd:SetAllPoints()
 
   list = K.NewList(left, {
+    look = "flat", -- narrow picker rail
     rowHeight = 44,
     onClick = function(item)
       if item.empty then

@@ -13,13 +13,13 @@ local BUTTON_W = 200
 
 ns.AddLocale("enUS", {
   ["gmset.title"] = "GuildManager",
-  ["gmset.help"] = "Guild tools for officers.\nSettings sit in the tab Settings of the guild page.",
+  ["gmset.help"] = "Guild tools for officers.\nFind the settings in the tab Settings of the guild page.",
   ["gmset.open"] = "Open settings",
   ["gmset.open.wait"] = "Opens once the GuildManager runs",
 })
 ns.AddLocale("deDE", {
   ["gmset.title"] = "GildenManager",
-  ["gmset.help"] = "Gildenwerkzeuge für Offiziere.\nEinstellungen im Reiter Optionen der Gildenseite.",
+  ["gmset.help"] = "Gildenwerkzeuge für Offiziere.\nDie Einstellungen findest du im Reiter Einstellungen der Gildenseite.",
   ["gmset.open"] = "Einstellungen öffnen",
   ["gmset.open.wait"] = "Öffnet, sobald der GildenManager läuft",
 })

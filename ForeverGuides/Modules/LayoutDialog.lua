@@ -128,7 +128,7 @@ local function createRow(parent)
   row.line:SetPoint("BOTTOMLEFT")
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
-  row.line:SetColorTexture(1, 1, 1, 0.06)
+  row.line:SetColorTexture(Theme.fillColor("line"))
   row.mark = W.Glyph(row, "check", 14, "accent2")
   row.flag = W.Text(row, { text = "*", role = "ui", color = "warning", justify = "RIGHT" })
   row.detail = W.Text(row, { role = "small", color = "textSecondary" })
@@ -147,9 +147,14 @@ local function createRow(parent)
   row.del = icon("trash", "act.delete", "canvas.deleteTip", function()
     api.delete(row.id)
   end)
-  row.share = icon("share", "layoutshare.btn", "layoutshare.tip.layout", function()
-    api.share(row.id)
-  end)
+  row.share = ns.PageShare.Button(row, {
+    size = ICON,
+    tooltip = "layoutshare.btn",
+    tooltipText = "layoutshare.tip.layout",
+    onClick = function()
+      api.share(row.id)
+    end,
+  })
   row.dup = icon("copy", "act.duplicate", "canvas.dupTip", function()
     api.duplicate(row.id)
   end)

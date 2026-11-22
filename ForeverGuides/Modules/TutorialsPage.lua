@@ -7,7 +7,7 @@ local STATUS_COLOR = { new = "accent", outdated = "warning", done = "success", s
 local function build(container)
   local view = ns.NewPageView(container)
   local s = view.stack
-  ns.AddParagraph(view, "tutorials.intro")
+  ns.AddIntro(view, "tutorials.intro")
   s:Add(
     W.Toggle(view.content, {
       key = "tutorials.autoOffer",
@@ -39,7 +39,7 @@ local function build(container)
     local card = W.Card(view.content, { key = tour.title })
     card.tour = tour
     card.status = W.Text(card, { role = "ui" })
-    card.status:SetPoint("TOPLEFT", 12, card.contentTop)
+    card.status:SetPoint("TOPLEFT", card.pad, card.contentTop)
     local start = W.Action(card, {
       label = "act.start",
       icon = "play",
@@ -50,7 +50,7 @@ local function build(container)
         ns.TutorialUI.Start(tour.id)
       end,
     })
-    start:SetPoint("BOTTOMLEFT", 12, 10)
+    start:SetPoint("BOTTOMLEFT", card.pad, card.pad)
     local reset = W.Action(card, {
       label = "act.reset",
       icon = "reset",
@@ -63,7 +63,7 @@ local function build(container)
     })
     reset:SetPoint("LEFT", start, "RIGHT", 8, 0)
     rows[#rows + 1] = card
-    s:Add(card, { height = 96 })
+    s:Add(card, { height = 104 })
   end
 
   s:Add(

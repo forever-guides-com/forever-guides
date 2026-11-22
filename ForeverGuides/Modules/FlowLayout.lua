@@ -41,7 +41,8 @@ end
 --   row:SetItemShown(id, v), row:SetItemEnabled(id, v), row:SetItemText(id, key, literal)
 --   row:Refresh()             re-evaluates function-valued shown/enabled, then places again
 --   row:fgGridLayout(w)       the same as SetWidthAvailable, so a page Stack can hold the row
--- The row also places itself when its own width changes (OnSizeChanged).
+-- The row also places itself when its own width changes (OnSizeChanged). opts.onResize() is called when a
+-- placement the row started itself changed its height.
 function FL.ButtonRow(parent, defs, opts)
   opts = opts or {}
   local gap, rowGap = opts.gap or 8, opts.rowGap or 6
@@ -62,6 +63,7 @@ function FL.ButtonRow(parent, defs, opts)
       text = d.text,
       label = d.label,
       icon = d.icon,
+      boxed = d.boxed,
       variant = d.variant,
       width = item.minWidth,
       height = height,
@@ -130,9 +132,15 @@ function FL.ButtonRow(parent, defs, opts)
     return contentHeight
   end
 
+  -- Places again after labels changed on their own (font, language): when the row got another height the owner
+  -- makes room (opts.onResize), or the next block would be drawn over the lines of this one.
   local function replace()
     if lastWidth then
+      local before = contentHeight
       place(lastWidth, true)
+      if contentHeight ~= before and opts.onResize then
+        opts.onResize()
+      end
     end
   end
 

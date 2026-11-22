@@ -205,7 +205,7 @@ local function source(view, add)
   if not (opts.showMini and receiving()) then
     return
   end
-  local entries = Store.All()
+  local entries = Store.All("guild")
   if #entries == 0 then
     return
   end

@@ -9,7 +9,9 @@
 -- least one open line. Look and zoom come from Modules/WindowStyle.lua (kind "proftracker"). The
 -- position is an offset from the anchor in UIParent units, one per anchor kind, in
 -- ns.db.frames.profTracker = { track = { x, y }, screen = { x, y }, collapsed, scale, style }.
--- The position changes only out of combat; PLAYER_REGEN_ENABLED places it afterwards.
+-- In combat the panel is shown and painted as long as the client lets this add-on touch it (it is anchored to the
+-- tracker of the game, which can make it protected): a panel not placed yet hangs on the screen edge then, and
+-- PLAYER_REGEN_ENABLED anchors it to the tracker afterwards.
 local _, ns = ...
 local W, L, Theme, U, WS = ns.W, ns.L, ns.Theme, ns.U, ns.WindowStyle
 local S, SW, R = ns.ProfessionShop, ns.ProfessionShopWindow, ns.ProfessionRouteLogic
@@ -22,9 +24,9 @@ WS.PREFIX.proftracker = "profTrackerWindow"
 ns.AddLocale("enUS", {
   ["proftracker.heading"] = "Shopping list",
   ["proftracker.setting"] = "Shopping list in tracker",
-  ["proftracker.hint"] = "Panel below the quest tracker, drag the title.",
-  ["proftracker.collapse"] = "Collapse or expand",
-  ["proftracker.close"] = "Hide the list (switch it on again in the settings)",
+  ["proftracker.hint"] = "Panel below the quest tracker. Drag the title to move it.",
+  ["proftracker.collapse"] = "Collapses or expands the list.",
+  ["proftracker.close"] = "Hides the list. Switch it on again in the settings.",
   ["proftracker.send"] = "To shopping list",
   ["proftracker.window"] = "Window",
   ["proftracker.more"] = "+%d more",
@@ -32,22 +34,20 @@ ns.AddLocale("enUS", {
   ["proftracker.showTitle"] = "Small shopping list",
   ["proftracker.showTip"] = "Shows the small shopping list next to the quest tracker.",
   ["proftracker.nothingOpen"] = "Nothing left to buy on the shopping list.",
-  ["proftracker.afterCombat"] = "The small shopping list appears after combat.",
 })
 ns.AddLocale("deDE", {
   ["proftracker.heading"] = "Einkaufsliste",
   ["proftracker.setting"] = "Einkaufsliste im Tracker",
-  ["proftracker.hint"] = "Feld unter dem Quest-Tracker, am Titel ziehen.",
-  ["proftracker.collapse"] = "Ein- oder ausklappen",
-  ["proftracker.close"] = "Liste ausblenden (in den Einstellungen wieder einschaltbar)",
+  ["proftracker.hint"] = "Feld unter dem Questtracker. Titel ziehen verschiebt es.",
+  ["proftracker.collapse"] = "Klappt die Liste ein oder aus.",
+  ["proftracker.close"] = "Blendet die Liste aus. Einschalten: Einstellungen.",
   ["proftracker.send"] = "An Einkaufsliste",
   ["proftracker.window"] = "Fenster",
   ["proftracker.more"] = "+%d weitere",
   ["proftracker.show"] = "Kleine Liste",
   ["proftracker.showTitle"] = "Kleine Einkaufsliste",
-  ["proftracker.showTip"] = "Zeigt die kleine Einkaufsliste neben dem Quest-Tracker.",
+  ["proftracker.showTip"] = "Zeigt die kleine Einkaufsliste neben dem Questtracker.",
   ["proftracker.nothingOpen"] = "Auf der Einkaufsliste ist nichts mehr zu kaufen.",
-  ["proftracker.afterCombat"] = "Die kleine Einkaufsliste erscheint nach dem Kampf.",
 })
 
 local WIDTH, HEAD_H = 250, 22
@@ -71,6 +71,12 @@ end
 
 local function inCombat()
   return type(InCombatLockdown) == "function" and InCombatLockdown() == true
+end
+
+-- May this add-on move, size or show the panel now? Always out of combat, in combat only while the client does
+-- not protect it (through an anchor to the tracker of the game).
+local function touchable(f)
+  return not inCombat() or ns.ProtectedAllowed(f)
 end
 
 local function frameDb()
@@ -160,8 +166,13 @@ local function scaleOf()
   return finite(scale) and U.clamp(scale, SCALE_MIN, SCALE_MAX) or 1
 end
 
-local function place(f)
+-- screenOnly: the screen edge, whatever the tracker does (a panel not placed yet in combat must not be anchored
+-- to a frame the client may protect).
+local function place(f, screenOnly)
   local a = anchor()
+  if screenOnly and a.mode ~= "screen" then
+    a = { mode = "screen", rel = UIParent, point = "TOPRIGHT", x = SCREEN_X, y = SCREEN_Y }
+  end
   local ox, oy = offsetOf(a.mode)
   local s = f:GetScale()
   f:ClearAllPoints()
@@ -191,7 +202,7 @@ end
 
 -- Zoom: mouse wheel with the windowScale key (default Ctrl) on the title bar, the top right corner stays where it is.
 local function changeScale(f, delta)
-  if inCombat() then
+  if not touchable(f) then
     return
   end
   local db = frameDb()
@@ -256,7 +267,7 @@ local function newRow(parent)
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row.hover = row:CreateTexture(nil, "BACKGROUND")
   row.hover:SetAllPoints()
-  row.hover:SetColorTexture(1, 1, 1, 0)
+  row.hover:SetColorTexture(ns.Theme.fillColor())
   row.box = CreateFrame("Button", nil, row)
   row.box:SetSize(BOX, BOX)
   row.box:SetPoint("LEFT", PAD, 0)
@@ -274,13 +285,13 @@ local function newRow(parent)
   row.name:SetPoint("RIGHT", row.qty, "LEFT", -4, 0)
   row.name:SetMaxLines(1)
   row:SetScript("OnEnter", function(self)
-    self.hover:SetColorTexture(1, 1, 1, 0.06)
+    self.hover:SetColorTexture(Theme.fillColor("hover"))
     if self.line then
       S.RowTooltip(self, self.line)
     end
   end)
   row:SetScript("OnLeave", function(self)
-    self.hover:SetColorTexture(1, 1, 1, 0)
+    self.hover:SetColorTexture(ns.Theme.fillColor())
     ns.HideTooltip()
   end)
   row:SetScript(
@@ -404,9 +415,9 @@ local function create()
   f.bar:EnableMouse(true)
   f.bar:RegisterForDrag("LeftButton")
   f.bar:SetScript("OnDragStart", function()
-    -- The window is ours and not protected, so it moves in combat too. Only re-anchoring it to the game's
-    -- frame waits for the end of the fight.
-    if f:IsProtected() and inCombat() then
+    -- The window is ours: it moves in combat while the client does not protect it. Re-anchoring it to the
+    -- game's frame waits for the end of the fight when it does.
+    if not touchable(f) then
       return
     end
     f.dragging = true
@@ -424,7 +435,7 @@ local function create()
       WS.Hold(f, "move", false)
       saveOffset(f)
       f.replace = true
-      if not inCombat() then
+      if touchable(f) then
         place(f)
       end
     end)
@@ -473,11 +484,8 @@ local function create()
   f.body:SetPoint("BOTTOMRIGHT", 0, 0)
   local half = math.floor((WIDTH - 2 * PAD - 6) / 2)
   f.half = half
-  f.send = W.Action(f.body, {
-    label = "act.send",
-    icon = "share",
-    width = half,
-    height = BUTTON_H,
+  f.send = ns.PageShare.Button(f.body, {
+    size = BUTTON_H,
     tooltip = "profshop.send",
     tooltipText = "profshop.sendTip",
     onClick = function()
@@ -488,7 +496,7 @@ local function create()
   f.window = W.Action(f.body, {
     label = "act.open",
     icon = "open",
-    width = half,
+    width = 2 * half - BUTTON_H,
     height = BUTTON_H,
     tooltip = "profshop.title",
     tooltipText = "profroute.shopTip",
@@ -535,8 +543,7 @@ local function fitWidth(f, progW)
   local half = math.floor((width - 2 * PAD - 6) / 2)
   if half ~= f.half then
     f.half = half
-    f.send:SetWidth(half)
-    f.window:SetWidth(half)
+    f.window:SetWidth(2 * half - BUTTON_H)
   end
 end
 
@@ -583,7 +590,7 @@ end
 
 local function hide()
   if frame and frame:IsShown() then
-    frame:Hide()
+    ns.SafeHide(frame)
   end
 end
 
@@ -598,7 +605,7 @@ function T.Refresh()
   if plan and plan.data then
     list, open = entries(plan)
   end
-  if open == 0 or (inCombat() and not (frame and frame.placed)) then
+  if open == 0 then
     hide()
     return
   end
@@ -609,11 +616,17 @@ function T.Refresh()
     setCollapsed(frame, frameDb().collapsed == true)
     applyLook(frame)
   end
-  if not inCombat() and not frame.dragging then
+  if not frame.dragging then
     local a = anchor()
-    if not frame.placed or frame.replace or frame.mode ~= a.mode or frame.rel ~= a.rel then
+    if not frame.placed then
+      place(frame, inCombat())
+    elseif (frame.replace or frame.mode ~= a.mode or frame.rel ~= a.rel) and touchable(frame) then
       place(frame)
     end
+  end
+  -- Protected through its anchor in combat: painting waits for the end of the fight (PLAYER_REGEN_ENABLED).
+  if not touchable(frame) then
+    return
   end
   paint(frame, list)
   if not frame:IsShown() then
@@ -645,9 +658,7 @@ function T.Open()
   end
   local shown = frame ~= nil and frame:IsShown()
   if not shown then
-    -- An unplaced panel waits for the end of combat (T.Refresh), anything else has no open line.
-    local waits = inCombat() and not (frame and frame.placed)
-    ns.Notify(L[waits and "proftracker.afterCombat" or "proftracker.nothingOpen"], "info")
+    ns.Notify(L["proftracker.nothingOpen"], "info")
   end
   return shown
 end

@@ -12,7 +12,8 @@ ns.Consent = Consent
 Consent.VERSION = 1
 Consent.MAX_LOG = 30
 Consent.DIRECTIONS = { "send", "receive" }
-Consent.AUDIENCES = { "group", "guild", "chat", "world" }
+-- friends: character friends of the game, bnfriends: Battle.net friends.
+Consent.AUDIENCES = { "group", "guild", "friends", "bnfriends", "chat", "world" }
 -- Who made a decision: the player in the settings, the setup wizard, or the migration of an old switch.
 Consent.BY = { user = true, wizard = true, migrated = true }
 -- Replaceable in tests.
@@ -320,6 +321,64 @@ function Consent.Allows(fn, dir, aud)
   return lookup(fn, dir, aud) == true
 end
 
+-- The stored choice of the player: true, false, or nil when it was never made. Only for the few paths that are on
+-- until the player switches them off (a click that shares one payload, turning a readable chat line into a link).
+function Consent.Choice(fn, dir, aud)
+  if lookup(fn, dir, aud) == nil then
+    return nil
+  end
+  local db, cdb = ns.db, ns.charDB
+  local acct = type(db) == "table"
+    and type(db.consent) == "table"
+    and type(db.consent.items) == "table"
+    and db.consent.items[fn]
+  local mine = type(cdb) == "table"
+    and type(cdb.consent) == "table"
+    and type(cdb.consent.items) == "table"
+    and cdb.consent.items[fn]
+  if mine and mine.wd == (type(acct) == "table" and acct.wd or 0) then
+    local v = flag(mine, dir, aud)
+    if type(v) == "boolean" then
+      return v
+    end
+  end
+  local v = flag(acct, dir, aud)
+  if type(v) == "boolean" then
+    return v
+  end
+  return nil
+end
+
+-- True unless the player switched it off. For the same few paths as Choice.
+function Consent.OnUnlessOff(fn, dir, aud)
+  return lookup(fn, dir, aud) ~= nil and Consent.Choice(fn, dir, aud) ~= false
+end
+
+-- Flags that count as on while the player never chose (see OnUnlessOff): per function the directions.
+Consent.DEFAULT_ON = {
+  linkShare = { send = true, receive = true },
+  versionCheck = { send = true, receive = true },
+}
+
+-- True when this direction of the function is on until switched off.
+function Consent.IsDefaultOn(fn, dir)
+  local d = type(fn) == "string" and Consent.DEFAULT_ON[fn]
+  return type(d) == "table" and type(dir) == "string" and d[dir] == true
+end
+
+-- Whether a function that is on until switched off (Comm def.defaultOn) may act: the stored yes, or no choice yet.
+function Consent.Effective(fn, dir, aud)
+  return Consent.Allows(fn, dir, aud) or (Consent.IsDefaultOn(fn, dir) and Consent.OnUnlessOff(fn, dir, aud))
+end
+
+-- What a switch shows: the stored flag, or on for a default-on direction that was never chosen.
+function Consent.Shown(fn, dir, aud)
+  if Consent.Allows(fn, dir, aud) then
+    return true
+  end
+  return Consent.IsDefaultOn(fn, dir) and Consent.OnUnlessOff(fn, dir, aud)
+end
+
 -- When the effective flag was switched on (epoch), nil while it is off.
 function Consent.Since(fn, dir, aud)
   local v, _, item = lookup(fn, dir, aud)
@@ -423,7 +482,8 @@ function Consent.Reset(fn, dir, aud, by)
   return true
 end
 
-local function withdraw(def, by)
+-- clear: the flags are removed (never chosen) instead of stored as off.
+local function withdraw(def, by, clear)
   local root = accountRoot()
   if not root then
     return false
@@ -431,7 +491,11 @@ local function withdraw(def, by)
   local item = touch(root.items, def.id)
   for _, dir in ipairs(def.directions) do
     for _, aud in ipairs(def.audiences) do
-      item[dir][aud] = false
+      if clear then
+        item[dir][aud] = nil
+      else
+        item[dir][aud] = false
+      end
     end
   end
   item.since = { send = {}, receive = {} }
@@ -458,6 +522,21 @@ function Consent.Withdraw(fn, by)
     return false
   end
   log({ fn = fn, dir = "*", aud = "*", value = false, by = by, scope = "account" })
+  return true
+end
+
+-- Removes every stored choice of one function for the account and this character: back to "never
+-- chosen", so default-on directions are on again and everything else stays off.
+function Consent.Clear(fn, by)
+  by = by == nil and "user" or by
+  local def = type(fn) == "string" and defs[fn]
+  if not def or type(by) ~= "string" or not Consent.BY[by] then
+    return false
+  end
+  if not withdraw(def, by, true) then
+    return false
+  end
+  log({ fn = fn, dir = "*", aud = "*", by = by, scope = "account", reset = true })
   return true
 end
 
@@ -529,11 +608,31 @@ function Consent.Log()
   return root and U.copy(root.log) or {}
 end
 
+-- Battle.net friends were one group with the character friends. A decision about friends carries over to
+-- bnfriends once (a flag that is still unset takes the value of friends), so nobody is exposed to a group they
+-- never agreed to and an "off" stays off. Later runs find the flags set and change nothing.
+local function carryBnFriends(root)
+  local item = type(root) == "table" and type(root.items) == "table" and root.items.friendMap
+  if type(item) ~= "table" then
+    return
+  end
+  for _, dir in ipairs(Consent.DIRECTIONS) do
+    local flags = type(item[dir]) == "table" and item[dir]
+    if flags and type(flags.friends) == "boolean" and flags.bnfriends == nil then
+      flags.bnfriends = flags.friends
+      local since = type(item.since) == "table" and type(item.since[dir]) == "table" and item.since[dir]
+      if since and flags.friends then
+        since.bnfriends = since.friends
+      end
+    end
+  end
+end
+
 -- The old switch peerShare (item level and professions to group and guild) becomes consent for
 -- peerStats and professions; everything else starts off. Runs once from Store.init before the defaults
 -- (marker: account.consent exists), later runs only repair the table. The old keys stay, the beta
 -- keys layerShare and layerHost go.
-function Consent.Migrate(account)
+function Consent.Migrate(account, char)
   if type(account) ~= "table" then
     return nil
   end
@@ -546,6 +645,8 @@ function Consent.Migrate(account)
     local c = account.consent
     if not (type(c) == "table" and type(c.v) == "number" and c.v > Consent.VERSION) then
       account.consent = Consent.Clean(c)
+      carryBnFriends(account.consent)
+      carryBnFriends(char and char.consent)
     end
     return account.consent
   end
@@ -579,10 +680,12 @@ local BUILT_IN = {
   { "crestMark", { "crests" }, { "group", "guild" } },
   { "linkShare", { "notes", "drawings", "builds", "lists", "layouts" }, { "chat" } },
   { "guildMap", { "position" }, { "guild" } },
+  { "friendMap", { "position" }, { "friends", "bnfriends" } },
   { "crafting", { "recipes" }, { "guild" } },
   { "gmShare", { "rules" }, { "guild" } },
   { "chatPeer", { "extras" }, { "chat" } },
   { "teamChat", { "teams" }, { "chat" } },
+  { "versionCheck", { "version" }, { "group", "guild" } },
   -- Placeholder for a later layer network, nothing uses it yet.
   { "layer", { "layer" }, { "world" } },
 }

@@ -1,6 +1,8 @@
 -- "Where does this drop": the way back from an item to the boss and the instance, built from the loot rows of the
 -- instance data (boss.lo of every boss and inst.tl, the loot of an instance that no boss owns). No game API and no
 -- stored state: the index is rebuilt from ns.Data.Instances on first use, so a data update needs nothing else.
+-- The loot sits in the load-on-demand data add-on: the first lookup loads it (Modules/InstanceDataAccess.lua),
+-- a lookup in combat or without the add-on finds nothing and asks again later.
 -- Lines are for item tooltips (Modules/InventoryTooltip.lua appends them).
 --
 -- Rules: one line per instance, the bosses of that instance joined; an item that only sits in inst.tl gets the
@@ -105,14 +107,21 @@ function S.Reset()
   index = nil
 end
 
+local NONE = {}
+
 local function ensure()
-  if not index then
-    index = S.Build(ns.Data and ns.Data.Instances)
+  if index then
+    return index
   end
+  local DA = ns.InstanceDataAccess
+  if DA and DA.Ensure() ~= DA.STATUS.ok then
+    return NONE
+  end
+  index = S.Build(ns.Data and ns.Data.Instances)
   return index
 end
 
--- Entries of an item: { { instance = "name", bosses = { { name, pr, r } }, noBoss = bool } }, nil when the data
+-- Entries of an item: { { instance = "name", inst = instance table, bosses = { { name, pr, r } }, noBoss = bool } }, nil when the data
 -- has no row for the item. An instance whose tl row has a boss row too is not marked noBoss.
 function S.Rows(itemId)
   local id = whole(tonumber(itemId), 1)
@@ -122,7 +131,12 @@ function S.Rows(itemId)
   end
   local out = {}
   for _, e in ipairs(list) do
-    local row = { instance = text(e.inst.n) or tostring(e.inst.id or "?"), bosses = {}, noBoss = #e.bosses == 0 }
+    local row = {
+      instance = text(e.inst.n) or tostring(e.inst.id or "?"),
+      inst = e.inst,
+      bosses = {},
+      noBoss = #e.bosses == 0,
+    }
     for _, b in ipairs(e.bosses) do
       local name = text(b.boss.n)
       if name then

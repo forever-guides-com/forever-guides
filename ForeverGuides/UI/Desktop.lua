@@ -251,22 +251,7 @@ local function toolPaint(b)
   local selected = eval(def.selected, b) and true or false
   local active = enabled and (b.hover or Focus.current == b)
   b.fgSelected, b.fgEnabled = selected, enabled
-  if selected then
-    -- Filled and outlined: the state never rests on color alone.
-    local r, g, bl = Theme.rgb("surface3")
-    local lift = active and 0.04 or 0
-    b.bg:SetColorTexture(r + lift, g + lift, bl + lift, 1)
-    b.border.set("accent2", 1)
-    b.border.show(true)
-  elseif active then
-    b.bg:SetColorTexture(Theme.color("surface2"))
-    b.border.set("accentDim", 0.8)
-    b.border.show(true)
-  else
-    b.bg:SetColorTexture(0, 0, 0, 0)
-    b.border.show(false)
-  end
-  local tint = (not enabled and "textMuted") or (selected and "accent") or (active and "text") or "textSecondary"
+  local tint = W.PaintState(b, selected, active, enabled)
   b.icon:SetTint(tint)
   b.icon:SetAlpha(enabled and 1 or 0.45)
   if b.chevron then
@@ -280,10 +265,7 @@ end
 function W.ToolButton(parent, def)
   local b = CreateFrame("Button", nil, parent)
   b.hover = false
-  b.bg = b:CreateTexture(nil, "BACKGROUND")
-  b.bg:SetAllPoints()
-  b.border = W.Border(b, "accent2", 1)
-  b.border.show(false)
+  W.StateChrome(b)
   b.icon = IconDraw.new(b, 16)
 
   function b:SetDef(newDef)
@@ -483,7 +465,7 @@ Desktop.Menus = Menus
 
 local function paintRow(row)
   if row.isSeparator then
-    row.hl:SetColorTexture(0, 0, 0, 0)
+    row.hl:SetColorTexture(ns.Theme.fillColor())
     row.line:Show()
     row.line:SetColorTexture(Theme.color("accentDim", 0.6))
     row.label:Hide()
@@ -500,7 +482,7 @@ local function paintRow(row)
   if lit then
     row.hl:SetColorTexture(Theme.color("surface3"))
   else
-    row.hl:SetColorTexture(0, 0, 0, 0)
+    row.hl:SetColorTexture(ns.Theme.fillColor())
   end
   -- Keyboard focus gets its own outline, the shared focus ring can sit under the popup.
   row.focusBorder.show(row.kbd == true and not row.disabled)
@@ -782,7 +764,7 @@ local function paintTitle(b)
   elseif b.hover then
     b.bg:SetColorTexture(Theme.color("surface2"))
   else
-    b.bg:SetColorTexture(0, 0, 0, 0)
+    b.bg:SetColorTexture(ns.Theme.fillColor())
   end
   -- The open title also carries an underline, not only a fill.
   b.underline:SetShown(open)

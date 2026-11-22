@@ -2,7 +2,9 @@
 --
 --   flat     today's look: flat fills and 1 px edges (nothing in here is drawn for it)
 --   forever  the look of the game's own windows: stone background, metal frame, gold title in
---            the game's display font, red close button. Blizzard art only, nothing is shipped.
+--            GameFontNormal, red close button, cards and rows in the game's own card art. Blizzard
+--            art only, nothing is shipped. The element names are the plain ones: the Forever client
+--            resolves them to its own bronze art kit. Every part has the flat look as its fallback.
 --
 --   Skins.list[id] = { id, nameKey, palette = { token = "#rrggbb" }, metrics = { ... } }
 --   Skins.ORDER                  ids in the order of the settings dropdown
@@ -18,6 +20,9 @@
 --     kind "nine"  metal frame (NineSlice) on the edge overlay of a shell, surrounding the window
 --                  (part.offset / part.outset per side, see buildNine)
 --     kind "close" red close button art on a button
+--     kind "card" | "rowHover" | "rowActive" | "header" | "redButton*" | "tab*" | "search" | ...
+--                  every key of Skins.ART.slices: a nine-sliced Blizzard atlas filling its owner (the first
+--                  known atlas of its list wins)
 --     The part is built on first need and shown or hidden to match the skin (or `want`), so a
 --     switch needs no rebuild. Returns the part while it is shown, nil when the skin is off or the
 --     client lacks the art: the caller keeps its flat look then.
@@ -35,7 +40,8 @@ local Theme = ns.Theme
 local Skins = { failures = {} }
 ns.Skins = Skins
 
-Skins.DEFAULT = "flat"
+Skins.FLAT = "flat"
+Skins.DEFAULT = "forever"
 Skins.ORDER = { "flat", "forever" }
 
 -- Client art. Atlas names and file paths as they exist in the Forever client.
@@ -46,6 +52,92 @@ Skins.ART = {
     normal = "RedButton-Exit",
     pressed = "RedButton-exit-pressed",
     highlight = "RedButton-Highlight",
+  },
+  -- Nine-sliced surfaces: candidates in order of preference, margins = left, top, right, bottom of the art in px.
+  -- The margins are read from the art sheets, not yet confirmed in the client ([probe], docs/UI-FRAMEWORK.md).
+  -- layer / sub = draw layer of the texture on its owner.
+  slices = {
+    card = {
+      candidates = {
+        { atlas = "Profession-overview-Card", margins = { 16, 16, 16, 16 } },
+        { atlas = "common-insideframe", margins = { 24, 24, 24, 24 } },
+        { atlas = "heavybronze-frame-basic", margins = { 20, 20, 20, 20 } },
+      },
+      layer = "BACKGROUND",
+      sub = 1,
+    },
+    rowHover = {
+      candidates = {
+        { atlas = "Options_List_Hover", margins = { 8, 4, 8, 4 } },
+        { atlas = "common-list-hoverBG-mid", margins = { 8, 8, 8, 8 } },
+      },
+      layer = "BACKGROUND",
+      sub = 2,
+    },
+    rowActive = {
+      candidates = {
+        { atlas = "common-button-list-small-selected", margins = { 12, 8, 12, 8 } },
+        { atlas = "Options_List_Active", margins = { 8, 4, 8, 4 } },
+      },
+      layer = "BACKGROUND",
+      sub = 2,
+    },
+    redButton = {
+      candidates = {
+        { atlas = "128-RedButton-Center", margins = { 16, 12, 16, 12 } },
+      },
+      layer = "BACKGROUND",
+      sub = 1,
+    },
+    redButtonPressed = {
+      candidates = {
+        { atlas = "128-RedButton-Center-Pressed", margins = { 16, 12, 16, 12 } },
+      },
+      layer = "BACKGROUND",
+      sub = 2,
+    },
+    redButtonDisabled = {
+      candidates = {
+        { atlas = "128-RedButton-Center-Disabled", margins = { 16, 12, 16, 12 } },
+      },
+      layer = "BACKGROUND",
+      sub = 2,
+    },
+    tab = {
+      candidates = {
+        { atlas = "common-internaltab", margins = { 10, 8, 10, 8 } },
+      },
+      layer = "BACKGROUND",
+      sub = 1,
+    },
+    tabHover = {
+      candidates = {
+        { atlas = "common-internaltab-hover", margins = { 10, 8, 10, 8 } },
+      },
+      layer = "BACKGROUND",
+      sub = 2,
+    },
+    search = {
+      candidates = {
+        { atlas = "common-search-border-middle", margins = { 8, 8, 8, 8 } },
+      },
+      layer = "BACKGROUND",
+      sub = 1,
+    },
+    divider = {
+      candidates = {
+        { atlas = "Options_HorizontalDivider" },
+      },
+      layer = "ARTWORK",
+      sub = 0,
+    },
+    popover = {
+      candidates = {
+        { atlas = "Tooltip-NineSlice-Center" },
+      },
+      layer = "BACKGROUND",
+      sub = 0,
+    },
   },
 }
 
@@ -67,8 +159,6 @@ Skins.list = {
       surface2 = "#28211a",
       surface3 = "#33291f",
       text = "#f5efe0",
-      textSecondary = "#ddd2bb",
-      textMuted = "#b8aa8f",
       accent = "#ffe27a",
       accent2 = "#ffd100",
       accentDim = "#a68a2e",
@@ -76,10 +166,9 @@ Skins.list = {
       actionHi = "#ff8f78",
     },
     metrics = {
-      titleFont = "Fonts\\MORPHEUS.TTF",
+      -- Fallback of GameFontNormal's file (Friz Quadrata); Skins.titleFont asks the font object first.
+      titleFont = "Fonts\\FRIZQT__.TTF",
       titleMinSize = 12,
-      -- Multiplied onto the stone, so light text keeps its contrast on every spot of it.
-      rockTint = { 0.55, 0.5, 0.45 },
       -- Title strip in the metal bar (UI/WindowShell.lua): margin = gap to the window edge, textPad = the title is at
       -- most bar height minus this tall, metal = height of the visible metal bar of the top edge (measured in the
       -- client: rim, streaks and lower rim, about 18 px; the tile around it is taller and carries clear padding), the
@@ -105,12 +194,14 @@ ns.AddLocale("enUS", {
   ["settings.skin.flat"] = "Flat",
   ["settings.skin.forever"] = "WoW Forever",
   ["settings.skinHint"] = "Forever: metal frame, stone, gold title\nHigh contrast uses Flat",
+  ["settings.skinMigrated"] = "New default style: Forever. Switch back under Settings > Look.",
 })
 ns.AddLocale("deDE", {
   ["settings.skin"] = "Fensterstil",
   ["settings.skin.flat"] = "Flach",
   ["settings.skin.forever"] = "WoW Forever",
   ["settings.skinHint"] = "Forever: Metallrahmen, Fels, Goldtitel\nHoher Kontrast nutzt Flach",
+  ["settings.skinMigrated"] = "Neuer Standardstil: Forever. Du stellst ihn unter Einstellungen > Aussehen zurück.",
 })
 
 function Skins.cleanId(v)
@@ -126,8 +217,8 @@ end
 -- style, its red/green swap is a token override above the skin palette.
 function Skins.activeId()
   local id = Skins.currentId()
-  if id == Skins.DEFAULT or Theme.highContrast() then
-    return Skins.DEFAULT
+  if id == Skins.FLAT or Theme.highContrast() then
+    return Skins.FLAT
   end
   return id
 end
@@ -163,7 +254,6 @@ local function buildRock(frame)
   tex:SetTexture(Skins.ART.rock, "REPEAT", "REPEAT")
   tex:SetHorizTile(true)
   tex:SetVertTile(true)
-  tex:SetVertexColor(unpack(Skins.list.forever.metrics.rockTint))
   return tex
 end
 
@@ -407,7 +497,29 @@ local function buildClose(button)
   return art
 end
 
+-- A nine-sliced Blizzard atlas filling `owner`; errors when no candidate is known (the caller keeps its flat look).
+local function buildSlice(owner, kind)
+  local spec = Skins.ART.slices[kind]
+  for _, candidate in ipairs(spec.candidates) do
+    if atlasKnown(candidate.atlas) then
+      local tex = owner:CreateTexture(nil, spec.layer or "BACKGROUND", nil, spec.sub or 1)
+      tex:SetAllPoints()
+      tex:SetAtlas(candidate.atlas)
+      local m = candidate.margins
+      if m and type(tex.SetTextureSliceMargins) == "function" then
+        tex:SetTextureSliceMargins(m[1], m[2], m[3], m[4])
+      end
+      tex.fgAtlas = candidate.atlas
+      return tex
+    end
+  end
+  error("no atlas of " .. kind .. " known", 0)
+end
+
 local BUILD = { rock = buildRock, nine = buildNine, close = buildClose }
+for kind in pairs(Skins.ART.slices) do
+  BUILD[kind] = buildSlice
+end
 local parts = setmetatable({}, { __mode = "k" })
 
 function Skins.Apply(owner, kind, want)
@@ -421,7 +533,7 @@ function Skins.Apply(owner, kind, want)
   end
   local part = own[kind]
   if part == nil and want then
-    local ok, built = pcall(BUILD[kind], owner)
+    local ok, built = pcall(BUILD[kind], owner, kind)
     if not ok then
       Skins.failures[kind] = tostring(built)
       ns.Log.warn("skin part %s not built: %s", kind, tostring(built))
@@ -456,6 +568,18 @@ end
 
 -- Fonts ---------------------------------------------------------------------------------------
 
+-- File of GameFontNormal (the title font of every native window, localized clients included), else the metric.
+function Skins.titleFont()
+  local object = rawget(_G, "GameFontNormal")
+  if type(object) == "table" and type(object.GetFont) == "function" then
+    local ok, path = pcall(object.GetFont, object)
+    if ok and type(path) == "string" and path ~= "" then
+      return path
+    end
+  end
+  return Skins.list.forever.metrics.titleFont
+end
+
 -- maxSize caps the title (a title in the metal band must fit the band), never below the font floor.
 function Skins.StyleTitle(fs, role, family, maxSize)
   if Skins.isForever() then
@@ -464,7 +588,7 @@ function Skins.StyleTitle(fs, role, family, maxSize)
     if maxSize then
       size = math.min(size, math.max(Theme.fontFloor(), maxSize))
     end
-    if fs:SetFont(metrics.titleFont, size, "") then
+    if fs:SetFont(Skins.titleFont(), size, "") then
       fs:SetShadowOffset(1, -1)
       fs:SetShadowColor(0, 0, 0, 0.9)
       return

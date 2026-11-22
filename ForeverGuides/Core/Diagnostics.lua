@@ -207,6 +207,10 @@ function ns.DiagReport()
     local okShare, text = pcall(ns.ShareSync.Text)
     out[#out + 1] = okShare and text or "share: ?"
   end
+  if ns.WorldMapGuildPins then
+    local okOpen, text = pcall(ns.WorldMapGuildPins.DiagLine)
+    out[#out + 1] = okOpen and text or "guild map open: ?"
+  end
   if ns.LogoStatus then
     local okLogo, text = pcall(ns.LogoStatus.Text)
     out[#out + 1] = okLogo and text or "logo chain: ?"

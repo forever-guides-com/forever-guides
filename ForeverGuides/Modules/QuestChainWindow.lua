@@ -28,7 +28,7 @@ ns.AddLocale("enUS", {
   ["questchain.giver"] = "Giver: %s",
   ["questchain.giverZone"] = "Giver: %s in %s",
   ["questchain.giverNone"] = "Giver not recorded",
-  ["questchain.placeNone"] = "Place not recorded, so no marker and no map",
+  ["questchain.placeNone"] = "Place not recorded, so no waypoint and no map",
   ["questchain.tag.chosen"] = "This quest",
   ["questchain.tag.access"] = "Access quest",
   ["questchain.where.inside"] = "Inside",
@@ -36,7 +36,7 @@ ns.AddLocale("enUS", {
   ["questchain.tag.from"] = "From %s",
   ["questchain.missing"] = "Quest %d is not in the data",
   ["questchain.pair"] = "Counterpart of the other faction: %s",
-  ["questchain.marker"] = "Set marker",
+  ["questchain.marker"] = "Set waypoint",
   ["questchain.markerTip"] = "Sets a waypoint at the giver of this step.",
   ["questchain.map"] = "Map",
   ["questchain.mapTip"] = "Shows the giver of this step on the map.",
@@ -51,7 +51,7 @@ ns.AddLocale("enUS", {
   ["questchain.lane.any"] = "One of these is enough",
   ["questchain.lane.var"] = "Variant %d",
   ["questchain.lane.var.sparklematic"] = "Machine %d",
-  ["questchain.keys"] = "Up and Down move between the buttons, Enter presses, Esc closes.",
+  ["questchain.keys"] = "Up and Down arrows move between the buttons. Enter presses, Esc closes.",
 })
 
 ns.AddLocale("deDE", {
@@ -59,8 +59,8 @@ ns.AddLocale("deDE", {
   ["questchain.close"] = "Questreihe schließen",
   ["questchain.steps.one"] = "1 Schritt",
   ["questchain.steps.other"] = "%d Schritte",
-  ["questchain.level"] = "Quest-Stufe %s",
-  ["questchain.levelUnknown"] = "Quest-Stufe nicht in den Daten",
+  ["questchain.level"] = "Queststufe %s",
+  ["questchain.levelUnknown"] = "Queststufe nicht in den Daten",
   ["questchain.from"] = "Verfügbar ab Stufe %d",
   ["questchain.fromPartial"] = "Verfügbar frühestens ab Stufe %d (nicht jeder Schritt hat eine Stufe)",
   ["questchain.fromUnknown"] = "Mindeststufe nicht in den Daten",
@@ -74,7 +74,7 @@ ns.AddLocale("deDE", {
   ["questchain.giver"] = "Geber: %s",
   ["questchain.giverZone"] = "Geber: %s in %s",
   ["questchain.giverNone"] = "Geber nicht erfasst",
-  ["questchain.placeNone"] = "Ort nicht erfasst, daher kein Marker und keine Karte",
+  ["questchain.placeNone"] = "Ort nicht erfasst, daher kein Wegpunkt und keine Karte",
   ["questchain.tag.chosen"] = "Diese Quest",
   ["questchain.tag.access"] = "Zugangsquest",
   ["questchain.where.inside"] = "In der Instanz",
@@ -82,13 +82,13 @@ ns.AddLocale("deDE", {
   ["questchain.tag.from"] = "Aus %s",
   ["questchain.missing"] = "Quest %d ist nicht in den Daten",
   ["questchain.pair"] = "Gegenstück der anderen Fraktion: %s",
-  ["questchain.marker"] = "Marker setzen",
+  ["questchain.marker"] = "Wegpunkt setzen",
   ["questchain.markerTip"] = "Setzt einen Wegpunkt beim Geber dieses Schritts.",
   ["questchain.map"] = "Karte",
   ["questchain.mapTip"] = "Zeigt den Geber dieses Schritts auf der Karte.",
   ["questchain.next"] = "Danach: %s",
   ["questchain.noteTruncated"] = "Die Kette ist lang: Es werden nur die letzten %d Schritte gezeigt.",
-  ["questchain.noteCycle"] = "Die Daten haben einen Kreis zwischen Quests. Er wurde ignoriert.",
+  ["questchain.noteCycle"] = "Die Daten enthalten eine Schleife zwischen Quests. Sie wurde ignoriert.",
   ["questchain.noteMissing"] = "%d Vorquests fehlen in den Daten.",
   ["questchain.class"] = "Klassenquest:",
   ["questchain.repeatable"] = "wiederholbar",
@@ -97,7 +97,7 @@ ns.AddLocale("deDE", {
   ["questchain.lane.any"] = "Eine davon genügt",
   ["questchain.lane.var"] = "Variante %d",
   ["questchain.lane.var.sparklematic"] = "Maschine %d",
-  ["questchain.keys"] = "Pfeil hoch und runter wechseln zwischen den Knöpfen, Enter drückt, Esc schließt.",
+  ["questchain.keys"] = "Die Pfeiltasten hoch und runter wechseln zwischen den Knöpfen. Enter drückt, Esc schließt.",
 })
 
 local QW = {}
@@ -111,7 +111,7 @@ local CONTENT_W = WIDTH - 2 * PAD - 12
 local frame
 
 local function name(q)
-  return q and ns.T(q.n) or nil
+  return q and (ns.QuestNames and ns.QuestNames.Name(q) or ns.T(q.n)) or nil
 end
 
 local function plural(n, key)
@@ -128,14 +128,13 @@ end
 
 local REPEAT_ICON = "Interface\\Buttons\\UI-RefreshButton"
 
--- "Class quest: [icon] Warlock" with the class name in its class color (lifted to AA on the panel surface). The
--- words carry the meaning, the color and the icon only add to them. Nil for a token that is no class.
-function QW.ClassText(class)
+-- Icon and class-colored name of one class token (lifted to AA on the panel surface), nil for a token that is no class.
+local function classPart(class, surface)
   local K, R = ns.PageKit, ns.RefLogic
   if type(class) ~= "string" or not (K and R and R.className(class) ~= class) then
     return nil
   end
-  local hex = Theme.readable(K.ClassColorHex(class), Theme.hex("surface3"))
+  local hex = Theme.readable(K.ClassColorHex(class), Theme.hex(surface or "surface3"))
   local coords = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[class]
   local icon = ""
   if coords then
@@ -151,16 +150,30 @@ function QW.ClassText(class)
       px(coords[4])
     )
   end
-  return string.format("%s %s|cff%s%s|r", L["questchain.class"], icon, hex:sub(2), R.className(class))
+  return string.format("%s|cff%s%s|r", icon, hex:sub(2), R.className(class))
+end
+
+-- "Class quest: [icon] Warlock" with the class name in its class color. `class` is one token or a list of tokens (a quest
+-- of several classes: "Class quest: Mage, Warlock"). The words carry the meaning, the color and the icon only add to
+-- them. Nil when no token is a class.
+function QW.ClassText(class, surface)
+  local parts = {}
+  for _, token in ipairs(type(class) == "table" and class or { class }) do
+    parts[#parts + 1] = classPart(token, surface)
+  end
+  return #parts > 0 and L["questchain.class"] .. " " .. table.concat(parts, ", ") or nil
 end
 
 -- The same without any markup, for readers and the keyboard name.
 function QW.ClassPlain(class)
   local R = ns.RefLogic
-  if type(class) ~= "string" or not (R and R.className(class) ~= class) then
-    return nil
+  local names = {}
+  for _, token in ipairs(type(class) == "table" and class or { class }) do
+    if type(token) == "string" and R and R.className(token) ~= token then
+      names[#names + 1] = R.className(token)
+    end
   end
-  return L["questchain.class"] .. " " .. R.className(class)
+  return #names > 0 and L["questchain.class"] .. " " .. table.concat(names, ", ") or nil
 end
 
 -- "[icon] repeatable".
@@ -326,7 +339,7 @@ local function makeRow(parent)
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
     row.bar:SetColorTexture(Theme.color("accent2"))
     row.bg:SetColorTexture(Theme.color("accent2", row.chosen and 0.14 or 0))
   end)
@@ -601,7 +614,7 @@ function QW.Open(inst, quest, opts)
   end
   local f = frame
   local chain = QC.Chain(inst, quest, opts)
-  f.inst, f.quest, f.chain = inst, quest, chain
+  f.inst, f.quest, f.chain, f.opts = inst, quest, chain, opts
   W.SetText(ns.WindowShell.Of(f).titleText, nil, name(quest) or "?")
   local head, sub = QW.HeadLines(chain)
   f.head:SetText(head)
@@ -633,6 +646,15 @@ function QW.Close()
     ns.SafeHide(frame)
   end
 end
+
+-- A client title for a quest arrived: the open window shows it and keeps its scroll position.
+ns.On("FG_QUEST_NAMES", function()
+  if frame and frame:IsShown() and frame.inst then
+    local y = frame.scroll:GetVerticalScroll()
+    QW.Open(frame.inst, frame.quest, frame.opts)
+    frame.scroll:ScrollTo(y)
+  end
+end)
 
 -- Re-lays out the open window (after a font or scale change).
 function QW.Relayout()

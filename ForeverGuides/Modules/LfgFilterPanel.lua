@@ -53,7 +53,7 @@ ns.AddLocale("enUS", {
   ["lfgp.search.none"] = "Choose at least one dungeon",
   ["lfgp.search.noneActivity"] = "Choose at least one activity",
   ["lfgp.hint.list"] = "The list is in the Search tab.",
-  ["lfgp.search.failed"] = "Search failed. Please wait a moment and try again.",
+  ["lfgp.search.failed"] = "Search failed. Wait a moment and try again.",
   ["lfgp.search.blocked"] = "Search is blocked right now.",
   ["lfgp.show"] = "Show",
   ["lfgp.selected"] = "selected",
@@ -71,7 +71,7 @@ ns.AddLocale("enUS", {
   ["lfgp.roles.class"] = "Your class cannot play this role.",
   ["lfgp.roles.blocked"] = "The roles could not be passed to the game.",
   ["lfgp.match"] = "Show matching groups",
-  ["lfgp.match.tip"] = "Only groups with a free slot for your role.\nWorks when you choose at least one role.",
+  ["lfgp.match.tip"] = "Shows only groups with a free slot for your role.\nWorks once you choose at least one role.",
   ["lfgp.langs"] = "Languages",
   ["lfgp.langs.locked"] = "Your game language is always included.",
   ["lfgp.langs.none"] = "No extra ones",
@@ -128,14 +128,14 @@ ns.AddLocale("deDE", {
   ["lfgp.search.none"] = "Mindestens einen Dungeon wählen",
   ["lfgp.search.noneActivity"] = "Mindestens eine Aktivität wählen",
   ["lfgp.hint.list"] = "Die Liste siehst du im Reiter Suchen.",
-  ["lfgp.search.failed"] = "Suche fehlgeschlagen. Bitte kurz warten und erneut versuchen.",
+  ["lfgp.search.failed"] = "Suche fehlgeschlagen. Warte kurz und versuche es erneut.",
   ["lfgp.search.blocked"] = "Die Suche ist gerade gesperrt.",
-  ["lfgp.show"] = "Zeigen",
+  ["lfgp.show"] = "Anzeigen",
   ["lfgp.selected"] = "ausgewählt",
   ["lfgp.unselected"] = "nicht ausgewählt",
   ["lfgp.preset.groups"] = "Gruppen suchen Spieler",
   ["lfgp.preset.players"] = "Spieler suchen Gruppe",
-  ["lfgp.preset.all"] = "Alles zeigen",
+  ["lfgp.preset.all"] = "Alles anzeigen",
   ["lfgp.resize"] = "Panelbreite",
   ["lfgp.resize.hint"] = "Ziehen oder Pfeiltasten.\nEnter setzt zurück.",
   ["lfgp.roles"] = "Ich suche als",
@@ -146,7 +146,7 @@ ns.AddLocale("deDE", {
   ["lfgp.roles.class"] = "Deine Klasse kann diese Rolle nicht.",
   ["lfgp.roles.blocked"] = "Die Rollen konnten nicht an das Spiel übergeben werden.",
   ["lfgp.match"] = "Passende Gruppen anzeigen",
-  ["lfgp.match.tip"] = "Nur Gruppen mit freiem Platz für deine Rolle.\nWirkt, wenn du mindestens eine Rolle wählst.",
+  ["lfgp.match.tip"] = "Zeigt nur Gruppen mit freiem Platz für deine Rolle.\nWirkt, sobald du mindestens eine Rolle wählst.",
   ["lfgp.langs"] = "Sprachen",
   ["lfgp.langs.locked"] = "Deine Spielsprache ist immer dabei.",
   ["lfgp.langs.none"] = "Keine zusätzlichen",
@@ -313,7 +313,7 @@ end
 local function pressable(button)
   local shade = button:CreateTexture(nil, "BORDER")
   shade:SetAllPoints()
-  shade:SetColorTexture(1, 1, 1, 0.14)
+  shade:SetColorTexture(Theme.fillColor("selected"))
   shade:Hide()
   local function release()
     shade:Hide()
@@ -611,7 +611,8 @@ local function newRow(parent)
   row.level:SetPoint("TOPRIGHT", row, "TOPRIGHT", 0, -3)
   row.label:SetPoint("TOPLEFT", row, "TOPLEFT", 24, -3)
   row.label:SetPoint("TOPRIGHT", row.level, "TOPLEFT", -LEVEL_GAP, 0)
-  row.mark = W.Text(row, { key = "lfgp.mark", role = "small", color = "accent2" })
+  -- Not "mark": a toggle button keeps its accent bar under that name (W.ActiveMark).
+  row.levelMark = W.Text(row, { key = "lfgp.mark", role = "small", color = "accent2" })
   -- chosen: the checked set of the list when the caller has it (one pass for all rows).
   function row.paint(chosen)
     local s = state()
@@ -644,8 +645,9 @@ local function newRow(parent)
       row.paint()
     end)
   )
-  row:SetScript("OnEnter", row.tip)
-  row:SetScript("OnLeave", ns.HideTooltip)
+  -- Hooks: pressable() hooked OnLeave to release the pressed look, a SetScript would drop it.
+  row:HookScript("OnEnter", row.tip)
+  row:HookScript("OnLeave", ns.HideTooltip)
   row.fgOnFocus, row.fgOnBlur = row.tip, ns.HideTooltip
   local from = #ns.Focus.items
   ns.Focus.register(row, function(self)
@@ -665,7 +667,7 @@ local function bindRow(row, entry, level, chosen)
   row.label:SetText(row.text)
   row.level:SetText(row.range)
   row.mine = LB.InRange(entry, level)
-  row.mark:SetShown(row.mine)
+  row.levelMark:SetShown(row.mine)
   row.paint(chosen)
   row:Show()
 end
@@ -720,8 +722,8 @@ local function dungeonList(parent)
       row:SetSize(width, height)
       row.label:SetHeight(line)
       row.level:SetSize(levelWidth, line)
-      row.mark:ClearAllPoints()
-      row.mark:SetPoint("TOPLEFT", row, "TOPLEFT", 24, -(3 + line))
+      row.levelMark:ClearAllPoints()
+      row.levelMark:SetPoint("TOPLEFT", row, "TOPLEFT", 24, -(3 + line))
       y = y + height + 2
     end
     if #entries == 0 then
@@ -1675,7 +1677,7 @@ local function build(parent)
 
   local divider = frame:CreateTexture(nil, "ARTWORK")
   ns.Bind(divider, function(t)
-    t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    t:SetColorTexture(Theme.fillColor("line"))
   end)
 
   -- The grip at the right edge changes the width: drag with the mouse, Left and Right with the focus on it.

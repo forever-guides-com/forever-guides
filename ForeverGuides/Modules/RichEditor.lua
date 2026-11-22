@@ -48,19 +48,19 @@ ns.RichEditor = RE
 ns.AddLocale("enUS", {
   ["notes.edit.limit"] = "Limit of %d characters reached, nothing added.",
   ["notes.rich.copyTitle"] = "Copy text",
-  ["notes.rich.copyHint"] = "Plain text, Ctrl+C copies it.",
+  ["notes.rich.copyHint"] = "Plain text. Ctrl+C copies it.",
   ["notes.rich.menuCopy"] = "Copy as text",
   ["notes.rich.menuAll"] = "Select all",
-  ["notes.rich.fallback"] = "Formatted editor unavailable, code view in use.",
+  ["notes.rich.fallback"] = "The formatted editor is unavailable. The code view is active.",
 })
 
 ns.AddLocale("deDE", {
   ["notes.edit.limit"] = "Limit von %d Zeichen erreicht, nichts hinzugefügt.",
   ["notes.rich.copyTitle"] = "Text kopieren",
-  ["notes.rich.copyHint"] = "Reiner Text, Strg+C kopiert ihn.",
-  ["notes.rich.menuCopy"] = "Text kopieren",
+  ["notes.rich.copyHint"] = "Reiner Text. Strg+C kopiert ihn.",
+  ["notes.rich.menuCopy"] = "Als Text kopieren",
   ["notes.rich.menuAll"] = "Alles markieren",
-  ["notes.rich.fallback"] = "Formatierter Editor nicht verfügbar, Code-Ansicht aktiv.",
+  ["notes.rich.fallback"] = "Der formatierte Editor ist nicht verfügbar. Die Codeansicht ist aktiv.",
 })
 
 local clamp = U.clamp
@@ -198,15 +198,15 @@ local function buildMenu()
     r:SetPoint("TOPRIGHT", -1, -1 - (i - 1) * 22)
     r.hl = r:CreateTexture(nil, "BACKGROUND")
     r.hl:SetAllPoints()
-    r.hl:SetColorTexture(1, 1, 1, 0)
+    r.hl:SetColorTexture(ns.Theme.fillColor())
     r.text = W.Text(r, { role = "ui" })
     r.text:SetPoint("LEFT", 8, 0)
     r.key = key
     r:SetScript("OnEnter", function()
-      r.hl:SetColorTexture(1, 1, 1, 0.08)
+      r.hl:SetColorTexture(Theme.fillColor("hover"))
     end)
     r:SetScript("OnLeave", function()
-      r.hl:SetColorTexture(1, 1, 1, 0)
+      r.hl:SetColorTexture(ns.Theme.fillColor())
     end)
     r:SetScript(
       "OnClick",
@@ -293,7 +293,7 @@ function RE.New(parent, opts)
   overlay:SetAllPoints(frame)
   overlay:SetFrameLevel(frame:GetFrameLevel() + 20)
   ed.hintBg = newTexture("OVERLAY", overlay)
-  ed.hintBg:SetColorTexture(0, 0, 0, 0.75)
+  ed.hintBg:SetColorTexture(ns.Theme.scrim(0.75))
   ed.hint = W.Text(overlay, { role = "micro", color = "accent2", justify = "RIGHT" })
   ed.hint:SetPoint("BOTTOMRIGHT", -8, 6)
   ed.hintBg:SetPoint("TOPLEFT", ed.hint, "TOPLEFT", -4, 2)
@@ -449,7 +449,8 @@ function Editor:PaintSelection(layout, top, bottom)
       t:ClearAllPoints()
       t:SetPoint("TOPLEFT", self.selLayer, "TOPLEFT", RE.PAD + r.x, -(RE.PAD + r.y))
       t:SetSize(r.w, r.h)
-      t:SetVertexColor(0.25, 0.5, 0.95, alpha)
+      local cr, cg, cb = ns.Theme.rgb("info")
+      t:SetVertexColor(cr, cg, cb, alpha)
       t:Show()
     end
   end

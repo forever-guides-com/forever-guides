@@ -5,7 +5,7 @@
 -- hands in the zone, the switches and the visible part of the map through the Attach context.
 local _, ns = ...
 local L, Theme, MI = ns.L, ns.Theme, ns.MapIcons
-local GM = ns.GatheringMapLogic
+local GM, SM = ns.GatheringMapLogic, ns.SpotMarker
 
 local GMap = {}
 ns.GatheringMap = GMap
@@ -16,7 +16,7 @@ GMap.GLOW = 3 -- the hover ring reaches this far past the symbol
 
 ns.AddLocale("enUS", {
   ["map.gather"] = "Show ores and herbs",
-  ["map.gather.tip"] = "Shows the spots of all ores and herbs of the zone on the zone map. The page Ores and herbs narrows it down per zone.\nHover a symbol for its name.",
+  ["map.gather.tip"] = "Shows the spots of all ores and herbs of the zone on the zone map. The page Ores and herbs narrows it down per zone.\nHover over a symbol to see its name.",
   ["map.gather.spots"] = "Spots: %d (items: %d)",
   ["map.gather.noZone"] = "Open a zone to see ore and herb spots.",
   ["map.gather.none"] = "All items of this zone are switched off. Choose them on the page Ores and herbs.",
@@ -28,8 +28,9 @@ ns.AddLocale("enUS", {
   ["map.gather.chooseTip"] = "Opens the page Ores and herbs.",
   ["map.gather.known"] = "Known spot",
   ["map.gather.own"] = "Own find",
+  ["map.gather.possible"] = "Possible node",
   ["map.gatherObjects"] = "Show chests and fishing schools",
-  ["map.gatherObjects.tip"] = "Shows the spots of chests, clams and other finds and of fishing schools on the zone map. The settings choose the kinds.\nHover a symbol for its name.",
+  ["map.gatherObjects.tip"] = "Shows the spots of chests, clams and other finds and of fishing schools on the zone map. The settings choose the kinds.\nHover over a symbol to see its name.",
   ["map.gatherObjects.spots"] = "Chests and schools: %d spots (kinds: %d)",
   ["map.gatherObjects.noZone"] = "Open a zone to see chests and fishing schools.",
   ["map.gatherObjects.none"] = "All kinds of this zone are switched off. Choose them in the settings.",
@@ -38,8 +39,8 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["map.gather"] = "Erze und Kräuter zeigen",
-  ["map.gather.tip"] = "Zeigt die Fundorte aller Erze und Kräuter des Gebiets auf der Gebietskarte. Die Seite Erze und Kräuter schränkt sie je Gebiet ein.\nSymbol anfahren zeigt den Namen.",
+  ["map.gather"] = "Erze und Kräuter anzeigen",
+  ["map.gather.tip"] = "Zeigt die Fundorte aller Erze und Kräuter des Gebiets auf der Gebietskarte. Die Seite Erze und Kräuter schränkt sie je Gebiet ein.\nBewege die Maus über ein Symbol, um den Namen zu sehen.",
   ["map.gather.spots"] = "Fundorte: %d (Items: %d)",
   ["map.gather.noZone"] = "Öffne ein Gebiet, um Fundorte von Erzen und Kräutern zu sehen.",
   ["map.gather.none"] = "Alle Items dieses Gebiets sind ausgeschaltet. Wähle sie auf der Seite Erze und Kräuter.",
@@ -51,8 +52,9 @@ ns.AddLocale("deDE", {
   ["map.gather.chooseTip"] = "Öffnet die Seite Erze und Kräuter.",
   ["map.gather.known"] = "Bekannter Fundort",
   ["map.gather.own"] = "Eigener Fund",
-  ["map.gatherObjects"] = "Truhen und Fischschwärme zeigen",
-  ["map.gatherObjects.tip"] = "Zeigt die Fundorte von Truhen, Muscheln und weiteren Fundstücken sowie von Fischschwärmen auf der Gebietskarte. Die Einstellungen wählen die Arten.\nSymbol anfahren zeigt den Namen.",
+  ["map.gather.possible"] = "Möglicher Fundort",
+  ["map.gatherObjects"] = "Truhen und Fischschwärme anzeigen",
+  ["map.gatherObjects.tip"] = "Zeigt die Fundorte von Truhen, Muscheln und weiteren Fundstücken sowie von Fischschwärmen auf der Gebietskarte. Die Arten wählst du in den Einstellungen.\nBewege die Maus über ein Symbol, um den Namen zu sehen.",
   ["map.gatherObjects.spots"] = "Truhen und Schwärme: %d Fundorte (Arten: %d)",
   ["map.gatherObjects.noZone"] = "Öffne ein Gebiet, um Truhen und Fischschwärme zu sehen.",
   ["map.gatherObjects.none"] = "Alle Arten dieses Gebiets sind ausgeschaltet. Wähle sie in den Einstellungen.",
@@ -63,6 +65,9 @@ ns.AddLocale("deDE", {
 -- The lines of a symbol's tooltip: title (item name) and text (profession and skill, then where the spot
 -- comes from). item is the data entry of the item.
 function GMap.TipText(data, pin)
+  if pin.multi and type(pin.items) == "table" then
+    return GMap.SpotTipText(data, pin)
+  end
   local item = data.items and data.items[pin.itemId] or {}
   local title = ns.GatheringLogic.ItemName(pin.itemId, item)
   local lines = {}
@@ -72,6 +77,23 @@ function GMap.TipText(data, pin)
   end
   lines[#lines + 1] = Theme.hexText("textMuted", L[pin.own and "map.gather.own" or "map.gather.known"])
   return title, table.concat(lines, "\n")
+end
+
+-- Tooltip of a spot with several possible items: the header, then every possible item with its skill, the
+-- selected ones in the normal text color first, the others dimmed.
+function GMap.SpotTipText(data, pin)
+  local lines = {}
+  for i, id in ipairs(pin.items) do
+    local item = data.items and data.items[id] or {}
+    local name = ns.GatheringLogic.ItemName(id, item)
+    local sub = item.prof
+        and string.format(L["gather.itemSub"], ns.ProfessionRouteLogic.Name(item.prof), tonumber(item.skill) or 0)
+      or nil
+    local line = sub and (name .. "  " .. sub) or name
+    lines[#lines + 1] = Theme.hexText(i <= (pin.selected or 0) and "text" or "textMuted", line)
+  end
+  lines[#lines + 1] = Theme.hexText("textMuted", L["map.gather.known"])
+  return L["map.gather.possible"], table.concat(lines, "\n")
 end
 
 -- The feed of the ore and herb spots, the default of Attach: the items of the zone that pass the filter.
@@ -268,20 +290,27 @@ function GMap.Attach(ctx)
 
   -- Painting -----------------------------------------------------------------------------------------
 
+  local function hideSymbol(s)
+    s.icon:Hide()
+    s.ring:Hide()
+    if s.marker then
+      SM.Hide(s.marker)
+    end
+  end
+
   function ctl.Clear()
     ctl.plan, ctl.hover = nil, nil
     ctl.stamp = ctl.stamp + 1
     glow:Hide()
     hideTip()
     for i = 1, used do
-      pool[i].icon:Hide()
-      pool[i].ring:Hide()
+      hideSymbol(pool[i])
     end
     used = 0
     layer:Hide()
   end
 
-  local function place(i, pin, size, path, ring)
+  local function place(i, pin, size, path, ring, scale, markerOn)
     local s = pool[i]
     if not s then
       s = newSymbol()
@@ -298,6 +327,13 @@ function GMap.Attach(ctx)
     s.ring:SetSize(size + 2 * ring, size + 2 * ring)
     s.icon:Show()
     s.ring:Show()
+    local marker = GM.Marker(pin, size / scale, markerOn)
+    if marker then
+      s.marker = s.marker or SM.New(layer, s.icon)
+      SM.Paint(s.marker, marker, size, ring, 1, scale)
+    elseif s.marker then
+      SM.Hide(s.marker)
+    end
   end
 
   -- Lays the symbols out for the open zone. force = false (the map was only dragged) keeps the symbols
@@ -340,6 +376,7 @@ function GMap.Attach(ctx)
     plan.radius = GM.HitRadius(size, u)
     plan.index = GM.Index(plan.pins, plan.radius)
     local icons = {}
+    local markerOn = GM.MarkerEnabled()
     for i, pin in ipairs(plan.pins) do
       local key = feed.iconKey(pin)
       local path = icons[key]
@@ -347,11 +384,10 @@ function GMap.Attach(ctx)
         path = feed.icon(data, pin)
         icons[key] = path
       end
-      place(i, pin, size, path, GMap.RING * u)
+      place(i, pin, size, path, GMap.RING * u, u, markerOn)
     end
     for i = #plan.pins + 1, used do
-      pool[i].icon:Hide()
-      pool[i].ring:Hide()
+      hideSymbol(pool[i])
     end
     used = #plan.pins
     ctl.plan = plan
@@ -381,6 +417,13 @@ function GMap.Attach(ctx)
     local points, items = feed.summary(data, mapId, set)
     return { state = "shown", mapId = mapId, points = points, items = items }
   end
+
+  -- The switch of the marker repaints what is drawn.
+  ns.On("FG_SETTING_CHANGED", function(_, path)
+    if path == "settings.gather.spotMarker" and ctl.plan then
+      ns.Safe("gather-map-marker", ctl.Paint, true)
+    end
+  end)
 
   return ctl
 end

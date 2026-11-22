@@ -36,7 +36,14 @@ Store.defaults = {
     -- "#rrggbb" ("" = theme accent). skin: window style id (UI/Skins.lua), "flat" or "forever".
     mainAlpha = 75,
     theme = "default",
-    skin = "flat",
+    skin = "forever",
+    -- The one-time hint about the search and the help button was shown (UI/Page.lua).
+    startHintSeen = false,
+    -- Spacing of pages and cards: "normal" or "compact" (UI/Theme.lua Theme.DENSITY).
+    density = "normal",
+    -- Marks that Store.migrateSkin ran (a fresh database starts with it); skinNotice = 1 asks for the
+    -- one-time hint about the new default (Core/Init.lua clears it).
+    skinDefault = 1,
     accent = "",
     contrast = false,
     colorblind = false,
@@ -44,6 +51,9 @@ Store.defaults = {
     -- Short text next to the icon of action buttons (W.Action label); off = icons only.
     buttonLabels = true,
     combatHide = false,
+    -- Opt-in "Lock in combat" (ns.CombatLocked in Core/Capabilities.lua): off = every window, page and click of
+    -- the addon works in combat as it does outside.
+    combatLock = false,
     -- Reminder bar after a price scan and at calm moments while data is unsaved (Modules/SaveState.lua), off
     -- by default. saveHintDefault marks that Store.migrateSaveHint ran (a fresh database starts with it).
     saveHint = false,
@@ -74,6 +84,16 @@ Store.defaults = {
     instancesClosed = {},
     -- Instance list grouped by faction (Alliance, Horde, both).
     instancesGroup = false,
+    -- Instance overview (Modules/InstanceCards.lua): "list" or "cards", the sort column ("name", "level", "zone",
+    -- "quests"), its reversed order, the level bracket filter ("all", "mine", "10" to "50") and the collapsed
+    -- sections { ["20"] = true, raid = true }.
+    instancesView = "cards",
+    -- Marks that Store.migrateInstancesView ran (a fresh database starts with it).
+    instancesViewDefault = 1,
+    instancesSortBy = "level",
+    instancesSortDesc = false,
+    instancesBracket = "all",
+    instancesCollapsed = {},
     -- Favorite instances as a set of slugs { ["gnomeregan"] = true } and the pin size of the dungeon map in
     -- percent, 60 to 200 (Modules/InstanceDisplayLogic.lua).
     instanceFavorites = {},
@@ -102,7 +122,9 @@ Store.defaults = {
     -- item (chests and other finds, fishing schools; Modules/GatherObjects.lua) have their own switch on the
     -- Forever map (foreverObjects), a switch per category (treasure, schools) and a list of the kinds switched
     -- off (hiddenKinds, { [kindId] = true }); the Blizzard world map shows them under its main switch (worldmap).
-    -- placesOpen: the section with the fishing places of the zone in the tab Gather of the map panel is open.
+    -- A spot with several possible items (spawn pools) carries a marker (colored arcs and the count, see
+    -- Modules/SpotMarker.lua) unless spotMarker is off. minimapStyle sets the look of the pins on the minimap and
+    -- the farm HUD: "subtle" (a faint ring in the item color) or "icon" (the item symbol).
     -- The four categories (herbs, mining, treasure, schools) start off so a new map stays clean; the setup row
     -- "gathering", the settings and the map filter all switch these same keys.
     gather = {
@@ -111,18 +133,19 @@ Store.defaults = {
       worldmap = true,
       minimap = true,
       minimapEdge = "clamp",
+      minimapStyle = "subtle",
       minimapSize = 12,
       minimapAlpha = 100,
       minimapNear = 60,
       minimapRingSize = 18,
       minimapRingWidth = 2,
+      spotMarker = true,
       herbs = false,
       mining = false,
       hidden = {},
       treasure = false,
       schools = false,
       hiddenKinds = {},
-      placesOpen = false,
     },
     -- Farm HUD (Modules/FarmHud.lua): the real minimap enlarged over the screen, on demand only (the switch is
     -- not stored). scale = share of the smaller screen side, strata of the HUD, terrain variant (auto, ground,
@@ -137,6 +160,7 @@ Store.defaults = {
       hideInCombat = false,
       hideInInstance = true,
       hideOtherIcons = true,
+      blipTips = true,
       compass = true,
       compassSize = 14,
       compassColor = { 1, 1, 1 },
@@ -177,10 +201,31 @@ Store.defaults = {
     slotOverlays = "auto",
     -- Hides Blizzard's talking head window, the voice keeps playing (Modules/TalkingHead.lua).
     hideTalkingHead = false,
+    -- Other add-ons' minimap buttons in one flyout (Modules/MinimapCollector.lua), the angle of its button, the free
+    -- slots on the backpack button (Modules/BagSlots.lua) and the chat line about a newer version (Modules/VersionNotice.lua).
+    minimapCollect = false,
+    minimapCollectAngle = 160,
+    bagFreeSlots = true,
+    versionNotice = true,
+    -- Window after the first start of a new version; important updates ignore it.
+    changelogPopup = true,
     -- Blizzard world map (Modules/WorldMapLinks.lua): button, marker/route bar, own pins, bar state.
     worldMapButton = true,
     worldMapPanel = true,
     worldMapPins = true,
+    -- Route planning on the world map (Modules/WorldMapRoute.lua): the pins, lines and the panel, and the panel's open state.
+    worldMapRoute = true,
+    -- Walking style of the route legs over free points (Modules/WalkPathLogic.lua): "fastest", "balanced", "roads".
+    routeWalkStyle = "balanced",
+    -- How walked route paths are drawn (Modules/MapRouteStrokeLogic.lua): "line", "dots" or "dash", width and dot spacing in px, opacity 0.3 to 1.
+    routeLineStyle = "line",
+    routeLineWidth = 3,
+    routeDotSpacing = 9,
+    routeLineAlpha = 0.9,
+    -- The planned walking path as a line on the minimap (Modules/MinimapRoute.lua).
+    routeMinimapLine = true,
+    -- Plain right click on the map opens "set waypoint here"; off means Alt + right click only.
+    worldMapRightClick = false,
     worldMapPanelOpen = false,
     worldMapPanelTab = "markers",
     -- Instance entrance markers (Modules/MapMarkerLogic.lua): on the Blizzard world map, on the add-on map,
@@ -217,6 +262,9 @@ Store.defaults = {
     mapZoneArrowsGuess = true,
     zoneCrossRecord = true,
     zoneCrossNotify = true,
+    -- Level range in the middle of every zone on the continent maps of Blizzard's window (Modules/WorldMapZoneLevels.lua);
+    -- the range under the zone name while hovering is always shown.
+    mapZoneLevels = false,
     -- List of the nearest flight points (Modules/FlightPointList.lua): length 3 to 10, only discovered points.
     flightListCount = 5,
     flightListOnlyKnown = false,
@@ -268,6 +316,29 @@ Store.defaults = {
     -- Skill order at the game's talent window (Modules/TalentFrameOrder.lua): numbers on the talents, side panel.
     talentFrameNumbers = false,
     talentFramePanel = true,
+    -- Tooltips (Modules/TooltipTweaks.lua): lines for item level, vendor price, ids, the target and class color
+    -- of units, guild rank, tooltip at the cursor, no unit tooltips in combat, scale in percent.
+    tipItemLevel = true,
+    tipSellPrice = true,
+    tipItemId = false,
+    tipSpellId = false,
+    tipUnitTarget = true,
+    tipClassColor = true,
+    tipGuildRank = true,
+    tipCursor = false,
+    tipHideCombat = false,
+    tipScale = 100,
+    -- Unit frames (Modules/UnitFrameTweaks.lua): class colored health bars, class icons as portraits, scale in
+    -- percent of the player, target and party frames.
+    ufClassBars = false,
+    ufClassIcons = false,
+    ufScalePlayer = 100,
+    ufScaleTarget = 100,
+    ufScaleParty = 100,
+    -- Cast bars (Modules/CastBarTweaks.lua): time and spell icon on the bars, larger target cast bar.
+    castTimer = true,
+    castIcon = true,
+    castTargetBig = false,
     -- Experience bar (Modules/XpBarWindow.lua): window shown and pinned, chosen layout, saved layouts
     -- (seeded from the presets on first use), opacity, then the tracker options (Modules/XpTracker.lua).
     xpBar = {
@@ -369,6 +440,8 @@ Store.defaults = {
     lootEnabled = true,
     lootOutside = false,
     lootMinQuality = 2,
+    -- Faster looting (Modules/FastLoot.lua): takes every slot at once while auto loot applies.
+    fastLoot = false,
     -- Inventory of all characters in item tooltips (Modules/Inventory.lua, InventoryTooltip.lua): on, record the bank,
     -- record the mailbox, count the guild bank (record it while its window is open, show it as a row),
     -- own faction only, current character first, class colors.
@@ -380,7 +453,8 @@ Store.defaults = {
     inventoryCurrentFirst = true,
     inventoryColors = true,
     -- Auction house prices (Modules/PriceDb.lua): record them, age in days after which a price counts as old.
-    priceDb = { enabled = true, maxAgeDays = 14 },
+    -- showOther: item tooltips also list the prices of the other auction houses (neutral houses, other faction).
+    priceDb = { enabled = true, maxAgeDays = 14, showOther = false },
     -- Sell helper at the merchant (Modules/SellHelper.lua): gray items, white, green, blue and epic gear
     -- below an item level (0 = rule off) or every item of a quality (switches, off), bind filter (all,
     -- unbound, bound), keep consumables, crafting reagents and upgrades, protected item ids (comma
@@ -432,6 +506,13 @@ Store.defaults = {
     autoQuestNotice = true,
     -- One chat line when a quest of the log turns ready to hand in (Modules/QuestReady.lua).
     questReadyNotice = false,
+    -- Same event as one line with the quest link to the group chat.
+    questReadyGroup = false,
+    -- Objective counts going up (3/10) as group lines, coalesced per objective.
+    questProgressGroup = false,
+    -- "Forever Guides: " in front of those group lines, and the icon before it ("logo", "rt1".."rt8", "none").
+    questChatPrefix = true,
+    questChatIcon = "logo",
     autoQuestIgnoreQuests = "",
     autoQuestIgnoreNpcs = "",
     autoSocial = false,
@@ -451,10 +532,9 @@ Store.defaults = {
     -- Look of the waypoint arrow window (Modules/WaypointArrow.lua): title bar and background.
     waypointWindowTitle = false,
     waypointWindowBackground = false,
-    -- Move Blizzard windows and remember their position (Modules/FrameTweaks.lua), no changes in combat,
+    -- Move Blizzard windows and remember their position (Modules/FrameTweaks.lua),
     -- saved positions by frame name { p, r, rp, x, y } (Modules/FrameTweaksLogic.lua).
     frameTweaks = true,
-    frameTweaksCombat = true,
     frames = {},
     -- Bar below the windows with opacity, zoom and resize grip (Modules/FrameTweaksBar.lua): on,
     -- windows without it { [name] = false }, zoom of the world map (moving, opacity and bar always work).
@@ -546,6 +626,10 @@ Store.defaults = {
     guildMapMaxLevel = 100,
     guildMapRankFilter = -1,
     guildMapOnlineOnly = true,
+    -- Hide the dots of members and friends while inside a dungeon, raid or battleground, and show a badge on the
+    -- zone of friends online that do not share their position.
+    guildMapHideInstances = false,
+    guildMapFriendZones = true,
     -- Sender wish of the presence mark (Modules/Presence.lua): badge in chat only, none on nameplates.
     -- The mark itself is the consent presenceMark, this key only sets a flag inside it.
     presenceChatOnly = false,
@@ -568,6 +652,8 @@ Store.defaults = {
     },
     chatBadgeSelf = false,
     chatBadgeOtherAddons = false,
+    -- Clickable web addresses in chat (Modules/ChatUrl.lua): display only, on by default.
+    chatUrl = true,
     -- Chat name (Modules/ChatName.lua): the own name in front of the own chat messages, everything off by default.
     -- This is the profile of the account; a character that deviates keeps a full copy in ForeverGuidesCharDB.chatName
     -- (absent = follows the account). Shape and repair: Modules/ChatNameProfile.lua, which must list the same
@@ -689,6 +775,8 @@ Store.defaults = {
     toast = { point = "TOPRIGHT", rel = "TOPRIGHT", x = -20, y = -120 },
   },
   tutorials = { v = 1, autoOffer = true, seen = {} },
+  -- Pages whose help strip the player collapsed (UI/Page.lua, ns.AddIntro): pageId = true.
+  helpStrip = { hidden = {} },
   -- Setup wizard (Modules/SetupWizardLogic.lua): fresh = installed with an empty SavedVariables
   -- file, noticeVersion = addon version that already showed the "new setup" hint.
   setup = {
@@ -753,13 +841,32 @@ Store.defaults = {
   shotMeta = { seq = 0, last = "", plates = true },
   -- Waypoints (Modules/Waypoints.lua): own schema number in v, validated on first read.
   waypoints = {
-    v = 1,
+    v = 2,
     list = {},
     settings = {
       arrow = true,
-      arrivalRadius = 15,
+      arrivalRadius = 10,
       autoClear = true,
+      -- The last target stays on arrival (no toast, no removal) until the player clears it.
+      keepOnArrival = false,
       nativeMarker = true,
+      -- Screen navigation (Modules/WaypointNav.lua): off until the player turns it on; navCvarBefore is the
+      -- showInGameNavigation value to restore ("" = we changed nothing).
+      screenNav = false,
+      navCvarBefore = "",
+      -- Light beam above the marker and the marker size (factor).
+      navBeam = true,
+      -- Marker in the world at all, and what happens close to the target ("keep", "marker", "native").
+      navMarker = true,
+      navNear = "keep",
+      navNearDistance = 30,
+      -- Our marker also replaces the client marker of the super-tracked quest.
+      navReplaceQuest = true,
+      navSize = 1,
+      -- Beam height: 0 = up to the top of the screen, else a fixed height.
+      navBeamHeight = 0,
+      -- Ordinary map pins the player sets become waypoints of ours.
+      adoptNative = true,
       scale = 1,
       locked = false,
       style = {},
@@ -816,16 +923,22 @@ Store.defaults = {
   -- characters (register of the characters of the account for "when active", [ "Name-Realm" ] = { name, realm,
   -- class, seen }, at most 60, Modules/CharScopeLogic.lua) has no default: LoadState.Register creates it at login.
   errors = {},
+  -- newestSeen = { version, important }: the newest version others reported (Modules/VersionCheck.lua).
+  -- versionCheckSendBlocked: account wide lock, only the developer add-on sets it.
   meta = { sessions = 0 },
   -- consent (opt-in register, Core/Consent.lua) has no default: Consent.Migrate creates it before the defaults.
 }
 
 Store.charDefaults = {
   lastRoute = "dashboard",
+  -- Remembered state per page: [pageId] = { scroll, fields = { filters, tab, selection } } (UI/Page.lua PageState).
+  pageState = {},
   -- Legacy plan of this character: ranks by perk key (Modules/LegacyPlan.lua).
   legacy = { v = 1, ranks = {} },
   -- Per character override of the sub-addon switches: [id] = true or false, nil follows the account.
   subaddons = {},
+  -- Library books the player marked as read (Modules/LibraryBooksPage.lua): [quest id as text] = true.
+  libraryBooksRead = {},
   -- XP bar (Modules/XpTracker.lua): session (empty = none yet) and the played seconds at the start of each level.
   xp = { levelStart = {}, session = {} },
   -- Free areas (Modules/AreaWindow.lua): [id] = { x, y, scale, shown, locked }, the account's areas live in
@@ -835,6 +948,7 @@ Store.charDefaults = {
   -- for this character only; a missing field means "like the account".
   -- flightKnown (flight points learned at flight masters, Modules/FlightKnown.lua) is absent until the first
   -- flight map was read: no default, an absent key means "no data yet".
+  -- learnedSpells (Modules/LearnedSpells.lua) = { [spell id] = true } is absent until a trainer entry was seen as learned.
   -- farmhudOn (Modules/FarmHud.lua) is absent until the player switches the Farm HUD on or off: the switch as the
   -- player left it, read after a /reload only.
   -- consent (Core/Consent.lua) is absent until this character overrides a flag of the account register.
@@ -842,12 +956,19 @@ Store.charDefaults = {
   -- character only; an empty table would count as an override that wins over the account layout.
   -- Chat history per chat window id (Modules/ChatHistoryLogic.lua), the window layouts are per character.
   chatWindows = { v = 1, windows = {} },
+  -- Wishlist (Modules/WishlistLogic.lua): items the character wants, [item id] = order of adding.
+  wishlist = { v = 1, seq = 0, items = {} },
   -- Active build per talent group (Modules/TalentActive.lua): [group] = id of an own build in talentBuilds.
   talentActive = {},
   -- Skill order panel of the talent editor (Modules/TalentOrderPanel.lua): open state and the step
   -- numbers on the talents; frameOpen is the side panel at the game's talent window (Modules/TalentFrameOrder.lua).
   -- The panels start collapsed, the numbers start off.
   talentOrderUi = { open = false, numbers = false, frameOpen = false },
+  -- Route plan of this character (Modules/RoutePlan.lua, WorldMapRouteLogic.lua): the points in order (the last is the
+  -- goal, slugs of places or free points "@map_x_y"), an optional start, and the two switches. Validated on first read.
+  routePlan = { v = 1, points = {}, optimize = false, returnToStart = false, hearth = false, fromHere = false },
+  -- The route drawer at the world map (Modules/WorldMapRoutePanel.lua): closed by default, kept per character.
+  routeDrawerOpen = false,
 }
 
 -- Migrations[n] upgrades a db from schema n-1 to n.
@@ -1061,6 +1182,34 @@ function Store.migrateSaveHint(account)
   s.saveHintDefault = 1
 end
 
+-- The instance overview default changed from "list" to "cards". A stored "list" becomes "cards" once, marked by
+-- instancesViewDefault; a later deliberate list stays. Runs before the defaults are filled in.
+function Store.migrateInstancesView(account)
+  local s = account.settings
+  if type(s) ~= "table" or s.instancesViewDefault ~= nil then
+    return
+  end
+  if s.instancesView == "list" then
+    s.instancesView = "cards"
+  end
+  s.instancesViewDefault = 1
+end
+
+-- The window style default changed from "flat" to "forever". An existing database that still stores "flat"
+-- gets "forever" once, marked by skinDefault, and skinNotice = 1 triggers a hint at login. A choice made
+-- afterwards stays. Runs before the defaults are filled in (a fresh database gets the marker with them).
+function Store.migrateSkin(account)
+  local s = account.settings
+  if type(s) ~= "table" or s.skinDefault ~= nil then
+    return
+  end
+  s.skinDefault = 1
+  if s.skin == "flat" then
+    s.skin = "forever"
+    s.skinNotice = 1
+  end
+end
+
 -- settings.inviteBarStyle was a number (1 bar, 2 card, 3 chat line); it is a word now ("window" or "bar"):
 -- every old number becomes the window (the new default: the number 1 was only the old default, not a choice).
 -- A word stays as it is, so it can run on every start.
@@ -1144,6 +1293,14 @@ function Store.migrateSparkles(account)
   end
 end
 
+-- Saved auction prices of version 1 (houses Horde, Alliance and Neutral per realm) become legacy houses, see
+-- PriceDbLogic.MigrateHouses. Idempotent: a house that already has a current key is left alone.
+function Store.migratePriceHouses(account)
+  if type(account.prices) == "table" and ns.PriceDbLogic and ns.PriceDbLogic.MigrateHouses then
+    ns.PriceDbLogic.MigrateHouses(account.prices)
+  end
+end
+
 function Store.init(account, char)
   account = type(account) == "table" and account or {}
   char = type(char) == "table" and char or {}
@@ -1155,20 +1312,24 @@ function Store.init(account, char)
   Store.migrateHostSkin(account)
   Store.migrateXpSession(account)
   Store.migrateSaveHint(account)
+  Store.migrateInstancesView(account)
+  Store.migrateSkin(account)
   Store.migrateSparkles(account)
+  Store.migratePriceHouses(account)
   Store.migrateInviteStyle(account)
   Store.cleanFontScales(account)
   if ns.Consent then
-    ns.Consent.Migrate(account)
+    ns.Consent.Migrate(account, char)
   end
   Store.cleanChat(account, char)
   Store.cleanChatName(account, char)
   U.applyDefaults(account, Store.defaults)
   Store.seedSellProtect(account)
+  if ns.ProfileLogic then
+    ns.ProfileLogic.Attach(account, char, Store.defaults.settings)
+  end
   if isNew then
     account.setup.fresh = true
-    -- Only a database that never existed gets the game look, an installed one keeps its choice.
-    account.settings.skin = "forever"
   end
   char.schema = char.schema or Store.CHAR_SCHEMA
   U.applyDefaults(char, Store.charDefaults)

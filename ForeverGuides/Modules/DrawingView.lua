@@ -197,7 +197,7 @@ function V.New(parent, opts)
   self.skipBackground = opts.skipBackground == true
   self.bg:SetShown(not self.skipBackground)
   self.fill = frame:CreateTexture(nil, "OVERLAY", nil, 1)
-  self.fill:SetColorTexture(1, 1, 1, 0.14)
+  self.fill:SetColorTexture(ns.Theme.fillColor("selected"))
   self.fill:Hide()
   self.edges = {}
   for i = 1, 4 do

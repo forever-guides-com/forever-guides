@@ -36,6 +36,24 @@ function W.ApplyWindowAlpha()
   end
 end
 
+-- Selected mark of a toggle (same show() as W.Border): a 2 px accent bar along the bottom edge, a cue that is
+-- not a color. An outline box looks heavy, the bar matches the selected tab.
+function W.ActiveMark(frame)
+  local bar = frame:CreateTexture(nil, "ARTWORK")
+  bar:SetPoint("BOTTOMLEFT")
+  bar:SetPoint("BOTTOMRIGHT")
+  bar:SetHeight(2)
+  bar:Hide()
+  local m = { bar = bar }
+  function m.show(shown)
+    bar:SetShown(shown == true)
+  end
+  ns.Bind(frame, function()
+    bar:SetColorTexture(Theme.color("accent2"))
+  end)
+  return m
+end
+
 -- 1px (or `size`) border made of four textures; color can change later.
 function W.Border(frame, colorName, alpha, size)
   size = size or 1
@@ -94,7 +112,7 @@ function W.Text(parent, opts)
     Theme.applyFont(f, opts.role or "ui", opts.family or "body")
     f:SetTextColor(Theme.color(f.fgColor))
     if f.fgKey then
-      f:SetText(L[f.fgKey])
+      f:SetText(f.fgCount and string.format("%s (%d)", L[f.fgKey], f.fgCount) or L[f.fgKey])
     elseif f.fgText then
       f:SetText(f.fgText)
     end
@@ -102,9 +120,42 @@ function W.Text(parent, opts)
   return fs
 end
 
+-- Wraps a label at `width` and answers its height. The explicit height is dropped first: a client
+-- FontString with a height clips to it and then measures the clipped text, so a label that once
+-- fitted in fewer lines would never grow again.
+function W.FitLabel(fs, width)
+  fs:SetWordWrap(true)
+  fs:SetWidth(math.max(1, width))
+  fs:SetHeight(0)
+  return math.ceil(fs:GetStringHeight() or 0)
+end
+
+-- Meta line that carries a decision (level, count, data state): role small in textSecondary.
+-- Footnotes stay role micro in textMuted.
+function W.Meta(parent, opts)
+  opts = opts or {}
+  return W.Text(parent, {
+    key = opts.key,
+    text = opts.text,
+    role = opts.role or "small",
+    color = opts.color or "textSecondary",
+    wrap = opts.wrap,
+    justify = opts.justify,
+    family = opts.family,
+  })
+end
+
 function W.SetText(fs, keyOrNil, literal)
   fs.fgKey, fs.fgText = keyOrNil, literal
   fs:SetText(keyOrNil and L[keyOrNil] or literal or "")
+end
+
+-- Appends the count to the keyed text of a section heading: "Zones (25)"; nil removes it.
+function W.SetCount(fs, count)
+  fs.fgCount = count
+  if fs.fgKey then
+    fs:SetText(count and string.format("%s (%d)", L[fs.fgKey], count) or L[fs.fgKey])
+  end
 end
 
 function W.SetColor(fs, colorName)
@@ -298,6 +349,10 @@ function Tooltip.Show(owner, spec)
     tip:AddLine(spec.hint, r, g, b, true)
   end
   tip:Show()
+  tip.fgCompare = nil
+  if item and ns.ItemActions then
+    ns.ItemActions.Compare(tip)
+  end
   -- The tooltip follows its owner into hiding (a panel closed under the mouse).
   if not hookedOwners[owner] and owner.HookScript then
     hookedOwners[owner] = true
@@ -330,6 +385,28 @@ local function attachTooltip(frame, titleKey, textKey)
   frame:HookScript("OnLeave", ns.HideTooltip)
 end
 W.AttachTooltip = attachTooltip
+
+-- True while a single-line text is cut short by its width.
+function W.IsCut(fs)
+  if type(fs.IsTruncated) == "function" then
+    local ok, cut = pcall(fs.IsTruncated, fs)
+    if ok and type(cut) == "boolean" then
+      return cut
+    end
+  end
+  local room = fs:GetWidth()
+  return type(room) == "number" and room > 0 and fs:GetStringWidth() > room + 0.5
+end
+
+-- A single-line text that may be cut with an ellipsis names itself in full in a tooltip on `frame`.
+function W.TipWhenCut(frame, fs)
+  frame:HookScript("OnEnter", function(self)
+    if fs:IsShown() and W.IsCut(fs) then
+      ns.ShowTooltip(self, fs:GetText() or "")
+    end
+  end)
+  frame:HookScript("OnLeave", ns.HideTooltip)
+end
 
 -- Keyboard focus ----------------------------------------------------------
 -- Tab/Shift+Tab walk visible focusables of the main window in creation
@@ -559,8 +636,17 @@ function Focus.register(frame, activate)
   end)
 end
 
+-- A row share icon (PageShare.RowButton) is invisible until its row is hovered or focused: keyboard navigation
+-- reaches it only then, so a long list does not get a second stop per row.
 local function visible(frame)
-  return frame:IsVisible() and (not frame.IsEnabled or frame:IsEnabled())
+  return frame:IsVisible() and (not frame.IsEnabled or frame:IsEnabled()) and not (frame.fgRowIcon and frame:GetAlpha() < 0.01)
+end
+
+local function repaintShare(frame)
+  local icon = frame and frame.fgRowShare
+  if icon then
+    icon.fgPaint()
+  end
 end
 
 -- Scrolls the nearest W.ScrollArea above `frame` just far enough to show it.
@@ -595,6 +681,8 @@ function Focus.set(frame)
     previous:fgOnBlur()
   end
   Focus.current = frame
+  repaintShare(previous)
+  repaintShare(frame)
   local r = getRing()
   r:ClearAllPoints()
   r:SetPoint("TOPLEFT", frame, "TOPLEFT", -3, 3)
@@ -614,6 +702,7 @@ end
 function Focus.clear()
   local previous = Focus.current
   Focus.current = nil
+  repaintShare(previous)
   Focus.keyAt = nil
   if ring then
     ring:Hide()
@@ -624,14 +713,21 @@ function Focus.clear()
 end
 
 function Focus.move(step)
-  local list = {}
-  local index = 0
+  -- Controls flagged fgFocusLast (the footer of the main window) come after everything else.
+  local list, tail = {}, {}
   for _, f in ipairs(Focus.items) do
     if visible(f) then
-      list[#list + 1] = f
-      if f == Focus.current then
-        index = #list
-      end
+      local into = f.fgFocusLast and tail or list
+      into[#into + 1] = f
+    end
+  end
+  for _, f in ipairs(tail) do
+    list[#list + 1] = f
+  end
+  local index = 0
+  for i, f in ipairs(list) do
+    if f == Focus.current then
+      index = i
     end
   end
   if #list == 0 then
@@ -660,6 +756,7 @@ end
 ns.AddLocale("enUS", {
   ["act.shortcut"] = "Shortcut: %s",
   ["action.opensWindow"] = "Opens a new window",
+  ["action.markerRightClick"] = "Right-click: set marker",
   ["act.new"] = "New",
   ["act.add"] = "Add",
   ["act.remove"] = "Remove",
@@ -724,10 +821,12 @@ ns.AddLocale("enUS", {
   ["act.none"] = "None",
   ["act.all"] = "All",
   ["act.pick"] = "Pick",
-  ["act.enable"] = "Enable",
+  ["act.enable"] = "Switch on",
   ["act.fit"] = "Fit",
   ["act.open"] = "Open",
   ["act.clear"] = "Clear",
+  ["empty.loading"] = "Loading ...",
+  ["empty.resetFilters"] = "Reset filters",
   ["act.restore"] = "Restore",
   ["act.closeAll"] = "Close all",
   ["act.backup"] = "Backup",
@@ -736,6 +835,7 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["act.shortcut"] = "Tastenkürzel: %s",
   ["action.opensWindow"] = "Öffnet ein neues Fenster",
+  ["action.markerRightClick"] = "Rechtsklick: Marker setzen",
   ["act.new"] = "Neu",
   ["act.add"] = "Hinzufügen",
   ["act.remove"] = "Entfernen",
@@ -772,7 +872,7 @@ ns.AddLocale("deDE", {
   ["act.commands"] = "Befehle",
   ["act.options"] = "Optionen",
   ["act.look"] = "Aussehen",
-  ["act.show"] = "Zeigen",
+  ["act.show"] = "Anzeigen",
   ["act.keys"] = "Tasten",
   ["act.move"] = "Verschieben",
   ["act.test"] = "Test",
@@ -804,6 +904,8 @@ ns.AddLocale("deDE", {
   ["act.fit"] = "Anpassen",
   ["act.open"] = "Öffnen",
   ["act.clear"] = "Leeren",
+  ["empty.loading"] = "Lädt ...",
+  ["empty.resetFilters"] = "Filter zurücksetzen",
   ["act.restore"] = "Zurückholen",
   ["act.closeAll"] = "Alle zu",
   ["act.backup"] = "Sicherung",
@@ -834,13 +936,24 @@ local VARIANTS = {
     bgHover = "surface3",
     text = "text",
     textHover = "text",
-    border = "white",
-    borderHover = "accentDim",
+    border = "accentDim",
+    borderAlpha = 0.7,
+    borderHover = "accent2",
+  },
+  -- Segment of a tab row (settings navigation): same face as W.Tabs.
+  tab = {
+    bg = "surface2",
+    bgHover = "surface3",
+    text = "textSecondary",
+    textHover = "text",
+    border = "accentDim",
+    borderAlpha = 0.7,
+    borderHover = "accent2",
   },
   ghost = { bgHover = "surface2", text = "textSecondary", textHover = "text", borderHover = "accentDim" },
   icon = {
-    bgHover = "text",
-    hoverAlpha = 0.08,
+    bgHover = "hover",
+    hoverAlpha = Theme.fillAlpha.hover,
     text = "textSecondary",
     textHover = "accent",
     borderHover = "accentDim",
@@ -873,15 +986,16 @@ local VARIANTS = {
     border = "streamHi",
     borderAlpha = 1,
   },
-  -- The footer Save button: a filled accent button at rest, a warning fill while data is unsaved
+  -- The footer Save button: a quiet button at rest (like a secondary one), a warning fill while data is unsaved
   -- (UI/SaveUI.lua). Text on both fills passes AA in every theme (tests/test_savestate.lua).
   save = {
-    bg = "action",
-    bgHover = "actionHi",
+    bg = "surface2",
+    bgHover = "surface3",
     text = "text",
-    textHover = "bg",
-    border = "actionHi",
-    borderAlpha = 0.6,
+    textHover = "text",
+    border = "accentDim",
+    borderAlpha = 0.7,
+    borderHover = "accent2",
   },
   saveDirty = {
     bg = "warning",
@@ -897,14 +1011,25 @@ local VARIANTS = {
     bgHover = "surface3",
     text = "textSecondary",
     textHover = "accent",
-    border = "white",
-    borderHover = "accentDim",
+    border = "accentDim",
+    borderAlpha = 0.7,
+    borderHover = "accent2",
   },
+}
+-- Forever look: the art family a variant takes in the skin "forever" (Skins.ART.slices: "redButton*" = the red
+-- gold-rimmed button of the game for the few main actions). The dark quiet buttons keep the flat fill and hairline
+-- of the theme: the game's dark button art has round end caps that do not survive slicing at every size (black
+-- blobs in the corners). Variants of their own meaning (confirm, danger, gold, stream) and the bare ones (ghost,
+-- icon) keep their fills as well.
+local SKIN_FAMILY = {
+  [VARIANTS.primary] = "redButton",
+  [VARIANTS.saveDirty] = "redButton",
 }
 W.ACTION_VARIANTS = VARIANTS
 W.ACTION_SIZES = { 24, 28, 32 }
 W.ACTION_ICON_SIZE = 24 -- icon buttons without a label are square
 local ACTION_PAD, ACTION_GAP, ACTION_SLACK = 8, 4, 4
+W.ACTION_PAD = ACTION_PAD -- inset of a button label on each side
 
 local function labelsOn()
   local settings = ns.db and ns.db.settings
@@ -916,12 +1041,42 @@ local function iconPixels(height)
   return math.max(14, math.min(18, math.floor(height * 0.58 + 0.5)))
 end
 
+-- Shows the art of the state of a button face (family "redButton") and hides the others; returns true
+-- while the face is the game's art. The family has no hover art for red (the text answers), kinds the table lacks
+-- are skipped.
+local function paintFace(b, family, enabled, hover, pressed)
+  local Skins = ns.Skins
+  local slices = Skins.ART.slices
+  local base = Skins.Apply(b, family)
+  local function state(suffix, want)
+    local kind = family .. suffix
+    if slices[kind] then
+      Skins.Apply(b, kind, want and base ~= nil)
+    end
+  end
+  state("Hover", enabled and hover and not pressed)
+  state("Pressed", enabled and pressed)
+  state("Disabled", not enabled)
+  return base ~= nil
+end
+
+local function hideFace(b, family)
+  for _, suffix in ipairs({ "", "Hover", "Pressed", "Disabled" }) do
+    local kind = family .. suffix
+    if ns.Skins.ART.slices[kind] then
+      ns.Skins.Apply(b, kind, false)
+    end
+  end
+end
+
 local function paintAction(b)
   local v = b.fgPalette
   local enabled = b:IsEnabled()
   local hover, pressed = b.fgHover and enabled, b.fgPressed and enabled
   local bgName, bgAlpha, text = v.bg, 1, v.text
   local edge, edgeAlpha = v.border, v.borderAlpha
+  local family = ns.Skins.isForever() and SKIN_FAMILY[v] or nil
+  local face = false
   if not enabled then
     -- Disabled steps down the palette (flat fill, faint edge, muted content), never text color alone.
     bgName = v.bg and "surface" or nil
@@ -933,21 +1088,41 @@ local function paintAction(b)
       edge, edgeAlpha = v.borderHover, v.border and 0.9 or 0.6
     end
   end
+  if b.fgFaceFamily and b.fgFaceFamily ~= family then
+    hideFace(b, b.fgFaceFamily)
+  end
+  if family then
+    face = paintFace(b, family, enabled, hover, pressed)
+  end
+  b.fgFaceFamily = face and family or nil
+  if face then
+    -- Light text on the art in every state (the dark hover text of the flat fill would sit on red or dark brown).
+    bgName, bgAlpha, edge = nil, 1, nil
+    if enabled then
+      text = (family == "redButton") and "text" or (hover and v.textHover or v.text)
+    end
+  end
   if b.fgSelected and enabled then
-    -- A toggle that is on: filled, accent content and a 2 px ring (b.ring), never color alone.
-    bgName, bgAlpha, text = hover and "surface3" or "surface2", 1, "accent"
-    edge, edgeAlpha = nil, nil
+    -- A toggle that is on: filled, accent content and the accent bar (b.mark), never color alone.
+    bgName, bgAlpha, text = "accent2", hover and 0.32 or 0.22, "accent"
+    edge, edgeAlpha = "accent2", 1
   end
   -- A variant with a ring (v.ring) shows it in high contrast and colorblind mode: a cue that is not a color.
-  local wantRing = b.fgSelected == true or (v.ring == true and Theme.accessibleMode())
-  local ringOn = enabled and wantRing
+  local wantRing = v.ring == true and Theme.accessibleMode()
   if wantRing and not b.ring then
     b.ring = W.Border(b, "accent2", 1, 2)
   end
   if b.ring then
-    b.ring.show(ringOn)
+    b.ring.show(enabled and wantRing)
   end
-  if pressed then
+  -- Selected: the accent bar, no outline box.
+  if b.fgSelected and not b.mark then
+    b.mark = W.ActiveMark(b)
+  end
+  if b.mark then
+    b.mark.show(enabled and b.fgSelected == true)
+  end
+  if pressed and not face then
     if v.bg then
       local r, g, bl = Theme.rgb(bgName)
       b.bg:SetColorTexture(r * 0.7, g * 0.7, bl * 0.7, bgAlpha)
@@ -957,14 +1132,15 @@ local function paintAction(b)
   elseif bgName then
     b.bg:SetColorTexture(Theme.color(bgName, bgAlpha))
   else
-    b.bg:SetColorTexture(0, 0, 0, 0)
+    b.bg:SetColorTexture(ns.Theme.fillColor())
   end
   if edge then
     b.border.set(edge, edgeAlpha)
   end
   b.border.show(edge ~= nil)
   local dx, dy = pressed and 1 or 0, pressed and -1 or 0
-  if dx ~= b.fgDx then
+  -- fgPlace exists only after the button is built; the first placement follows the build.
+  if dx ~= b.fgDx and b.fgPlace then
     b.fgDx, b.fgDy = dx, dy
     b.fgPlace(b)
   end
@@ -1018,8 +1194,10 @@ local function placeContent(b)
     b.opensMark:SetPoint("RIGHT", b, "RIGHT", -ACTION_PAD + dx, dy)
   end
   if labelShown then
-    local inset = mark and (ACTION_PAD + (b.fgIconPx or 0) + ACTION_GAP) or ACTION_PAD
-    local tail = ACTION_PAD + (markShown and b.fgOpensPx + ACTION_GAP or 0)
+    -- b.fgPad: a layout that has no room for the usual inset (a tab row) narrows it for this button.
+    local pad = b.fgPad or ACTION_PAD
+    local inset = mark and (ACTION_PAD + (b.fgIconPx or 0) + ACTION_GAP) or pad
+    local tail = pad + (markShown and b.fgOpensPx + ACTION_GAP or 0)
     b.label:ClearAllPoints()
     b.label:SetPoint("LEFT", b, "LEFT", inset + dx, dy)
     b.label:SetPoint("RIGHT", b, "RIGHT", -tail + dx, dy)
@@ -1147,7 +1325,7 @@ function W.Action(parent, opts)
   placeContent(b)
   b:SetSize((opts.width or height) + (hasText and opensExtra(b) or 0), height)
   b.Fit, b.FullWidth = fitAction, fullWidth
-  -- Toggle state: filled, accent content and a 2 px ring instead of the resting edge.
+  -- Toggle state: gold tint, gold edge, accent content and the accent bar.
   function b:SetSelected(on)
     on = on and true or false
     if on == self.fgSelected then
@@ -1273,6 +1451,246 @@ function W.Button(parent, opts)
   })
 end
 
+-- State button ----------------------------------------------------------------------------------
+-- One look for every on/off or selected button: idle face, lighter face on hover or focus, and when
+-- on a raised face, an accent edge and a bar along the bottom (never color alone). "mixed" (part of a
+-- selection is on) shows a short dash instead of the full bar.
+
+-- Adds the state chrome (face, edge, bar, dash) to a button that has none; a button that owns b.bg
+-- or b.border keeps them.
+function W.StateChrome(b)
+  if not b.bg then
+    b.bg = b:CreateTexture(nil, "BACKGROUND")
+    b.bg:SetAllPoints()
+  end
+  if not b.border then
+    b.border = W.Border(b, "accent2", 1)
+    b.border.show(false)
+  end
+  b.fgBar = b:CreateTexture(nil, "OVERLAY")
+  b.fgBar:SetHeight(2)
+  b.fgBar:SetPoint("BOTTOMLEFT", 3, 2)
+  b.fgBar:SetPoint("BOTTOMRIGHT", -3, 2)
+  b.fgDash = b:CreateTexture(nil, "OVERLAY")
+  b.fgDash:SetSize(10, 2)
+  b.fgDash:SetPoint("BOTTOM", 0, 2)
+end
+
+-- Paints the chrome for state (true, false or "mixed"); returns the Theme token for the content.
+function W.PaintState(b, state, hover, enabled)
+  local tint = "textSecondary"
+  local edge, edgeAlpha = nil, 1
+  if not enabled then
+    b.bg:SetColorTexture(Theme.fillColor())
+    tint = "textMuted"
+  elseif state == true then
+    local r, g, bl = Theme.rgb("surface3")
+    local lift = hover and 0.04 or 0
+    b.bg:SetColorTexture(r + lift, g + lift, bl + lift, 1)
+    edge, tint = "accent2", "accent"
+  elseif state == "mixed" then
+    b.bg:SetColorTexture(Theme.color("surface2"))
+  elseif hover then
+    b.bg:SetColorTexture(Theme.color("surface2"))
+    edge, edgeAlpha, tint = "accentDim", 0.8, "text"
+  else
+    b.bg:SetColorTexture(Theme.fillColor())
+  end
+  if edge then
+    b.border.set(edge, edgeAlpha)
+  end
+  b.border.show(edge ~= nil)
+  local ar, ag, ab = Theme.rgb("accent2")
+  b.fgBar:SetColorTexture(ar, ag, ab, 1)
+  b.fgBar:SetShown(enabled and state == true)
+  b.fgDash:SetColorTexture(ar, ag, ab, 1)
+  b.fgDash:SetShown(enabled and state == "mixed")
+  return tint
+end
+
+local stateGroups = setmetatable({}, { __mode = "k" })
+
+-- opts: key|text (label), icon (name of ns.UI_ICONS or of a drawn symbol), chevron (small arrow for a
+-- dropdown), level (the label sits right of the icon and shows a short value), tooltip + tooltipText
+-- (locale keys), stateKeys = { on, off, mixed } (locale keys appended to the tooltip title as
+-- "(state)"), checked, disabled, onChange(btn, checked), onClick(btn) (runs on every click, after the
+-- state change), manual (a click does not change the state, the owner sets it with SetChecked: a
+-- button that opens a popup or runs a command), group (any table or string; checking one button of a
+-- group unchecks the others, a click on the checked one keeps it), height (26), width, scaled
+-- (height follows the desktop scale), wrap (name for ns.Wrap).
+-- b:SetChecked(true|false|"mixed") and b:GetChecked() never call onChange; b.fgState holds the state.
+-- b:SetIcon(name), b:SetLabel(text) (literal), b:Paint().
+function W.StateButton(parent, opts)
+  local height = opts.height or 26
+  local function px()
+    return opts.scaled and ns.Desktop.scaled(height) or height
+  end
+  local b = CreateFrame("Button", nil, parent)
+  b.fgState = false
+  b:SetHeight(px())
+  W.StateChrome(b)
+  local shift = opts.chevron and -4 or 0
+  local hasLabel = opts.key ~= nil or opts.text ~= nil
+  -- Own content only: a caller may hang its own content on the button (b.icon, b.text, ...).
+  local icon, label, chevron
+  local drawn = opts.icon ~= nil and not ns.UI_ICONS[opts.icon]
+  if opts.icon then
+    if not drawn then
+      icon = W.Glyph(b, opts.icon, 14, "textSecondary")
+    else
+      icon = ns.IconDraw.new(b, 14)
+      icon:Draw(opts.icon)
+    end
+    icon:SetPoint("CENTER", shift + (opts.level and -6 or 0), 1)
+  end
+  if hasLabel or opts.level then
+    label = W.Text(b, { key = opts.key, text = opts.text or "", role = "ui", color = "textSecondary", justify = "CENTER" })
+    label:SetPoint("CENTER", shift + (opts.level and 9 or 0), 1)
+  end
+  if opts.chevron then
+    chevron = ns.IconDraw.new(b, 8)
+    chevron:SetPoint("RIGHT", -4, -1)
+    chevron:Draw("chevron-down")
+  end
+  b.icon, b.label, b.chevron = icon, label, chevron
+  b.fgNameKey = opts.tooltip or opts.key
+  function b.fgName()
+    return b.fgNameKey and L[b.fgNameKey] or nil
+  end
+
+  function b:Paint()
+    local enabled = self:IsEnabled()
+    local tint = W.PaintState(self, self.fgState, (self.fgHover or self.fgFocused) and enabled, enabled)
+    if label then
+      W.SetColor(label, tint)
+    end
+    if icon then
+      if drawn then
+        icon:SetTint(tint)
+      else
+        icon:SetColorToken(tint)
+      end
+      icon:SetAlpha(enabled and 1 or 0.45)
+    end
+    if chevron then
+      chevron:SetTint(tint)
+    end
+  end
+  ns.Bind(b, function()
+    b:SetHeight(px())
+    if opts.width then
+      b:SetWidth(opts.width)
+    elseif label and not icon then
+      b:SetWidth(math.ceil(label:GetStringWidth()) + 32)
+    elseif not label then
+      b:SetWidth(height)
+    end
+    b:Paint()
+  end)
+
+  local group = opts.group
+  if group ~= nil then
+    stateGroups[group] = stateGroups[group] or {}
+    table.insert(stateGroups[group], b)
+  end
+  function b:SetChecked(state)
+    if state ~= true and state ~= "mixed" then
+      state = false
+    end
+    self.fgState = state
+    if state == true and group ~= nil then
+      for _, other in ipairs(stateGroups[group]) do
+        if other ~= self and other.fgState ~= false then
+          other.fgState = false
+          other:Paint()
+        end
+      end
+    end
+    self:Paint()
+  end
+  function b:GetChecked()
+    return self.fgState == true
+  end
+  function b:SetIcon(name)
+    if not icon then
+      return
+    end
+    if drawn then
+      if icon.glyph ~= name then
+        icon:Draw(name)
+      end
+    else
+      icon:SetIcon(name)
+    end
+  end
+  function b:SetLabel(text)
+    if label then
+      W.SetText(label, nil, text)
+    end
+  end
+  if opts.checked then
+    b:SetChecked(true)
+  end
+
+  b:SetScript("OnEnter", function(self)
+    self.fgHover = true
+    self:Paint()
+    if opts.tooltip then
+      local title = L[opts.tooltip]
+      local keys = opts.stateKeys
+      if keys then
+        local key = self.fgState == true and keys.on or (self.fgState == "mixed" and keys.mixed or keys.off)
+        title = title .. " (" .. L[key] .. ")"
+      end
+      ns.ShowTooltip(self, title, opts.tooltipText and L[opts.tooltipText] or nil)
+    end
+  end)
+  b:SetScript("OnLeave", function(self)
+    self.fgHover = false
+    self:Paint()
+    ns.HideTooltip()
+  end)
+  b.fgOnFocus = function(self)
+    self.fgFocused = true
+    self:Paint()
+  end
+  b.fgOnBlur = function(self)
+    self.fgFocused = false
+    self:Paint()
+  end
+  b:HookScript("OnEnable", b.Paint)
+  b:HookScript("OnDisable", function(self)
+    self.fgHover = false
+    self:Paint()
+  end)
+  b:SetScript(
+    "OnClick",
+    ns.Wrap(opts.wrap or "state-button", function(self)
+      if not opts.manual then
+        local was = self.fgState == true
+        if group ~= nil and was then
+          return
+        end
+        self:SetChecked(not was)
+        if opts.onChange then
+          opts.onChange(self, not was)
+        end
+      end
+      if opts.onClick then
+        opts.onClick(self)
+      end
+    end)
+  )
+  Focus.register(b, function(self)
+    self:Click()
+  end)
+  if opts.disabled then
+    b:Disable()
+    b:Paint()
+  end
+  return b
+end
+
 -- opts: icon (texture path or fileID, or the name of an icon of ns.UI_ICONS), size, tooltip,
 -- onClick, glyph (text instead of icon), boxed (surface and edge like a secondary button, for
 -- actions that must read as buttons). Thin adapter on W.Action. The "x" in the title strip of a
@@ -1302,15 +1720,17 @@ end
 -- buttons, left to right. The actions are K.PlaceOnMap (addon map page) and K.PlaceMarker
 -- (waypoint), so every page does the same. bar:SetPlace(place) takes the place table or a
 -- function returning it (see PageKit), nil hides the bar. The name of each button is its tooltip,
--- shown on hover and on keyboard focus.
+-- shown on hover and on keyboard focus. opts.compact: a single 24 px map button, the marker moves to the right
+-- click (hint in the tooltip, bar.marker is nil); it works with opts.share. Opt-in, no page uses it by default.
 W.MAP_ACTION_SIZE = 24
 W.MAP_ACTION_GAP = 4
 W.MARKER_ICON = "Interface\\TargetingFrame\\UI-RaidTargetingIcon_7"
 function W.MapActionButtons(parent, opts)
   opts = opts or {}
   local size = opts.size or W.MAP_ACTION_SIZE
+  local compact = opts.compact == true
   local bar = CreateFrame("Frame", nil, parent)
-  bar:SetSize(size * 2 + W.MAP_ACTION_GAP, size)
+  bar:SetSize(compact and size or (size * 2 + W.MAP_ACTION_GAP), size)
   local function make(icon, action, titleKey, tipKey, opens)
     local b = W.Action(bar, {
       icon = icon,
@@ -1332,12 +1752,89 @@ function W.MapActionButtons(parent, opts)
     return b
   end
   bar.map = make("map", "PlaceOnMap", "kit.placeMap", opts.mapTip or "kit.placeMapTip", true)
-  bar.map:SetPoint("LEFT")
-  bar.marker = make("marker", "PlaceMarker", "kit.placeMarker", opts.markerTip or "kit.placeMarkerTip")
-  bar.marker:SetPoint("LEFT", bar.map, "RIGHT", W.MAP_ACTION_GAP, 0)
+  if compact then
+    -- One map button: left click opens the map, right click (Right arrow on the keyboard) sets the marker.
+    local function marker()
+      if bar.place then
+        ns.PageKit.PlaceMarker(bar.place)
+      end
+    end
+    local function showTip(b)
+      local hint = table.concat({ L["action.opensWindow"], L["action.markerRightClick"] }, "\n")
+      ns.ShowTooltip(b, L["kit.placeMap"], L[opts.mapTip or "kit.placeMapTip"], { hint = hint })
+    end
+    local map = bar.map
+    map:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    map:SetScript(
+      "OnClick",
+      ns.Wrap("action", function(_, button)
+        if button == "RightButton" then
+          marker()
+        elseif bar.place then
+          ns.PageKit.PlaceOnMap(bar.place)
+        end
+      end)
+    )
+    map:HookScript("OnEnter", showTip)
+    map.fgOnFocus = showTip
+    -- Keyboard: Right arrow on the focused button sets the marker (Enter and Space open the map).
+    function map.fgArrow(_, step)
+      if step > 0 then
+        marker()
+      end
+    end
+    local plain = map.fgDescription
+    function map.fgDescription()
+      return (plain() and (plain() .. ". ") or "") .. L["action.markerRightClick"]
+    end
+  else
+    bar.marker = make("marker", "PlaceMarker", "kit.placeMarker", opts.markerTip or "kit.placeMarkerTip")
+  end
+  -- opts.share: a third, rightmost icon that shares a page link (bar:SetShare). Without it the bar keeps
+  -- its two-icon layout and the old show/hide rule.
+  if opts.share then
+    bar.share = ns.PageShare.Button(bar, { size = size })
+  end
+  local managed = opts.share or compact
+  -- Buttons left to right: map and marker while a place is set, share while a payload is set.
+  local function layout(self)
+    local x, count = 0, 0
+    for _, b in ipairs({ self.map, self.marker or false, self.share or false }) do
+      if b and b:IsShown() then
+        b:ClearAllPoints()
+        b:SetPoint("LEFT", self, "LEFT", x, 0)
+        x = x + size + W.MAP_ACTION_GAP
+        count = count + 1
+      end
+    end
+    local empty = compact and size or size * 2 + W.MAP_ACTION_GAP
+    self:SetWidth(count > 0 and (x - W.MAP_ACTION_GAP) or empty)
+    self:SetShown(count > 0)
+  end
   function bar:SetPlace(place)
     self.place = place
-    self:SetShown(place ~= nil)
+    if not managed then
+      self.map:SetPoint("LEFT")
+      self.marker:SetPoint("LEFT", self.map, "RIGHT", W.MAP_ACTION_GAP, 0)
+      self:SetShown(place ~= nil)
+      return
+    end
+    self.map:SetShown(place ~= nil)
+    if self.marker then
+      self.marker:SetShown(place ~= nil)
+    end
+    layout(self)
+  end
+  -- Payload of the share icon (string or function), nil hides it. Needs opts.share.
+  function bar:SetShare(payload)
+    self.share:SetTarget(payload)
+    layout(self)
+  end
+  if not managed then
+    bar.map:SetPoint("LEFT")
+    bar.marker:SetPoint("LEFT", bar.map, "RIGHT", W.MAP_ACTION_GAP, 0)
+  else
+    bar.map:SetPoint("LEFT")
   end
   return bar
 end
@@ -1404,30 +1901,36 @@ function W.InfoButton(parent, titleKey, textKeys)
   return b
 end
 
-function W.Badge(parent, key, colorName)
-  local f = CreateFrame("Frame", nil, parent)
-  f:SetHeight(18)
+-- True when s names a string of the locale tables, so a caller can hand over a key or a literal text.
+local function isLocaleKey(s)
+  return type(s) == "string" and ns.Locales.enUS[s] ~= nil
+end
+
+-- A small tinted label (NEW, soon). textOrKey is a locale key or a literal text, colorName a Theme token
+-- (default accent2). The look is K.Tag, so contrast and size follow the page kit. Sizes itself on every
+-- text or locale change; f:SetKey(textOrKey, colorName) repaints a pooled badge.
+function W.Badge(parent, textOrKey, colorName)
+  local f = ns.PageKit.Tag(parent)
   f.colorName = colorName or "accent2"
-  local bg = f:CreateTexture(nil, "BACKGROUND")
-  bg:SetAllPoints()
-  local text = W.Text(f, { key = key, role = "micro", color = f.colorName, justify = "CENTER" })
-  text:SetPoint("CENTER")
-  local border = W.Border(f, f.colorName, 0.6)
-  local function paint()
-    bg:SetColorTexture(Theme.color(f.colorName, 0.15))
-    f:SetWidth(text:GetStringWidth() + 14)
+  f.text = f.label
+  local function set(value, color)
+    f.colorName = color or f.colorName
+    local tag = { color = f.colorName }
+    if isLocaleKey(value) then
+      tag.key = value
+    else
+      tag.text = value
+    end
+    f:SetTag(tag)
+    f:Fit()
   end
-  ns.Bind(f, paint)
-  f.text = text
-  -- Repaints a pooled badge for a new locale key/color without leaking a
-  -- new frame, used by card grids that reuse badge frames across refreshes.
-  function f:SetKey(newKey, newColorName)
-    f.colorName = newColorName or f.colorName
-    W.SetText(text, newKey)
-    W.SetColor(text, f.colorName)
-    border.set(f.colorName, 0.6)
-    paint()
+  function f:SetKey(value, color)
+    set(value, color)
   end
+  set(textOrKey)
+  ns.Bind(f, function()
+    f:Fit()
+  end)
   return f
 end
 
@@ -1437,8 +1940,14 @@ end
 -- In a W.Stack the widget takes all the room the page has left (viewport height minus what lies
 -- above it, so the page does not scroll); add it with { gap = 0 }. Standalone, f:Fill() anchors it
 -- to the whole parent and it follows the parent's size. f:SetTexts(text, hint) changes the lines.
+-- action = { label (locale key), onClick } adds a button below the lines (f:SetAction(label, onClick)
+-- sets or, with nil, removes it; W.EMPTY_RESET is the label for "reset filters"). compact = true keeps
+-- the block at its own height inside a W.Stack instead of taking the room left, for result areas
+-- that have other content below. f:SetLoading(true) shows the loading line (opts.loading starts so)
+-- instead of text, hint and action; false returns to them.
 W.EMPTY_ICON_SIZE = 32
-local EMPTY_MAX_SHARE, EMPTY_ICON_GAP, EMPTY_HINT_GAP, EMPTY_MARGIN = 0.7, 10, 6, 16
+W.EMPTY_RESET = "empty.resetFilters"
+local EMPTY_MAX_SHARE, EMPTY_ICON_GAP, EMPTY_HINT_GAP, EMPTY_MARGIN, EMPTY_ACTION_GAP = 0.7, 10, 6, 16, 12
 
 function W.EmptyState(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
@@ -1450,6 +1959,8 @@ function W.EmptyState(parent, opts)
   f.text = W.Text(group, { key = opts.text, role = "h3", color = "textSecondary", wrap = true, justify = "CENTER" })
   f.hint = W.Text(group, { key = opts.hint, role = "ui", color = "textMuted", wrap = true, justify = "CENTER" })
   f.hint:SetShown(opts.hint ~= nil)
+  f.textKey, f.hintKey, f.compact = opts.text, opts.hint, opts.compact
+  local actions = {}
 
   -- Places icon, text and hint as one block in the middle of the widget.
   function f:Relayout(width)
@@ -1470,19 +1981,77 @@ function W.EmptyState(parent, opts)
       f.hint:SetPoint("TOP", group, "TOP", 0, -(y + EMPTY_HINT_GAP))
       y = y + EMPTY_HINT_GAP + f.hint:GetStringHeight()
     end
+    if f.actionBtn and f.actionBtn:IsShown() then
+      f.actionBtn:ClearAllPoints()
+      f.actionBtn:SetPoint("TOP", group, "TOP", 0, -(y + EMPTY_ACTION_GAP))
+      y = y + EMPTY_ACTION_GAP + f.actionBtn:GetHeight()
+    end
     group:SetSize(w, y)
     group:ClearAllPoints()
     group:SetPoint("CENTER", f, "CENTER", 0, 0)
     f.minHeight = y + EMPTY_MARGIN * 2
   end
 
+  local function relayout()
+    f:Relayout(f.fgWidth or math.max(1, parent:GetWidth() or 1))
+  end
+
   function f:SetTexts(textKey, hintKey)
-    W.SetText(f.text, textKey)
-    W.SetText(f.hint, hintKey)
-    f.hint:SetShown(hintKey ~= nil)
-    if f.fgWidth then
-      f:Relayout(f.fgWidth)
+    f.textKey, f.hintKey = textKey, hintKey
+    if not f.loading then
+      W.SetText(f.text, textKey)
+      W.SetText(f.hint, hintKey)
+      f.hint:SetShown(hintKey ~= nil)
     end
+    relayout()
+  end
+
+  function f:SetAction(labelKey, onClick)
+    if f.actionBtn then
+      f.actionBtn:Hide()
+    end
+    f.actionBtn = nil
+    f.action = labelKey and { label = labelKey, onClick = onClick } or nil
+    if labelKey and not f.loading then
+      local btn = actions[labelKey]
+      if not btn then
+        btn = W.Button(group, {
+          key = labelKey,
+          onClick = function()
+            if f.action and f.action.onClick then
+              f.action.onClick()
+            end
+          end,
+        })
+        actions[labelKey] = btn
+      end
+      btn:Show()
+      f.actionBtn = btn
+    end
+    relayout()
+  end
+
+  function f:SetLoading(on)
+    on = on and true or false
+    if on == (f.loading or false) then
+      return
+    end
+    f.loading = on
+    if on then
+      W.SetText(f.text, "empty.loading")
+      f.hint:Hide()
+      if f.actionBtn then
+        f.actionBtn:Hide()
+        f.actionBtn = nil
+      end
+    else
+      local action = f.action
+      f:SetTexts(f.textKey, f.hintKey)
+      if action then
+        f:SetAction(action.label, action.onClick)
+      end
+    end
+    relayout()
   end
 
   -- Stack hook: width of the page column, ctx = room left (see W.Stack).
@@ -1490,7 +2059,7 @@ function W.EmptyState(parent, opts)
     f.fgWidth = width
     f:Relayout(width)
     local h = f.minHeight
-    if ctx and ctx.viewHeight and ctx.viewHeight > 0 then
+    if not f.compact and ctx and ctx.viewHeight and ctx.viewHeight > 0 then
       h = math.max(h, ctx.viewHeight - ctx.top - ctx.gap - ctx.pad)
     end
     f:SetHeight(h)
@@ -1517,24 +2086,155 @@ function W.EmptyState(parent, opts)
     end
   end)
   f:Relayout(math.max(1, parent:GetWidth() or 1))
+  if opts.action then
+    f:SetAction(opts.action.label, opts.action.onClick)
+  end
+  if opts.loading then
+    f:SetLoading(true)
+  end
   return f
 end
 
--- Card: surface panel with optional title, content anchored below it.
-function W.Card(parent, opts)
+-- Panel: the one card and section building block. A surface that follows the window opacity with a
+-- hairline border (opts.edge = token or "#rrggbb", opts.edgeAlpha: own rest border, for example a class
+-- color), an optional header and the padding from Theme.space. opts: key|text (header title, heading
+-- font in accent2), count (number after the title, key titles only), selected, frameType ("Button" for a
+-- card that is clicked), capsTitle (locale key or text: instead of the title a header band like K.SectionCard,
+-- gold capitals in the heading color with a rule below; default off). The frame offers:
+--   f.pad            inner padding on all four sides (Theme.space.inset)
+--   f.contentTop     y offset for the first content line (below the header when there is one)
+--   f:SetCount(n)    number behind the title, nil removes it
+--   f:SetActions(w)  puts a widget (button, row of buttons) at the right end of the header
+--   f:SetHover(on)   accent edge and hover fill, set by the owner (the mouse belongs to the owner's script)
+--   f:SetSelected(on) accent edge and selected fill
+-- f.rim is the rest border and f.ring the accent border (2 px), only one of them shows. In the skin "forever" the
+-- card art (Skins.Apply "card") takes the place of fill and rest border.
+-- Line of the title of a box: a little above the padding (the text has leading), content 24 px below that line.
+local function panelHeader(pad)
+  return pad - 2, pad + 22
+end
+
+function W.Panel(parent, opts)
   opts = opts or {}
-  local f = CreateFrame("Frame", nil, parent)
-  W.FadeWithWindow(W.Fill(f, "surface", 1))
-  W.Border(f, "white")
-  local top = -12
-  if opts.key or opts.text then
+  local f = CreateFrame(opts.frameType or "Frame", nil, parent)
+  local pad = Theme.space.inset
+  local titleTop, headerBottom = panelHeader(pad)
+  f.pad = pad
+  local fill = W.FadeWithWindow(W.Fill(f, "surface", 1))
+  f.rim = W.Border(f, opts.edge or "white", opts.edgeAlpha)
+  f.ring = W.Border(f, "accent2", 1, 2)
+  f.ring.show(false)
+  f.wash = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+  f.wash:SetAllPoints()
+  f.wash:Hide()
+  local top = -pad
+  if opts.capsTitle then
+    -- Header band like K.SectionCard: gold capitals, a rule below, content under the rule.
+    local K = ns.PageKit
+    local band = CreateFrame("Frame", nil, f)
+    band.fgFlushTop = true -- the band starts at the card's top edge on purpose (see tests/pagematrix.lua)
+    local headH = K.scaledHeight(Theme.size.sectionHeader)
+    band:SetPoint("TOPLEFT", f, "TOPLEFT", pad, 0)
+    band:SetPoint("TOPRIGHT", f, "TOPRIGHT", -pad, 0)
+    band:SetHeight(headH)
+    local rule = f:CreateTexture(nil, "ARTWORK")
+    rule:SetHeight(1)
+    rule:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -headH)
+    rule:SetPoint("TOPRIGHT", f, "TOPRIGHT", -pad, -headH)
+    ns.Bind(f, function()
+      rule:SetColorTexture(Theme.fillColor("line"))
+    end)
+    f.head = band
+    f.title = W.Text(f, { role = "small", family = "heading", color = "heading" })
+    f.title:SetPoint("LEFT", band, "LEFT", 0, 0)
+    f.title:SetPoint("RIGHT", band, "RIGHT", 0, 0)
+    local capsKey = isLocaleKey(opts.capsTitle) and opts.capsTitle or nil
+    local function paintCaps()
+      local text = K.Caps(capsKey and L[capsKey] or opts.capsTitle)
+      f.title:SetText(f.capsCount and string.format("%s (%d)", text, f.capsCount) or text)
+    end
+    f.fgPaintCaps = paintCaps
+    ns.Bind(f, paintCaps)
+    top = -(headH + 1 + Theme.space.md)
+  elseif opts.key or opts.text then
     f.title = W.Text(f, { key = opts.key, text = opts.text, role = "h3", family = "heading", color = "accent2" })
-    f.title:SetPoint("TOPLEFT", 12, -10)
-    f.title:SetPoint("RIGHT", -12, 0)
-    top = -34
+    f.title:SetPoint("TOPLEFT", pad, -titleTop)
+    f.title:SetPoint("RIGHT", -pad, 0)
+    top = -headerBottom
   end
   f.contentTop = top
+
+  local hover, selected = false, false
+  local function paint()
+    local lit = hover or selected
+    -- Forever: the card art of the game replaces fill and hairline. A rim of its own color (class color) stays.
+    local art = ns.Skins.Apply(f, "card")
+    fill:SetShown(art == nil)
+    if art then
+      W.FadeWithWindow(art)
+    end
+    f.ring.show(lit)
+    f.rim.show(not lit and (art == nil or opts.edge ~= nil))
+    f.wash:SetShown(lit)
+    if lit then
+      f.wash:SetColorTexture(Theme.fillColor(selected and "selected" or "hover"))
+    end
+  end
+  ns.Bind(f, paint)
+  function f:SetHover(on)
+    hover = on == true
+    paint()
+  end
+  function f:SetSelected(on)
+    selected = on == true
+    paint()
+  end
+
+  function f:SetCount(n)
+    if f.fgPaintCaps then
+      f.capsCount = n
+      f.fgPaintCaps()
+      return
+    end
+    local title = f.title
+    if not (title and title.fgKey) then
+      return
+    end
+    title.fgCount = n
+    title:SetText(n and string.format("%s (%d)", L[title.fgKey], n) or L[title.fgKey])
+  end
+
+  function f:SetActions(widget)
+    widget:ClearAllPoints()
+    if f.head then
+      widget:SetPoint("RIGHT", f.head, "RIGHT", 0, 0)
+      f.title:ClearAllPoints()
+      f.title:SetPoint("LEFT", f.head, "LEFT", 0, 0)
+      f.title:SetPoint("RIGHT", widget, "LEFT", -Theme.space.sm, 0)
+      f.actions = widget
+      return
+    end
+    widget:SetPoint("TOPRIGHT", f, "TOPRIGHT", -pad, -(titleTop - 4))
+    if f.title then
+      f.title:ClearAllPoints()
+      f.title:SetPoint("TOPLEFT", pad, -titleTop)
+      f.title:SetPoint("RIGHT", widget, "LEFT", -Theme.space.sm, 0)
+    end
+    f.actions = widget
+  end
+
+  if opts.count then
+    f:SetCount(opts.count)
+  end
+  if opts.selected then
+    f:SetSelected(true)
+  end
   return f
+end
+
+-- Card: Panel with an optional title, content anchored below it (f.contentTop).
+function W.Card(parent, opts)
+  return W.Panel(parent, opts)
 end
 
 -- Toggle and checkbox -----------------------------------------------------
@@ -1605,6 +2305,22 @@ function W.Toggle(parent, opts)
   -- labelInset: room between the state text and the name (a decorative icon of the caller sits there).
   label:SetPoint("LEFT", state, "RIGHT", 4 + (opts.labelInset or 0), 0)
   label:SetPoint("RIGHT")
+  -- Outside a Stack the label stays one line (ellipsis, full name in the tooltip).
+  if not opts.tooltip and not opts.compact then
+    W.TipWhenCut(f, label)
+  end
+  -- In a Stack the label wraps and the row grows with it.
+  function f:fgGridLayout(width)
+    local h = 24
+    if not opts.compact then
+      local inset = 36 + 6 + 30 + 4 + (opts.labelInset or 0)
+      label:ClearAllPoints()
+      label:SetPoint("LEFT", state, "RIGHT", 4 + (opts.labelInset or 0), 0)
+      h = math.max(h, W.FitLabel(label, width - inset) + 6)
+    end
+    self:SetHeight(h)
+    return h
+  end
   f.state = state
   if opts.quality then
     -- A quality name in its item color; the name stays in the text.
@@ -1653,6 +2369,17 @@ function W.Checkbox(parent, opts)
   local label = W.Text(f, { key = opts.key, text = opts.text, role = "ui" })
   label:SetPoint("LEFT", box, "RIGHT", 8, 0)
   label:SetPoint("RIGHT")
+  if not opts.tooltip then
+    W.TipWhenCut(f, label)
+  end
+  -- In a Stack the label wraps and the row grows with it.
+  function f:fgGridLayout(width)
+    label:ClearAllPoints()
+    label:SetPoint("LEFT", box, "RIGHT", 8, 0)
+    local h = math.max(22, W.FitLabel(label, width - 24) + 6)
+    self:SetHeight(h)
+    return h
+  end
   local function paint()
     local on = opts.get() and true or false
     check:SetShown(on)
@@ -1701,6 +2428,12 @@ function W.ReleaseGate(s, opts)
   function gate.change(v)
     if s.fgHeld and type(IsMouseButtonDown) == "function" and not IsMouseButtonDown("LeftButton") then
       gate.flush()
+    end
+    -- The engine sets the value of a click before our OnMouseDown hook runs: a pressed button over the
+    -- slider counts as held, so the write waits for the release and never runs inside the engine's handler.
+    local down = type(IsMouseButtonDown) == "function" and IsMouseButtonDown("LeftButton")
+    if not s.fgHeld and down and s:IsMouseOver() then
+      s.fgHeld = true
     end
     if s.fgHeld then
       pending = v
@@ -1817,6 +2550,19 @@ function W.Slider(parent, opts)
   s:SetHeight(16)
   s:SetPoint("TOPLEFT", 0, -20)
   s:SetPoint("TOPRIGHT", 0, -20)
+  -- In a Stack the label wraps left of the value and the track moves below it.
+  function f:fgGridLayout(width)
+    label:ClearAllPoints()
+    label:SetPoint("TOPLEFT")
+    local textH = W.FitLabel(label, width - math.ceil(value:GetStringWidth() or 0) - 8)
+    local trackY = math.max(20, textH + 4)
+    s:ClearAllPoints()
+    s:SetPoint("TOPLEFT", 0, -trackY)
+    s:SetPoint("TOPRIGHT", 0, -trackY)
+    local h = trackY + 22
+    self:SetHeight(h)
+    return h
+  end
   s:SetMinMaxValues(opts.min, opts.max)
   s:SetValueStep(opts.step)
   if s.SetObeyStepOnDrag then
@@ -1828,7 +2574,7 @@ function W.Slider(parent, opts)
   rim:SetPoint("LEFT", -1, 0)
   rim:SetPoint("RIGHT", 1, 0)
   rim:SetHeight(6)
-  rim:SetColorTexture(1, 1, 1, 0.35)
+  rim:SetColorTexture(Theme.fillColor("lineStrong"))
   local track = s:CreateTexture(nil, "BACKGROUND")
   track:SetPoint("LEFT")
   track:SetPoint("RIGHT")
@@ -1970,7 +2716,7 @@ function W.CompactSlider(parent, opts)
   rim:SetPoint("LEFT", 0, 0)
   rim:SetPoint("RIGHT", 0, 0)
   rim:SetHeight(6)
-  rim:SetColorTexture(1, 1, 1, 0.35)
+  rim:SetColorTexture(Theme.fillColor("lineStrong"))
   local track = s:CreateTexture(nil, "BACKGROUND")
   track:SetPoint("LEFT", 1, 0)
   track:SetPoint("RIGHT", -1, 0)
@@ -2022,8 +2768,16 @@ function W.CompactSlider(parent, opts)
   function s.fgArrow(_, delta)
     move(delta)
   end
+  -- Moves the range (the client may hold a value outside the planned one); the value is not touched.
+  function s.SetRange(self, lo, hi)
+    opts.min, opts.max = lo, hi
+    syncing = true
+    self:SetMinMaxValues(lo, hi)
+    syncing = false
+  end
   function s.Sync(self, v)
-    if self.fgValue ~= v and not self.fgHeld then
+    -- The thumb is compared too: the engine may have moved it while fgValue stayed.
+    if (self.fgValue ~= v or self:GetValue() ~= v) and not self.fgHeld then
       self.fgValue = v
       syncing = true
       self:SetValue(v)
@@ -2045,28 +2799,50 @@ end
 function W.Tabs(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(28)
-  local line = f:CreateTexture(nil, "BACKGROUND")
-  line:SetPoint("BOTTOMLEFT")
-  line:SetPoint("BOTTOMRIGHT")
-  line:SetHeight(1)
-  ns.Bind(line, function(t)
-    t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
-  end)
   f.buttons = {}
+  -- Segment look shared with W.Action "tab" and the choice buttons: dark face and accentDim edge at rest, a
+  -- lighter face on hover or focus, the chosen one gold edge + gold tint + bright text (never color alone).
+  function f:fgPaintTab(b)
+    local on = b.fgTabId == f.selected
+    local lit = b.fgOver or b.fgFocused
+    b.hl:SetColorTexture(Theme.color(lit and "surface3" or "surface2"))
+    b.tint:SetShown(on)
+    b.border.set(on and "accent2" or lit and "accent2" or "accentDim", on and 1 or lit and 0.7 or 0.7)
+    W.SetColor(b.label, on and "accent" or (lit and "text" or "textSecondary"))
+  end
   local prev
   for _, tab in ipairs(opts.tabs) do
     local b = CreateFrame("Button", nil, f)
     b:SetHeight(28)
+    b.fgTabId = tab.id
+    b.hl = b:CreateTexture(nil, "BACKGROUND")
+    b.hl:SetAllPoints()
     b.label = W.Text(b, { key = tab.key, role = "ui", color = "textSecondary", justify = "CENTER" })
     b.label:SetPoint("CENTER")
-    b.bar = b:CreateTexture(nil, "ARTWORK")
-    b.bar:SetPoint("BOTTOMLEFT")
-    b.bar:SetPoint("BOTTOMRIGHT")
-    b.bar:SetHeight(2)
+    b.tint = b:CreateTexture(nil, "BORDER")
+    b.tint:SetAllPoints()
+    b.border = W.Border(b, "accentDim", 0.7)
     ns.Bind(b, function()
-      b:SetWidth(b.label:GetStringWidth() + 24)
-      b.bar:SetColorTexture(Theme.color("accent2"))
+      b:SetWidth(b.label:GetStringWidth() + 32)
+      b.tint:SetColorTexture(Theme.color("accent2", 0.22))
+      f:fgPaintTab(b)
     end)
+    b:HookScript("OnEnter", function()
+      b.fgOver = true
+      f:fgPaintTab(b)
+    end)
+    b:HookScript("OnLeave", function()
+      b.fgOver = false
+      f:fgPaintTab(b)
+    end)
+    b.fgOnFocus = function()
+      b.fgFocused = true
+      f:fgPaintTab(b)
+    end
+    b.fgOnBlur = function()
+      b.fgFocused = false
+      f:fgPaintTab(b)
+    end
     b:SetPoint("BOTTOMLEFT", prev or f, prev and "BOTTOMRIGHT" or "BOTTOMLEFT", prev and 4 or 0, 0)
     b:SetScript(
       "OnClick",
@@ -2088,7 +2864,7 @@ function W.Tabs(parent, opts)
     function f:fgGridLayout(width)
       local x, row = 0, 0
       for _, b in ipairs(self.order) do
-        local w = math.min(width, math.ceil(b.label:GetStringWidth()) + 24)
+        local w = math.min(width, math.ceil(b.label:GetStringWidth()) + 32)
         if x > 0 and x + w > width then
           x, row = 0, row + 1
         end
@@ -2102,13 +2878,15 @@ function W.Tabs(parent, opts)
       return h
     end
   end
-  function f:Select(id)
+  -- Marks a tab without calling onSelect (the owner follows a state it holds itself).
+  function f:SetSelected(id)
     f.selected = id
-    for tid, b in pairs(f.buttons) do
-      local on = tid == id
-      b.bar:SetShown(on)
-      W.SetColor(b.label, on and "accent" or "textSecondary")
+    for _, b in pairs(f.buttons) do
+      f:fgPaintTab(b)
     end
+  end
+  function f:Select(id)
+    f:SetSelected(id)
     if opts.onSelect then
       opts.onSelect(id)
     end
@@ -2130,8 +2908,15 @@ function W.EditBox(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f:SetHeight(opts.height or 26)
   describe(f, "text", opts.placeholder)
-  W.Fill(f, "bg", 0.9)
+  local fill = W.Fill(f, "bg", 0.9)
   local border = W.Border(f, "white", 0.25)
+  -- Forever: the search box art of the game. The edge stays as the focus ring while the box has the focus.
+  local focused = false
+  ns.Bind(f, function()
+    local art = ns.Skins.Apply(f, "search")
+    fill:SetShown(art == nil)
+    border.show(art == nil or focused)
+  end)
   local eb = CreateFrame("EditBox", nil, f)
   local inset = opts.inset or 8
   eb:SetPoint("TOPLEFT", inset, 0)
@@ -2144,14 +2929,30 @@ function W.EditBox(parent, opts)
     Theme.applyFont(eb, "ui", "body")
     eb:SetTextColor(Theme.color("text"))
   end)
-  local ph = W.Text(f, { key = opts.placeholder, role = "ui", color = "textMuted" })
+  local ph = W.Text(f, { key = opts.placeholder, role = "ui", color = "textMuted", justify = "LEFT" })
+  -- Both edges: a placeholder longer than the field ends in "..." inside it instead of running over the edge.
   ph:SetPoint("LEFT", inset, 0)
-  local clearBtn
+  ph:SetPoint("RIGHT", opts.clear and -24 or -inset, 0)
+  ph:SetWordWrap(false)
+  ph.fgEllipsis = true
+  local clearBtn, bound, send, store
   if opts.clear then
     clearBtn = W.Action(f, { icon = "close", size = 18, tooltip = "common.clear" })
     clearBtn:SetPoint("RIGHT", -4, 0)
     clearBtn:SetScript("OnClick", function()
+      local had = eb:GetText() ~= ""
+      -- SetText reports userInput=false, so the clear is passed on here (once) instead of in OnTextChanged.
       eb:SetText("")
+      if bound then
+        if opts.live then
+          send()
+        else
+          store()
+        end
+      end
+      if had and opts.onChange then
+        ns.Safe("editbox-change", opts.onChange, "")
+      end
       eb:ClearFocus()
     end)
   end
@@ -2162,7 +2963,7 @@ function W.EditBox(parent, opts)
       clearBtn:SetShown(not empty)
     end
   end
-  local bound = type(opts.get) == "function"
+  bound = type(opts.get) == "function"
   -- shown: the text the box was given last; a different text at the end of an edit is what gets stored.
   local shown, sent, discard, storing = "", "", false, false
   -- The saved text goes into the box and the view starts at its beginning: a text set while the box has no
@@ -2181,7 +2982,7 @@ function W.EditBox(parent, opts)
     end
   end
   -- A live box sends each text once: what Enter or leaving finds already sent is not written again.
-  local function send()
+  function send()
     local text = eb:GetText()
     if opts.live and text == sent then
       return
@@ -2189,7 +2990,7 @@ function W.EditBox(parent, opts)
     sent = text
     ns.Safe("editbox-set", opts.set, text)
   end
-  local function store()
+  function store()
     if not bound or storing then
       return
     end
@@ -2211,11 +3012,15 @@ function W.EditBox(parent, opts)
     end)
   )
   eb:SetScript("OnEditFocusGained", function()
+    focused = true
     border.set("actionHi", 1)
+    border.show(true)
     update()
   end)
   eb:SetScript("OnEditFocusLost", function()
+    focused = false
     border.set("white", 0.25)
+    border.show(ns.Skins.Apply(f, "search") == nil)
     if discard then
       discard = false
       show(true)
@@ -2323,7 +3128,8 @@ end
 W.DROPDOWN_FIELD_Y = 20
 
 -- opts: key (label), options = { { value, key|text, quality, tooltip|tooltipKey } }, get(), set(v), width, tooltip
--- and tooltipText (locale keys). An option with a quality shows its text in the item color of that quality.
+-- and tooltipText (locale keys). An option with a quality shows its text in the item color of that quality,
+-- one with an icon (texture markup) shows it in front of the text.
 -- compact: no label line, the frame is the 24 px field only (rows of a card); f.button:SetWidth resizes it.
 -- The frame has a height only: the owner gives it a width (SetWidth, or anchors on both sides) when it
 -- places the dropdown itself, otherwise its width is undefined and the client may draw nothing.
@@ -2344,7 +3150,7 @@ function W.TypeaheadFind(texts, typed, from)
   local first = (from or 1) + (repeated and 1 or 0)
   for step = 0, count - 1 do
     local index = (first - 1 + step) % count + 1
-    local text = (texts[index] or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower()
+    local text = (texts[index] or ""):gsub("|T.-|t", ""):gsub("^%s+", ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):lower()
     if text:sub(1, #needle) == needle then
       return index
     end
@@ -2366,7 +3172,7 @@ end
 
 function W.Dropdown(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetHeight(opts.compact and 24 or 46)
+  f:SetHeight(opts.compact and 24 or Theme.size.control)
   describe(f, "choice", opts.key, opts.tooltipText)
   local label = W.Text(f, { key = opts.key, role = "ui", color = "textMuted" })
   label:SetPoint("TOPLEFT")
@@ -2376,14 +3182,40 @@ function W.Dropdown(parent, opts)
   b:SetHeight(24)
   b:SetPoint("TOPLEFT", 0, opts.compact and 0 or -W.DROPDOWN_FIELD_Y)
   b:SetWidth(opts.width or 220)
-  W.Fill(b, "surface2")
-  W.Border(b, "white", 0.25)
+  -- Forever: a dark field with a gold edge; the stretched game art put the text on a bright gradient.
+  local fill = b:CreateTexture(nil, "BACKGROUND")
+  fill:SetAllPoints()
+  b.fgBack = fill
+  local rim = W.Border(b, "white", 0.25)
+  local over = false
+  local function paintField()
+    local forever = ns.Skins.isForever()
+    fill:SetColorTexture(Theme.color(forever and "bg" or "surface2"))
+    if forever then
+      rim.set(over and "accent2" or "accentDim", 1)
+    else
+      rim.set("white", 0.25)
+    end
+  end
+  b:HookScript("OnEnter", function()
+    over = true
+    paintField()
+  end)
+  b:HookScript("OnLeave", function()
+    over = false
+    paintField()
+  end)
+  ns.Bind(b, paintField)
   local current = W.Text(b, { role = "ui", color = "text" })
   current:SetPoint("LEFT", 8, 0)
-  local arrow = W.Glyph(b, "chevron-down", 12, "textMuted")
+  current:SetPoint("RIGHT", -26, 0)
+  local arrow = W.Glyph(b, "chevron-down", 12, "accent")
   arrow:SetPoint("RIGHT", -8, 0)
   local function optionText(o)
     local text = o.key and L[o.key] or o.text
+    if o.icon then
+      text = o.icon .. " " .. text
+    end
     return o.quality and ns.ItemInfo.ColorName(text, o.quality) or text
   end
   local function textOf(value)
@@ -2410,7 +3242,7 @@ function W.Dropdown(parent, opts)
         r:SetHeight(22)
         r.hl = r:CreateTexture(nil, "BACKGROUND")
         r.hl:SetAllPoints()
-        r.hl:SetColorTexture(1, 1, 1, 0)
+        r.hl:SetColorTexture(ns.Theme.fillColor())
         r.text = W.Text(r, { role = "ui" })
         r.text:SetPoint("LEFT", 8, 0)
         -- An option may carry a tooltip text (o.tooltip), shown on hover and on keyboard focus.
@@ -2425,11 +3257,11 @@ function W.Dropdown(parent, opts)
           end
         end
         r:SetScript("OnEnter", function()
-          r.hl:SetColorTexture(1, 1, 1, 0.08)
+          r.hl:SetColorTexture(Theme.fillColor("hover"))
           showTip()
         end)
         r:SetScript("OnLeave", function()
-          r.hl:SetColorTexture(1, 1, 1, 0)
+          r.hl:SetColorTexture(ns.Theme.fillColor())
           hideTip()
         end)
         r.fgOnFocus, r.fgOnBlur = showTip, hideTip

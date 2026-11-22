@@ -10,7 +10,7 @@ ns.ItemEnchantSettings = S
 
 ns.AddLocale("enUS", {
   ["ench.heading"] = "Enchants and gems next to the slots",
-  ["ench.hint"] = "Enchant (green) and gem icons at each slot of the character window.\nMissing enchant: red note.",
+  ["ench.hint"] = "Shows enchant (green) and gem icons at each slot of the character window.\nA missing enchant gets a red note.",
   ["ench.enable"] = "Show enchants next to the slots",
   ["ench.missing"] = "Mark missing enchants",
   ["ench.gems"] = "Show gems",
@@ -19,7 +19,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["ench.heading"] = "Verzauberungen und Edelsteine neben den Slots",
-  ["ench.hint"] = "Verzauberung (grün) und Edelstein-Symbole an jedem Slot des Charakterfensters.\nFehlende Verzauberung: roter Hinweis.",
+  ["ench.hint"] = "Zeigt Verzauberung (grün) und Edelsteinsymbole an jedem Slot des Charakterfensters.\nEine fehlende Verzauberung bekommt einen roten Hinweis.",
   ["ench.enable"] = "Verzauberungen neben den Slots anzeigen",
   ["ench.missing"] = "Fehlende Verzauberungen markieren",
   ["ench.gems"] = "Edelsteine anzeigen",

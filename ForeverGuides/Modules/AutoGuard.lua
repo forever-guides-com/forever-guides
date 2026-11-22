@@ -52,7 +52,7 @@ ns.AddLocale("enUS", {
   ["auto.name.autoSocialAcceptContacts"] = "Contacts may invite me",
   ["auto.name.autoInvite"] = "Accepting invites",
   ["auto.name.autoRoleCheck"] = "Auto role check",
-  ["auto.hint.autoRepair"] = "Repairs at the merchant by itself.\nHold %s to stop it.",
+  ["auto.hint.autoRepair"] = "Repairs at the vendor by itself.\nHold %s to stop it.",
   ["auto.hint.autoSummon"] = "Accepts summons after a delay.\nHold %s to stop it.",
   ["auto.hint.autoResurrect"] = "Accepts resurrections of friends.\nHold %s to stop it.",
   ["auto.hint.autoQuest"] = "Accepts and turns in quests.\nNo reward choice, no gold.\nHold %s to stop it.",

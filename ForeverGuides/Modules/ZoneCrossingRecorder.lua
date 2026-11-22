@@ -8,13 +8,13 @@ local WP, WL, MW, ZCL, Guard = ns.Waypoints, ns.WaypointLogic, ns.MapWorld, ns.Z
 
 ns.AddLocale("enUS", {
   ["zcr.set.record"] = "Record zone crossings while walking",
-  ["zcr.set.recordHint"] = "When you walk or ride from one zone into the next, the add-on notes where you crossed and shows the place as a real crossing on the maps. Flights, teleports, deaths and instances are skipped. Saved on this computer only, nothing is sent anywhere.",
+  ["zcr.set.recordHint"] = "When you walk or ride from one zone into the next, the addon notes where you crossed and shows the place as a real crossing on the maps. Flights, teleports, deaths and instances are skipped. The addon saves on this computer only and sends nothing anywhere.",
   ["zcr.set.notify"] = "Message for every new crossing",
   ["zcr.recorded"] = "Crossing %s to %s recorded",
 })
 ns.AddLocale("deDE", {
   ["zcr.set.record"] = "Zonenübergänge beim Laufen aufnehmen",
-  ["zcr.set.recordHint"] = "Wenn du von einer Zone in die nächste läufst oder reitest, merkt sich das Addon die Stelle und zeigt sie auf den Karten als echten Übergang. Flüge, Teleports, Tod und Instanzen zählen nicht. Gespeichert wird nur auf diesem Computer, es wird nichts gesendet.",
+  ["zcr.set.recordHint"] = "Wenn du von einer Zone in die nächste läufst oder reitest, merkt sich das Addon die Stelle und zeigt sie auf den Karten als echten Übergang. Flüge, Teleports, Tod und Instanzen zählen nicht. Das Addon speichert nur auf diesem Computer und sendet nichts.",
   ["zcr.set.notify"] = "Meldung bei jedem neuen Übergang",
   ["zcr.recorded"] = "Übergang %s zu %s aufgenommen",
 })

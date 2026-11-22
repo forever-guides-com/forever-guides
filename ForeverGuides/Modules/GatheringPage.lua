@@ -9,6 +9,7 @@ local G, Sel, Data, R = ns.GatheringLogic, ns.GatherSelection, ns.GatherDataAcce
 ns.AddLocale("enUS", {
   ["page.gathering"] = "Ores and herbs",
   ["gather.intro"] = "Where ore veins and herbs grow, zone by zone. The maps show every item. Pick items to narrow a zone down, then open it on the map.",
+  ["page.gathering.sub"] = "Where ore and herbs grow, by zone",
   ["gather.source"] = "Positions come from Classic data and your own finds, not all of them are confirmed for Forever.",
   ["gather.search"] = "Search",
   ["gather.searchPh"] = "Item name",
@@ -21,7 +22,6 @@ ns.AddLocale("enUS", {
   ["gather.zoneOption"] = "%s (%d-%d)",
   ["gather.mine"] = "Only what I can gather",
   ["gather.mineTip"] = "Hides items above your skill. A profession you do not have hides all its items.",
-  ["gather.reset"] = "Reset filters",
   ["gather.resetTip"] = "Clears search, profession, zone and faction. The selection stays.",
   ["gather.itemsHeading"] = "Items",
   ["gather.zonesHeading"] = "Zones",
@@ -55,6 +55,7 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["page.gathering"] = "Erze und Kräuter",
   ["gather.intro"] = "Wo Erzadern und Kräuter wachsen, Gebiet für Gebiet. Die Karten zeigen alle Items. Wähle Items, um ein Gebiet einzuschränken, und öffne es dann auf der Karte.",
+  ["page.gathering.sub"] = "Wo Erz und Kräuter wachsen, nach Gebiet",
   ["gather.source"] = "Die Positionen stammen aus Classic-Daten und eigenen Funden, nicht alle sind für Forever bestätigt.",
   ["gather.search"] = "Suchen",
   ["gather.searchPh"] = "Itemname",
@@ -67,7 +68,6 @@ ns.AddLocale("deDE", {
   ["gather.zoneOption"] = "%s (%d-%d)",
   ["gather.mine"] = "Nur was ich sammeln kann",
   ["gather.mineTip"] = "Blendet Items über deiner Fertigkeit aus. Ein Beruf, den du nicht hast, blendet alle seine Items aus.",
-  ["gather.reset"] = "Filter zurücksetzen",
   ["gather.resetTip"] = "Leert Suche, Beruf, Gebiet und Fraktion. Die Auswahl bleibt.",
   ["gather.itemsHeading"] = "Items",
   ["gather.zonesHeading"] = "Gebiete",
@@ -83,30 +83,21 @@ ns.AddLocale("deDE", {
   ["gather.groupCount"] = "Items: %d",
   ["gather.groupTip"] = "Klick wählt alle Items dieser Gruppe in der Liste. Ein weiterer Klick hebt die Wahl auf.",
   ["gather.groupLabel"] = "%s (%d/%d)",
-  ["gather.groupZoneTip"] = "Klick schaltet alle %s-Items dieses Gebiets an oder aus.",
+  ["gather.groupZoneTip"] = "Klick schaltet alle %s-Items dieses Gebiets ein oder aus.",
   ["gather.total"] = "Items: %d, Gebiete: %d",
   ["gather.levels"] = "Stufen %d-%d",
   ["gather.city"] = "Stadt",
   ["gather.spots"] = "Fundorte: %d",
   ["gather.map"] = "Karte",
   ["gather.mapTip"] = "Zeigt das Gebiet auf der Karte mit den eingeschalteten Items.",
-  ["gather.chipTip"] = "Fundorte: %d. Klick schaltet das Item für das Gebiet an oder aus.",
-  ["gather.chipOn"] = "An",
+  ["gather.chipTip"] = "Fundorte: %d. Klick schaltet das Item für das Gebiet ein oder aus.",
+  ["gather.chipOn"] = "Ein",
   ["gather.chipOff"] = "Aus",
   ["gather.empty"] = "Keine Items für diesen Filter.",
   ["gather.noProfession"] = "Kein Bergbau und keine Kräuterkunde bei diesem Charakter gefunden.",
   ["gather.noZones"] = "Keine Gebiete für diese Auswahl.",
 })
 
-local ITEM_ROW_H = 44
-local ITEM_ROWS = 8
-local ICON = 28
-local CONTROL_W = 200
-local FIELD_W = 220
-local CHECK_W = 260
-local RESET_W = 160
-local CONTROL_GAP = 12
-local CONTROL_H = 46
 local BUTTON_H = 24
 local MAP_W = 90
 local CHIP_ICON = 20
@@ -115,117 +106,8 @@ local CHIP_GAP_X = 10
 local CHIP_GAP_Y = 6
 local LABEL_H = 18
 local GROUP_GAP = 6
-
--- The own skill per profession of the data ({ mining = n, herbalism = n }), only the professions the
--- character has.
-local function ownSkills()
-  local skills = {}
-  local shop = ns.ProfessionShop
-  for _, p in ipairs(shop and shop.Own() or {}) do
-    for _, prof in ipairs(G.PROFESSIONS) do
-      if p.slug == prof then
-        skills[prof] = p.skill
-      end
-    end
-  end
-  return skills
-end
-
--- Item rows ----------------------------------------------------------------------------------------
-
-local function showItemTip(row)
-  local e = row.entry
-  if e then
-    ns.ShowTooltip(row, e.name, string.format(L["gather.itemTip"], e.skill))
-  elseif row.header then
-    ns.ShowTooltip(row, row.header.name, L["gather.groupTip"])
-  end
-end
-
-local function createItemRow(parent)
-  local row = CreateFrame("Button", nil, parent)
-  row:SetClipsChildren(true)
-  row:SetScript("OnEnter", showItemTip)
-  row:SetScript("OnLeave", ns.HideTooltip)
-  -- The head row of a profession group is this same row with the plate on.
-  row.headBg = W.Fill(row, "surface2", 0.6)
-  K.RowHover(row)
-  row.box = CreateFrame("Frame", nil, row)
-  row.box:SetSize(16, 16)
-  row.box:SetPoint("LEFT", 8, 0)
-  W.Fill(row.box, "surface2")
-  row.boxOn = W.Fill(row.box, "action", 1)
-  row.boxBorder = W.Border(row.box, "white", 0.4)
-  row.check = W.CheckMark(row.box, 12, "text")
-  row.check:SetPoint("CENTER")
-  row.icon = row:CreateTexture(nil, "ARTWORK")
-  row.icon:SetSize(ICON, ICON)
-  row.icon:SetPoint("LEFT", row.box, "RIGHT", 8, 0)
-  row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  row.count = W.Text(row, { role = "micro", color = "textMuted", justify = "RIGHT" })
-  row.count:SetPoint("RIGHT", -8, 0)
-  row.title = W.Text(row, { role = "ui" })
-  row.title:SetPoint("TOPLEFT", row.icon, "TOPRIGHT", 8, 0)
-  row.title:SetPoint("RIGHT", row.count, "LEFT", -8, 0)
-  row.sub = W.Text(row, { role = "micro", color = "textSecondary" })
-  row.sub:SetPoint("TOPLEFT", row.title, "BOTTOMLEFT", 0, -2)
-  row.sub:SetPoint("RIGHT", row.count, "LEFT", -8, 0)
-  row.line = row:CreateTexture(nil, "ARTWORK")
-  row.line:SetPoint("BOTTOMLEFT")
-  row.line:SetPoint("BOTTOMRIGHT")
-  row.line:SetHeight(1)
-  ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
-  end)
-  row:SetScript(
-    "OnClick",
-    ns.Wrap("gather-item", function()
-      if row.onToggle then
-        row.onToggle()
-      end
-    end)
-  )
-  ns.Focus.register(row, function(self)
-    self:Click()
-  end)
-  -- Keyboard focus shows the same tooltip as the mouse, so the head row explains itself without one.
-  row.fgOnFocus = showItemTip
-  row.fgOnBlur = ns.HideTooltip
-  return row
-end
-
-local function paintItemRow(row, entry, on, onToggle)
-  row.entry, row.header, row.onToggle = entry, nil, onToggle
-  row.headBg:Hide()
-  row.icon:Show()
-  W.SetColor(row.title, "text")
-  row.icon:SetTexture(G.IconPath(entry.id, entry))
-  row.title:SetText(entry.name)
-  row.sub:SetText(string.format(L["gather.itemSub"], R.Name(entry.prof), entry.skill))
-  row.count:SetText(string.format(L["gather.itemZones"], entry.zones))
-  row.check:SetShown(on)
-  row.boxOn:SetShown(on)
-  row.boxBorder.set(on and "actionHi" or "white", on and 1 or 0.4)
-  row.paintHover()
-end
-
--- Head row of a profession group: a box that is full when every item of the group is picked, the name of
--- the profession, how many of its items are picked and the number of items. The entry is
--- { header, prof, name, count, items }.
-local function paintHeaderRow(row, entry, picked, onToggle)
-  row.entry, row.header, row.onToggle = nil, entry, onToggle
-  row.headBg:Show()
-  row.icon:Hide()
-  W.SetColor(row.title, "accent2")
-  row.title:SetText(entry.name)
-  row.sub:SetText(string.format(L["gather.selected"], picked, entry.count))
-  row.count:SetText(string.format(L["gather.groupCount"], entry.count))
-  local all = picked == entry.count
-  row.check:SetShown(all)
-  row.boxOn:SetShown(all)
-  row.boxBorder.set(picked > 0 and "actionHi" or "white", picked > 0 and 1 or 0.4)
-  row.paintHover()
-end
+-- A zone is a card: at least this wide, up to three side by side (ns.CardFlow).
+local CARD_MIN_W = 300
 
 -- Zone rows ----------------------------------------------------------------------------------------
 
@@ -236,7 +118,7 @@ local function createChip(parent)
   chip.border = W.Border(chip, "white", 0.25)
   local hover = chip:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.08)
+  hover:SetColorTexture(Theme.fillColor("hover"))
   chip.check = W.CheckMark(chip, 10, "text")
   chip.check:SetPoint("LEFT", CHIP_PAD, 0)
   chip.icon = chip:CreateTexture(nil, "ARTWORK")
@@ -248,13 +130,17 @@ local function createChip(parent)
   chip:SetScript("OnEnter", function(self)
     local d = self.data
     if d then
-      ns.ShowTooltip(self, d.name, string.format(L["gather.chipTip"], d.count))
+      ns.ShowTooltip(self, d.name, string.format(L["gather.chipTip"], d.count), { link = "item:" .. tostring(d.id) })
     end
   end)
   chip:SetScript("OnLeave", ns.HideTooltip)
   chip:SetScript(
     "OnClick",
-    ns.Wrap("gather-chip", function(self)
+    ns.Wrap("gather-chip", function(self, button)
+      -- Shift+click links the item in the chat like everywhere else, a plain click toggles the chip.
+      if self.data and ns.ItemActions.Click(self.data.id, button) then
+        return
+      end
       if self.onToggle then
         self.onToggle()
       end
@@ -285,7 +171,7 @@ local function createGroupLabel(parent)
   local label = CreateFrame("Button", nil, parent)
   local hover = label:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.08)
+  hover:SetColorTexture(Theme.fillColor("hover"))
   label.text = W.Text(label, { role = "micro", color = "textSecondary" })
   label.text:SetPoint("LEFT", 6, 0)
   label:SetScript("OnEnter", function(self)
@@ -314,9 +200,9 @@ local function createGroupLabel(parent)
 end
 
 local function createZoneRow(parent)
-  local row = CreateFrame("Frame", nil, parent)
+  local row = W.Panel(parent)
   row.title = W.Text(row, { role = "ui", color = "accent2", wrap = true })
-  row.meta = W.Text(row, { role = "micro", color = "textMuted", wrap = true })
+  row.meta = W.Meta(row, { wrap = true })
   row.map = W.Button(row, {
     key = "gather.map",
     width = MAP_W,
@@ -333,26 +219,19 @@ local function createZoneRow(parent)
   -- Chips come in the order of the groups: spans[g] = { first, last } are the chips of group g, labels[g]
   -- is its caption.
   row.chips, row.shown, row.labels, row.spans = {}, 0, {}, {}
-  row.line = row:CreateTexture(nil, "ARTWORK")
-  row.line:SetPoint("BOTTOMLEFT")
-  row.line:SetPoint("BOTTOMRIGHT")
-  row.line:SetHeight(1)
-  ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
-  end)
   function row:fgLayout(width)
-    local inner = math.max(40, width - 16)
+    local inner = math.max(40, width - 2 * Theme.space.md)
     self.map:ClearAllPoints()
-    self.map:SetPoint("TOPRIGHT", -8, -8)
+    self.map:SetPoint("TOPRIGHT", -Theme.space.md, -Theme.space.md)
     local textW = math.max(40, inner - MAP_W - 8)
     self.title:ClearAllPoints()
-    self.title:SetPoint("TOPLEFT", 8, -10)
+    self.title:SetPoint("TOPLEFT", Theme.space.md, -Theme.space.md - 2)
     self.title:SetWidth(textW)
-    local y = 10 + math.max(self.title:GetStringHeight(), 14) + 2
+    local y = Theme.space.md + 2 + math.max(self.title:GetStringHeight(), 14) + 2
     self.meta:ClearAllPoints()
-    self.meta:SetPoint("TOPLEFT", 8, -y)
+    self.meta:SetPoint("TOPLEFT", Theme.space.md, -y)
     self.meta:SetWidth(textW)
-    y = math.max(y + self.meta:GetStringHeight() + 6, 8 + BUTTON_H + 6)
+    y = math.max(y + self.meta:GetStringHeight() + 6, Theme.space.md + BUTTON_H + 6)
     local chipH = K.scaledHeight(CHIP_ICON + 6)
     local labelH = K.scaledHeight(LABEL_H)
     -- cy is the top of the next line below y: a caption line, then the wrapped chips of its group.
@@ -366,7 +245,7 @@ local function createZoneRow(parent)
         label.text:SetWidth(math.max(20, inner - 12))
       end
       label:ClearAllPoints()
-      label:SetPoint("TOPLEFT", self, "TOPLEFT", 8, -(y + cy))
+      label:SetPoint("TOPLEFT", self, "TOPLEFT", Theme.space.md, -(y + cy))
       label:SetSize(lw, labelH)
       cy = cy + labelH + 2
       local x = 0
@@ -384,14 +263,14 @@ local function createZoneRow(parent)
           x, cy = 0, cy + chipH + CHIP_GAP_Y
         end
         chip:ClearAllPoints()
-        chip:SetPoint("TOPLEFT", self, "TOPLEFT", 8 + x, -(y + cy))
+        chip:SetPoint("TOPLEFT", self, "TOPLEFT", Theme.space.md + x, -(y + cy))
         chip:SetSize(w, chipH)
         x = x + w + CHIP_GAP_X
       end
       cy = cy + chipH + GROUP_GAP
     end
-    local chipsH = #self.spans > 0 and (cy - GROUP_GAP + 8) or 0
-    return y + chipsH + 1
+    local chipsH = #self.spans > 0 and (cy - GROUP_GAP + Theme.space.md) or 0
+    return y + chipsH + (#self.spans > 0 and 0 or Theme.space.xs)
   end
   return row
 end
@@ -451,18 +330,17 @@ local function build(container)
   local view = ns.NewPageView(container)
   local s = view.stack
   local state = { prof = "all", query = "", mine = false, zone = "all", faction = "all" }
-  -- Items the player picked in the list, kept while the page lives.
+  ns.PageState.Bind(view, state, { "prof", "query", "mine", "zone", "faction" })
+  -- Items the player picked in the filter window, kept while the page lives.
   local selected = {}
   -- What the last refresh showed: the items of the list, the zones of the list below.
   local items, zones, itemOrder = {}, {}, {}
-  -- The rows of the item list (a head row per profession, then its items) and the row of each item.
-  local rows, rowOf = {}, {}
   local data
   local refresh, setSelected, afterSelection
 
-  ns.AddParagraph(view, "gather.intro")
-  local source = ns.AddParagraph(view, "gather.source", { role = "micro", color = "textMuted", gap = 4 })
-  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = 12 })
+  ns.AddIntro(view, "gather.intro")
+  local source = ns.AddParagraph(view, "gather.source", { role = "micro", color = "textMuted", gap = Theme.space.xs })
+  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = Theme.space.md })
   -- Instead of the hint while the data add-on is off or missing: the button that switches it on.
   local banner = ns.PackageUI.Banner(view.content, Data.ADDON, {
     onLoaded = function()
@@ -472,7 +350,7 @@ local function build(container)
       view:Layout()
     end,
   })
-  s:Add(banner, { gap = 12 })
+  s:Add(banner, { gap = Theme.space.md })
 
   -- Controls, wrapped to the width: search, profession, zone, own skill, reset.
   local professionOptions = { { value = "all", key = "gather.professionAll" } }
@@ -480,23 +358,35 @@ local function build(container)
     professionOptions[#professionOptions + 1] = { value = prof, text = R.Name(prof) }
   end
   local zoneOptions = { { value = "all", key = "gather.zoneAll" } }
-  local controls = CreateFrame("Frame", nil, view.content)
-  local searchBox = CreateFrame("Frame", nil, controls)
-  searchBox:SetSize(FIELD_W, CONTROL_H)
-  W.Text(searchBox, { key = "gather.search", role = "ui" }):SetPoint("TOPLEFT")
-  local search = W.EditBox(searchBox, {
+  local search
+  local function clearFilters()
+    state.prof, state.zone, state.faction, state.mine = "all", "all", "all", false
+    state.query = ""
+    search.edit:SetText("")
+    refresh(false)
+  end
+  local filters = K.FilterBar(view.content, {
+    count = function()
+      return (state.prof ~= "all" and 1 or 0)
+        + (state.zone ~= "all" and 1 or 0)
+        + (state.faction ~= "all" and 1 or 0)
+        + (state.mine and 1 or 0)
+        + (state.query ~= "" and 1 or 0)
+    end,
+    reset = clearFilters,
+    resetTip = "gather.resetTip",
+  })
+  search = filters:AddSearch({
+    key = "gather.search",
+    text = state.query,
     placeholder = "gather.searchPh",
-    clear = true,
     onChange = function(text)
       state.query = text
       refresh(false)
     end,
   })
-  search:SetPoint("TOPLEFT", 0, -18)
-  search:SetWidth(FIELD_W)
-  local professionDd = W.Dropdown(controls, {
+  local professionDd = filters:AddDropdown({
     key = "gather.profession",
-    width = CONTROL_W,
     options = professionOptions,
     tooltip = "gather.profession",
     tooltipText = "gather.professionTip",
@@ -508,10 +398,9 @@ local function build(container)
       refresh(false)
     end,
   })
-  professionDd:SetWidth(CONTROL_W)
-  local zoneDd = W.Dropdown(controls, {
+  local zoneDd = filters:AddDropdown({
     key = "gather.zone",
-    width = FIELD_W,
+    width = 220,
     options = zoneOptions,
     tooltip = "gather.zone",
     tooltipText = "gather.zoneTip",
@@ -523,8 +412,17 @@ local function build(container)
       refresh(false)
     end,
   })
-  zoneDd:SetWidth(FIELD_W)
-  local mine = W.Checkbox(controls, {
+  local factionButtons = filters:AddGroup(K.FactionButtons(filters, {
+    withAll = true,
+    get = function()
+      return state.faction
+    end,
+    set = function(v)
+      state.faction = v
+      refresh(false)
+    end,
+  }))
+  local mine = filters:AddToggle({
     key = "gather.mine",
     tooltip = "gather.mine",
     tooltipText = "gather.mineTip",
@@ -536,151 +434,96 @@ local function build(container)
       refresh(false)
     end,
   })
-  mine:SetWidth(CHECK_W)
-  local reset = W.Button(controls, {
-    key = "gather.reset",
-    width = RESET_W,
-    height = BUTTON_H,
-    tooltip = "gather.reset",
-    tooltipText = "gather.resetTip",
-    onClick = function()
-      state.prof, state.zone, state.faction, state.mine = "all", "all", "all", false
-      state.query = ""
-      search.edit:SetText("")
-      refresh(false)
-    end,
-  })
-  -- The checkbox and the button sit level with the fields, not with their captions.
-  local controlItems = {
-    { frame = searchBox },
-    { frame = professionDd },
-    { frame = zoneDd },
-    { frame = mine, dy = CONTROL_H - 22 },
-    { frame = reset, dy = CONTROL_H - BUTTON_H },
-  }
-  function controls:fgGridLayout(width)
-    local x, y = 0, 0
-    for _, item in ipairs(controlItems) do
-      local w = item.frame:GetWidth()
-      if x > 0 and x + w > width then
-        x, y = 0, y + CONTROL_H + 8
-      end
-      item.frame:ClearAllPoints()
-      item.frame:SetPoint("TOPLEFT", self, "TOPLEFT", x, -(y + (item.dy or 0)))
-      x = x + w + CONTROL_GAP
-    end
-    local h = y + CONTROL_H
-    self:SetHeight(h)
-    return h
-  end
-  s:Add(controls, { gap = 10 })
-  K.Anchor("FG.Gathering.Controls", controls)
-
-  local factionButtons = K.FactionButtons(view.content, {
-    withAll = true,
-    get = function()
-      return state.faction
-    end,
-    set = function(v)
-      state.faction = v
-      refresh(false)
-    end,
-  })
-  s:Add(factionButtons, { gap = 10 })
+  s:Add(filters, { gap = Theme.space.md })
+  K.Anchor("FG.Gathering.Controls", filters)
 
   local itemsHead = ns.AddHeading(view, "gather.itemsHeading")
   local bar = CreateFrame("Frame", nil, view.content)
-  local selectAll = W.Button(bar, {
-    key = "gather.all",
-    width = 120,
-    height = BUTTON_H,
-    tooltip = "gather.all",
-    tooltipText = "gather.allTip",
-    onClick = function()
-      for _, e in ipairs(items) do
-        setSelected(e.id, true)
+  -- One button per profession: it shows how many of its items are picked and opens the filter window.
+  local pickers = {}
+  local function itemsOf(prof)
+    local out = {}
+    for _, e in ipairs(items) do
+      if e.prof == prof then
+        out[#out + 1] = {
+          id = e.id,
+          prof = prof,
+          name = e.name,
+          icon = G.IconPath(e.id, e),
+          skill = e.skill,
+          sub = string.format(L["gather.filter.skill"], e.skill),
+          tip = string.format(L["gather.itemZones"], e.zones),
+        }
       end
-      afterSelection()
-    end,
-  })
-  local selectNone = W.Button(bar, {
-    key = "gather.none",
-    width = 120,
-    height = BUTTON_H,
-    tooltip = "gather.none",
-    tooltipText = "gather.noneTip",
-    onClick = function()
-      for _, e in ipairs(items) do
-        setSelected(e.id, false)
-      end
-      afterSelection()
-    end,
-  })
-  local selectedText = W.Text(bar, { role = "micro", color = "textMuted", wrap = true })
+    end
+    return out
+  end
+  local function isPicked(id)
+    return selected[id] == true
+  end
+  for _, prof in ipairs(G.PROFESSIONS) do
+    local key = "gather.win.t." .. prof
+    local b = W.Button(bar, {
+      text = "",
+      width = 120,
+      height = BUTTON_H,
+      tooltip = key,
+      tooltipText = "gather.win.openTip",
+      opens = true,
+      onClick = function()
+        ns.GatherPick.Open({
+          title = key,
+          hint = "gather.spots.hint." .. prof,
+          entries = function()
+            return itemsOf(prof)
+          end,
+          isOn = isPicked,
+          setMany = function(ids, on)
+            for _, id in ipairs(ids) do
+              setSelected(id, on)
+            end
+            afterSelection()
+          end,
+          canGather = ns.GatherPick.SkillGate(),
+        })
+      end,
+    })
+    b.fgProf = prof
+    pickers[prof] = b
+  end
+  local selectedText = W.Meta(bar, { wrap = true })
   function bar:fgGridLayout(width)
-    selectAll:ClearAllPoints()
-    selectAll:SetPoint("TOPLEFT", 0, 0)
-    selectNone:ClearAllPoints()
-    selectNone:SetPoint("LEFT", selectAll, "RIGHT", 8, 0)
-    local textX = 2 * 120 + 16
-    local textW = width - textX
-    if textW < 120 then
-      selectedText:ClearAllPoints()
-      selectedText:SetPoint("TOPLEFT", 0, -(BUTTON_H + 6))
-      selectedText:SetWidth(math.max(40, width))
-      local h = BUTTON_H + 6 + selectedText:GetStringHeight()
-      self:SetHeight(h)
-      return h
+    local x, y = 0, 0
+    for _, prof in ipairs(G.PROFESSIONS) do
+      local b = pickers[prof]
+      if b:IsShown() then
+        local w = math.min(b:GetWidth(), width)
+        b:SetWidth(w)
+        if x > 0 and x + w > width then
+          x, y = 0, y + BUTTON_H + 6
+        end
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", x, -y)
+        x = x + w + 8
+      end
     end
     selectedText:ClearAllPoints()
-    selectedText:SetPoint("TOPLEFT", textX, -5)
-    selectedText:SetWidth(textW)
-    local h = math.max(BUTTON_H, 5 + selectedText:GetStringHeight())
+    selectedText:SetPoint("TOPLEFT", 0, -(y + BUTTON_H + 6))
+    selectedText:SetWidth(math.max(40, width))
+    local h = y + BUTTON_H + 6 + selectedText:GetStringHeight()
     self:SetHeight(h)
     return h
   end
-  s:Add(bar, { gap = 8 })
-
-  local list = W.ScrollList(view.content, {
-    rowHeight = K.scaledHeight(ITEM_ROW_H),
-    createRow = createItemRow,
-    bindRow = function(row, entry)
-      if entry.header then
-        local function picked()
-          local n = 0
-          for _, e in ipairs(entry.items) do
-            n = n + (selected[e.id] and 1 or 0)
-          end
-          return n
-        end
-        paintHeaderRow(row, entry, picked(), function()
-          local on = picked() < entry.count
-          for _, e in ipairs(entry.items) do
-            setSelected(e.id, on)
-          end
-          afterSelection()
-        end)
-        return
-      end
-      paintItemRow(row, entry, selected[entry.id] == true, function()
-        setSelected(entry.id, selected[entry.id] ~= true)
-        afterSelection()
-      end)
-    end,
-  })
-  function list:fgGridLayout()
-    local h = K.scaledHeight(ITEM_ROW_H) * ITEM_ROWS
-    self:SetHeight(h)
-    return h
-  end
-  s:Add(list, { gap = 14 })
-  K.Anchor("FG.Gathering.Items", list)
-  local empty = ns.AddParagraph(view, nil, { role = "ui", gap = 14 })
+  s:Add(bar, { gap = Theme.space.lg })
+  local empty = view.stack:Add(
+    W.EmptyState(view.content, { text = "gather.empty", icon = "search", compact = true }),
+    { gap = Theme.space.lg }
+  )
 
   local zonesHead = ns.AddHeading(view, "gather.zonesHeading")
-  local total = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = 6 })
-  local zoneList = K.RowPool(view.content, createZoneRow)
-  s:Add(zoneList, { gap = 8 })
+  local total = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = Theme.space.sm })
+  local zoneList = K.RowPool(view.content, createZoneRow, { cards = { minWidth = CARD_MIN_W, gap = Theme.space.md } })
+  s:Add(zoneList, { gap = Theme.space.sm })
   K.Anchor("FG.Gathering.Zones", zoneList)
   local noZones = ns.AddParagraph(view, "gather.noZones", { role = "ui" })
 
@@ -783,17 +626,14 @@ local function build(container)
       selectedText:SetText(L["gather.noneSelected"])
     end
     total:SetText(string.format(L["gather.total"], #ids, #zones))
-  end
-
-  -- Head rows and items of the list in the order of the professions.
-  local function buildRows()
-    rows, rowOf = {}, {}
-    for _, g in ipairs(G.GroupByProfession(items)) do
-      rows[#rows + 1] = { header = true, prof = g.prof, name = R.Name(g.prof), count = g.count, items = g.items }
-      for _, e in ipairs(g.items) do
-        rows[#rows + 1] = e
-        rowOf[e.id] = #rows
-      end
+    W.SetCount(itemsHead, #items)
+    W.SetCount(zonesHead, #zones)
+    for _, prof in ipairs(G.PROFESSIONS) do
+      local b = pickers[prof]
+      local entries = itemsOf(prof)
+      b:SetShown(#entries > 0)
+      W.SetText(b.label, nil, R.Name(prof) .. ": " .. ns.GatherPick.ButtonText(entries, isPicked))
+      b:SetWidth(b:Fit())
     end
   end
 
@@ -809,7 +649,6 @@ local function build(container)
       end
       zones = only
     end
-    list:SetData(rows)
     paintCounts()
     paintZones()
     noZones:SetShown(data ~= nil and #items > 0 and #zones == 0)
@@ -856,14 +695,12 @@ local function build(container)
     if not data then
       hint:SetText(Data.Hint(status))
       items, zones, itemOrder = {}, {}, {}
-      buildRows()
-      list:SetData(rows)
       zoneList:Sync(zones, function() end)
     else
       fillZoneOptions()
       local skills, own = nil, nil
       if state.mine then
-        skills = ownSkills()
+        skills = ns.GatherPick.OwnSkills()
         own = next(skills) ~= nil
       end
       items = G.Items(data, {
@@ -877,16 +714,20 @@ local function build(container)
       for i, e in ipairs(items) do
         itemOrder[e.id] = i
       end
-      buildRows()
-      empty:SetText(L[state.mine and own == false and "gather.noProfession" or "gather.empty"])
+      local noSkill = state.mine and own == false
+      empty:SetTexts(noSkill and "gather.noProfession" or "gather.empty")
+      empty:SetAction(not noSkill and W.EMPTY_RESET or nil, function()
+        filters:Reset()
+      end)
       empty:SetShown(#items == 0)
     end
     professionDd.Refresh()
     zoneDd.Refresh()
     mine.Refresh()
     factionButtons.Refresh()
+    filters:Refresh()
     local shown = data ~= nil
-    for _, f in ipairs({ source, controls, factionButtons, itemsHead, bar, list, zonesHead, total }) do
+    for _, f in ipairs({ source, filters, itemsHead, bar, zonesHead, total }) do
       f:SetShown(shown)
     end
     if not shown then
@@ -896,8 +737,13 @@ local function build(container)
       view:Layout()
       return
     end
-    list:SetShown(#items > 0)
     afterSelection()
+  end
+
+  -- Page link: the picked item when it is exactly one.
+  function view:ShareState()
+    local id = next(selected)
+    return id and not next(selected, id) and { id } or {}
   end
 
   -- params[1] = item id or name (deep link, /fg erze <item>): the filters are cleared and only this item
@@ -912,11 +758,6 @@ local function build(container)
       selected[id] = true
     end
     refresh(true)
-    if id then
-      if rowOf[id] then
-        list:Reveal(rowOf[id])
-      end
-    end
   end
   ns.On("FG_UI_REFRESHED", function()
     if container:IsVisible() then
@@ -931,6 +772,7 @@ ns.RegisterPage({
   order = 440,
   group = "professions",
   title = "page.gathering",
+  subtitle = "page.gathering.sub",
   icon = ns.ICONS.gathering,
   aliases = { "sammelpunkte", "erze", "kraeuter", "kräuter", "gathering", "nodes", "farmen", "farm", "ore", "herbs" },
   crumbLabel = function(param)

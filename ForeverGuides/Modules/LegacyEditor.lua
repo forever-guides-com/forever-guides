@@ -45,7 +45,7 @@ ns.AddLocale("enUS", {
   ["legacy.ed.read"] = "Read from game",
   ["legacy.ed.readTip"] = "Takes the current Legacy ranks of your character as the plan.",
   ["legacy.ed.import"] = "Import",
-  ["legacy.ed.importTip"] = "Paste a Legacy link or code from forever-guides.com and check it first.",
+  ["legacy.ed.importTip"] = "Opens a dialog to paste a Legacy link or code from forever-guides.com and check it first.",
   ["legacy.ed.export"] = "Export",
   ["legacy.ed.exportTip"] = "Shows the link and the code of this plan so you can copy them.",
   ["legacy.ed.save"] = "Save plan",
@@ -79,7 +79,7 @@ ns.AddLocale("enUS", {
   ["legacy.ed.cmp.totalUnknown"] = "To buy: %d points.",
   ["legacy.ed.cmp.short"] = "%d points are missing for the whole plan.",
   ["legacy.ed.cmp.over"] = "%s is higher in the game (%d) than in the plan (%d). Points cannot be taken back.",
-  ["legacy.ed.cmp.shape"] = "The game reports perks that differ from the add-on data. Compare with the Legacy window before you rely on the plan.",
+  ["legacy.ed.cmp.shape"] = "The game reports perks that differ from the addon data. Compare with the Legacy window before you rely on the plan.",
   ["legacy.ed.next"] = "Next purchase",
   ["legacy.ed.next.buy"] = "%s, rank %d to %d",
   ["legacy.ed.next.done"] = "Nothing left to buy for this plan.",
@@ -122,7 +122,7 @@ ns.AddLocale("deDE", {
   ["legacy.ed.read"] = "Aus Spiel lesen",
   ["legacy.ed.readTip"] = "Übernimmt die aktuellen Vermächtnis-Ränge deines Charakters als Plan.",
   ["legacy.ed.import"] = "Importieren",
-  ["legacy.ed.importTip"] = "Einen Vermächtnis-Link oder -Code von forever-guides.com einfügen und vorher prüfen.",
+  ["legacy.ed.importTip"] = "Öffnet einen Dialog, in dem du einen Vermächtnis-Link oder -Code von forever-guides.com einfügst und vorher prüfst.",
   ["legacy.ed.export"] = "Exportieren",
   ["legacy.ed.exportTip"] = "Zeigt Link und Code dieses Plans, damit du sie kopieren kannst.",
   ["legacy.ed.save"] = "Plan speichern",
@@ -255,7 +255,7 @@ function LE.Build(view)
   local paint, refreshPlans, planDropdown
 
   ns.AddHeading(view, "legacy.ed.title")
-  ns.AddParagraph(view, "legacy.ed.intro", { color = "text" })
+  ns.AddIntro(view, "legacy.ed.intro")
 
   -- Plan changes ---------------------------------------------------------------------------------------
   local function total()
@@ -561,7 +561,7 @@ function LE.Build(view)
     t.now:SetPoint("LEFT", t.rank, "RIGHT", 5, 0)
     local hl = t:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.08)
+    hl:SetColorTexture(Theme.fillColor("hover"))
     -- Left click adds a rank to the plan, right click removes one (same gesture as the talent editor).
     t:SetScript(
       "OnClick",

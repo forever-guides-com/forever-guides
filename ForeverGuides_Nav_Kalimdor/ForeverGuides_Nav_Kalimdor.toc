@@ -1,0 +1,100 @@
+## Interface: 16001
+## Title: Forever Guides: Walk data Kalimdor
+## Title-deDE: Forever Guides: Laufdaten Kalimdor
+## Notes: Walking routes on Kalimdor. Loads by itself when a route needs it.
+## Notes-deDE: Laufwege auf Kalimdor. Wird von selbst geladen, sobald eine Route es braucht.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 1.0.0
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+Head.lua
+Data1.lua
+Data2.lua
+Data3.lua
+Data4.lua
+Data5.lua
+Data6.lua
+Data7.lua
+Data8.lua
+Data9.lua
+Data10.lua
+Data11.lua
+Data12.lua
+Data13.lua
+Data14.lua
+Data15.lua
+Data16.lua
+Data17.lua
+Data18.lua
+Data19.lua
+Data20.lua
+Data21.lua
+Data22.lua
+Data23.lua
+Data24.lua
+Data25.lua
+Data26.lua
+Data27.lua
+Data28.lua
+Data29.lua
+Data30.lua
+Data31.lua
+Data32.lua
+Data33.lua
+Data34.lua
+Data35.lua
+Data36.lua
+Data37.lua
+Data38.lua
+Data39.lua
+Data40.lua
+Data41.lua
+Data42.lua
+Data43.lua
+Data44.lua
+Data45.lua
+Data46.lua
+Data47.lua
+Data48.lua
+Data49.lua
+Data50.lua
+Data51.lua
+Data52.lua
+Data53.lua
+Data54.lua
+Data55.lua
+Data56.lua
+Data57.lua
+Data58.lua
+Data59.lua
+Data60.lua
+Data61.lua
+Data62.lua
+Data63.lua
+Data64.lua
+Data65.lua
+Data66.lua
+Data67.lua
+Data68.lua
+Data69.lua
+Data70.lua
+Data71.lua
+Data72.lua
+Data73.lua
+Data74.lua
+Data75.lua
+Data76.lua
+Data77.lua
+Data78.lua
+Data79.lua
+Data80.lua
+Data81.lua
+Data82.lua
+Data83.lua

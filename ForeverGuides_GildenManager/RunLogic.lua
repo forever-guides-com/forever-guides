@@ -12,6 +12,7 @@
 --   request()           asks the game for a fresh roster
 --   rule(step, snap)    true, or false and a reason: does the rule still apply to fresh data
 --   exec(step)          the action through the backend: "sent", "dry", "copy", "armed" or false and a reason
+--   execBatch(steps)    only with a batch: arms one button for the first n of the steps ("armed", button, n)
 --   offer(step)         nil when the client can do the step, else the reason code why it never can (skipped)
 --   again(step)         shows the command of the step in the copy window once more
 --   values(step)        old and new text of the step for the protocol
@@ -21,7 +22,7 @@ local _, gm = ...
 if not gm.ext then
   return
 end
-local AL = gm.ActionsLogic
+local AL, PN = gm.ActionsLogic, gm.FG.PlayerName
 
 local RL = {}
 gm.RunLogic = RL
@@ -101,6 +102,8 @@ function RL.Step(entry)
     index = entry.index,
     fromRank = from,
     toRank = to,
+    -- One command per rank step: a jump over several ranks is that many promote or demote lines.
+    lines = action == "setRank" and math.abs(from - to) or 1,
     value = type(value) == "string" and value or nil,
     rule = entry.ruleName or entry.rule,
     undoOf = entry.undoOf,
@@ -122,6 +125,54 @@ function RL.Landed(step, member)
   return step.toRank ~= nil and member.rank == step.toRank
 end
 
+-- System messages with which the game refuses a command, per reason code (locale "gm.why.<code>"): the
+-- game's own format string first (formats[code], from the GlobalStrings), then built-in texts. A format
+-- with a value names the member, one without (no permission) does not.
+local REFUSALS = {
+  { code = "permission", fallback = { "Ihr habt keine Befugnis, das zu tun.", "You do not have permission to do that." } },
+  { code = "rankTooHigh", fallback = {} },
+  { code = "rankTooLow", fallback = {} },
+  { code = "notInGuild", fallback = {} },
+}
+RL.REFUSAL_CODES = {}
+for i, r in ipairs(REFUSALS) do
+  RL.REFUSAL_CODES[i] = r.code
+end
+
+-- One system message as { code, name } when it is a refusal of a guild command (name nil when the message
+-- has none), else nil. formats = { [code] = game format string }.
+function RL.ParseRefusal(msg, formats)
+  if type(msg) ~= "string" or msg == "" or #msg > 500 then
+    return nil
+  end
+  local HL = gm.HistoryLogic
+  msg = HL.StripChat(msg)
+  formats = type(formats) == "table" and formats or {}
+  for _, r in ipairs(REFUSALS) do
+    local list = {}
+    if type(formats[r.code]) == "string" then
+      list[1] = formats[r.code]
+    end
+    for _, f in ipairs(r.fallback) do
+      list[#list + 1] = f
+    end
+    for _, fmt in ipairs(list) do
+      if type(fmt) == "string" and fmt ~= "" then
+        local pattern = HL.PatternFromFormat(fmt)
+        if pattern then
+          local who = msg:match(pattern)
+          if who then
+            return { code = r.code, name = PN.Normalize(who) }
+          end
+        elseif msg == fmt then
+          return { code = r.code }
+        end
+      end
+    end
+  end
+  return nil
+end
+
 local INVERSE = { promote = "demote", demote = "promote", setRank = "setRank" }
 
 -- The step that takes a logged rank change back. e: log entry { t, action, from, to, result, undone },
@@ -134,7 +185,7 @@ function RL.Undo(e, member, now, days)
   if e.undone == true then
     return nil, "alreadyDone"
   end
-  if e.result == "dry" or e.result == "copy" or e.result == "failed" or e.result == "mismatch" then
+  if e.result == "dry" or e.result == "copy" or e.result == "failed" or e.result == "mismatch" or e.result == "refused" then
     return nil, "unchanged"
   end
   local from, to = rank(e.from), rank(e.to)
@@ -193,6 +244,7 @@ function RL.Settings(get)
     maxTotal = get("maxTotal"),
     undoDays = get("undoDays"),
     notify = get("notifyDone") == true,
+    batch = get("macroMode") == "batch" and get("batchSize") or nil,
   }
 end
 
@@ -207,6 +259,8 @@ end
 
 -- entries: plan entries (PlanLogic) or steps; only "ready" ones run, the guild master never, one step
 -- per member. opts: { settings = RL.Settings(..), backend = "direct" | "macro" | "copy", env, copyWait }.
+-- A batch (settings.batch >= 2, backend "macro", env.execBatch) arms one button for up to that many steps:
+-- one click runs all their commands, the roster or the system message confirms each one.
 -- copyWait (backend "copy"): a shown command is not a sent step. The step waits until the roster shows its
 -- change (verified) or the player skips it (open); the next command only comes with the next click.
 function RL.New(entries, opts)
@@ -222,10 +276,23 @@ function RL.New(entries, opts)
     -- A series needs the setting and the direct way: macro and copy take one click per member.
     series = s.series == true and opts.backend == "direct",
     copyWait = opts.copyWait == true and opts.backend == "copy",
+    batch = opts.backend == "macro" and type(s.batch) == "number" and s.batch >= 2 and env.execBatch and s.batch
+      or nil,
+    pendings = {},
     steps = {},
     skipped = {},
     log = {},
-    counts = { sent = 0, dry = 0, copy = 0, skipped = 0, failed = 0, verified = 0, unverified = 0, open = 0 },
+    counts = {
+      sent = 0,
+      dry = 0,
+      copy = 0,
+      skipped = 0,
+      failed = 0,
+      verified = 0,
+      unverified = 0,
+      open = 0,
+      refused = 0,
+    },
     i = 1,
     executed = 0,
   }, Run)
@@ -247,6 +314,7 @@ function RL.New(entries, opts)
       end
     end
   end
+  run:Precheck()
   return run
 end
 
@@ -324,6 +392,7 @@ function Run:Summary()
     verified = c.verified,
     unverified = c.unverified,
     open = c.open,
+    refused = c.refused,
   }
 end
 
@@ -389,51 +458,63 @@ local function settleCopy(self, snap)
   return "wait"
 end
 
+-- Every step that went out waits for the roster (or the system message) to confirm it.
 local function settle(self, snap, now)
   if self.awaitingChange then
     return settleCopy(self, snap)
   end
-  local p = self.pending
-  if not p then
+  local list = self.pendings
+  if #list == 0 then
     return nil
   end
-  if snap and not snap.combat and type(snap.takenAt) == "number" and snap.takenAt > p.sentAt then
-    local landed = RL.Landed(p.step, snap.members and snap.members[p.step.key])
-    self.pending = nil
-    if landed then
-      self.counts.verified = self.counts.verified + 1
-      setResult(self, p.log, "verified")
-      return "ok"
+  local fresh = snap and not snap.combat and type(snap.takenAt) == "number"
+  local keep = {}
+  for _, p in ipairs(list) do
+    if fresh and snap.takenAt > p.sentAt then
+      if RL.Landed(p.step, snap.members and snap.members[p.step.key]) then
+        self.counts.verified = self.counts.verified + 1
+        setResult(self, p.log, "verified")
+      else
+        setResult(self, p.log, "mismatch")
+        self.pendings = {}
+        finish(self, "aborted", "rankMismatch")
+        return "abort"
+      end
+    elseif now - p.sentAt > RL.WAIT_LIMIT then
+      self.counts.unverified = self.counts.unverified + 1
+      setResult(self, p.log, "unverified")
+      if self.series and self.i <= #self.steps then
+        self.pendings = {}
+        finish(self, "aborted", "unverified")
+        return "abort"
+      end
+    else
+      keep[#keep + 1] = p
     end
-    setResult(self, p.log, "mismatch")
-    finish(self, "aborted", "rankMismatch")
-    return "abort"
   end
-  if now - p.sentAt > RL.WAIT_LIMIT then
-    self.pending = nil
-    self.counts.unverified = self.counts.unverified + 1
-    setResult(self, p.log, "unverified")
-    if self.series and self.i <= #self.steps then
-      finish(self, "aborted", "unverified")
-      return "abort"
-    end
-    return "ok"
+  self.pendings = keep
+  return #keep > 0 and "wait" or "ok"
+end
+
+-- Steps the pre-check already skipped need no turn of their own.
+local function skipBlocked(self)
+  while self.steps[self.i] and self.steps[self.i].blocked do
+    self.i = self.i + 1
   end
-  return "wait"
 end
 
 local function done(self)
-  if self.i > #self.steps and not self.pending and not self.awaitingClick and not self.awaitingChange then
+  skipBlocked(self)
+  if self.i > #self.steps and #self.pendings == 0 and not self.awaitingClick and not self.awaitingChange then
     finish(self, "done")
   end
 end
 
--- Why an entry may not run now, checked on fresh data: nil when it may. A second value "abort" marks a
--- reason that ends the whole run (the right is gone).
-local function recheck(self, step, snap)
-  if step.action == "remove" and step.confirmed ~= true then
-    return "nameMismatch", "abort"
-  end
+-- Why the player or the client does not allow the step now, checked on the roster of `snap`: nil when it
+-- may. Rights, the rank of the target and the new rank (never up to the own rank or higher, never on an
+-- equal or higher rank) and "already there". A second value "abort" marks a reason that ends the whole
+-- run (the right is gone).
+local function eligible(self, step, snap)
   local never = self.env.offer and self.env.offer(step)
   if never then
     return never
@@ -472,12 +553,56 @@ local function recheck(self, step, snap)
   if not v.ok then
     return v.reason, v.reason == "noRight" and "abort" or nil
   end
+end
+
+-- Why an entry may not run now, checked on fresh data: nil when it may. A second value "abort" marks a
+-- reason that ends the whole run.
+local function recheck(self, step, snap)
+  if step.action == "remove" and step.confirmed ~= true then
+    return "nameMismatch", "abort"
+  end
+  local why, severity = eligible(self, step, snap)
+  if why then
+    return why, severity
+  end
   if self.env.rule then
-    local yes, why = self.env.rule(step, snap)
+    local yes, reason = self.env.rule(step, snap)
     if not yes then
-      return why or "ruleChanged"
+      return reason or "ruleChanged"
     end
   end
+end
+
+-- Before anything is queued: a step the rights or the ranks do not allow is shown as skipped with its
+-- reason at once and never sent. Only with a roster that knows the own row (an empty list says nothing).
+function Run:Precheck()
+  local snap = self.env.snapshot and self.env.snapshot()
+  if not (snap and snap.me and type(snap.members) == "table" and next(snap.members)) then
+    return
+  end
+  for _, step in ipairs(self.steps) do
+    local why, severity = eligible(self, step, snap)
+    -- A missing guild right is no matter of one member: it ends the run at the first step, as before.
+    if why and severity ~= "abort" then
+      step.blocked = true
+      self.counts.skipped = self.counts.skipped + 1
+      entryOf(self, step, "skipped", why)
+    end
+  end
+end
+
+-- The steps one batch click may carry: the current one and the next ones that pass the same checks on
+-- the same fresh data. The first step that must wait for its own turn (skipped, changed) ends the group.
+local function collect(self, snap)
+  local group = {}
+  for j = self.i, math.min(#self.steps, self.i + self.batch - 1) do
+    local step = self.steps[j]
+    if j > self.i and recheck(self, step, snap) then
+      break
+    end
+    group[#group + 1] = step
+  end
+  return group
 end
 
 -- Runs the next step when it may run now. Answers true and the result of the step ("sent", "dry",
@@ -510,6 +635,7 @@ function Run:Step()
     wait(self, "verify")
     return false, "verify"
   end
+  skipBlocked(self)
   while self.i <= #self.steps do
     local step = self.steps[self.i]
     local stale = not snap or type(snap.takenAt) ~= "number" or now - snap.takenAt > RL.MAX_AGE
@@ -535,8 +661,15 @@ function Run:Step()
         finish(self, "aborted", why)
         return false, why
       end
+      skipBlocked(self)
     else
-      local status, info = env.exec(step)
+      local group = self.batch and collect(self, snap)
+      local status, info, count
+      if group and #group > 1 then
+        status, info, count = env.execBatch(group)
+      else
+        status, info = env.exec(step)
+      end
       if status == false then
         if info == "combat" then
           wait(self, "combat")
@@ -552,7 +685,11 @@ function Run:Step()
       if status == "armed" then
         -- One click on the secure button runs the command; Clicked() goes on from there.
         self.awaitingClick, self.pendingStep, self.pendingButton = true, step, info
-        return true, "armed", info
+        self.pendingGroup = { step }
+        for k = 2, math.min(type(count) == "number" and count or 1, group and #group or 1) do
+          self.pendingGroup[k] = group[k]
+        end
+        return true, "armed", info, #self.pendingGroup
       end
       if status == "copy" and self.copyWait then
         self.counts.copy = self.counts.copy + 1
@@ -567,7 +704,7 @@ function Run:Step()
         entryOf(self, step, status)
       else
         self.counts.sent = self.counts.sent + 1
-        self.pending = { step = step, log = entryOf(self, step, "sent"), sentAt = now }
+        self.pendings[#self.pendings + 1] = { step = step, log = entryOf(self, step, "sent"), sentAt = now }
       end
       wait(self, "gap", gap(self))
       done(self)
@@ -578,23 +715,115 @@ function Run:Step()
   return false, self.state
 end
 
--- The click on the secure button happened (the command went out): counts as sent, the roster tells the rest.
+-- The click on the secure button happened (the commands went out): counts as sent, the roster tells the rest.
 function Run:Clicked()
   local step = self.awaitingClick and self.pendingStep
   if not step then
     return false
   end
-  local button = self.pendingButton
-  self.awaitingClick, self.pendingStep, self.pendingButton = nil, nil, nil
+  local button, group = self.pendingButton, self.pendingGroup or { step }
+  self.awaitingClick, self.pendingStep, self.pendingButton, self.pendingGroup = nil, nil, nil, nil
   if button and self.env.disarm then
     self.env.disarm(button)
   end
-  self.i = self.i + 1
-  self.executed = self.executed + 1
-  self.counts.sent = self.counts.sent + 1
   local now = self.env.now()
-  self.pending = { step = step, log = entryOf(self, step, "sent"), sentAt = now }
+  for _, sent in ipairs(group) do
+    self.i = self.i + 1
+    self.executed = self.executed + 1
+    self.counts.sent = self.counts.sent + 1
+    self.pendings[#self.pendings + 1] = { step = sent, log = entryOf(self, sent, "sent"), sentAt = now }
+  end
   wait(self, "gap", gap(self))
+  return true
+end
+
+-- The direction of the command lines a step sends.
+local function kindOf(step)
+  if step.action == "setRank" then
+    return step.toRank < step.fromRank and "promote" or "demote"
+  end
+  return step.action
+end
+
+local function isMember(step, parsed)
+  return (parsed.key ~= nil and step.key == parsed.key) or PN.Equal(step.name, parsed.name)
+end
+
+-- The system message of the game ({ kind, key, name } of HistoryLogic.ParseChat) confirms one command line
+-- of a step that went out: the server did it, no need to wait for the roster. A jump over several ranks
+-- is done with its last line. True when a waiting step matched.
+function Run:Confirmed(parsed)
+  if type(parsed) ~= "table" then
+    return false
+  end
+  for k, p in ipairs(self.pendings) do
+    local step = p.step
+    if kindOf(step) == parsed.kind and isMember(step, parsed) then
+      p.left = (p.left or step.lines or 1) - 1
+      if p.left > 0 then
+        return true
+      end
+      table.remove(self.pendings, k)
+      self.counts.verified = self.counts.verified + 1
+      setResult(self, p.log, "verified")
+      done(self)
+      return true
+    end
+  end
+  return false
+end
+
+-- The game refused a command ({ code, name } of RL.ParseRefusal). The commands of a click run in order and
+-- each one answers once, so a message with a name belongs to that member and one without to the oldest
+-- step that still waits. The step ends as refused with the reason; the run goes on. True when a step matched.
+function Run:Refused(parsed)
+  if type(parsed) ~= "table" or type(parsed.code) ~= "string" then
+    return false
+  end
+  for k, p in ipairs(self.pendings) do
+    if not parsed.name or PN.Equal(p.step.name, parsed.name) then
+      table.remove(self.pendings, k)
+      self.counts.refused = self.counts.refused + 1
+      p.log.reason = parsed.code
+      setResult(self, p.log, "refused")
+      done(self)
+      return true
+    end
+  end
+  return false
+end
+
+-- The combat is over: a run that waited for it goes on. A series continues by itself on its next tick; any
+-- other run flags `resumed`, so the panel arms the button for the next click again (nothing is sent
+-- without that click). False when the run did not wait for the combat.
+function Run:Resume()
+  if self.state ~= "paused" or self.why ~= "combat" or self.awaitingClick then
+    return false
+  end
+  self.state, self.why, self.nextAt = "running", nil, nil
+  self.resumed = not self.series or nil
+  return true
+end
+
+-- The player drops the step (or the batch) the button waits for: nothing was sent, the run goes on with
+-- the next one. False when no button waits.
+function Run:SkipClick()
+  local step = self.awaitingClick and self.pendingStep
+  if not step then
+    return false
+  end
+  local button, group = self.pendingButton, self.pendingGroup or { step }
+  self.awaitingClick, self.pendingStep, self.pendingButton, self.pendingGroup = nil, nil, nil, nil
+  if button and self.env.disarm then
+    self.env.disarm(button)
+  end
+  for _, dropped in ipairs(group) do
+    self.i = self.i + 1
+    self.counts.skipped = self.counts.skipped + 1
+    entryOf(self, dropped, "skipped", "player")
+  end
+  self.state, self.why, self.nextAt = "running", nil, nil
+  done(self)
   return true
 end
 

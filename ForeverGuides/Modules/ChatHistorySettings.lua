@@ -11,7 +11,7 @@ local BUTTON_W = 200
 
 ns.AddLocale("enUS", {
   ["chathistory.set.heading"] = "Chat window history",
-  ["chathistory.set.hint"] = "Keeps the normal chat windows after /reload. Saved on this PC only, never sent.\nForever Chat saves its own chats with its option Save chats (on by default).",
+  ["chathistory.set.hint"] = "Keeps the normal chat windows after /reload. Saved on this PC only, never sent.\nForever Chat saves its own chats with its setting Save chats (on by default).",
   ["chathistory.set.enable"] = "Save window history",
   ["chathistory.set.enable.tip"] = "Off by default.\nNothing is saved while off.",
   ["chathistory.set.windowLines"] = "Lines per window",
@@ -21,9 +21,9 @@ ns.AddLocale("enUS", {
   ["chathistory.set.clear.tip"] = "Deletes all saved lines after asking.\nContacts stay.",
 })
 ns.AddLocale("deDE", {
-  ["chathistory.set.heading"] = "Chat-Fenster-Verlauf",
-  ["chathistory.set.hint"] = "Hält die normalen Chatfenster nach /reload. Nur auf diesem PC gespeichert, nie gesendet.\nForever Chat speichert seine eigenen Chats mit der Option Chats speichern (Standard an).",
-  ["chathistory.set.enable"] = "Fenster-Verlauf speichern",
+  ["chathistory.set.heading"] = "Chat-Fensterverlauf",
+  ["chathistory.set.hint"] = "Hält die normalen Chatfenster nach /reload. Nur auf diesem PC gespeichert, nie gesendet.\nForever Chat speichert seine eigenen Chats mit der Einstellung Chats speichern (Standard an).",
+  ["chathistory.set.enable"] = "Fensterverlauf speichern",
   ["chathistory.set.enable.tip"] = "Standard aus.\nSolange aus, wird nichts gespeichert.",
   ["chathistory.set.windowLines"] = "Zeilen je Fenster",
   ["chathistory.set.windowDays"] = "Zeilen behalten für",

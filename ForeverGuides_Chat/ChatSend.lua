@@ -144,7 +144,8 @@ local function defaultEnv()
         error("no chat function", 0)
       end
       Send.lastApi = name
-      return fn(text, chatType, nil, target)
+      -- The central exit of the main add-on: only text the client accepts goes into the chat.
+      return FG.ChatSafe.Send(text, chatType, target, fn)
     end,
     -- Whether a refused call may be tried once with the other chat function (the default sender only).
     canRetry = function()
@@ -237,7 +238,7 @@ local function defaultEnv()
       return flag(call(global("IsInInstance"))) == true
     end,
     homeRealm = function()
-      local realm = safe(call(global("GetNormalizedRealmName")))
+      local realm = safe(FG.Realm.Get())
       return type(realm) == "string" and realm or nil
     end,
     own = function()
@@ -893,6 +894,18 @@ local function prepare(conv, text, quiet)
     if not parts then
       return nil, why
     end
+  end
+  -- Only what the client takes in chat leaves (ChatSafe); a part that is empty after that is dropped.
+  local prepared = {}
+  for _, part in ipairs(parts) do
+    part = FG.ChatSafe.Prepare(part)
+    if part ~= "" then
+      prepared[#prepared + 1] = part
+    end
+  end
+  parts = prepared
+  if #parts == 0 then
+    return nil, "empty"
   end
   local restricted = Send.Restricted()
   if restricted and not Queue.CanAdd() then

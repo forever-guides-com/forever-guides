@@ -25,6 +25,24 @@ add(
   "Notes can hold private text. Off is safer.",
   "Notizen können Privates enthalten. Aus ist sicherer."
 )
+add("gm.set.shareBansSend", "Send bans", "Bans senden")
+add(
+  "gm.set.shareBansSend.hint",
+  "Offers your ban list to officers",
+  "Bietet deine Banliste den Offizieren an"
+)
+add("gm.set.shareBansReceive", "Receive bans", "Bans empfangen")
+add(
+  "gm.set.shareBansReceive.hint",
+  "Offers land in the inbox, nothing is added alone",
+  "Angebote landen im Eingang, nichts wird allein ergänzt"
+)
+add("gm.set.shareBansRank", "Ban rank", "Rang für Bans")
+add(
+  "gm.set.shareBansRank.hint",
+  "Only this rank and better send or are heard",
+  "Nur dieser Rang und besser sendet oder wird gehört"
+)
 add("gm.set.shareChannel", "Channel", "Kanal")
 add("gm.set.shareChannel.hint", "Both sides need the same channel", "Beide Seiten brauchen denselben Kanal")
 add("gm.set.shareChannel.officer", "Officer chat", "Offizierschat")
@@ -72,6 +90,8 @@ add("gm.share.inbox.more", "%d more offers are not shown", "%d weitere Angebote 
 add("gm.share.what.J", "Join date: %s", "Beitritt: %s")
 add("gm.share.what.M", "Marks: %s", "Markierungen: %s")
 add("gm.share.what.N", "Note: %s", "Notiz: %s")
+add("gm.share.what.B", "Ban suggested: %s", "Ban vorgeschlagen: %s")
+add("gm.share.what.Bremove", "Removal of the ban suggested", "Aufhebung des Bans vorgeschlagen")
 add("gm.share.from", "From %s (%s), %s, source %s", "Von %s (%s), %s, Quelle %s")
 add("gm.share.also", "also from %d more", "auch von %d weiteren")
 add("gm.share.adopt", "Adopt", "Übernehmen")

@@ -62,7 +62,7 @@ ns.AddLocale("enUS", {
   ["shots.msg.combat"] = "Not in combat.",
   ["shots.msg.limit"] = "List full (200). Delete entries or mark them as uploaded.",
   ["shots.msg.noapi"] = "This client does not allow addons to take screenshots.",
-  ["shots.msg.id"] = "Could not create an entry id.",
+  ["shots.msg.id"] = "Could not create an entry ID.",
   ["shots.msg.saveCombat"] = "Saving by reload is not possible in combat.",
   ["shots.warn.instance"] = "Instance: a poor guessing location.",
   ["shots.warn.city"] = "City or resting area: usually a poor guessing location.",
@@ -96,7 +96,7 @@ ns.AddLocale("enUS", {
   ["tour.shots.capture.title"] = "Take screenshot",
   ["tour.shots.capture.text"] = "Hides the interface and takes the picture. Also /fg shot or a key. Not in combat.",
   ["tour.shots.save.title"] = "Save by reload",
-  ["tour.shots.save.text"] = "Data reaches the disk only on logout or reload. Use this after a few shots.",
+  ["tour.shots.save.text"] = "Data reaches the disk only on logout or reload. Use the button after a few shots.",
   ["tour.shots.list.title"] = "Your shots",
   ["tour.shots.list.text"] = "Time, zone, position per shot. New ones are not uploaded yet.",
   ["tour.shots.manage.title"] = "Export and clean up",
@@ -110,10 +110,10 @@ ns.AddLocale("deDE", {
   ["shots.privacy"] = "Datenschutz: Screenshots können Charaktername, Namensplaketten und Chat zeigen.\nDas Addon blendet die Oberfläche aus (Namensplaketten falls aktiv). Prüfe Bilder vor dem Hochladen.",
   ["shots.take"] = "Screenshot aufnehmen",
   ["shots.takeTip"] = "Blendet die Oberfläche aus und macht den Screenshot.\nWie /fg shot oder die Tastenbelegung. Nicht im Kampf.",
-  ["shots.save"] = "Sichern (Neuladen)",
+  ["shots.save"] = "Speichern (Neuladen)",
   ["shots.saveTip"] = "Das Spiel speichert nur beim Ausloggen oder /reload.\nEin Absturz verliert neuere Einträge. Lädt die Oberfläche neu, nicht im Kampf.",
   ["shots.plates"] = "Namensplaketten beim Aufnehmen ausblenden",
-  ["shots.usage"] = "%d von %d Einträgen (%d neu, %d hochgeladen). Nicht gesichert: %d.",
+  ["shots.usage"] = "%d von %d Einträgen (%d neu, %d hochgeladen). Nicht gespeichert: %d.",
   ["shots.check.bad"] = "Prüfsumme falsch: %d Eintrag/Einträge von Hand geändert.",
   ["shots.check.gaps"] = "%d Lücke(n) in der Kette (gelöschte Einträge).",
   ["shots.empty"] = "Noch keine Screenshots. Knopf, Tastenbelegung oder /fg shot.",
@@ -139,7 +139,7 @@ ns.AddLocale("deDE", {
   ["shots.export.hint"] = "%d Einträge in %d String(s), je ein Block. Mit Strg+C kopieren.\nDie Website liest auch ForeverGuides.lua (WTF/Account/<Konto>/SavedVariables) direkt, dann brauchst du keinen String.\nAls hochgeladen markierte Einträge fehlen im Export der neuen.",
   ["shots.export.none"] = "Nichts zu exportieren.",
   ["shots.export.fail"] = "Export fehlgeschlagen.",
-  ["shots.msg.saved"] = "Orts-Shot %s gespeichert: %s, %s, %s. Nicht gesichert: %d (Sichern oder /reload).",
+  ["shots.msg.saved"] = "Orts-Shot %s gespeichert: %s, %s, %s. Nicht gespeichert: %d (Speichern oder /reload).",
   ["shots.msg.timeout"] = "Screenshot nicht bestätigt. Prüfe den Screenshots-Ordner, Eintrag bleibt.",
   ["shots.msg.failed"] = "Screenshot fehlgeschlagen, kein Eintrag angelegt.",
   ["shots.msg.abort"] = "Screenshot abgebrochen, die Oberfläche ist zurück.",
@@ -148,11 +148,11 @@ ns.AddLocale("deDE", {
   ["shots.msg.limit"] = "Liste voll (200). Lösche Einträge oder markiere sie als hochgeladen.",
   ["shots.msg.noapi"] = "Dieser Client erlaubt Addons keine Screenshots.",
   ["shots.msg.id"] = "Konnte keine Eintrags-ID erzeugen.",
-  ["shots.msg.saveCombat"] = "Sichern per Neuladen geht im Kampf nicht.",
+  ["shots.msg.saveCombat"] = "Speichern per Neuladen geht im Kampf nicht.",
   ["shots.warn.instance"] = "Instanz: schlechter Ort zum Raten.",
   ["shots.warn.city"] = "Stadt oder Ruhegebiet: meist ein schlechter Ort zum Raten.",
   ["shots.web"] = "Hochladen auf forever-guides.com: wähle deine Bilder (Screenshots-Ordner) und diese Daten.\nZuordnung über die Zeit im Dateinamen (WoWScrnShot_MMDDYY_HHMMSS, 2 Sekunden Toleranz).",
-  ["shots.limit"] = "Grenze: Das Spiel speichert nur beim Ausloggen oder Neuladen, ein Absturz verliert neuere Einträge.\nDie Prüfsummen-Kette erkennt nur Zufall oder Handänderungen, keine Sicherheitsfunktion.",
+  ["shots.limit"] = "Grenze: Das Spiel speichert nur beim Ausloggen oder Neuladen, ein Absturz verliert neuere Einträge.\nDie Prüfsummenkette erkennt nur versehentliche oder manuelle Änderungen und ist keine Sicherheitsfunktion.",
   ["shots.preview"] = "Vorschau des Bildes anzeigen",
   ["shots.d.zone"] = "%s / %s",
   ["shots.d.pos"] = "Position %s",
@@ -180,8 +180,8 @@ ns.AddLocale("deDE", {
   ["tour.shots.intro.text"] = "Für das Orte-Raten. Prüfe Bilder vor dem Hochladen auf Name und Chat.",
   ["tour.shots.capture.title"] = "Screenshot aufnehmen",
   ["tour.shots.capture.text"] = "Blendet die Oberfläche aus und macht das Bild. Auch per /fg shot oder Taste. Nicht im Kampf.",
-  ["tour.shots.save.title"] = "Sichern per Neuladen",
-  ["tour.shots.save.text"] = "Daten landen nur beim Ausloggen oder Neuladen auf der Platte. Knopf nach ein paar Aufnahmen.",
+  ["tour.shots.save.title"] = "Speichern per Neuladen",
+  ["tour.shots.save.text"] = "Daten landen nur beim Ausloggen oder Neuladen auf der Platte. Nutze den Knopf nach ein paar Aufnahmen.",
   ["tour.shots.list.title"] = "Deine Aufnahmen",
   ["tour.shots.list.text"] = "Zeit, Zone, Position je Aufnahme. Neue sind noch nicht hochgeladen.",
   ["tour.shots.manage.title"] = "Exportieren und aufräumen",
@@ -251,7 +251,7 @@ local function build(container)
   local state = { sel = nil }
   local refresh
 
-  ns.AddParagraph(view, "shots.intro")
+  ns.AddIntro(view, "shots.intro")
   ns.AddParagraph(view, "shots.privacy", { role = "ui", color = "textSecondary" })
 
   local bar = CreateFrame("Frame", nil, view.content)
@@ -314,6 +314,7 @@ local function build(container)
   local check = ns.AddParagraph(view, nil, { role = "ui", color = "textSecondary" })
 
   local list = K.NewList(view.content, {
+    look = "flat", -- developer tool list
     rowHeight = 42,
     bind = function(e)
       local sub = fmt("shots.row", e.zone, e.sub ~= "" and e.sub or "-", e.file or "")

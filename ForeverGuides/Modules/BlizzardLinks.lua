@@ -211,6 +211,11 @@ local TARGETS = {
     root = "PlayerSpellsFrame",
     view = SIDE_VIEW,
     links = { "levels", "talents" },
+    -- The learn list side panel sits at the right edge of the window and carries the tabs at its own edge.
+    edge = function()
+      local side = ns.SpellbookSide
+      return side and side.EdgeFrame()
+    end,
   },
   { id = "spellbook", parent = "SpellBookFrame", view = SIDE_VIEW, links = { "levels", "talents" } },
   {
@@ -502,14 +507,14 @@ local function menuRow(index)
   row:EnableMouse(true)
   row.hl = row:CreateTexture(nil, "BACKGROUND")
   row.hl:SetAllPoints()
-  row.hl:SetColorTexture(1, 1, 1, 0)
+  row.hl:SetColorTexture(ns.Theme.fillColor())
   row.text = W.Text(row, { role = "ui" })
   row.text:SetPoint("LEFT", 8, 0)
   row:SetScript("OnEnter", function()
-    row.hl:SetColorTexture(1, 1, 1, 0.08)
+    row.hl:SetColorTexture(ns.Theme.fillColor("hover"))
   end)
   row:SetScript("OnLeave", function()
-    row.hl:SetColorTexture(1, 1, 1, 0)
+    row.hl:SetColorTexture(ns.Theme.fillColor())
   end)
   menu.rows[index] = row
   return row
@@ -581,11 +586,11 @@ local function finishButton(parent, button)
   end)
 end
 
--- Selected look of a tab button through fgSetSelected(on): a gold border and the
+-- Selected look of a tab button through fgSetSelected(on): the accent bar and the
 -- stock glow texture.
 local function decorateTab(button)
   local selected, hovering = false, false
-  local border = W.Border(button, "accent2", 1, 2)
+  local border = W.ActiveMark(button)
   local glow = button:CreateTexture(nil, "OVERLAY")
   glow:SetAllPoints()
   glow:SetTexture(TAB_GLOW)
@@ -610,7 +615,7 @@ local function decorateTab(button)
   paint()
 end
 
--- Drawn stand-in of the template tab: same size, dark tile, logo on it, gold frame when selected.
+-- Drawn stand-in of the template tab: same size, dark tile, logo on it, accent bar when selected.
 local function makeIconButton(parent, link, window, handler)
   local button = W.Action(parent, {
     texture = LOGO,

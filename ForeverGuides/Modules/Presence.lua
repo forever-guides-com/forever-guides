@@ -228,7 +228,9 @@ local function announce(kind, trigger)
   local crest = ns.CrestMark
   local body = crest and type(crest.MergedBody) == "function" and crest.MergedBody(kind) or nil
   local tail = body or (carries[kind] and PL.NO_LOGOS or nil)
-  if not Comm.Send(FN, "P", PL.Encode(chatOnly(), tail), kind, nil, { priority = "background" }) then
+  -- The version tag only goes out where the version check may send (release build, no developer lock).
+  local version = ns.VersionCheck and ns.VersionCheck.SendVersion()
+  if not Comm.Send(FN, "P", PL.Encode(chatOnly(), tail, version), kind, nil, { priority = "background" }) then
     return result(false, "refused")
   end
   carries[kind] = body ~= nil or nil

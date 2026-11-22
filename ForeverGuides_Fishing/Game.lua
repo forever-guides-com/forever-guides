@@ -420,7 +420,12 @@ function G.CharKey()
   if type(name) ~= "string" or name == "" then
     return nil
   end
+  -- The display realm stays first so stored journal keys keep matching; the shared fallback only fills an
+  -- empty answer.
   local realm = query("GetRealmName") or query("GetNormalizedRealmName")
+  if type(realm) ~= "string" or realm == "" then
+    realm = FG.Realm.Get()
+  end
   return name .. "-" .. (type(realm) == "string" and realm or "")
 end
 
@@ -880,6 +885,9 @@ function G.Character()
   local guid = query("UnitGUID", "player")
   local name = query("UnitName", "player")
   local realm = query("GetRealmName")
+  if type(realm) ~= "string" or realm == "" then
+    realm = FG.Realm.Get()
+  end
   name = type(name) == "string" and name or nil
   realm = type(realm) == "string" and realm or nil
   local key = type(guid) == "string" and guid or (name and (name .. "-" .. (realm or "?"))) or nil
@@ -1028,15 +1036,15 @@ function G.ItemLink(id)
   return "item:" .. id
 end
 
--- A link for the chat: the client's own link for a cached item, else a plain link built from the name that is
--- known. nil when neither exists (a link without a name would show as a number).
+-- A link for the chat: the client's own link for a cached item, else the plain "[name]" of the name that is
+-- known (a self-built link is refused by the chat). nil when neither exists.
 function G.ChatLink(id, name)
   local _, link = query("C_Item.GetItemInfo", id)
   if type(link) == "string" and link:find("|H", 1, true) then
     return link
   end
   if type(id) == "number" and type(name) == "string" and name ~= "" then
-    return string.format("|Hitem:%d::::::::::::::|h[%s]|h", id, name)
+    return "[" .. name .. "]"
   end
   return nil
 end

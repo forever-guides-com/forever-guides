@@ -1,0 +1,17 @@
+## Interface: 16001
+## Title: Forever Guides: Comprehension data
+## Title-deDE: Forever Guides: Verständnis-Daten
+## Notes: Skill stages, scrolls, results and libraries of the Comprehension guide. Loads by itself when the guide is opened.
+## Notes-deDE: Skillstufen, Schriftrollen, Ergebnisse und Bibliotheken des Verständnis-Guides. Wird von selbst geladen, sobald du den Guide öffnest.
+## Author: Wosande
+## IconTexture: Interface\AddOns\ForeverGuides\Media\Logo.png
+## Version: 1.0.0
+## Dependencies: ForeverGuides
+## LoadOnDemand: 1
+## X-Website: https://forever-guides.com
+## X-Curse-Project-ID: 1734295
+## X-Wago-ID: qGZAwdKd
+## X-License: All Rights Reserved (see LICENSE)
+## X-Category: Guide
+
+GuideData.lua

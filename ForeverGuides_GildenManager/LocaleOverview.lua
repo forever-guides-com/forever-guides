@@ -71,6 +71,7 @@ add(
   "Mitglieder, die nach langer Pause zurück sind.\nZwei Wochen lang sichtbar."
 )
 add("gm.rem.returner.line", "%s: back %s, offline %d days before", "%s: zurück %s, vorher %d Tage offline")
+add("gm.rem.returner.banned", "On the ban list", "Auf der Banliste")
 add("gm.rem.returner.lineShort", "%s: back %s", "%s: zurück %s")
 add("gm.rem.returners.empty", "No returners in the last %d days", "Keine Rückkehrer in den letzten %d Tagen")
 

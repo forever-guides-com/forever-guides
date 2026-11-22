@@ -20,7 +20,7 @@ ns.AddLocale("enUS", {
   ["cost.sum"] = "Total: %s",
   ["cost.sumUnknown"] = "+ %d without price",
   ["cost.availableTotal"] = "Everything learnable now: %s",
-  ["cost.weaponsTotal"] = "All skills with a teacher: %s",
+  ["cost.weaponsTotal"] = "All skills with a trainer: %s",
   ["cost.letter.copper"] = "c",
 })
 
@@ -28,7 +28,7 @@ ns.AddLocale("deDE", {
   ["cost.legend"] = "~ = unsicherer Preis, im Spiel unbestätigt",
   ["cost.tip.forever"] = "Preis aus den Forever-Guides-Daten, nicht im Spiel bestätigt",
   ["cost.tip.differs"] = "Forever Guides: %s, Classic: %s, im Spiel nicht bestätigt",
-  ["cost.tip.classic"] = "Classic-Preis, in Forever unbestätigt\nLehrer öffnen zeigt den echten Preis",
+  ["cost.tip.classic"] = "Classic-Preis, in Forever unbestätigt\nÖffne den Lehrer, um den echten Preis zu sehen",
   ["cost.tip.observed"] = "Im Lehrerfenster gesehen",
   ["cost.tip.suspect"] = "Stufe weicht von Classic ab, Preis evtl. anderer Rang",
   ["cost.sum"] = "Summe: %s",

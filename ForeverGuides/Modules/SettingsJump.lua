@@ -11,6 +11,8 @@ ns.SettingsJump = SJ
 SJ.MARK_SECONDS = 1.5
 -- Space kept above a control that was scrolled to.
 SJ.TOP_MARGIN = 28
+-- The mark reaches this far beyond its control on every side.
+SJ.MARK_OUTSET = 4
 
 local function field(frame, name)
   return type(frame) == "table" and rawget(frame, name) or nil
@@ -21,7 +23,8 @@ local function matches(frame, ref)
     return true
   end
   local spec = field(frame, "fgSetting")
-  return spec ~= nil and spec.key == ref
+  -- A link word writes the dots of a locale key as dashes.
+  return spec ~= nil and (spec.key == ref or spec.key:gsub("%.", "-") == ref)
 end
 
 -- The first frame below root (or root itself) whose id or name key is ref, in creation order.
@@ -115,7 +118,9 @@ local function inViewport(view, hl)
     return true
   end
   local offset = contentTop - top
-  return offset >= scroll and offset + (top - bottom) <= scroll + height
+  -- A control at the very end of the page cannot scroll further, so its outset may reach past the viewport.
+  local slack = SJ.MARK_OUTSET
+  return offset >= scroll - slack and offset + (top - bottom) <= scroll + height + slack
 end
 
 -- The client does not always clip the children of the scroll content: the mark is drawn only while its control
@@ -151,8 +156,8 @@ end
 function SJ.Mark(view, frame)
   local hl = mark(view)
   hl:ClearAllPoints()
-  hl:SetPoint("TOPLEFT", frame, "TOPLEFT", -4, 4)
-  hl:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 4, -4)
+  hl:SetPoint("TOPLEFT", frame, "TOPLEFT", -SJ.MARK_OUTSET, SJ.MARK_OUTSET)
+  hl:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", SJ.MARK_OUTSET, -SJ.MARK_OUTSET)
   -- A text line is a region without a frame level of its own, it sits on the level of its parent.
   local owner = frame.GetFrameLevel and frame or frame:GetParent() or view.content
   hl:SetFrameLevel(owner:GetFrameLevel() + 4)

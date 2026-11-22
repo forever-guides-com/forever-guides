@@ -729,3 +729,81 @@ function TL.Plan(specs, want, have, free)
   end
   return plan
 end
+
+-- Backgrounds -------------------------------------------------------------------------------------------
+
+-- Art of the default talent frame per tree (TalentTab.BackgroundFile of the game tables, hotfixes applied), by the
+-- slug of the tree. The files are Interface\TalentFrame\<name>-TopLeft, -TopRight, -BottomLeft and -BottomRight.
+TL.BACKGROUNDS = {
+  ["warrior-arms"] = "WarriorArms",
+  ["warrior-fury"] = "WarriorFury",
+  ["warrior-protection"] = "WarriorProtection",
+  ["paladin-holy"] = "PaladinHoly",
+  ["paladin-protection"] = "PaladinProtection",
+  ["paladin-retribution"] = "PaladinCombat",
+  ["hunter-beast-mastery"] = "HunterBeastMastery",
+  ["hunter-marksmanship"] = "HunterMarksmanship",
+  ["hunter-survival"] = "HunterSurvival",
+  ["rogue-assassination"] = "RogueAssassination",
+  ["rogue-combat"] = "RogueCombat",
+  ["rogue-subtlety"] = "RogueSubtlety",
+  ["priest-discipline"] = "PriestDiscipline",
+  ["priest-holy"] = "PriestHoly",
+  ["priest-shadow"] = "PriestShadow",
+  ["shaman-elemental"] = "ShamanElementalCombat",
+  ["shaman-enhancement"] = "ShamanEnhancement",
+  ["shaman-restoration"] = "ShamanRestoration",
+  ["mage-arcane"] = "MageArcane",
+  ["mage-fire"] = "MageFire",
+  ["mage-frost"] = "MageFrost",
+  ["warlock-affliction"] = "WarlockCurses",
+  ["warlock-demonology"] = "WarlockSummoning",
+  ["warlock-destruction"] = "WarlockDestruction",
+  ["druid-balance"] = "DruidBalance",
+  ["druid-feral-combat"] = "DruidFeralCombat",
+  ["druid-restoration"] = "DruidRestoration",
+}
+
+-- The four files together are 320 x 384 units: 256 + 64 wide, 256 + 128 high.
+local ART_W, ART_H = 320, 384
+local ART_PARTS = {
+  { suffix = "TopLeft", x = 0, y = 0, w = 256, h = 256 },
+  { suffix = "TopRight", x = 256, y = 0, w = 64, h = 256 },
+  { suffix = "BottomLeft", x = 0, y = 256, w = 256, h = 128 },
+  { suffix = "BottomRight", x = 256, y = 256, w = 64, h = 128 },
+}
+
+-- Name of the background of a tree, nil for an unknown one. The table is the client's own data (TalentTab), so it
+-- also serves the classes the player does not play.
+function TL.Background(spec)
+  return spec and TL.BACKGROUNDS[spec.slug] or nil
+end
+
+-- The four texture pieces of a background laid over a frame of w x h, scaled to cover it and cut at the right and
+-- bottom edge: { { path, x, y, width, height, left, right, top, bottom } } in frame units from the top left,
+-- texture coordinates of the part that stays visible. Pieces outside the frame are left out.
+function TL.BackgroundPieces(name, w, h)
+  if not name or not (w and h and w > 0 and h > 0) then
+    return {}
+  end
+  local scale = math.max(w / ART_W, h / ART_H)
+  local seenW, seenH = w / scale, h / scale
+  local out = {}
+  for _, part in ipairs(ART_PARTS) do
+    local x1, y1 = math.min(part.x + part.w, seenW), math.min(part.y + part.h, seenH)
+    if x1 > part.x and y1 > part.y then
+      out[#out + 1] = {
+        path = "Interface\\TalentFrame\\" .. name .. "-" .. part.suffix,
+        x = part.x * scale,
+        y = part.y * scale,
+        width = (x1 - part.x) * scale,
+        height = (y1 - part.y) * scale,
+        left = 0,
+        right = (x1 - part.x) / part.w,
+        top = 0,
+        bottom = (y1 - part.y) / part.h,
+      }
+    end
+  end
+  return out
+end

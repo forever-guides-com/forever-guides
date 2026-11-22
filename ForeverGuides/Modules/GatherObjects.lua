@@ -15,11 +15,13 @@ ns.AddLocale("enUS", {
   ["gather.cat.treasure"] = "Chest",
   ["gather.cat.school"] = "Fishing school",
   ["gather.obj.several"] = "The kind changes from visit to visit.",
+  ["gather.obj.lock"] = "Locked: needs lockpicking, skill %d",
 })
 ns.AddLocale("deDE", {
   ["gather.cat.treasure"] = "Truhe",
   ["gather.cat.school"] = "Fischschwarm",
   ["gather.obj.several"] = "Die Art wechselt von Besuch zu Besuch.",
+  ["gather.obj.lock"] = "Verschlossen: braucht Schlossknacken, Fertigkeit %d",
 })
 
 -- The categories in list order and the key of each switch below settings.gather.
@@ -139,6 +141,33 @@ function GO.SetKind(kindId, on)
   changed()
 end
 
+-- Switches many kinds on or off with one change message, the switch of the category stays as it is.
+function GO.SetKinds(ids, on)
+  local hidden = copyHidden()
+  for _, id in ipairs(ids) do
+    if type(id) == "number" then
+      hidden[id] = (not on) and true or nil
+    end
+  end
+  ns.Store.set("settings.gather.hiddenKinds", hidden)
+  changed()
+end
+
+-- Makes the given kinds visible on the maps: the pin switch of the maps and the chest category go on, the
+-- kinds go off the hidden list, every other kind stays as the player had it. One change message.
+function GO.Reveal(ids)
+  local hidden = copyHidden()
+  for _, id in ipairs(ids) do
+    if type(id) == "number" then
+      hidden[id] = nil
+    end
+  end
+  ns.Store.set("settings.gather.worldmap", true)
+  ns.Store.set("settings.gather." .. GO.KEYS.treasure, true)
+  ns.Store.set("settings.gather.hiddenKinds", hidden)
+  changed()
+end
+
 -- The category (nil: both) and each of its kinds on. data is optional, it is read through ns.GatherDataAccess.
 function GO.All(cat, data)
   local hidden = copyHidden()
@@ -176,8 +205,20 @@ function GO.Name(kindId, kind)
   return ns.T({ de = kind.de, en = kind.en }) or ("#" .. tostring(kindId))
 end
 
--- Icon file of a kind: the file of the data, else the question mark.
+-- The pin icon of every locked chest (the lockpicking spell), so the player tells them from open chests at a glance.
+GO.LOCK_ICON = "Spell_Nature_MoonKey"
+
+-- Skill the kind needs to be opened, nil for a kind that is not locked.
+function GO.LockSkill(kind)
+  local lock = type(kind) == "table" and tonumber(kind.lock)
+  return lock and lock > 0 and lock or nil
+end
+
+-- Icon file of a kind: the lock icon for a locked chest, else the file of the data, else the question mark.
 function GO.IconPath(kind)
+  if GO.LockSkill(kind) then
+    return "Interface\\Icons\\" .. GO.LOCK_ICON
+  end
   local icon = type(kind) == "table" and kind.icon
   if type(icon) == "string" and icon ~= "" then
     return "Interface\\Icons\\" .. icon
@@ -193,7 +234,8 @@ function GO.Entries(data)
     local list = {}
     for id, kind in pairs(kinds) do
       if type(kind) == "table" and kind.cat == cat then
-        list[#list + 1] = { id = id, cat = cat, name = GO.Name(id, kind), icon = GO.IconPath(kind) }
+        list[#list + 1] =
+          { id = id, cat = cat, name = GO.Name(id, kind), icon = GO.IconPath(kind), lock = GO.LockSkill(kind) }
       end
     end
     table.sort(list, function(a, b)
@@ -302,7 +344,12 @@ function GO.TipText(data, pin)
     return ns.Theme.hexText("textMuted", text)
   end
   if #names == 1 then
-    return names[1], muted(category) .. "\n" .. muted(ns.L["map.gather.known"])
+    local lines = muted(category) .. "\n" .. muted(ns.L["map.gather.known"])
+    local lock = GO.LockSkill(first)
+    if lock then
+      lines = ns.Theme.hexText("warning", string.format(ns.L["gather.obj.lock"], lock)) .. "\n" .. lines
+    end
+    return names[1], lines
   end
   return category, table.concat(names, "\n") .. "\n" .. muted(ns.L["gather.obj.several"])
 end

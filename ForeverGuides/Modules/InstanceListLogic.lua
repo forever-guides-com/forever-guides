@@ -18,6 +18,19 @@ ns.AddLocale("enUS", {
   ["instances.card.type.raid"] = "Raid",
   ["instances.card.tip.location"] = "Location: %s",
   ["instances.card.tip.bosses"] = "Bosses: %d",
+  ["instances.list.new"] = "NEW",
+  ["instances.list.access.quest"] = "Quest",
+  ["instances.list.access.more"] = "%s +%d",
+  ["instances.list.access.none"] = "-",
+  ["instances.list.tip.access"] = "Access: %s",
+  ["instances.list.col.name"] = "Name",
+  ["instances.list.col.level"] = "Level",
+  ["instances.list.col.zone"] = "Zone",
+  ["instances.list.col.quests"] = "Quests",
+  ["instances.list.col.access"] = "Access",
+  ["instances.list.col.tip"] = "Sorts the list by this column. Click again to reverse the order.",
+  ["instances.list.map"] = "Map",
+  ["instances.list.map.tip"] = "Opens the map of this instance.",
 })
 
 ns.AddLocale("deDE", {
@@ -34,6 +47,19 @@ ns.AddLocale("deDE", {
   ["instances.card.type.raid"] = "Raid",
   ["instances.card.tip.location"] = "Ort: %s",
   ["instances.card.tip.bosses"] = "Bosse: %d",
+  ["instances.list.new"] = "NEU",
+  ["instances.list.access.quest"] = "Quest",
+  ["instances.list.access.more"] = "%s +%d",
+  ["instances.list.access.none"] = "-",
+  ["instances.list.tip.access"] = "Zugang: %s",
+  ["instances.list.col.name"] = "Name",
+  ["instances.list.col.level"] = "Stufe",
+  ["instances.list.col.zone"] = "Gebiet",
+  ["instances.list.col.quests"] = "Quests",
+  ["instances.list.col.access"] = "Zugang",
+  ["instances.list.col.tip"] = "Sortiert die Liste nach dieser Spalte. Ein weiterer Klick dreht die Reihenfolge um.",
+  ["instances.list.map"] = "Karte",
+  ["instances.list.map.tip"] = "Öffnet die Karte dieser Instanz.",
 })
 
 local IL = {}
@@ -44,6 +70,9 @@ IL.CARD_MIN, IL.GAP = 230, 10
 IL.LEVEL_MAX = 99
 IL.KINDS = { "all", "dungeon", "raid" }
 IL.SORTS = { "name", "level" }
+-- Columns of the list view that sort it (the toggle of the bar has the first two).
+IL.COLUMN_SORTS = { "name", "level", "zone", "quests" }
+IL.VIEWS = { "list", "cards" }
 
 local function number(value, default)
   if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
@@ -76,6 +105,8 @@ function IL.NewFilter(faction)
     favorites = false,
     favoritesFirst = true,
     sort = "level",
+    desc = false,
+    bracket = "all",
   }
 end
 
@@ -88,6 +119,21 @@ function IL.Faction(saved, player)
   return (player == "A" or player == "H") and player or "all"
 end
 
+-- A saved sort column: one of COLUMN_SORTS, else the level.
+function IL.NormalizeSort(value)
+  for _, id in ipairs(IL.COLUMN_SORTS) do
+    if value == id then
+      return id
+    end
+  end
+  return "level"
+end
+
+-- A saved view: "list" or "cards", else the list.
+function IL.NormalizeView(value)
+  return value == "cards" and "cards" or "list"
+end
+
 -- True while nothing but the default is set (the sort and the favorites switch are no filter).
 function IL.IsDefault(filter, faction)
   local base = IL.NewFilter(faction)
@@ -96,6 +142,7 @@ function IL.IsDefault(filter, faction)
     and filter.level == nil
     and (filter.query or "") == ""
     and not filter.favorites
+    and ns.InstanceBracketLogic.Normalize(filter.bracket) == "all"
 end
 
 -- A level typed into the box: whole number from 1 to LEVEL_MAX, else nil (no level filter).
@@ -112,24 +159,38 @@ local function defaultFavorite(inst)
 end
 
 -- The instances of the grid in display order. isFavorite(inst) -> bool defaults to the saved favorites,
--- match(text, query) to the search of the addon. The order is the one of RefLogic.Instances (name or level),
--- with the favorites in front of the others when filter.favoritesFirst, each group in its own order.
-function IL.Apply(filter, isFavorite, match)
+-- match(text, query) to the search of the addon. ctx (optional): playerLevel (default: the level of the player,
+-- for the bracket "mine") and questCount(inst) -> number or nil (the quest column). The order is the one of
+-- RefLogic.Instances (name or level); the zone and quest columns and a reversed order sort here. The favorites
+-- stand in front of the others when filter.favoritesFirst, each group in its own order.
+function IL.Apply(filter, isFavorite, match, ctx)
   isFavorite = isFavorite or defaultFavorite
+  ctx = ctx or {}
+  local B = ns.InstanceBracketLogic
   local kind = (filter.kind == "dungeon" or filter.kind == "raid") and filter.kind or nil
   local faction = (filter.faction == "A" or filter.faction == "H") and filter.faction or nil
+  local sort = filter.sort
   local found = ns.RefLogic.Instances(
     kind,
     faction,
     filter.query or "",
     match or ns.SearchLogic.match,
-    filter.sort == "level" and "level" or "name"
+    sort == "level" and "level" or "name"
   )
+  if sort == "zone" or sort == "quests" or filter.desc == true then
+    found = B.SortList(found, sort, filter.desc == true, ctx.questCount)
+  end
   local level = number(filter.level, nil)
+  local choice = B.Normalize(filter.bracket)
+  local player = choice == "mine" and (ctx.playerLevel or B.PlayerLevel()) or nil
   local first, rest = {}, {}
   for _, inst in ipairs(found) do
     local fav = isFavorite(inst)
-    if (not level or ns.InstanceLevelLogic.Covers(inst, level)) and (fav or not filter.favorites) then
+    if
+      (not level or ns.InstanceLevelLogic.Covers(inst, level))
+      and B.Matches(inst, choice, player)
+      and (fav or not filter.favorites)
+    then
       table.insert(fav and filter.favoritesFirst and first or rest, inst)
     end
   end
@@ -270,6 +331,117 @@ function IL.TipLines(inst, L, questText)
   lines[#lines + 1] = string.format(L["instances.card.tip.bosses"], #(inst.bo or {}))
   lines[#lines + 1] = questText
   return lines
+end
+
+-- List view ---------------------------------------------------------------------------------------
+
+-- An instance the data marks with a release day: Forever adds it to the classic world.
+function IL.IsNew(inst)
+  return type(inst) == "table" and inst.rd ~= nil
+end
+
+function IL.ZoneText(inst)
+  return ns.RefLogic.Names(inst.loc) or ""
+end
+
+-- Access column: the first required item (a key) of Data.Access, "Quest" when a quest opens the door, "+n"
+-- for further required entries, "-" for an instance without access data. Returns the text and the full list
+-- of the required entries (nil without any) for the tooltip.
+function IL.AccessText(inst, L)
+  L = L or ns.L
+  local list = ns.Data and ns.Data.Access and ns.Data.Access[ns.RefLogic.InstanceSlug(inst)]
+  local names, firstItem = {}, nil
+  for _, entry in ipairs(list or {}) do
+    if not entry.optional and entry.kind ~= "note" then
+      local name = entry.kind == "quest" and L["instances.list.access.quest"] or ns.RefLogic.Names(entry.name)
+      if name then
+        names[#names + 1] = name
+        firstItem = firstItem or (entry.kind == "item" and name or nil)
+      end
+    end
+  end
+  if #names == 0 then
+    return L["instances.list.access.none"], nil
+  end
+  local first = firstItem or names[1]
+  local text = #names > 1 and string.format(L["instances.list.access.more"], first, #names - 1) or first
+  return text, table.concat(names, ", ")
+end
+
+-- The line of the detail header: level, zone, faction (not for both), group size of a raid and the opening day,
+-- joined with a bar. Parts the data does not have are left out.
+function IL.InfoLine(inst, L)
+  L = L or ns.L
+  local LL = ns.InstanceLevelLogic
+  local parts = { IL.LevelText(inst, L) }
+  local zone = IL.ZoneText(inst)
+  if zone ~= "" then
+    parts[#parts + 1] = zone
+  end
+  local faction = LL.Faction(inst)
+  if faction ~= "B" then
+    parts[#parts + 1] = L["kit.faction." .. faction]
+  end
+  if inst.t == "raid" then
+    parts[#parts + 1] = IL.PlayersText(inst, L)
+  end
+  local release = LL.Of(inst, L).releaseText
+  if release then
+    parts[#parts + 1] = release
+  end
+  return table.concat(parts, " | ")
+end
+
+-- Columns of a list row for a width. scale: the text size factor (fixed columns grow with it). The name
+-- always stays; the others drop out in this order when the width runs out: access, zone, faction, quests,
+-- thumbnail, map button, level. The flexible columns (name, zone) share the rest.
+-- Returns { list = { { id, x, w } }, by = { [id] = column } }.
+IL.ROW_PAD, IL.ROW_GAP = 8, 8
+IL.COLUMN_BASE = { thumb = 64, level = 96, faction = 24, quests = 72, access = 130, action = 28 }
+IL.NAME_MIN, IL.ZONE_MIN = 140, 120
+IL.COLUMN_ORDER = { "thumb", "name", "level", "faction", "zone", "access", "quests", "action" }
+local KEEP = { "level", "action", "thumb", "quests", "faction", "zone", "access" }
+
+function IL.ListColumns(width, scale)
+  width = number(width, 0)
+  scale = math.max(1, number(scale, 1))
+  local function base(id)
+    return math.ceil((id == "zone" and IL.ZONE_MIN or IL.COLUMN_BASE[id]) * scale)
+  end
+  local nameMin = math.ceil(IL.NAME_MIN * scale)
+  local inner = width - 2 * IL.ROW_PAD
+  local used, on = nameMin, { name = true }
+  for _, id in ipairs(KEEP) do
+    local need = base(id) + IL.ROW_GAP
+    if used + need <= inner then
+      on[id] = true
+      used = used + need
+    end
+  end
+  local fixed = 0
+  for _, id in ipairs(IL.COLUMN_ORDER) do
+    if on[id] and id ~= "name" and id ~= "zone" then
+      fixed = fixed + base(id) + IL.ROW_GAP
+    end
+  end
+  local free = inner - fixed - (on.zone and IL.ROW_GAP or 0)
+  local widths = {}
+  if on.zone then
+    local nameW = math.min(math.max(nameMin, math.floor(free * 0.55)), free - base("zone"))
+    widths.name = nameW
+    widths.zone = math.max(1, free - nameW)
+  else
+    widths.name = math.max(1, free)
+  end
+  local list, by, x = {}, {}, IL.ROW_PAD
+  for _, id in ipairs(IL.COLUMN_ORDER) do
+    if on[id] then
+      local col = { id = id, x = x, w = widths[id] or base(id) }
+      list[#list + 1], by[id] = col, col
+      x = x + col.w + IL.ROW_GAP
+    end
+  end
+  return { list = list, by = by }
 end
 
 -- Plaque fit ---------------------------------------------------------------------------------------

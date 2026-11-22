@@ -10,7 +10,6 @@ ns.MapRouteList = MRL
 
 local SWATCH_W, DUR_W, TAB_H = 30, 52, 28
 local ROW_MIN = 30
-local ICON_BTN, ICON_GAP = 28, 2 -- boxed icon button, space between buttons
 local MAX_STOPS_TITLE = 8 -- room for " 99/100" behind the goal name in a title
 
 ns.AddLocale("enUS", {
@@ -23,10 +22,10 @@ ns.AddLocale("enUS", {
   ["map.route.capped"] = "Route too long to draw, the list shows every leg.",
   ["map.route.copy"] = "Copy as text",
   ["map.route.adopt"] = "Take route as waypoints",
-  ["map.route.adopt.tip"] = "Adds a waypoint per stop with a position.\nExisting waypoints of this route are replaced.",
+  ["map.route.adopt.tip"] = "Adds a waypoint per stop with a position.\nReplaces existing waypoints of this route.",
   ["map.route.adopt.title"] = "Route as waypoints",
-  ["map.route.adopt.text"] = "Add %d waypoints for the route to %s?\nExisting ones of this route are replaced.",
-  ["map.route.adopt.ask"] = "Add waypoints for the route?\nExisting ones of this route are replaced.",
+  ["map.route.adopt.text"] = "Add %d waypoints for the route to %s?\nThe addon replaces existing waypoints of this route.",
+  ["map.route.adopt.ask"] = "Add waypoints for the route?\nThe addon replaces existing waypoints of this route.",
   ["map.route.adopt.done"] = "%d waypoints added for the route to %s.",
   ["map.route.adopt.limit"] = "Waypoint list full: only %d of %d stops added.",
   ["map.route.adopt.skipped"] = "No real position, skipped: %s.",
@@ -36,23 +35,29 @@ ns.AddLocale("enUS", {
   ["map.route.next.done"] = "All stops of this route are reached.",
   ["map.route.next.none"] = "No stop of this route has a real position.",
   ["map.route.wpName"] = "Route: %s",
-  ["map.route.pickStart"] = "Click a start. Esc or Done ends.",
-  ["map.route.pickDest"] = "Click a goal. Esc or Done ends.",
-  ["map.plan"] = "Start and goal",
+  ["map.route.pickStart"] = "Click a start. Esc or Done ends the mode.",
+  ["map.route.pickDest"] = "Click a goal. Esc or Done ends the mode.",
   ["map.resetRoute"] = "Reset route",
   ["map.resetRoute.tip"] = "Clears start, goal and stops.",
-  ["map.addStop"] = "+ Stop",
-  ["map.addStop.tip"] = "Adds the selected place as a stop. Up to 5 stops, in the order shown.",
-  ["map.stop"] = "Stop %d: %s",
-  ["map.stop.up"] = "Move stop up",
-  ["map.stop.down"] = "Move stop down",
-  ["map.stop.remove"] = "Remove stop",
+  ["act.waypoint"] = "Waypoint",
+  ["map.point.name"] = "Point in %s (%d, %d)",
+  ["map.point.unknown"] = "Point (%d, %d)",
+  ["map.cf.grid"] = "walk map",
+  ["map.route.waitRide"] = "wait %s, ride %s",
+  ["map.route.estimated"] = "Estimated: %d leg(s) walk over free points, refined as soon as the walk map answers.",
+  ["map.pin.start"] = "S",
+  ["map.pin.goal"] = "G",
+  ["map.pin.tip"] = "%s: %s",
+  ["map.pin.tip.free"] = "Drag to move this point.",
+  ["map.pin.role.start"] = "Start",
+  ["map.pin.role.goal"] = "Goal",
+  ["map.pin.role.stop"] = "Stop %d",
   ["map.route.part"] = "Part %d: %s to %s",
   ["map.route.part.stop"] = "%s (stop %d)",
   ["map.route.noneLeg"] = "No connection for part %d (%s to %s), change filters or faction.",
   ["map.route.share"] = "Route text for pasting:",
   ["map.route.paste"] = "Paste a route",
-  ["map.route.paste.done"] = "Route taken over.",
+  ["map.route.paste.done"] = "Route imported.",
   ["map.route.paste.bad"] = "This text is not a Forever Guides route.",
   ["map.route.paste.unknown"] = "Place not known for this faction: %s.",
 })
@@ -67,30 +72,36 @@ ns.AddLocale("deDE", {
   ["map.route.capped"] = "Route zu lang für die Karte, die Liste zeigt alle Etappen.",
   ["map.route.copy"] = "Als Text kopieren",
   ["map.route.adopt"] = "Route als Wegpunkte übernehmen",
-  ["map.route.adopt.tip"] = "Legt für jeden Halt mit Position einen Wegpunkt an.\nBestehende Wegpunkte dieser Route werden ersetzt.",
+  ["map.route.adopt.tip"] = "Legt für jeden Stopp mit Position einen Wegpunkt an.\nErsetzt bestehende Wegpunkte dieser Route.",
   ["map.route.adopt.title"] = "Route als Wegpunkte",
-  ["map.route.adopt.text"] = "%d Wegpunkte für die Route nach %s anlegen?\nBestehende dieser Route werden ersetzt.",
-  ["map.route.adopt.ask"] = "Wegpunkte für die Route anlegen?\nBestehende dieser Route werden ersetzt.",
+  ["map.route.adopt.text"] = "%d Wegpunkte für die Route nach %s anlegen?\nDas Addon ersetzt bestehende Wegpunkte dieser Route.",
+  ["map.route.adopt.ask"] = "Wegpunkte für die Route anlegen?\nDas Addon ersetzt bestehende Wegpunkte dieser Route.",
   ["map.route.adopt.done"] = "%d Wegpunkte für die Route nach %s angelegt.",
-  ["map.route.adopt.limit"] = "Wegpunkt-Liste voll: nur %d von %d Halten angelegt.",
+  ["map.route.adopt.limit"] = "Wegpunktliste voll: nur %d von %d Stopps angelegt.",
   ["map.route.adopt.skipped"] = "Keine echte Position, übersprungen: %s.",
-  ["map.route.adopt.none"] = "Kein Halt mit echter Position, kein Wegpunkt angelegt.",
-  ["map.route.next"] = "Nächster Halt zum Pfeil",
-  ["map.route.next.tip"] = "Richtet den Pfeil auf den ersten noch nicht erreichten Halt.",
-  ["map.route.next.done"] = "Alle Halte dieser Route sind erreicht.",
-  ["map.route.next.none"] = "Kein Halt dieser Route hat eine echte Position.",
+  ["map.route.adopt.none"] = "Kein Stopp mit echter Position, kein Wegpunkt angelegt.",
+  ["map.route.next"] = "Nächster Stopp zum Pfeil",
+  ["map.route.next.tip"] = "Richtet den Pfeil auf den ersten noch nicht erreichten Stopp.",
+  ["map.route.next.done"] = "Alle Stopps dieser Route sind erreicht.",
+  ["map.route.next.none"] = "Kein Stopp dieser Route hat eine echte Position.",
   ["map.route.wpName"] = "Route: %s",
-  ["map.route.pickStart"] = "Start anklicken. Esc oder Beenden schließt.",
-  ["map.route.pickDest"] = "Ziel anklicken. Esc oder Beenden schließt.",
-  ["map.plan"] = "Start und Ziel",
+  ["map.route.pickStart"] = "Klicke einen Start an. Esc oder Beenden schließt den Modus.",
+  ["map.route.pickDest"] = "Klicke ein Ziel an. Esc oder Beenden schließt den Modus.",
   ["map.resetRoute"] = "Route zurücksetzen",
-  ["map.resetRoute.tip"] = "Leert Start, Ziel und Zwischenstopps.",
-  ["map.addStop"] = "+ Zwischenstopp",
-  ["map.addStop.tip"] = "Fügt den gewählten Ort als Zwischenstopp hinzu. Bis zu 5 Stopps, in der gezeigten Reihenfolge.",
-  ["map.stop"] = "Stopp %d: %s",
-  ["map.stop.up"] = "Stopp nach oben",
-  ["map.stop.down"] = "Stopp nach unten",
-  ["map.stop.remove"] = "Stopp entfernen",
+  ["map.resetRoute.tip"] = "Leert Start, Ziel und Stopps.",
+  ["act.waypoint"] = "Wegpunkt",
+  ["map.point.name"] = "Punkt in %s (%d, %d)",
+  ["map.point.unknown"] = "Punkt (%d, %d)",
+  ["map.cf.grid"] = "Laufkarte",
+  ["map.route.waitRide"] = "Warten %s, Fahrt %s",
+  ["map.route.estimated"] = "Geschätzt: %d Laufstück(e) über freie Punkte, wird genauer, sobald die Laufkarte antwortet.",
+  ["map.pin.start"] = "S",
+  ["map.pin.goal"] = "Z",
+  ["map.pin.tip"] = "%s: %s",
+  ["map.pin.tip.free"] = "Ziehen verschiebt diesen Punkt.",
+  ["map.pin.role.start"] = "Start",
+  ["map.pin.role.goal"] = "Ziel",
+  ["map.pin.role.stop"] = "Stopp %d",
   ["map.route.part"] = "Teilstrecke %d: %s nach %s",
   ["map.route.part.stop"] = "%s (Stopp %d)",
   ["map.route.noneLeg"] = "Keine Verbindung für Teilstrecke %d (%s nach %s), ändere Filter oder Fraktion.",
@@ -148,7 +159,7 @@ local function extras(step, colored)
   if step.rq and L["map.rq." .. step.rq] ~= "map.rq." .. step.rq then
     out[#out + 1] = tint("warning", L["map.rq." .. step.rq])
   end
-  if step.cf == "estimate" or step.cf == "reported" then
+  if step.cf == "estimate" or step.cf == "reported" or step.cf == "grid" then
     out[#out + 1] = tint("textMuted", L["map.cf." .. step.cf])
   end
   if step.cost and step.cost > 0 then
@@ -163,10 +174,25 @@ end
 -- The tooltip text of a step: second line, duration, and where a walk time comes from.
 function MRL.LegDetail(step)
   local text = MRL.StepSub(step) .. " · " .. TL.FormatDuration(step.sec)
+  local wait = MRL.WaitText(step)
+  if wait then
+    text = text .. " · " .. wait
+  end
   if step.wc then
     text = text .. " · " .. L["map.cf.world"]
   end
   return text
+end
+
+-- "wait 2:00, ride 1:10" for a step with a timetable wait, nil without one.
+function MRL.WaitText(step)
+  if step.wait and step.wait > 0 and step.mode ~= "walk" then
+    return string.format(
+      L["map.route.waitRide"],
+      TL.FormatDuration(step.wait),
+      TL.FormatDuration(math.max(0, step.sec - step.wait))
+    )
+  end
 end
 
 -- The second line of a step: transport, then the extra facts.
@@ -174,6 +200,10 @@ function MRL.StepSub(step)
   local parts = { L["map.mode." .. step.mode] }
   for _, e in ipairs(extras(step, true)) do
     parts[#parts + 1] = e
+  end
+  local wait = MRL.WaitText(step)
+  if wait then
+    parts[#parts + 1] = Theme.hexText("textMuted", wait)
   end
   return table.concat(parts, " · ")
 end
@@ -238,17 +268,13 @@ function MRL.Text(result, nameOf, share)
   return table.concat(lines, "\n")
 end
 
--- Which end a click on a place sets next in the Start/Goal mode.
-function MRL.NextWhich(st)
-  return st.pickNext or ((st.start and not st.dest) and "dest" or "start")
-end
-
--- Sets the next end to the place and moves on; returns which end was set.
-function MRL.Pick(st, slug)
-  local which = MRL.NextWhich(st)
-  st[which] = slug
-  st.pickNext = which == "start" and "dest" or "start"
-  return which
+-- The name of a free point: its zone (nil when unknown) and the position in percent.
+function MRL.PointName(p, zoneName)
+  local x, y = math.floor(p.x * 100 + 0.5), math.floor(p.y * 100 + 0.5)
+  if zoneName then
+    return string.format(L["map.point.name"], zoneName, x, y)
+  end
+  return string.format(L["map.point.unknown"], x, y)
 end
 
 -- Start, the stops in order, goal (start and goal must be set).
@@ -261,43 +287,7 @@ function MRL.Chain(st)
   return out
 end
 
--- Adds slug as the last stop. Returns true, or false and the reason: "none" (no place), "full"
--- (TL.MAX_STOPS reached) or "same" (the place before or after it is the same one).
-function MRL.AddStop(st, slug)
-  if not slug then
-    return false, "none"
-  end
-  st.stops = st.stops or {}
-  if #st.stops >= TL.MAX_STOPS then
-    return false, "full"
-  end
-  if slug == (st.stops[#st.stops] or st.start) or slug == st.dest then
-    return false, "same"
-  end
-  st.stops[#st.stops + 1] = slug
-  return true
-end
-
--- Swaps stop i with its neighbor (delta -1 up, 1 down). Returns whether anything moved.
-function MRL.MoveStop(st, i, delta)
-  local stops = st.stops or {}
-  local j = i + delta
-  if not (stops[i] and stops[j]) then
-    return false
-  end
-  stops[i], stops[j] = stops[j], stops[i]
-  return true
-end
-
-function MRL.RemoveStop(st, i)
-  if st.stops and st.stops[i] then
-    table.remove(st.stops, i)
-    return true
-  end
-  return false
-end
-
--- "fgroute:v1:<faction>:<start>;<stop>;...;<goal>" with the place slugs, to share or paste.
+-- "fgroute:v1:<faction>:<start>;<stop>;...;<goal>" with the place slugs (free points as @map_x_y), to share or paste.
 function MRL.Encode(faction, list)
   return "fgroute:v1:" .. faction .. ":" .. table.concat(list, ";")
 end
@@ -305,13 +295,13 @@ end
 -- Reads such a string: { faction, start, stops, dest } or nil and "format". Only the shape is
 -- checked here, whether the places exist is the caller's business.
 function MRL.Decode(text)
-  local faction, body = ns.U.trim(text or ""):match("^fgroute:v1:([AH]):([%w%-;]+)$")
+  local faction, body = ns.U.trim(text or ""):match("^fgroute:v1:([AH]):([%w%-;@_]+)$")
   if not faction then
     return nil, "format"
   end
   local list = {}
   for slug in (body .. ";"):gmatch("([^;]*);") do
-    if slug == "" then
+    if slug == "" or (TL.IsPoint(slug) and not TL.ParsePoint(slug)) then
       return nil, "format"
     end
     list[#list + 1] = slug
@@ -348,6 +338,9 @@ function MRL.Options(st)
     mount = st.mount ~= false,
     preferFlight = st.preferFlight ~= false,
     today = okDate and today or nil,
+    worldPos = ns.TravelWalk.CanConvert() and ns.TravelWalk.GamePos or nil,
+    walkCost = ns.RouteWalk.Cost,
+    walkStyle = ns.RouteWalk.Style(),
   }
 end
 
@@ -476,104 +469,26 @@ function MRL.NextStop(stops, byK, done)
   end
 end
 
--- Controls -----------------------------------------------------------------------------
-
--- The start, stop and goal lines of the side column. ctx = { side, state, nameOf(slug),
--- changed() }: the lines read state.start, state.stops and state.dest; a change of the stop list
--- (move, remove) calls changed(). Returns { box, startText, destText, rows, Update }; the page
--- sets the texts of start and goal itself.
-function MRL.AttachStops(ctx)
-  local st = ctx.state
-  local box = CreateFrame("Frame", nil, ctx.side.content)
-  local ctl = { box = box, rows = {} }
-  ctl.startText = W.Text(box, { role = "text", color = "text", wrap = true })
-  ctl.destText = W.Text(box, { role = "text", color = "text", wrap = true })
-
-  local function newRow()
-    local row = CreateFrame("Frame", nil, box)
-    row.text = W.Text(row, { role = "text", color = "text", wrap = true })
-    local function act(fn, delta)
-      return function()
-        if fn(st, row.index, delta) then
-          ctx.changed()
-        end
-      end
+-- specFor(slug) extended by free points, which carry their own position.
+function MRL.SpecOf(specFor)
+  return function(slug)
+    local p = TL.IsPoint(slug) and TL.ParsePoint(slug)
+    if p then
+      return { map = p.map, x = p.x, y = p.y }
     end
-    row.remove = W.Action(row, {
-      icon = "close",
-      size = ICON_BTN,
-      boxed = true,
-      tooltip = "map.stop.remove",
-      onClick = act(MRL.RemoveStop),
-    })
-    row.down = W.Action(row, {
-      icon = "chevron-down",
-      size = ICON_BTN,
-      boxed = true,
-      tooltip = "map.stop.down",
-      onClick = act(MRL.MoveStop, 1),
-    })
-    row.up = W.Action(row, {
-      icon = "chevron-up",
-      size = ICON_BTN,
-      boxed = true,
-      tooltip = "map.stop.up",
-      onClick = act(MRL.MoveStop, -1),
-    })
-    row.remove:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-    row.down:SetPoint("RIGHT", row.remove, "LEFT", -ICON_GAP, 0)
-    row.up:SetPoint("RIGHT", row.down, "LEFT", -ICON_GAP, 0)
-    return row
+    return specFor(slug)
   end
+end
 
-  -- Texts and buttons of the stop rows from the state; rows beyond the list hide.
-  function ctl.Update()
-    local stops = st.stops or {}
-    for i, slug in ipairs(stops) do
-      local row = ctl.rows[i]
-      if not row then
-        row = newRow()
-        ctl.rows[i] = row
-      end
-      row.index = i
-      W.SetText(row.text, nil, string.format(L["map.stop"], i, ctx.nameOf(slug)))
-      row.up:SetShown(i > 1)
-      row.down:SetShown(i < #stops)
-      row:Show()
-    end
-    for i = #stops + 1, #ctl.rows do
-      ctl.rows[i].index = nil
-      ctl.rows[i]:Hide()
+-- How many walk legs of a route are estimates over free points (they refine asynchronously).
+function MRL.EstimatedLegs(route)
+  local n = 0
+  for _, step in ipairs(route and route.steps or {}) do
+    if step.est then
+      n = n + 1
     end
   end
-
-  function box:fgGridLayout(width)
-    ctl.startText:ClearAllPoints()
-    ctl.startText:SetPoint("TOPLEFT", self, "TOPLEFT")
-    ctl.startText:SetWidth(width)
-    local y = math.ceil(ctl.startText:GetStringHeight()) + 6
-    local textW = math.max(40, width - 3 * ICON_BTN - 2 * ICON_GAP - 8)
-    for _, row in ipairs(ctl.rows) do
-      if row.index then
-        row.text:ClearAllPoints()
-        row.text:SetPoint("LEFT", row, "LEFT")
-        row.text:SetWidth(textW)
-        local h = math.max(ICON_BTN + 2, math.ceil(row.text:GetStringHeight()) + 6)
-        row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-        row:SetSize(width, h)
-        y = y + h + 4
-      end
-    end
-    ctl.destText:ClearAllPoints()
-    ctl.destText:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-    ctl.destText:SetWidth(width)
-    y = y + math.ceil(ctl.destText:GetStringHeight())
-    self:SetHeight(y)
-    return y
-  end
-
-  return ctl
+  return n
 end
 
 -- Attach -------------------------------------------------------------------------------
@@ -599,7 +514,7 @@ function MRL.Attach(ctx)
   ctl.box = box
   local msg = W.Text(box, { role = "ui", color = "textSecondary", wrap = true })
   local total = W.Text(box, { role = "h2", family = "heading", color = "accent2" })
-  local meta = W.Text(box, { role = "ui", color = "textSecondary" })
+  local meta = W.Text(box, { role = "ui", color = "textSecondary", wrap = true })
   local note = W.Text(box, { role = "micro", color = "textMuted", wrap = true })
   local capped = W.Text(box, { key = "map.route.capped", role = "micro", color = "warning", wrap = true })
   ctl.msg, ctl.total, ctl.meta, ctl.note, ctl.capped = msg, total, meta, note, capped
@@ -691,7 +606,7 @@ function MRL.Attach(ctx)
       self:Click()
     end)
     ns.Bind(row, function(self)
-      self.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+      self.line:SetColorTexture(Theme.fillColor("line"))
       self.stripe:SetColorTexture(Theme.color("accent2"))
       if self.step then
         ctl.PaintRow(self)
@@ -714,7 +629,7 @@ function MRL.Attach(ctx)
   function ctl.PaintRow(row)
     local style = MR.Style(row.step.mode)
     local lit = ctx.route.hover == row.index
-    row.bg:SetColorTexture(1, 1, 1, lit and 0.12 or 0)
+    row.bg:SetColorTexture(Theme.fillColor(lit and "selected" or nil))
     row.stripe:SetShown(lit)
     local segs = MR.Swatch(style, SWATCH_W)
     for i, tex in ipairs(row.swatch) do
@@ -749,13 +664,28 @@ function MRL.Attach(ctx)
   end
 
   -- Buttons --------------------------------------------------------------------------------
+  -- ctx.goal() names the goal where the route is not the state's own (the page: RoutePlan).
+  local function goalSlug()
+    return ctx.goal and ctx.goal() or st.dest
+  end
+
   local function goal()
-    return ctx.nameOf(st.dest)
+    return ctx.nameOf(goalSlug())
   end
 
   local function currentStops()
     local route = ctl.routes[st.alt or 1]
-    return route and MRL.Stops(route.steps, ctx.specFor) or {}
+    return route and MRL.Stops(route.steps, MRL.SpecOf(ctx.specFor)) or {}
+  end
+
+  -- What to do at stop k: its leg of the shown route.
+  local function legNote(k)
+    local route = ctl.routes[st.alt or 1]
+    local step = route and route.steps[k]
+    if not step then
+      return nil
+    end
+    return string.format(L["map.route.leg"], k, ctx.nameOf(step.from), ctx.nameOf(step.to)) .. "\n" .. MRL.StepSub(step)
   end
 
   -- Takes the stops of the shown route as waypoints (after the question); replaces the waypoints
@@ -774,6 +704,7 @@ function MRL.Attach(ctx)
         x = s.spec.x,
         y = s.spec.y,
         title = MRL.Title(name, s.k, stopCount),
+        note = legNote(s.k),
         source = "map",
         pinned = false,
       })
@@ -781,6 +712,12 @@ function MRL.Attach(ctx)
         added = added + 1
         ctl.adopted.ks[s.k] = true
       end
+    end
+    -- The arrow leads from transfer to transfer: the first stop after the start, then the list order.
+    local byK = MRL.RouteWaypoints(WP.List(), name)
+    local first = MRL.NextStop({ unpack(plan.items, 2) }, byK, nil)
+    if first and byK[first.k] then
+      WP.Activate(byK[first.k].id)
     end
     ns.Notify(string.format(L["map.route.adopt.done"], added, name), "success")
     if plan.truncated then
@@ -798,7 +735,7 @@ function MRL.Attach(ctx)
 
   function ctl.Adopt()
     local stops = currentStops()
-    if #stops == 0 or not st.dest then
+    if #stops == 0 or not goalSlug() then
       return
     end
     local plan = MRL.PlanAdopt(stops, goal(), ns.Waypoints.List(), WL.MAX)
@@ -826,7 +763,7 @@ function MRL.Attach(ctx)
   -- Points the arrow at the first stop that was not reached yet.
   function ctl.NextStop()
     local stops = currentStops()
-    if #stops == 0 or not st.dest then
+    if #stops == 0 or not goalSlug() then
       return
     end
     local name = goal()
@@ -983,7 +920,12 @@ function MRL.Attach(ctx)
     end
     if route then
       W.SetText(total, nil, TL.FormatDuration(route.totalSec))
-      W.SetText(meta, nil, string.format(L["map.route.legs"], #steps))
+      local text = string.format(L["map.route.legs"], #steps)
+      local est = MRL.EstimatedLegs(route)
+      if est > 0 then
+        text = text .. " · " .. string.format(L["map.route.estimated"], est)
+      end
+      W.SetText(meta, nil, text)
     end
     ctl.buttons:SetItemEnabled("adopt", route ~= nil)
     ctl.buttons:SetItemEnabled("next", route ~= nil)
@@ -1022,6 +964,7 @@ function MRL.Attach(ctx)
     local y = math.ceil(total:GetStringHeight()) + 2
     meta:ClearAllPoints()
     meta:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+    meta:SetWidth(width)
     y = y + math.ceil(meta:GetStringHeight()) + 8
     -- Tabs wrap like a button row; with a single route there is nothing to choose.
     if #routes > 1 then

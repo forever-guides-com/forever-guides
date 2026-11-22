@@ -24,7 +24,7 @@ local function newRow(parent)
   row:SetHeight(SG.ROW)
   row.hover = row:CreateTexture(nil, "BACKGROUND")
   row.hover:SetAllPoints()
-  row.hover:SetColorTexture(1, 1, 1, 0)
+  row.hover:SetColorTexture(ns.Theme.fillColor())
   -- The chosen row has a bar at its left edge as well as a different text color: color never carries it alone.
   row.bar = row:CreateTexture(nil, "ARTWORK")
   row.bar:SetPoint("TOPLEFT")
@@ -102,7 +102,7 @@ local function paintSelection()
   for i, row in ipairs(list and list.rows or {}) do
     local on = row:IsShown() and row.fgIndex == state.selected
     row.bar:SetShown(on)
-    row.hover:SetColorTexture(1, 1, 1, on and 0.1 or 0)
+    row.hover:SetColorTexture(Theme.fillColor(on and "hover" or nil))
     W.SetColor(row.label, on and "accent" or "text")
     if i > #state.shown then
       row.bar:Hide()

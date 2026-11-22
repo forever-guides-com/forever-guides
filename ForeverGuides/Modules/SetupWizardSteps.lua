@@ -308,12 +308,65 @@ end
 
 -- 8: sharing ---------------------------------------------------------------------------------------------
 
--- A row per function of the opt-in register that can show up (the first nine; the rest is in the settings
--- tab), send and receive for its first audience. Nothing is on until the player switches it on.
-local MAX_SHARING = 9
+-- The map table of the card on the world map (Modules/MapSharePrompt.lua). The boxes edit a draft that starts like the
+-- card (groups never decided are on until the question was answered, decided ones show the stored state); only
+-- finishing the wizard writes it.
+local MAP_TABLE_W = 360
+local mapDraft
+
+local function loadMapDraft()
+  local P = ns.MapSharePrompt
+  local prefill = P.Asked() < P.VERSION
+  mapDraft = {}
+  for _, group in ipairs(P.GROUPS) do
+    mapDraft[group.id] = {}
+    for _, column in ipairs(P.COLUMNS) do
+      mapDraft[group.id][column.id] = P.Current(group, column, prefill)
+    end
+  end
+end
+
+local function mapShare(view)
+  local P = ns.MapSharePrompt
+  if not (P and ns.Consent and ns.Consent.IsAvailable("friendMap")) then
+    return
+  end
+  if not mapDraft then
+    loadMapDraft()
+  end
+  local width = math.floor(MAP_TABLE_W * ns.SetupWizardRows.Factor() + 0.5)
+  local tbl = P.NewTable(view.area.content, {
+    width = width,
+    idPrefix = "wizard-mapshare-",
+    get = function(group, column)
+      return mapDraft ~= nil and mapDraft[group.id][column.id] == true
+    end,
+    set = function(group, column, value)
+      mapDraft[group.id][column.id] = value == true
+    end,
+  })
+  tbl.fgId = "wizard-mapshare"
+  view.stack:Add(tbl, { height = tbl:GetHeight(), width = width, gap = 6 })
+end
+
+local function mapShareClose(how)
+  if how == "finish" and mapDraft then
+    -- Same write as the card: all six flags explicit, and the card does not ask again.
+    ns.MapSharePrompt.Apply(mapDraft)
+  end
+  mapDraft = nil
+end
+
+
+
+-- A row per function of the opt-in register that can show up (the first four and the table; the rest is in the settings
+-- tab), send and receive for its first audience. Nothing is on until the player switches it on. The two map
+-- functions are the table above the rows, which takes the room of the rows that no longer fit the window height.
+local MAP_FUNCTIONS = { guildMap = true, friendMap = true }
+local MAX_SHARING = 4
 local sharing = {}
 for _, def in ipairs(ns.Consent and ns.Consent.List() or {}) do
-  if #sharing < MAX_SHARING and not ns.Consent.IsHidden(def.id) then
+  if #sharing < MAX_SHARING and not MAP_FUNCTIONS[def.id] and not ns.Consent.IsHidden(def.id) then
     sharing[#sharing + 1] = {
       type = "consent",
       key = "consent." .. def.id,
@@ -327,7 +380,10 @@ end
 step("sharing", sharing, {
   tab = "privacy",
   since = "0.5.0",
-  layout = { "title", "text", "privacy", "bulk", "controls", "allSettings" },
+  revised = "1.0.0",
+  mapShare = mapShare,
+  onClose = mapShareClose,
+  layout = { "title", "text", "mapshare", "privacy", "bulk", "controls", "allSettings" },
 })
 
 -- 10: done -----------------------------------------------------------------------------------------------

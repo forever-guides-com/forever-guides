@@ -131,7 +131,7 @@ local function guildKey()
     return nil
   end
   if type(realm) ~= "string" or realm == "" then
-    realm = try(g("GetNormalizedRealmName"))
+    realm = ns.Realm.Get()
   end
   return PN.Lower(name) .. "-" .. PN.Lower(type(realm) == "string" and realm or "")
 end

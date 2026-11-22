@@ -13,7 +13,9 @@ fish.FG.FishingLauncher.Register({
   StatusText = fish.Controller.StatusText,
   KeyText = fish.Controller.KeyText,
   Show = fish.Card.Show,
-  Journal = fish.JournalView.Open,
+  Journal = function()
+    fish.FG.Main.Show("fishing")
+  end,
   -- The fishing places for the panel of the world map: the fish of the area a zone name belongs to, the
   -- icon and the quality color of a fish, its item tooltip and the window of all places.
   Places = {

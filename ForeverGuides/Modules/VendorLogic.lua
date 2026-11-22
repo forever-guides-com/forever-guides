@@ -11,7 +11,7 @@ ns.VendorLogic = V
 V.MAX_SELLERS = 3
 
 -- Kinds of vendor in the order the page lists them: filter value, locale key part.
-V.KINDS = { "g", "r", "m", "k", "x", "f", "d", "b", "p", "t" }
+V.KINDS = { "g", "r", "m", "k", "x", "f", "d", "b", "p", "t", "o" }
 
 ns.AddLocale("enUS", {
   ["vendor.header"] = "Sold by:",
@@ -19,7 +19,7 @@ ns.AddLocale("enUS", {
   ["vendor.lineNoPrice"] = "%s (%s)",
   ["vendor.stack"] = "%s for %d",
   ["vendor.limited"] = "limited stock",
-  ["vendor.restricted"] = "needs standing or a quest",
+  ["vendor.restricted"] = "needs reputation or a quest",
   ["vendor.more"] = "and %d more",
   ["vendor.free"] = "free",
 })
@@ -113,6 +113,97 @@ function V.Build(data)
   return index
 end
 
+-- Mount vendors ---------------------------------------------------------------------------------------
+
+-- Kind letter of a vendor that sells a mount.
+V.MOUNT_KIND = "o"
+
+local function addOffer(index, entry, id, price, flags)
+  for _, offer in ipairs(entry.offers) do
+    if offer.id == id then
+      return
+    end
+  end
+  local offer = { id = id, price = price, flags = flags, count = 1 }
+  entry.offers[#entry.offers + 1] = offer
+  local at = index.byItem[id]
+  if not at then
+    at = {}
+    index.byItem[id] = at
+  end
+  at[#at + 1] = { vendor = entry, offer = offer }
+end
+
+-- Merges the vendors of the mount data (ns.Data.Mounts: mounts with item, fac and sources { t = "vendor", npc, n,
+-- c, z, x, y }, zones[z] = { en, m }) into the index. A vendor that is already there only gains the mount item and
+-- the mount kind, a new one is added with the place the mount data knows (none is fine: map, x and y stay nil).
+function V.AddMounts(index, mounts)
+  mounts = list(mounts)
+  local zones = list(mounts.zones)
+  for _, mount in ipairs(list(mounts.mounts)) do
+    local item = whole(mount.item, 1)
+    local sources = list(mount.s)
+    local conditional = false
+    for _, s in ipairs(sources) do
+      conditional = conditional or s.t == "pvp"
+    end
+    for _, s in ipairs(sources) do
+      local npc = s.t == "vendor" and whole(s.npc, 1) or nil
+      local name = type(s.n) == "table" and (s.n.en or s.n.de) or nil
+      if item and npc and type(name) == "string" then
+        local entry = index.byNpc[npc]
+        if not entry then
+          local zone = s.z and zones[s.z] or nil
+          local placed = zone and whole(zone.m, 1) and tonumber(s.x) and tonumber(s.y)
+          entry = {
+            npc = npc,
+            name = name,
+            nameDe = type(s.n.de) == "string" and s.n.de ~= name and s.n.de or nil,
+            map = zone and whole(zone.m, 1) or nil,
+            x = placed and tonumber(s.x) or nil,
+            y = placed and tonumber(s.y) or nil,
+            faction = (mount.fac == "A" or mount.fac == "H") and mount.fac or "B",
+            kinds = "",
+            mask = 0,
+            zoneEn = zone and type(zone.en) == "string" and zone.en or nil,
+            offers = {},
+          }
+          index.list[#index.list + 1] = entry
+          index.byNpc[npc] = entry
+        end
+        if not V.HasKind(entry, V.MOUNT_KIND) then
+          entry.kinds = entry.kinds .. V.MOUNT_KIND
+        end
+        addOffer(index, entry, item, math.max(0, tonumber(s.c) or 0), conditional and 2 or 0)
+      end
+    end
+  end
+  return index
+end
+
+-- Name of a vendor in the active language (the data names are English, mount vendors also carry German).
+function V.Name(entry)
+  return ns.GetActiveLocale() == "deDE" and entry.nameDe or entry.name
+end
+
+local byName = setmetatable({}, { __mode = "k" })
+
+-- The NPC id of the vendor with exactly this English name, nil when no vendor or several vendors have it.
+function V.NpcByName(index, name)
+  if type(index) ~= "table" or type(name) ~= "string" then
+    return nil
+  end
+  local map = byName[index]
+  if not map then
+    map = {}
+    for _, e in ipairs(index.list) do
+      map[e.name] = map[e.name] == nil and e.npc or false
+    end
+    byName[index] = map
+  end
+  return map[name] or nil
+end
+
 -- Sellers --------------------------------------------------------------------------------------------
 
 -- True when the faction (A, H, else everybody) may use the vendor (neutral vendors serve both).
@@ -187,7 +278,7 @@ end
 -- Text line of one seller: "Name (Zone): price (notes)". ctx.zone(entry) names the zone, ctx.money(copper) the coins.
 function V.SellerText(seller, ctx)
   local zone = ctx.zone(seller.vendor) or "?"
-  return string.format(ns.L["vendor.line"], seller.vendor.name, zone, V.PriceText(seller.offer, ctx.money))
+  return string.format(ns.L["vendor.line"], V.Name(seller.vendor), zone, V.PriceText(seller.offer, ctx.money))
     .. notes(seller.offer)
 end
 
@@ -222,7 +313,7 @@ end
 
 -- The text a search compares: name, zone names and the names of the offers (f.zoneText(entry), f.itemName(id)).
 local function haystack(entry, f)
-  local parts = { entry.name, entry.zoneEn or "" }
+  local parts = { entry.name, entry.nameDe or "", entry.zoneEn or "" }
   if f.zoneText then
     parts[#parts + 1] = f.zoneText(entry) or ""
   end
@@ -252,6 +343,38 @@ function V.Filter(entries, f)
     end
   end
   return out
+end
+
+-- The offers of one vendor for the detail list, a new list. f.query (every word has to occur in the item name),
+-- f.name(id), f.match(text, word), f.sort: "name" or "price" (cheapest first, free first), anything else keeps
+-- the order of the data.
+function V.Offers(entry, f)
+  f = f or {}
+  local name = f.name or tostring
+  local words = ns.TrainerSearchLogic.Words(f.query)
+  local out = {}
+  for i, offer in ipairs(entry.offers) do
+    if #words == 0 or ns.TrainerSearchLogic.MatchAll(tostring(name(offer.id)), words, f.match) then
+      out[#out + 1] = { offer = offer, rank = i, name = tostring(name(offer.id)) }
+    end
+  end
+  local sort = f.sort
+  if sort == "name" or sort == "price" then
+    table.sort(out, function(a, b)
+      if sort == "price" and a.offer.price ~= b.offer.price then
+        return a.offer.price < b.offer.price
+      end
+      if a.name ~= b.name then
+        return a.name < b.name
+      end
+      return a.rank < b.rank
+    end)
+  end
+  local offers = {}
+  for i, o in ipairs(out) do
+    offers[i] = o.offer
+  end
+  return offers
 end
 
 local FACTION_ORDER = { A = 1, H = 2, B = 3 }
@@ -289,7 +412,10 @@ function V.Count(entries)
   return #entries, offers
 end
 
--- The place the Map and Waypoint buttons act on: { map, x, y, label, zone }.
+-- The place the Map and Waypoint buttons act on: { map, x, y, label, zone }, nil for a vendor without a position.
 function V.Place(entry, zoneName)
-  return { map = entry.map, x = entry.x, y = entry.y, label = entry.name, zone = zoneName }
+  if not (entry.map and entry.x and entry.y) then
+    return nil
+  end
+  return { map = entry.map, x = entry.x, y = entry.y, label = V.Name(entry), zone = zoneName }
 end

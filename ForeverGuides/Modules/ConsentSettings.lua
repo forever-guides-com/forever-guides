@@ -68,7 +68,7 @@ local function counts()
     for _, dir in ipairs(def.directions) do
       for _, aud in ipairs(def.audiences) do
         total = total + 1
-        if Consent.Allows(def.id, dir, aud) then
+        if Consent.Shown(def.id, dir, aud) then
           active = active + 1
         end
       end
@@ -162,7 +162,7 @@ end
 function S.BulkCounts(targets, dir)
   local on = 0
   for _, t in ipairs(targets) do
-    if Consent.Allows(t.fn, dir, t.aud) then
+    if Consent.Shown(t.fn, dir, t.aud) then
       on = on + 1
     end
   end
@@ -307,6 +307,9 @@ end
 
 -- One function ------------------------------------------------------------------------------------
 
+-- Functions whose default-on label differs from the one of the chat links (prefix of the locale key).
+local DEFAULT_TEXT = { versionCheck = "consent.default.version." }
+
 -- A switch with the date it was switched on behind it.
 local function flagRow(card, def, dir, aud)
   local frame = CreateFrame("Frame", nil, card.content)
@@ -316,7 +319,7 @@ local function flagRow(card, def, dir, aud)
   local toggle = W.Toggle(frame, {
     key = "consent.aud." .. aud,
     get = function()
-      return Consent.Allows(def.id, dir, aud)
+      return Consent.Shown(def.id, dir, aud)
     end,
     set = function(v)
       Consent.Set(def.id, dir, aud, v == true, "user", scope(def.id))
@@ -331,7 +334,11 @@ local function flagRow(card, def, dir, aud)
   return track(frame, function()
     toggle.Refresh()
     local t = Consent.Since(def.id, dir, aud)
-    W.SetText(since, nil, t and string.format(L["consent.since"], dateText(t)) or "")
+    local text = t and string.format(L["consent.since"], dateText(t)) or ""
+    if not t and Consent.Shown(def.id, dir, aud) then
+      text = L[(DEFAULT_TEXT[def.id] or "consent.default.on.") .. dir]
+    end
+    W.SetText(since, nil, text)
   end)
 end
 
@@ -384,10 +391,23 @@ local function functionCard(card, def)
   local s = card.stack
   ns.AddHeading(card, def.labelKey)
   ns.AddParagraph(card, def.hintKey, { role = "ui", color = "textSecondary", gap = 6 })
-  for _, dir in ipairs(def.directions) do
-    ns.AddParagraph(card, "consent." .. dir, { role = "micro", color = "textMuted", gap = 2 })
-    for _, aud in ipairs(def.audiences) do
-      s:Add(flagRow(card, def, dir, aud), { height = 24, gap = 4 })
+  if def.id == "friendMap" then
+    -- The groups are chosen in one table in the map settings; a second set of switches here would repeat it.
+    local open = W.Action(card.content, {
+      key = "mapshare.consent.open",
+      width = 300,
+      height = 28,
+      opens = true,
+      onClick = ns.MapSharePrompt.OpenSettings,
+    })
+    open.fgId = "consent-friendMap-open"
+    s:Add(open, { height = 28, width = 300, gap = 6 })
+  else
+    for _, dir in ipairs(def.directions) do
+      ns.AddParagraph(card, "consent." .. dir, { role = "micro", color = "textMuted", gap = 2 })
+      for _, aud in ipairs(def.audiences) do
+        s:Add(flagRow(card, def, dir, aud), { height = 24, gap = 4 })
+      end
     end
   end
   ns.AddParagraph(card, "consent." .. def.id .. ".fields", { role = "micro", color = "textMuted", gap = 8 })

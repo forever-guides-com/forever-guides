@@ -15,7 +15,7 @@ ns.AddLocale("enUS", {
   ["instances.bosses.rareHeading"] = "Rare enemies (show up only now and then)",
   ["instances.bosses.oneOf"] = "One of: %s",
   ["instances.bosses.rareNote"] = "Rare enemy: shows up only now and then.",
-  ["instances.bosses.rareGroupNote"] = "These rare enemies share one spot: only one of them shows up at a time.",
+  ["instances.bosses.rareGroupNote"] = "These rare enemies share one spot. Only one of them shows up at a time.",
 })
 
 ns.AddLocale("deDE", {
@@ -23,7 +23,7 @@ ns.AddLocale("deDE", {
   ["instances.bosses.rareHeading"] = "Seltene Gegner (erscheinen nur manchmal)",
   ["instances.bosses.oneOf"] = "Einer von: %s",
   ["instances.bosses.rareNote"] = "Seltener Gegner: erscheint nur manchmal.",
-  ["instances.bosses.rareGroupNote"] = "Diese seltenen Gegner teilen sich einen Platz: es erscheint immer nur einer davon.",
+  ["instances.bosses.rareGroupNote"] = "Diese seltenen Gegner teilen sich einen Platz. Es erscheint immer nur einer davon.",
 })
 
 local BP = {}
@@ -181,11 +181,15 @@ function BP.Create(parent)
   end
 
   local hooks = {
+    share = true,
     select = function(e)
       f:Select(e.entryKey)
     end,
     tip = function()
       return L["instances.bosses.selectTip"]
+    end,
+    open = function()
+      BV.OpenDetail(f)
     end,
     activate = function()
       f:FocusDetail()
@@ -202,6 +206,7 @@ function BP.Create(parent)
 
   local function paintEntry(e, entry)
     e.entryKey = entry.key
+    e.share:SetTarget(IV.BossSharePayload(f.inst, entry.members[1].boss))
     e.fgSelected = f.selected == entry.key or nil
     local text, plain = titleOf(entry)
     local sub = subOf(f.inst, entry)
@@ -300,6 +305,26 @@ function BP.Create(parent)
     changed()
   end
 
+  -- Encounter ID of the chosen entry (first member of a rare group), nil without one.
+  function f:SelectedBossId()
+    local entry = self.selected and find(self.selected)
+    local boss = entry and entry.members[1].boss
+    return boss and boss.eid or nil
+  end
+
+  -- Chooses the entry that holds the boss with this encounter ID (a page link). False when none does.
+  function f:SelectBossId(id)
+    for _, entry in ipairs(self.list) do
+      for _, member in ipairs(entry.members) do
+        if member.boss.eid == id then
+          self:Select(entry.key)
+          return true
+        end
+      end
+    end
+    return false
+  end
+
   function f:FocusDetail()
     for _, stop in ipairs(detailStops()) do
       if stop:IsVisible() then
@@ -313,6 +338,9 @@ function BP.Create(parent)
   function f:SetInstance(inst)
     local list, regular, firstRare = BP.Entries(inst)
     local sameInst = self.inst == inst
+    if not sameInst then
+      self.fgShowDetail = false
+    end
     self.inst, self.list, self.regular = inst, list, regular
     self.count = inst and inst.bo and #inst.bo or 0
     if not (sameInst and self.selected and find(self.selected)) then
@@ -332,7 +360,8 @@ function BP.Create(parent)
     self:OrderFocus()
   end
 
-  function f:fgGridLayout(width)
+  function f:fgGridLayout(width, room)
+    self.fgFill = room and room.fill or nil
     return BV.SplitLayout(self, self.entries, self.detail, width, self.heads)
   end
 

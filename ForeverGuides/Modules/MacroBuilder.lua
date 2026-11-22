@@ -253,7 +253,7 @@ function Builder.Build(P)
     row.sel = row:CreateTexture(nil, "BACKGROUND")
     row.sel:SetPoint("TOPLEFT", -3, 2)
     row.sel:SetPoint("BOTTOMRIGHT", 3, -2)
-    row.sel:SetColorTexture(1, 1, 1, 0.07)
+    row.sel:SetColorTexture(ns.Theme.fillColor("hover"))
     row:Hide()
     clauseRows[i] = row
   end

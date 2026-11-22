@@ -35,6 +35,8 @@ RUL.KINDS = {
   { id = "tag", ops = { "has", "hasNot" }, value = "tag" },
   { id = "dateKnown", ops = { "exact", "bounded" }, value = "field" },
   { id = "online", ops = { "is", "isNot" }, bare = { is = true, isNot = true } },
+  { id = "banned", ops = { "is", "isNot" }, bare = { is = true, isNot = true } },
+  { id = "returned", ops = { "awayAtLeast", "within" }, value = "days" },
 }
 RUL.FIELDS = RL.DATE_FIELDS
 RUL.TAGS = { "inactive", "review", "cleanup", "returned", "protect" }
@@ -400,8 +402,14 @@ function RUL.Input(snap, guild, o)
   local store = guild.members or {}
   local rights = o.rights or {}
   local members, me = {}, nil
+  local historyKnown = type(guild.events) == "table" and #guild.events > 0
+  local banned = type(guild.bans) == "table" and gm.BansLogic and gm.BansLogic.BanIndex(guild) or nil
   for _, m in ipairs(snap.members or {}) do
     local e = type(store[m.key]) == "table" and store[m.key] or {}
+    local isBanned
+    if banned then
+      isBanned = banned(m.key)
+    end
     members[#members + 1] = {
       key = m.key,
       name = m.name,
@@ -416,6 +424,9 @@ function RUL.Input(snap, guild, o)
       tags = e.tags,
       away = e.away,
       returnedDay = e.returnedDay,
+      returnedAfter = e.returnedAfter,
+      historyKnown = historyKnown,
+      banned = isBanned,
       joined = e.joined,
       rankSince = e.rankSince,
       lastOnline = DL.LastOnline(m, o.today, o.now, o.offset),

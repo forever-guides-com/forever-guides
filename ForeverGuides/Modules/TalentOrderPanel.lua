@@ -20,12 +20,12 @@ ns.AddLocale("enUS", {
   ["talents.order.tip"] = "The order in which the talent points are spent. Enter or Space expands or collapses this section.",
   ["talents.order.open"] = "expanded",
   ["talents.order.closed"] = "collapsed",
-  ["talents.order.hint"] = "Drag a step, use its arrow buttons or press Shift+Up and Shift+Down on a focused step.",
+  ["talents.order.hint"] = "Drag a step, use its arrow buttons or press Shift+Up or Shift+Down on a focused step.",
   ["talents.order.blocked"] = "Not possible: %s",
   ["talents.order.empty"] = "No points yet. Every point you spend adds a step here.",
   ["talents.order.level"] = "Level %d",
   ["talents.order.row"] = "Step %d, level %d, %s, rank %d of %d",
-  ["talents.order.rowTip"] = "Level %d, rank %d/%d\nDrag it, use the arrow buttons or press Shift+Up and Shift+Down.",
+  ["talents.order.rowTip"] = "Level %d, rank %d/%d\nDrag it, use the arrow buttons or press Shift+Up or Shift+Down.",
   ["talents.order.up"] = "Move step %d up",
   ["talents.order.down"] = "Move step %d down",
   ["talents.order.first"] = "This is already the first step.",
@@ -39,12 +39,12 @@ ns.AddLocale("deDE", {
   ["talents.order.tip"] = "Die Reihenfolge, in der die Talentpunkte vergeben werden. Enter oder Leertaste klappt den Bereich auf oder zu.",
   ["talents.order.open"] = "aufgeklappt",
   ["talents.order.closed"] = "zugeklappt",
-  ["talents.order.hint"] = "Schritt ziehen, die Pfeilknöpfe nutzen oder auf einem markierten Schritt Umschalt+Hoch und Umschalt+Runter drücken.",
+  ["talents.order.hint"] = "Ziehe einen Schritt, nutze die Pfeilknöpfe oder drücke bei einem markierten Schritt Umschalt+Hoch oder Umschalt+Runter.",
   ["talents.order.blocked"] = "Nicht möglich: %s",
   ["talents.order.empty"] = "Noch keine Punkte. Jeder Punkt, den du vergibst, ergibt hier einen Schritt.",
   ["talents.order.level"] = "Stufe %d",
   ["talents.order.row"] = "Schritt %d, Stufe %d, %s, Rang %d von %d",
-  ["talents.order.rowTip"] = "Stufe %d, Rang %d/%d\nZiehen, die Pfeilknöpfe nutzen oder Umschalt+Hoch und Umschalt+Runter drücken.",
+  ["talents.order.rowTip"] = "Stufe %d, Rang %d/%d\nZiehe den Schritt, nutze die Pfeilknöpfe oder drücke Umschalt+Hoch oder Umschalt+Runter.",
   ["talents.order.up"] = "Schritt %d nach oben verschieben",
   ["talents.order.down"] = "Schritt %d nach unten verschieben",
   ["talents.order.first"] = "Das ist schon der erste Schritt.",
@@ -202,10 +202,10 @@ function P.Create(parent, opts)
   local function paintRow(row)
     local item = row.item
     local isHot = item ~= nil and item.sid == hot
-    row.bg:SetColorTexture(1, 1, 1, isHot and 0.14 or (row.hover and 0.06 or 0))
+    row.bg:SetColorTexture(Theme.fillColor(isHot and "selected" or (row.hover and "hover" or nil)))
     row.mark:SetColorTexture(Theme.color("accent"))
     row.mark:SetShown(isHot)
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
   end
 
   local function showRowTip(row)

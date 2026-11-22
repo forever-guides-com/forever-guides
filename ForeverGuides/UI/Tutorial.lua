@@ -1,5 +1,6 @@
 -- Tour overlay: dims everything except the target, gold frame + glow on
--- the target, bubble with back/next/skip. Pauses in combat.
+-- the target, bubble with back/next/skip. A tour starts in combat too; its overlay waits for the end of
+-- combat (it dims the whole screen).
 local _, ns = ...
 local W, L, Theme, U = ns.W, ns.L, ns.Theme, ns.U
 
@@ -23,22 +24,21 @@ local function ensure()
     local d = CreateFrame("Button", nil, overlay)
     d.tex = d:CreateTexture(nil, "BACKGROUND")
     d.tex:SetAllPoints()
-    d.tex:SetColorTexture(0, 0, 0, 0.45)
+    d.tex:SetColorTexture(ns.Theme.scrim(0.45))
     dims[i] = d
   end
   highlight = CreateFrame("Frame", nil, overlay)
-  highlight.border = W.Border(highlight, "accent2", 1, 2)
-  highlight.glow = highlight:CreateTexture(nil, "BACKGROUND")
-  highlight.glow:SetPoint("TOPLEFT", -10, 10)
-  highlight.glow:SetPoint("BOTTOMRIGHT", 10, -10)
-  highlight.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-  highlight.glow:SetBlendMode("ADD")
-  highlight.glow:SetVertexColor(Theme.rgb("accent2"))
+  -- A thin gold edge and a faint halo one step outside it; only the halo breathes.
+  highlight.border = W.Border(highlight, "accent2", 0.9, 1)
+  highlight.glow = CreateFrame("Frame", nil, highlight)
+  highlight.glow:SetPoint("TOPLEFT", -3, 3)
+  highlight.glow:SetPoint("BOTTOMRIGHT", 3, -3)
+  W.Border(highlight.glow, "accent2", 0.5, 1)
   local anim = highlight.glow:CreateAnimationGroup()
   anim:SetLooping("BOUNCE")
   local a = anim:CreateAnimation("Alpha")
-  a:SetFromAlpha(0.25)
-  a:SetToAlpha(0.9)
+  a:SetFromAlpha(0.2)
+  a:SetToAlpha(0.8)
   a:SetDuration(1.2)
   highlight.anim = anim
 
@@ -46,8 +46,14 @@ local function ensure()
   bubble:SetSize(320, 170)
   bubble:SetClampedToScreen(true)
   bubble:SetFrameLevel(overlay:GetFrameLevel() + 10)
-  W.Fill(bubble, "surface", 1)
-  W.Border(bubble, "accent2", 1)
+  -- Forever: the dark popover plate like the footer controls; flat keeps the solid fill and the gold edge.
+  local plate = W.Fill(bubble, "surface", 1)
+  local edge = W.Border(bubble, "accent2", 1)
+  ns.Bind(bubble, function()
+    local art = ns.Skins.Apply(bubble, "popover")
+    plate:SetShown(art == nil)
+    edge.show(art == nil)
+  end)
   bubble.title = W.Text(bubble, { role = "h3", family = "heading", color = "accent2", wrap = true })
   bubble.title:SetPoint("TOPLEFT", 12, -10)
   bubble.title:SetPoint("RIGHT", -12, 0)
@@ -149,6 +155,9 @@ local function placeBubble(l, r, t, b)
 end
 
 local function render()
+  if ns.InCombat() then
+    return
+  end
   local step = active.steps[active.index]
   local key = "tour." .. active.tour.id .. "." .. step.id
   W.SetText(bubble.title, key .. ".title")
@@ -163,8 +172,8 @@ local function render()
     local l, r, t, b = rect(f)
     layoutDims(l, r, t, b)
     highlight:ClearAllPoints()
-    highlight:SetPoint("TOPLEFT", overlay, "BOTTOMLEFT", l - 4, t + 4)
-    highlight:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMLEFT", r + 4, b - 4)
+    highlight:SetPoint("TOPLEFT", overlay, "BOTTOMLEFT", l - 2, t + 2)
+    highlight:SetPoint("BOTTOMRIGHT", overlay, "BOTTOMLEFT", r + 2, b - 2)
     highlight:Show()
     if Theme.reduceMotion() then
       highlight.anim:Stop()
@@ -187,13 +196,14 @@ local function render()
   overlay:Show()
 end
 
+-- Whether the dimming overlay is on screen (it waits for the end of combat).
+function UI.OverlayShown()
+  return overlay ~= nil and overlay:IsShown() == true
+end
+
 function UI.Start(id)
   local tour = ns.Tutorials.tours[id]
   if not tour then
-    return false
-  end
-  if InCombatLockdown() then
-    ns.Notify(L["tour.combat"], "warning")
     return false
   end
   ensure()

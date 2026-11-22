@@ -7,7 +7,8 @@
 -- (ChatInput.lua), Shift+F10 or the menu key opens the menu of the chat (ChatMenu.lua), PageUp and PageDown
 -- scroll, Ctrl+R opens the reactions of the last line (add-on extras, opt-in), Ctrl+M switches the look, Ctrl+N writes a new message (ChatNew.lua), Esc closes unless "keepOpenOnEsc" is on (or clears the
 -- search first). The gear in the title bar swaps the panes for the options (ChatSettings.lua).
--- Nothing is built in combat; the window opens after it.
+-- The window builds, opens and repaints in combat too (plain frames); only the secure "Send now" overlays
+-- wait for the end of combat (ChatSecure.lua).
 local _, chat = ...
 if not chat.hook then
   return
@@ -276,19 +277,11 @@ end
 
 -- Drawing ---------------------------------------------------------------------------------------------------
 
-local function inCombatNeedsFrames(f)
-  return FG.InCombat() and (f.list:NeedsFrames() or f.thread:NeedsFrames())
-end
-
 -- Draws list and thread again. keys (optional): the set of changed conversations; the thread follows only
 -- when its conversation is in it.
 function Window.Refresh(keys)
   local f = frame
   if not (f and f:IsShown()) then
-    return
-  end
-  if inCombatNeedsFrames(f) then
-    state.pending = true
     return
   end
   f.list:Refresh()
@@ -959,17 +952,12 @@ function Window.Parts()
     or nil
 end
 
--- Shows the window, built on first use (not in combat). Returns the frame, or nil in combat before the first
--- build. With the key of a known chat that chat is selected right away (the only selection of this open).
+-- Shows the window, built on first use. Returns the frame, or nil without the database. With the key of a known chat that chat is selected right away (the only selection of this open).
 function Window.Open(key)
   if not FG.db then
     return nil
   end
   if not frame then
-    if FG.InCombat() then
-      FG.Notify(L["chat.win.combat"], "warning")
-      return nil
-    end
     adopt(create())
   end
   pstart("win.place")
@@ -1229,10 +1217,6 @@ FG.On("PLAYER_REGEN_ENABLED", function()
   if prebuildWaits then
     prebuildWaits = false
     schedule(Window.STEP_DELAY)
-  end
-  if state.pending then
-    state.pending = false
-    Window.Refresh()
   end
 end)
 FG.On("PLAYER_LOGOUT", function()

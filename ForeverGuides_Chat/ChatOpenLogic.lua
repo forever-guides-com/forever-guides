@@ -119,9 +119,9 @@ function OL.Track(state, convs, keys, dirIn)
   return found
 end
 
--- Whether a candidate opens the window. st = { running, built (the window exists), combat, restricted, shown,
--- dismissed } (booleans). Never while the client restricts add-ons, never over an open window, and in combat
--- only a window that is built already (building it takes too long there).
+-- Whether a candidate opens the window. st = { running, restricted, shown, dismissed } (booleans). Never
+-- while the client restricts add-ons and never over an open window; combat does not matter, the window is
+-- made of plain frames.
 function OL.ShouldOpen(options, cand, st)
   if type(cand) ~= "table" or type(st) ~= "table" or not OL.Enabled(options, cand.kind) then
     return false
@@ -129,21 +129,5 @@ function OL.ShouldOpen(options, cand, st)
   if st.running ~= true or st.restricted == true or st.shown == true then
     return false
   end
-  if st.combat == true and st.built ~= true then
-    return false
-  end
   return not (st.dismissed == true and cand.fresh ~= true)
-end
-
--- The candidate waits for the end of the combat: it could open but the window is not built.
-function OL.ShouldWait(options, cand, st)
-  return type(cand) == "table"
-    and type(st) == "table"
-    and OL.Enabled(options, cand.kind)
-    and st.combat == true
-    and st.built ~= true
-    and st.running == true
-    and st.restricted ~= true
-    and st.shown ~= true
-    and not (st.dismissed == true and cand.fresh ~= true)
 end

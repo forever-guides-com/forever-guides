@@ -78,8 +78,9 @@ end
 
 -- "start" | "dest" | "selected" | "hover" | nil, strongest first.
 function MP.RoleOf(state, slug)
-  return (state.start == slug and "start")
-    or (state.dest == slug and "dest")
+  local start, dest = ns.RoutePlan.Ends()
+  return (start == slug and "start")
+    or (dest == slug and "dest")
     or (state.selected == slug and "selected")
     or (state.hover == slug and "hover")
     or nil
@@ -342,9 +343,10 @@ function MP.Attach(ctx)
         dot.labelBg:SetColorTexture(Theme.color("bg", 0.6))
       end
       local key, token
-      if not it.dimmed and st.start == it.slug then
+      local start, dest = ns.RoutePlan.Ends()
+      if not it.dimmed and start == it.slug then
         key, token = "map.flag.start", "success"
-      elseif not it.dimmed and st.dest == it.slug then
+      elseif not it.dimmed and dest == it.slug then
         key, token = "map.flag.dest", "warning"
       end
       paintFlag(dot, key, token, it.x, it.y, size, cw)

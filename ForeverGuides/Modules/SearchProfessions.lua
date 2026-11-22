@@ -12,7 +12,7 @@ local PL = ns.ProfessionTrainersLogic
 local SP = {}
 ns.SearchProfessions = SP
 
-SP.KINDS = { "item", "recipe", "professionTrainer" }
+SP.KINDS = { "item", "recipe", "professionTrainer", "vendor" }
 -- Milliseconds of work per frame while the index is cut, and the pause before the first slice that
 -- loads an add-on (the page shows its hint before the client stops for the load).
 SP.BUDGET_MS = 4
@@ -20,6 +20,8 @@ SP.START_DELAY = 0.1
 -- Entries between two looks at the clock.
 local TICK = 16
 local MAX_SLUGS_SHOWN = 3
+-- Ware names a vendor entry also answers to.
+local MAX_WARES = 10
 local ICON_DIR = "Interface\\Icons\\"
 local AUCTION_ICON = ICON_DIR .. "INV_Misc_Coin_01"
 local SHOP_ICON = ICON_DIR .. "INV_Scroll_03"
@@ -53,7 +55,7 @@ ns.AddLocale("enUS", {
   ["search.act.marker"] = "Set waypoint",
   ["search.act.mapTip"] = "Opens the map at the trainer.",
   ["search.act.markerTip"] = "Sets a waypoint at the trainer.",
-  ["search.act.noPosition"] = "The data has no position for this trainer.",
+  ["search.act.noPosition"] = "No position is known for this trainer.",
 })
 
 ns.AddLocale("deDE", {
@@ -75,11 +77,11 @@ ns.AddLocale("deDE", {
   ["search.act.auction"] = "Im Auktionshaus suchen",
   ["search.act.auctionTip"] = "Braucht das offene Auktionshaus, die Suche wird für dich gefüllt.",
   ["search.act.auctionTipPlain"] = "Braucht das offene Auktionshaus.",
-  ["search.act.map"] = "Auf der Karte zeigen",
+  ["search.act.map"] = "Auf der Karte anzeigen",
   ["search.act.marker"] = "Wegpunkt setzen",
   ["search.act.mapTip"] = "Öffnet die Karte beim Lehrer.",
   ["search.act.markerTip"] = "Setzt einen Wegpunkt beim Lehrer.",
-  ["search.act.noPosition"] = "Die Daten haben für diesen Lehrer keine Position.",
+  ["search.act.noPosition"] = "Für diesen Lehrer liegt keine Position vor.",
 })
 
 -- Preparation -----------------------------------------------------------------------------------
@@ -305,6 +307,22 @@ local function prepare()
       p and { p.de .. " Lehrer", p.en .. " trainer" } or nil,
       { slug = e.slug, n = e.name, nDe = e.nameDe, x = e.x, y = e.y, zone = e.zone, mapId = e.mapId, npc = e.npc }
     )
+    tick()
+  end
+
+  -- Vendors: the NPC by name, the names of what the profession items on offer are called as aliases.
+  local index = ns.VendorSource and ns.VendorSource.Index(false)
+  for _, v in ipairs(index and index.list or {}) do
+    local wares = {}
+    for _, offer in ipairs(v.offers) do
+      local it = items[offer.id]
+      if it and #wares < MAX_WARES * 2 then
+        wares[#wares + 1] = it.de
+        wares[#wares + 1] = it.en
+      end
+    end
+    local zone = ns.VendorSource.ZoneName(v)
+    batch.vendor.add({ en = v.name, de = v.nameDe }, zone, "vendors/" .. v.npc, wares)
     tick()
   end
 
@@ -651,3 +669,4 @@ end
 S.RegisterSource("item", nil)
 S.RegisterSource("recipe", nil, { weight = 0.9 })
 S.RegisterSource("professionTrainer", nil)
+S.RegisterSource("vendor", nil, { weight = 0.9 })

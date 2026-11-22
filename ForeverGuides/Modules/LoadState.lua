@@ -66,6 +66,9 @@ end
 function LS.Identity()
   local name, realm = call("UnitFullName", "player")
   local home = call("GetRealmName")
+  if home == "" then
+    home = ns.Realm.Fallback()
+  end
   local key = CS.Key(name, realm, home)
   if not key then
     return nil

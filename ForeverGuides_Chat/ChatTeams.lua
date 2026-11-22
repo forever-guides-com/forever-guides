@@ -121,16 +121,8 @@ end
 -- State -----------------------------------------------------------------------------------------------------------
 
 local function realm()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local fn = g(name)
-    if type(fn) == "function" then
-      local ok, value = pcall(fn)
-      if ok and type(value) == "string" and value ~= "" then
-        return value:lower()
-      end
-    end
-  end
-  return ""
+  local value = FG.Realm.Get()
+  return value and value:lower() or ""
 end
 
 local function selfName()

@@ -6,7 +6,7 @@ if not chat.hook then
 end
 
 chat.FG.AddLocale("enUS", {
-  ["chat.set.replyHead"] = "Reply head",
+  ["chat.set.replyHead"] = "@Name in replies",
   ["chat.set.replyHead.hint"] = "Puts @Name in front of a reply in group chats.",
   ["chat.line.copy"] = "Copy text",
   ["chat.line.copyTip"] = "Opens the text of this line to copy.",
@@ -28,7 +28,7 @@ chat.FG.AddLocale("enUS", {
 })
 
 chat.FG.AddLocale("deDE", {
-  ["chat.set.replyHead"] = "Antwort-Kopf",
+  ["chat.set.replyHead"] = "@Name in Antworten",
   ["chat.set.replyHead.hint"] = "Setzt @Name vor eine Antwort im Gruppenchat.",
   ["chat.line.copy"] = "Text kopieren",
   ["chat.line.copyTip"] = "Öffnet den Text dieser Zeile zum Kopieren.",

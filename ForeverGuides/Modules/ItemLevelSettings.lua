@@ -9,7 +9,7 @@ ns.ItemLevelSettings = S
 
 ns.AddLocale("enUS", {
   ["ilvl.heading"] = "Item level on items",
-  ["ilvl.hint"] = "Small item level number on item icons: character window, bags, bank.\nColored by quality.",
+  ["ilvl.hint"] = "Shows a small item level number on item icons: character window, bags, bank.\nColored by quality.",
   ["ilvl.enable"] = "Show item level on items",
   ["ilvl.character"] = "Character window",
   ["ilvl.bags"] = "Bags and bank",
@@ -28,12 +28,12 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["ilvl.heading"] = "Itemlevel auf Items",
-  ["ilvl.hint"] = "Kleine Itemlevel-Zahl auf Item-Symbolen: Charakterfenster, Taschen, Bank.\nNach Qualität gefärbt.",
+  ["ilvl.hint"] = "Zeigt eine kleine Zahl für das Itemlevel auf Itemsymbolen: Charakterfenster, Taschen, Bank.\nNach Qualität gefärbt.",
   ["ilvl.enable"] = "Itemlevel auf Items anzeigen",
   ["ilvl.character"] = "Charakterfenster",
   ["ilvl.bags"] = "Taschen und Bank",
   ["ilvl.inspect"] = "Auch beim Betrachten",
-  ["ilvl.corner"] = "Ecke des Item-Symbols",
+  ["ilvl.corner"] = "Ecke des Itemsymbols",
   ["ilvl.corner.TOPRIGHT"] = "Oben rechts",
   ["ilvl.corner.BOTTOMRIGHT"] = "Unten rechts",
   ["ilvl.corner.TOPLEFT"] = "Oben links",

@@ -8,7 +8,7 @@ ns.TalkingHead = TH
 
 ns.AddLocale("enUS", {
   ["settings.hideTalkingHead"] = "Show Talking Head",
-  ["settings.hideTalkingHeadHint"] = "Off hides the window only.\nVoice keeps playing.",
+  ["settings.hideTalkingHeadHint"] = "Off hides only the window.\nThe voice keeps playing.",
 })
 ns.AddLocale("deDE", {
   ["settings.hideTalkingHead"] = "Talking Head anzeigen",

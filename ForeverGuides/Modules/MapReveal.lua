@@ -19,16 +19,16 @@ MR.BASE_SUBLEVEL, MR.SUBLEVEL = 1, 2
 
 ns.AddLocale("enUS", {
   ["map.reveal.on"] = "Revealed",
-  ["map.reveal.onTip"] = "All areas of the zone map in color.",
+  ["map.reveal.onTip"] = "Shows all areas of the zone map in color.",
   ["map.reveal.explore"] = "Exploration",
-  ["map.reveal.exploreTip"] = "Zone view: only the areas you explored, the rest dark.",
+  ["map.reveal.exploreTip"] = "Shows only explored areas, the rest stays dark.",
   ["map.reveal.pkg"] = "Map data",
 })
 ns.AddLocale("deDE", {
   ["map.reveal.on"] = "Aufgedeckt",
-  ["map.reveal.onTip"] = "Alle Gebiete der Zonenkarte in Farbe.",
+  ["map.reveal.onTip"] = "Zeigt alle Gebiete der Zonenkarte in Farbe.",
   ["map.reveal.explore"] = "Erkundung",
-  ["map.reveal.exploreTip"] = "Zonenansicht: nur deine erkundeten Gebiete, der Rest dunkel.",
+  ["map.reveal.exploreTip"] = "Zeigt nur erkundete Gebiete, der Rest bleibt dunkel.",
   ["map.reveal.pkg"] = "Kartendaten",
 })
 
@@ -270,10 +270,10 @@ function MR.Attach(ctx)
         choose(false)
       end,
     },
-  }, { gap = 4 })
-  -- The chosen button carries a ring: a shape, not only a color.
+  }, { gap = 4, onResize = ctx.resized })
+  -- The chosen button carries a bar: a shape, not only a color.
   for _, id in ipairs({ "reveal", "explore" }) do
-    rings[id] = W.Border(ctl.row:GetButton(id), "accent2", 1, 2)
+    rings[id] = W.ActiveMark(ctl.row:GetButton(id))
   end
   ctl.Paint()
   ns.On("FG_UI_REFRESHED", ctl.Paint)

@@ -43,6 +43,10 @@
 -- Result    The answer of SendAddonMessage (a number of Enum.SendAddonMessageResult, a boolean on older clients, nothing on
 --             the oldest) is normalized by Comm.Result into { ok, code, name }. A sender that wants it passes opts.report
 --             (see Send); a function may pace itself with def.gate (see Register) and then skips the bucket of its channel.
+-- Friends   Kind "bnet" (BNSendGameData and BN_CHAT_MSG_ADDON, target = game account id, consent audience "bnfriends")
+--             and whispers of a function with whisperAud "friends" reach online friends only: the sender of a direct
+--             message is believed when def.whisperPeer says it is a friend. def.anyTyp names types (hello, answer) that go out with the send
+--             or the receive consent, so a friend that only listens can be found. Nothing here is guild or group.
 -- Counters  Comm.FnStats() counts packets and bytes per function in memory (never sent anywhere).
 -- Events: FG_COMM_RECEIVED(fn, type, sender, payload, channel), FG_COMM_SENT(fn, type, channel, size,
 -- farewell) with farewell true only for a farewell, FG_COMM_BLOCKED(fn, reason) with reason consent,
@@ -79,6 +83,7 @@ Comm.LIMITS = {
   officer = { burst = CL.LIMITS.BURST, refill = CL.LIMITS.REFILL },
   whisper = { burst = CL.LIMITS.BURST, refill = CL.LIMITS.REFILL },
   channel = { burst = CL.LIMITS.BURST, refill = CL.LIMITS.REFILL },
+  bnet = { burst = CL.LIMITS.BURST, refill = CL.LIMITS.REFILL },
   -- Incoming, per sender.
   receive = { burst = CL.LIMITS.BURST, refill = CL.LIMITS.REFILL },
   -- Answers of a whisper service, per requester: three at once, then one per 20 seconds.
@@ -152,7 +157,8 @@ function Comm.Result(raw)
   return { ok = false, code = 9, name = "GeneralError" }
 end
 
-local CONSENT_AUD = { group = "group", guild = "guild", officer = "guild", whisper = "chat", channel = "world" }
+local CONSENT_AUD =
+  { group = "group", guild = "guild", officer = "guild", whisper = "chat", channel = "world", bnet = "bnfriends" }
 local KIND_OF_CHANNEL = {
   PARTY = "group",
   RAID = "group",
@@ -161,6 +167,8 @@ local KIND_OF_CHANNEL = {
   OFFICER = "officer",
   WHISPER = "whisper",
   CHANNEL = "channel",
+  -- Not a game channel: OnBNet hands a Battle.net message in under this name.
+  BN = "bnet",
 }
 local RESTRICTIONS = { "Chat", "Combat", "Encounter", "ChallengeMode", "PvPMatch" }
 
@@ -168,6 +176,9 @@ local functions, legacy, prefixes = {}, {}, {}
 -- Consent audience of a channel kind for a function: a function may name its own one for whispers.
 local function audOf(fn, kind)
   local reg = functions[fn]
+  if reg and reg.consentAud then
+    return reg.consentAud
+  end
   if kind == "whisper" and reg and reg.whisperAud then
     return reg.whisperAud
   end
@@ -180,6 +191,8 @@ local sentTo = {}
 local function sentKey(kind, target)
   if kind == "whisper" and type(target) == "string" and target ~= "" then
     return "whisper:" .. PN.Key(target)
+  elseif kind == "bnet" and type(target) == "number" then
+    return "bnet:" .. target
   end
   return kind
 end
@@ -318,7 +331,10 @@ end
 -- consent audience of the whispers), request (optional type letter of a whisper request: sent with the receive
 -- consent, opens the answer window), service (optional, needs request, on[request] and decode:
 -- service(value) -> the content id a whisper request asks for, see the head of this file), whisperPeer (optional
--- name -> boolean, see "Whisper peers" above), gate (optional gate(cost, now, target) -> true, or false, the seconds to wait
+-- name, typ -> boolean, see "Whisper peers" above), consentAud (optional: one consent audience for every channel kind of
+-- the function), clickTyp (optional type letter that a click of the player may send (priority click) and that is received
+-- as long as the player did not switch the function off explicitly, see Consent.OnUnlessOff), typKinds (optional type -> list of channel kinds the type may travel on; with it every type of `on` needs
+-- an entry), defaultOn (optional: send and receive count as on until the player switches them off, only for functions in Consent.DEFAULT_ON), openChannel (optional: messages of the channel kind are taken in from anybody who is in the channel), gate (optional gate(cost, now, target) -> true, or false, the seconds to wait
 -- and optionally "item": called before every message of the function with its cost in bytes; while it says no, the
 -- function waits as a whole ("item": only this message waits) and the bucket of the channel kind is not used). decode(payload, typ)
 -- gets the envelope type as second argument. A handler is called as
@@ -343,6 +359,9 @@ function Comm.Register(fn, def)
   end
   if next(on) == nil or (def.decode ~= nil and type(def.decode) ~= "function") then
     return false, "on"
+  end
+  if def.clickTyp ~= nil and (type(def.clickTyp) ~= "string" or not on[def.clickTyp]) then
+    return false, "clickTyp"
   end
   if def.farewell ~= nil and (type(def.farewell) ~= "string" or not on[def.farewell]) then
     return false, "farewell"
@@ -377,7 +396,7 @@ function Comm.Register(fn, def)
   local whisperAud = def.whisperAud
   if whisperAud ~= nil then
     local known = false
-    for _, aud in pairs(CONSENT_AUD) do
+    for _, aud in ipairs(Consent.AUDIENCES) do
       known = known or aud == whisperAud
     end
     if not known or not kinds.whisper then
@@ -402,6 +421,47 @@ function Comm.Register(fn, def)
   if def.gate ~= nil and type(def.gate) ~= "function" then
     return false, "gate"
   end
+  local anyTyp
+  if def.anyTyp ~= nil then
+    anyTyp = {}
+    for typ in pairs(type(def.anyTyp) == "table" and def.anyTyp or {}) do
+      if not on[typ] or typ == def.farewell then
+        return false, "anyTyp"
+      end
+      anyTyp[typ] = true
+    end
+  end
+  local consentAud = def.consentAud
+  if consentAud ~= nil then
+    local known = false
+    for _, aud in pairs(CONSENT_AUD) do
+      known = known or aud == consentAud
+    end
+    if not known then
+      return false, "consentAud"
+    end
+  end
+  local typKinds
+  if def.typKinds ~= nil then
+    typKinds = {}
+    for typ, list in pairs(type(def.typKinds) == "table" and def.typKinds or {}) do
+      local set = kindSet(list)
+      if not on[typ] or not set then
+        return false, "typKinds"
+      end
+      for kind in pairs(set) do
+        if not kinds[kind] then
+          return false, "typKinds"
+        end
+      end
+      typKinds[typ] = set
+    end
+    for typ in pairs(on) do
+      if not typKinds[typ] then
+        return false, "typKinds"
+      end
+    end
+  end
   local prefix = def.prefix == nil and Comm.PREFIX or def.prefix
   if not claim(prefix, "v2") then
     return false, "prefix"
@@ -413,6 +473,7 @@ function Comm.Register(fn, def)
     on = on,
     decode = def.decode,
     farewell = def.farewell,
+    clickTyp = def.clickTyp,
     request = def.request,
     service = def.service,
     ask = def.ask,
@@ -420,6 +481,11 @@ function Comm.Register(fn, def)
     whisperAud = whisperAud,
     whisperPeer = def.whisperPeer,
     gate = def.gate,
+    anyTyp = anyTyp,
+    consentAud = consentAud,
+    typKinds = typKinds,
+    openChannel = def.openChannel == true,
+    defaultOn = def.defaultOn == true,
   }
   ensurePrefix(prefix)
   return true
@@ -536,6 +602,10 @@ local function channelOf(item)
     return try(g("IsInGuild")) == true and (item.kind == "guild" and "GUILD" or "OFFICER") or nil
   elseif item.kind == "whisper" then
     return item.target and "WHISPER" or nil
+  elseif item.kind == "bnet" then
+    return type(item.target) == "number" and "BN" or nil
+  elseif item.kind == "channel" then
+    return item.target and "CHANNEL" or nil
   end
 end
 
@@ -724,6 +794,17 @@ function Comm.Close(fn, target, id)
 end
 
 -- One queued message to the game. Returns "sent", "wait" (stays queued), or "drop".
+-- dir "either" (Register def.anyTyp): the send or the receive consent is enough.
+local function permitted(fn, dir, aud)
+  local reg = functions[fn]
+  -- def.defaultOn: on until the player switches it off (Consent.DEFAULT_ON).
+  local allows = reg and reg.defaultOn and Consent.Effective or Consent.Allows
+  if dir == "either" then
+    return allows(fn, "send", aud) or allows(fn, "receive", aud)
+  end
+  return allows(fn, dir, aud)
+end
+
 local function deliver(item, now)
   local fn = item.fn
   local text, aud = item.text, audOf(fn, item.kind)
@@ -737,7 +818,11 @@ local function deliver(item, now)
     if type(text) ~= "string" or text == "" or #text > Comm.MAX_LENGTH then
       return "drop"
     end
-  elseif not item.farewell and not Consent.Allows(fn, item.dir or "send", aud) then
+  elseif
+    not item.farewell
+    and not permitted(fn, item.dir or "send", aud)
+    and not (item.clickOnly and Consent.OnUnlessOff(fn, "send", aud))
+  then
     blocked(fn, "consent")
     return "drop"
   end
@@ -747,7 +832,11 @@ local function deliver(item, now)
     bump(stats.dropped, "no-channel")
     return "drop"
   end
-  if not api or type(api.SendAddonMessage) ~= "function" then
+  local bnet = item.kind == "bnet"
+  if
+    bnet and type(g("BNSendGameData")) ~= "function"
+    or not bnet and (not api or type(api.SendAddonMessage) ~= "function")
+  then
     blocked(fn, "no-api")
     return "drop"
   end
@@ -765,7 +854,12 @@ local function deliver(item, now)
     return "wait", 1 / math.max(0.01, Comm.LIMITS[item.kind].refill)
   end
   ensurePrefix(item.prefix)
-  local ok, result = pcall(api.SendAddonMessage, item.prefix, text, channel, item.target)
+  local ok, result
+  if bnet then
+    ok, result = pcall(g("BNSendGameData"), item.target, item.prefix, text)
+  else
+    ok, result = pcall(api.SendAddonMessage, item.prefix, text, channel, item.target)
+  end
   local res = ok and Comm.Result(result) or Comm.Result(9)
   local code = sendCode(res)
   if code ~= "ok" then
@@ -939,11 +1033,22 @@ local function admit(fn, kind, target, opts, allowed)
     return nil, "consent"
   end
   local api = chatApi()
-  if not api or type(api.SendAddonMessage) ~= "function" then
+  if kind == "bnet" then
+    if type(g("BNSendGameData")) ~= "function" then
+      blocked(fn, "no-api")
+      return nil, "no-api"
+    end
+  elseif not api or type(api.SendAddonMessage) ~= "function" then
     blocked(fn, "no-api")
     return nil, "no-api"
   end
+  if kind == "bnet" and not (type(target) == "number" and target > 0 and target % 1 == 0) then
+    return nil, "target"
+  end
   if kind == "whisper" and (type(target) ~= "string" or target == "" or #target > 64) then
+    return nil, "target"
+  end
+  if kind == "channel" and not (type(target) == "number" and target >= 1 and target <= 99 and target % 1 == 0) then
     return nil, "target"
   end
   -- A click gets its answer now; the rest waits for the end of the lock.
@@ -972,6 +1077,9 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
   if not reg.kinds[aud] then
     return false, "audience"
   end
+  if reg.typKinds and not (reg.typKinds[typ] and reg.typKinds[typ][aud]) then
+    return false, "audience"
+  end
   local farewell = reg.farewell ~= nil and typ == reg.farewell
   -- A request asks for what somebody else shares: it is a receive action and goes to a whisper target.
   local request = reg.request ~= nil and typ == reg.request
@@ -991,15 +1099,21 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
   if probe and payload ~= "" then
     return false, "payload"
   end
-  local allowed
-  if farewell then
+  local either = reg.anyTyp ~= nil and reg.anyTyp[typ] == true
+  local allowed, clickOnly
+  if either then
+    allowed = permitted(fn, "either", audOf(fn, aud))
+  elseif farewell then
     if type(payload) ~= "string" or #payload > Comm.FAREWELL_MAX then
       return false, "payload"
     end
     allowed = sentTo[fn] ~= nil and sentTo[fn][sentKey(aud, target)] == true
     opts = { priority = "reply", id = type(opts) == "table" and opts.id or nil }
   else
-    allowed = Consent.Allows(fn, (request or ask or probe) and "receive" or "send", audOf(fn, aud))
+    allowed = permitted(fn, (request or ask or probe) and "receive" or "send", audOf(fn, aud))
+    -- The one type a click may send without a stored choice (see Register): only an explicit off stops it.
+    clickOnly = not allowed and reg.clickTyp == typ and type(opts) == "table" and opts.priority == "click"
+    allowed = allowed or (clickOnly and Consent.OnUnlessOff(fn, "send", audOf(fn, aud)))
   end
   local prio, why = admit(fn, aud, target, opts, allowed)
   if not prio then
@@ -1019,6 +1133,7 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
       items[i].notBefore = items[i].at + (i - 1) * gap
     end
     items[i].farewell = farewell or nil
+    items[i].clickOnly = clickOnly or nil
     items[i].i, items[i].n = i, #texts
     if type(opts) == "table" and type(opts.report) == "function" then
       items[i].report, items[i].xfer = opts.report, xfer
@@ -1029,6 +1144,8 @@ function Comm.Send(fn, typ, payload, aud, target, opts)
       items[i].dir, items[i].ask, items[i].id = "receive", true, id
     elseif probe then
       items[i].dir = "receive"
+    elseif either then
+      items[i].dir = "either"
     end
   end
   if farewell then
@@ -1189,8 +1306,10 @@ local function inMyGroup(name)
 end
 
 -- Only people of the own group (group channels) or the own guild (guild and officer channel) are believed.
-local function trusted(kind, sender, name)
-  if kind == "guild" or kind == "officer" then
+local function trusted(kind, sender, name, open)
+  if kind == "channel" then
+    return open == true
+  elseif kind == "guild" or kind == "officer" then
     return ns.Invites ~= nil and ns.Invites.IsGuildMember(sender, nil) == true
   elseif kind == "group" then
     return inMyGroup(sender) or inMyGroup(name)
@@ -1240,7 +1359,7 @@ local function senderOk(key)
 end
 
 -- The sender as a normalized name; nil for ourselves (second value "echo"), for strangers and for anything unusable.
-local function knownSender(kind, sender)
+local function knownSender(kind, sender, open)
   if type(sender) ~= "string" or sender == "" or #sender > 64 then
     return nil
   end
@@ -1251,7 +1370,7 @@ local function knownSender(kind, sender)
   if PN.Equal(name, PN.Self()) then
     return nil, "echo"
   end
-  if not trusted(kind, sender, name) then
+  if not trusted(kind, sender, name, open) then
     return nil
   end
   return name
@@ -1336,7 +1455,8 @@ function Comm.OnAddon(prefix, text, channel, sender)
     return
   end
   stats.received = stats.received + 1
-  if kind ~= "whisper" and PN.Equal(PN.Normalize(sender), PN.Self()) then
+  local direct = kind == "whisper" or kind == "bnet"
+  if not direct and PN.Equal(PN.Normalize(sender), PN.Self()) then
     stats.echo = stats.echo + 1
     return
   end
@@ -1355,29 +1475,40 @@ function Comm.OnAddon(prefix, text, channel, sender)
   if not reg or reg.prefix ~= prefix or not reg.kinds[kind] or not reg.on[block.typ] then
     return drop("unknown")
   end
+  if reg.typKinds and not (reg.typKinds[block.typ] and reg.typKinds[block.typ][kind]) then
+    return drop("unknown")
+  end
   local fnName = block.fn
   noteReceived(fnName, text)
   local asked = kind == "whisper" and reg.service ~= nil and block.typ == reg.request
+  local either = reg.anyTyp ~= nil and reg.anyTyp[block.typ] == true
   -- The guild-wide question is a service: heard with the send consent.
   local asking = kind ~= "whisper" and reg.ask ~= nil and block.typ == reg.ask
   -- The probe is heard the same way, from the guild only.
   local probing = kind == "guild" and reg.probe ~= nil and block.typ == reg.probe
   local dir = (asked or asking or probing) and "send" or "receive"
-  if not Consent.Allows(block.fn, dir, audOf(block.fn, kind)) then
+  local consentOk = permitted(block.fn, dir, audOf(block.fn, kind))
+  if not consentOk and either then
+    consentOk = permitted(block.fn, "send", audOf(block.fn, kind))
+  end
+  if not consentOk and dir == "receive" and reg.clickTyp == block.typ then
+    consentOk = Consent.OnUnlessOff(block.fn, dir, audOf(block.fn, kind))
+  end
+  if not consentOk then
     return drop("consent", fnName)
   end
   local name, noName
-  if kind == "whisper" then
+  if direct then
     name, noName = whisperSender(sender)
   else
-    name, noName = knownSender(kind, sender)
+    name, noName = knownSender(kind, sender, reg.openChannel)
   end
   if not name then
     return noSender(noName, fnName)
   end
   local key = PN.Key(name)
-  if kind == "whisper" and not asked then
-    local peer = reg.whisperPeer ~= nil and block.typ ~= reg.request and try(reg.whisperPeer, name) == true
+  if direct and not asked then
+    local peer = reg.whisperPeer ~= nil and block.typ ~= reg.request and try(reg.whisperPeer, name, block.typ) == true
     if peer then
       if not senderOk(key) then
         return drop("throttle", fnName)
@@ -1425,8 +1556,29 @@ function Comm.OnAddon(prefix, text, channel, sender)
   pcall(reg.on[block.typ], name, value, { fn = block.fn, typ = block.typ, id = done.id, aud = kind, channel = channel })
 end
 
+-- BN_CHAT_MSG_ADDON: the sender is a game account id, turned into a character name by the friends roster. Only a
+-- function whose whisperPeer knows that name takes it in (OnAddon).
+function Comm.OnBNet(prefix, text, _, gameAccountID)
+  local guard = ns.AutoGuard
+  local roster = ns.FriendRoster
+  if not (guard and roster) then
+    return
+  end
+  gameAccountID = guard.Safe(gameAccountID)
+  if type(gameAccountID) ~= "number" then
+    return
+  end
+  local name = roster.NameOfGameAccount(gameAccountID)
+  if name then
+    Comm.OnAddon(prefix, text, "BN", name)
+  end
+end
+
 ns.On("CHAT_MSG_ADDON", function(_, prefix, text, channel, sender)
   Comm.OnAddon(prefix, text, channel, sender)
+end)
+ns.On("BN_CHAT_MSG_ADDON", function(_, prefix, text, channel, gameAccountID)
+  Comm.OnBNet(prefix, text, channel, gameAccountID)
 end)
 ns.On("PLAYER_REGEN_ENABLED", function()
   if #queue > 0 then

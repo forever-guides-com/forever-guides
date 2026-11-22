@@ -23,8 +23,8 @@ ns.AddLocale("enUS", {
   ["pkg.copy"] = "Copy link",
   ["pkg.copy.title"] = "Download",
   ["pkg.copy.hint"] = "Open the link in your browser",
-  ["pkg.tip.title"] = "Data add-on",
-  ["pkg.tip.text"] = "Installs or loads the data add-on this view needs.",
+  ["pkg.tip.title"] = "Data addon",
+  ["pkg.tip.text"] = "Installs or loads the data addon this view needs.",
 })
 ns.AddLocale("deDE", {
   ["pkg.missing"] = "Nicht installiert",
@@ -34,7 +34,7 @@ ns.AddLocale("deDE", {
   ["pkg.restart"] = "Beim nächsten Spielstart aktiv, /reload ist gesperrt",
   ["pkg.combat"] = "Nicht im Kampf",
   ["pkg.err.disabled"] = "Einschalten fehlgeschlagen",
-  ["pkg.err.noApi"] = "Im Client nicht möglich",
+  ["pkg.err.noApi"] = "In diesem Client nicht möglich",
   ["pkg.err.failed"] = "Laden fehlgeschlagen",
   ["pkg.enable"] = "Einschalten und laden",
   ["pkg.load"] = "Daten laden",

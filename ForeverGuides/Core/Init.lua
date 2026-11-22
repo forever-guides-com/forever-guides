@@ -26,6 +26,10 @@ ns.On("PLAYER_LOGIN", function()
   ns.MinimapButton.Init()
   ns.AddonCategory.Register()
   ns.Dock.Restore()
+  if ns.db.settings.skinNotice then
+    ns.db.settings.skinNotice = nil
+    ns.Notify(ns.L["settings.skinMigrated"], "info")
+  end
   ns.Log.info("loaded %s", ns.version)
 end)
 

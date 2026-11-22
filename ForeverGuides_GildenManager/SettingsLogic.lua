@@ -101,6 +101,14 @@ SL.OPTIONS = {
     default = "single",
     risky = "series",
   },
+  {
+    id = "macroMode",
+    page = "actions",
+    kind = "enum",
+    values = { "single", "batch" },
+    default = "single",
+  },
+  { id = "batchSize", page = "actions", kind = "int", min = 2, max = 10, step = 1, unit = "count", default = 5 },
   { id = "pauseSec", page = "actions", kind = "int", min = 2, max = 10, step = 1, unit = "sec", default = 3 },
   {
     id = "longPauseSec",
@@ -154,6 +162,11 @@ SL.OPTIONS = {
   { id = "shareJoins", page = "share", kind = "bool", default = false },
   { id = "shareMarks", page = "share", kind = "bool", default = false },
   { id = "shareNotes", page = "share", kind = "bool", default = false, danger = true },
+  -- Ban list: sending and receiving are separate switches, both off. Sender rank: only this rank index and
+  -- every better one sends bans, and only bans of such senders are accepted (0 is the guild master).
+  { id = "shareBansSend", page = "share", kind = "bool", default = false },
+  { id = "shareBansReceive", page = "share", kind = "bool", default = false },
+  { id = "shareBansRank", page = "share", kind = "int", min = 0, max = 9, step = 1, unit = "rank", default = 1 },
   {
     id = "shareChannel",
     page = "share",

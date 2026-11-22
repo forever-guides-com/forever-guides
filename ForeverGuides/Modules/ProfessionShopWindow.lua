@@ -56,7 +56,7 @@ ns.AddLocale("enUS", {
   ["profshop.surcharge"] = "Surcharge",
   ["profshop.surchargeTip"] = "Extra amount for crafts that need more tries.",
   ["profshop.send"] = "Send to shopping list",
-  ["profshop.sendTip"] = "Creates a shopping list, vendor items stay out.",
+  ["profshop.sendTip"] = "Creates a shopping list without vendor items.",
   ["profshop.copy"] = "Copy as text",
   ["profshop.clear"] = "Clear ticks",
   ["profshop.col.item"] = "Item",
@@ -81,7 +81,7 @@ ns.AddLocale("enUS", {
   ["profshop.btn.auction"] = "Auction list",
   ["profshop.btn.removeDone"] = "Remove done",
   ["profshop.removeDone"] = "Remove done positions",
-  ["profshop.removeDoneTip"] = "Ticked positions leave the list.",
+  ["profshop.removeDoneTip"] = "Removes the ticked positions from the list.",
   ["profshop.btn.clearAll"] = "Empty list",
   ["profshop.clearAll"] = "Empty the shopping list",
   ["profshop.clearAllText"] = "Remove every position from the shopping list?",
@@ -94,15 +94,15 @@ ns.AddLocale("enUS", {
   ["profshop.qtyInvalid"] = "Enter a whole amount from %d to 9999.",
   ["shoplist.col.sourceShort"] = "Source",
   ["shoplist.col.itemTip"] = "The item. Indented rows are materials of an item you craft yourself.",
-  ["shoplist.col.qtyTip"] = "Amount to buy: needed minus stock. Click - or + for one, or type a number.",
+  ["shoplist.col.qtyTip"] = "Amount to buy: needed minus stock. Click - or + to change it by one, or type a number.",
   ["shoplist.col.sourceTip"] = "Where the item comes from. On craftable items a click switches between crafting and the auction house.",
-  ["shoplist.col.priceTip"] = "Price per item, from the vendor or the auction house data. ~ marks old data or data of the price add-on.",
+  ["shoplist.col.priceTip"] = "Price per item, from the vendor or the auction house data. ~ marks old data or data of the price addon.",
   ["shoplist.col.totalTip"] = "Price times the amount to buy.",
   ["shoplist.col.progress"] = "Have/Need",
   ["shoplist.col.progressShort"] = "Stock",
-  ["shoplist.col.progressTip"] = "Owned / needed. Green: covered, orange: partly, grey: none.",
+  ["shoplist.col.progressTip"] = "Owned / needed. Green: covered, orange: partly, gray: none.",
   ["shoplist.view.combined"] = "Combined",
-  ["shoplist.view.combinedTip"] = "The same item from every reason in one row. Items you craft yourself are shown under By reason, their materials are in the rows.",
+  ["shoplist.view.combinedTip"] = "The same item from every reason in one row. Items you craft yourself are shown under \"By reason\", their materials are in the rows.",
   ["shoplist.view.reason"] = "By reason",
   ["shoplist.view.reasonTip"] = "One block per reason, the stock goes to the first reason in the list first.",
   ["shoplist.search"] = "Search list",
@@ -110,11 +110,11 @@ ns.AddLocale("enUS", {
   ["shoplist.hits"] = "Hits: %d",
   ["shoplist.rowGroupTip"] = "Ticks or unticks the item and all of its materials, also those a search hides.",
   ["shoplist.autoOpen"] = "Open at auction house",
-  ["shoplist.autoOpenTip"] = "Opens this list by itself next to the auction house.",
+  ["shoplist.autoOpenTip"] = "Opens this list next to the auction house automatically.",
   ["shoplist.craftAll"] = "Craft all",
-  ["shoplist.craftAllTip"] = "Every craftable item is crafted, its materials are listed.",
+  ["shoplist.craftAllTip"] = "Switches every craftable item to crafting it yourself, its materials are listed.",
   ["shoplist.auctionAll"] = "All at AH",
-  ["shoplist.auctionAllTip"] = "Every craftable item is bought at the auction house.",
+  ["shoplist.auctionAllTip"] = "Switches every craftable item to buying at the auction house.",
   ["shoplist.craft.short"] = "Craft",
   ["shoplist.ah.short"] = "AH",
   ["shoplist.craft.title"] = "Craft or buy",
@@ -122,29 +122,29 @@ ns.AddLocale("enUS", {
   ["shoplist.craft.off"] = "Buying it at the auction house. Click to craft it yourself, its materials join the list.",
   ["shoplist.rowCrafted"] = "Crafted by you, its materials are on the list.",
   ["shoplist.rowComplete"] = "The stock covers it, nothing to buy.",
-  ["shoplist.rowMerged"] = "The amount is a sum, change it in the by reason view.",
+  ["shoplist.rowMerged"] = "The amount is a sum. Change it in the \"By reason\" view.",
   ["shoplist.rowDerived"] = "Derived from the recipe, change the quantity of the item that needs it.",
   ["shoplist.total"] = "Total",
   ["shoplist.totalUnpriced"] = "Total (%d without price)",
   ["shoplist.totalTitle"] = "Total cost of the list",
-  ["shoplist.totalTip"] = "Everything still to buy: the lowest price of each item times the amount to buy. The stock is subtracted when Subtract stock is on, the surcharge is included. Ticked rows are not counted.",
+  ["shoplist.totalTip"] = "Everything still to buy: the lowest price of each item times the amount to buy. The stock is subtracted when \"Subtract stock\" is switched on, the surcharge is included. Ticked rows are not counted.",
   ["shoplist.totalUnpricedTip"] = "%d items have no price yet and are not in the sum. Scan the prices in the auction house, tab Settings.",
 })
 ns.AddLocale("deDE", {
   ["profshop.title"] = "Einkaufsliste",
   ["profshop.close"] = "Einkaufsliste schließen",
-  ["profshop.openPage"] = "Routen-Seite öffnen",
-  ["profshop.grip"] = "Zum Ändern der Größe ziehen",
+  ["profshop.openPage"] = "Routenseite öffnen",
+  ["profshop.grip"] = "Ziehen, um die Größe zu ändern",
   ["profshop.scaleTip"] = "Ziehen verschiebt, {key:windowScale} zoomt.",
   ["profshop.summary"] = "%s %d-%d, Aufschlag %d %%",
   ["profshop.stock"] = "Bestand abziehen",
   ["profshop.allChars"] = "Alle Charaktere",
   ["profshop.surcharge"] = "Aufschlag",
-  ["profshop.surchargeTip"] = "Zuschlag für Herstellungen mit mehr Versuchen.",
+  ["profshop.surchargeTip"] = "Aufschlag für Herstellungen, die mehr Versuche brauchen.",
   ["profshop.send"] = "An Einkaufsliste senden",
-  ["profshop.sendTip"] = "Erzeugt eine Einkaufsliste, ohne Händlerware.",
+  ["profshop.sendTip"] = "Erzeugt eine Einkaufsliste ohne Händlerware.",
   ["profshop.copy"] = "Als Text kopieren",
-  ["profshop.clear"] = "Haken löschen",
+  ["profshop.clear"] = "Haken entfernen",
   ["profshop.col.item"] = "Item",
   ["profshop.col.qty"] = "Menge",
   ["profshop.col.source"] = "Beschaffung",
@@ -157,21 +157,21 @@ ns.AddLocale("deDE", {
   ["profshop.noPrice"] = "-",
   ["profshop.rowTip"] = "Klicken zum Abhaken.",
   ["profshop.copy.title"] = "Einkaufsliste",
-  ["profshop.copy.hintImport"] = "Einkaufsliste: Zeile in das Import-Feld einfügen.",
-  ["profshop.copy.hintPlain"] = "Einfache Liste.",
+  ["profshop.copy.hintImport"] = "Einkaufsliste: Füge die Zeile ins Importfeld ein.",
+  ["profshop.copy.hintPlain"] = "Reine Textliste.",
   ["profshop.copy.asPlain"] = "Textliste",
-  ["profshop.copy.asImport"] = "Import-Zeile",
+  ["profshop.copy.asImport"] = "Importzeile",
   ["profshop.copy.none"] = "Nichts zu kopieren.",
   ["profshop.link"] = "Link in den Chat senden",
   ["profshop.linkTip"] = "Setzt die Liste als einen klickbaren Link in den Chat.",
   ["profshop.btn.auction"] = "Auktionsliste",
   ["profshop.btn.removeDone"] = "Erledigte entfernen",
   ["profshop.removeDone"] = "Erledigte Positionen entfernen",
-  ["profshop.removeDoneTip"] = "Abgehakte Positionen verlassen die Liste.",
+  ["profshop.removeDoneTip"] = "Entfernt die abgehakten Positionen aus der Liste.",
   ["profshop.btn.clearAll"] = "Liste leeren",
   ["profshop.clearAll"] = "Einkaufsliste leeren",
   ["profshop.clearAllText"] = "Alle Positionen aus der Einkaufsliste entfernen?",
-  ["profshop.btn.restore"] = "Zurücksetzen",
+  ["profshop.btn.restore"] = "Zurückholen",
   ["profshop.restore"] = "Entfernte Zeilen zurückholen",
   ["profshop.restoreTip"] = "Holt entfernte Routenzeilen und ihre Mengen zurück.",
   ["profshop.qtyUp"] = "Mehr",
@@ -180,27 +180,27 @@ ns.AddLocale("deDE", {
   ["profshop.qtyInvalid"] = "Gib eine ganze Menge von %d bis 9999 ein.",
   ["shoplist.col.sourceShort"] = "Quelle",
   ["shoplist.col.itemTip"] = "Das Item. Eingerückte Zeilen sind Materialien eines Items, das du selbst herstellst.",
-  ["shoplist.col.qtyTip"] = "Zu kaufende Menge: Bedarf minus Bestand. Mit - oder + um eins ändern oder eine Zahl tippen.",
+  ["shoplist.col.qtyTip"] = "Zu kaufende Menge: Bedarf minus Bestand. Klicke - oder +, um die Menge um eins zu ändern, oder tippe eine Zahl.",
   ["shoplist.col.sourceTip"] = "Woher das Item kommt. Bei herstellbaren Items wechselt ein Klick zwischen Herstellen und Auktionshaus.",
-  ["shoplist.col.priceTip"] = "Preis pro Item, vom Händler oder aus den Auktionshaus-Daten. ~ markiert alte Daten oder Daten des Preis-Addons.",
+  ["shoplist.col.priceTip"] = "Preis pro Item, vom Händler oder aus den Auktionshaus-Daten. ~ markiert alte Daten oder Daten des Preisaddons.",
   ["shoplist.col.totalTip"] = "Preis mal zu kaufende Menge.",
   ["shoplist.col.progress"] = "Bestand/Bedarf",
   ["shoplist.col.progressShort"] = "Bestand",
   ["shoplist.col.progressTip"] = "Vorhanden / benötigt. Grün: gedeckt, orange: teilweise, grau: nichts.",
   ["shoplist.view.combined"] = "Zusammen",
-  ["shoplist.view.combinedTip"] = "Dasselbe Item aus allen Gründen in einer Zeile. Selbst hergestellte Items stehen unter Nach Grund, ihre Materialien in den Zeilen.",
+  ["shoplist.view.combinedTip"] = "Dasselbe Item aus allen Gründen in einer Zeile. Selbst hergestellte Items stehen unter „Nach Grund“, ihre Materialien in den Zeilen.",
   ["shoplist.view.reason"] = "Nach Grund",
   ["shoplist.view.reasonTip"] = "Ein Block je Grund, der Bestand geht zuerst an den ersten Grund der Liste.",
   ["shoplist.search"] = "Liste durchsuchen",
   ["shoplist.noMatches"] = "Keine Treffer",
   ["shoplist.hits"] = "Treffer: %d",
-  ["shoplist.rowGroupTip"] = "Hakt das Item und alle seine Materialien ab oder wieder ab, auch die von der Suche ausgeblendeten.",
+  ["shoplist.rowGroupTip"] = "Hakt das Item und alle seine Materialien ab oder entfernt die Haken, auch bei Zeilen, die eine Suche ausblendet.",
   ["shoplist.autoOpen"] = "Im Auktionshaus öffnen",
-  ["shoplist.autoOpenTip"] = "Öffnet diese Liste von selbst neben dem Auktionshaus.",
+  ["shoplist.autoOpenTip"] = "Öffnet diese Liste automatisch neben dem Auktionshaus.",
   ["shoplist.craftAll"] = "Alles herstellen",
-  ["shoplist.craftAllTip"] = "Jedes herstellbare Item wird selbst hergestellt, die Materialien stehen in der Liste.",
+  ["shoplist.craftAllTip"] = "Stellt alle herstellbaren Items auf Selbstherstellung um, die Materialien stehen in der Liste.",
   ["shoplist.auctionAll"] = "Alles im AH",
-  ["shoplist.auctionAllTip"] = "Jedes herstellbare Item wird im Auktionshaus gekauft.",
+  ["shoplist.auctionAllTip"] = "Stellt alle herstellbaren Items auf Kauf im Auktionshaus um.",
   ["shoplist.craft.short"] = "Herst.",
   ["shoplist.ah.short"] = "AH",
   ["shoplist.craft.title"] = "Herstellen oder kaufen",
@@ -208,13 +208,13 @@ ns.AddLocale("deDE", {
   ["shoplist.craft.off"] = "Wird im Auktionshaus gekauft. Klick: selbst herstellen, die Materialien kommen in die Liste.",
   ["shoplist.rowCrafted"] = "Selbst hergestellt, die Materialien stehen in der Liste.",
   ["shoplist.rowComplete"] = "Der Bestand deckt es, nichts zu kaufen.",
-  ["shoplist.rowMerged"] = "Die Menge ist eine Summe, änderbar in der Ansicht Nach Grund.",
+  ["shoplist.rowMerged"] = "Die Menge ist eine Summe. Ändere sie in der Ansicht „Nach Grund“.",
   ["shoplist.rowDerived"] = "Ergibt sich aus dem Rezept, ändere die Menge des Items, das es braucht.",
   ["shoplist.total"] = "Gesamt",
   ["shoplist.totalUnpriced"] = "Gesamt (%d ohne Preis)",
   ["shoplist.totalTitle"] = "Gesamtkosten der Liste",
-  ["shoplist.totalTip"] = "Alles, was noch zu kaufen ist: der niedrigste Preis jedes Items mal die zu kaufende Menge. Der Bestand ist abgezogen, wenn Bestand abziehen an ist, der Aufschlag ist eingerechnet. Abgehakte Zeilen zählen nicht.",
-  ["shoplist.totalUnpricedTip"] = "%d Items haben noch keinen Preis und fehlen in der Summe. Preise scannen im Auktionshaus, Tab Einstellungen.",
+  ["shoplist.totalTip"] = "Alles, was noch zu kaufen ist: der niedrigste Preis jedes Items mal die zu kaufende Menge. Der Bestand ist abgezogen, wenn „Bestand abziehen“ eingeschaltet ist, der Aufschlag ist eingerechnet. Abgehakte Zeilen zählen nicht.",
+  ["shoplist.totalUnpricedTip"] = "%d Items haben noch keinen Preis und fehlen in der Summe. Preise scannen im Auktionshaus, Tab „Einstellungen“.",
 })
 
 local frame
@@ -563,7 +563,7 @@ function SW.NewSeparator(row, gap, pad)
   line:SetPoint("BOTTOMLEFT", row, "TOPLEFT", pad, math.floor(gap / 2))
   line:SetPoint("BOTTOMRIGHT", row, "TOPRIGHT", -pad, math.floor(gap / 2))
   ns.Bind(line, function(t)
-    t:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    t:SetColorTexture(Theme.fillColor("line"))
   end)
   line:Hide()
   row.sepLine, row.sepGap = line, gap
@@ -712,7 +712,7 @@ local function newRow(parent)
   row:SetHeight(ROW_H)
   row.hover = row:CreateTexture(nil, "BACKGROUND")
   row.hover:SetAllPoints()
-  row.hover:SetColorTexture(1, 1, 1, 0)
+  row.hover:SetColorTexture(ns.Theme.fillColor())
   -- Section header of the by reason view.
   SW.NewSeparator(row, SEP_GAP, PAD)
   row.headBg = W.Fill(row, "surface2", 0.9)
@@ -794,14 +794,14 @@ local function newRow(parent)
   -- The box ticks, the rest of the row searches (left), copies the name (right) or links it (Shift).
   row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row:SetScript("OnEnter", function(self)
-    self.hover:SetColorTexture(1, 1, 1, 0.1)
+    self.hover:SetColorTexture(Theme.fillColor("hover"))
     if self.line then
       self.mag:SetColorToken("accent2")
       S.RowTooltip(self, self.line)
     end
   end)
   row:SetScript("OnLeave", function(self)
-    self.hover:SetColorTexture(1, 1, 1, 0)
+    self.hover:SetColorTexture(ns.Theme.fillColor())
     self.mag:SetColorToken("textMuted")
     ns.HideTooltip()
   end)
@@ -825,7 +825,7 @@ local function newRow(parent)
   row.craft = CreateFrame("Button", nil, row)
   row.craft.hl = row.craft:CreateTexture(nil, "BACKGROUND")
   row.craft.hl:SetAllPoints()
-  row.craft.hl:SetColorTexture(1, 1, 1, 0)
+  row.craft.hl:SetColorTexture(ns.Theme.fillColor())
   W.Border(row.craft, "accent2", 0.5)
   row.craft:SetScript(
     "OnClick",
@@ -834,13 +834,13 @@ local function newRow(parent)
     end)
   )
   row.craft:SetScript("OnEnter", function(self)
-    self.hl:SetColorTexture(1, 1, 1, 0.12)
+    self.hl:SetColorTexture(Theme.fillColor("hover"))
     if row.line then
       SW.CraftTooltip(self, row.line)
     end
   end)
   row.craft:SetScript("OnLeave", function(self)
-    self.hl:SetColorTexture(1, 1, 1, 0)
+    self.hl:SetColorTexture(ns.Theme.fillColor())
     ns.HideTooltip()
   end)
   ns.Focus.register(row, function(self)
@@ -858,17 +858,19 @@ local function newRow(parent)
   ns.Focus.register(row.craft, function(self)
     self:Click()
   end)
+  -- Over the source cell of a vendor row: the vendor's name opens his page.
+  row.vendorLink = ns.VendorsPage.Link(row, row.source)
   -- The price cell tells where the price comes from; a click on it acts like a click on the row.
   row.priceHit = CreateFrame("Button", nil, row)
   row.priceHit:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   row.priceHit:SetScript("OnEnter", function(self)
-    row.hover:SetColorTexture(1, 1, 1, 0.1)
+    row.hover:SetColorTexture(Theme.fillColor("hover"))
     if row.line then
       S.PriceTooltip(self, row.line)
     end
   end)
   row.priceHit:SetScript("OnLeave", function()
-    row.hover:SetColorTexture(1, 1, 1, 0)
+    row.hover:SetColorTexture(ns.Theme.fillColor())
     ns.HideTooltip()
   end)
   row.priceHit:SetScript(
@@ -963,7 +965,9 @@ local function paintRow(row, item)
   row.minus:SetEnabled(item.editable and line.qty > leastQty(line))
   row.plus:SetEnabled(item.editable and line.need < PL.MAX_QTY)
   row.del:SetEnabled(item.removable)
-  row.source:SetText(L["profshop.group." .. line.source])
+  local seller = line.source == "vendor" and ns.VendorSource and ns.VendorSource.Best(line.id, false) or nil
+  row.source:SetText(seller and seller.seller.vendor.name or L["profshop.group." .. line.source])
+  row.vendorLink:SetNpc(seller and seller.seller.vendor.npc or nil)
   W.SetColor(row.source, item.craftable and "accent2" or "textSecondary")
   row.craft:SetShown(item.craftable)
   row.who:SetSpell(ns.CraftersView.SpellOfItem(line.id))
@@ -1014,13 +1018,13 @@ local function newHeader(parent)
     local hit = CreateFrame("Button", nil, head)
     hit.hl = hit:CreateTexture(nil, "BACKGROUND")
     hit.hl:SetAllPoints()
-    hit.hl:SetColorTexture(1, 1, 1, 0)
+    hit.hl:SetColorTexture(ns.Theme.fillColor())
     hit:SetScript("OnEnter", function(self)
-      self.hl:SetColorTexture(1, 1, 1, 0.1)
+      self.hl:SetColorTexture(Theme.fillColor("hover"))
       showHeaderTip(self, spec)
     end)
     hit:SetScript("OnLeave", function(self)
-      self.hl:SetColorTexture(1, 1, 1, 0)
+      self.hl:SetColorTexture(ns.Theme.fillColor())
       ns.HideTooltip()
     end)
     ns.Focus.register(hit, function() end)
@@ -1151,16 +1155,26 @@ function SW.Send(given)
     ns.Notify(ns.ProfessionRouteData.Hint(plan.status), "warning")
     return "nodata"
   end
-  local result, count = S.Send(plan)
-  if result == "sent" then
-    ns.Notify(string.format(L["profshop.sent"], count), "success")
-  elseif result == "nothing" then
-    ns.Notify(L["profshop.nothing"], "info")
-  else
-    ns.Notify(L["profshop." .. result], result == "failed" and "error" or "warning")
-    showCopy(false, plan)
+  local function send(mode)
+    local result, count = S.Send(plan, mode)
+    if result == "sent" then
+      ns.Notify(string.format(L["profshop.sent"], count), "success")
+    elseif result == "nothing" then
+      ns.Notify(L["profshop.nothing"], "info")
+    else
+      ns.Notify(L["profshop." .. result], result == "failed" and "error" or "warning")
+      showCopy(false, plan)
+    end
+    return result
   end
-  return result
+  -- A list of that name in the connected addon is overwritten by a plain send: ask first.
+  if S.ListApiReady() and ns.PriceSourceAddon.ListExists(plan.listName) then
+    ns.ProfessionList.AskMerge(string.format(L["proflist.ask.sendText"], plan.listName), function()
+      send("append")
+    end, send)
+    return "asked"
+  end
+  return send()
 end
 
 -- "Senden": the list as one link in the chat (ProfessionListLink.lua). The copy texts stay what they
@@ -1300,12 +1314,10 @@ local function create()
   f.cbAll:SetPoint("LEFT", f.cbStock, "RIGHT", 8, 0)
   f.cbSurcharge:SetPoint("LEFT", f.cbAll, "RIGHT", 8, 0)
 
-  f.link = W.Action(content, {
-    label = "act.send",
-    icon = "share",
+  f.link = ns.PageShare.Button(content, {
+    size = 28,
     tooltip = "profshop.link",
     tooltipText = "profshop.linkTip",
-    variant = "primary",
     onClick = function()
       SW.Link()
     end,
@@ -1465,19 +1477,19 @@ local function create()
   -- Every row of buttons and the switches share the width equally; the restore button is only there
   -- while a route line is removed or changed.
   local function split(_, w)
-    local function share(buttons)
+    local function share(buttons, taken)
       local shown = {}
       for _, b in ipairs(buttons) do
         if b:IsShown() then
           shown[#shown + 1] = b
         end
       end
-      local each = math.floor((w - 6 * (#shown - 1)) / #shown)
+      local each = math.floor((w - (taken or 0) - 6 * (#shown - 1)) / #shown)
       for _, b in ipairs(shown) do
         b:SetWidth(each)
       end
     end
-    share({ f.link, f.send, f.copy, f.clear })
+    share({ f.send, f.copy, f.clear }, f.link:GetWidth() + 6)
     share({ f.removeDone, f.clearAll, f.smallList, f.restore })
     share({ f.views.combined, f.views.reason, f.craftAll, f.auctionAll })
     f.cbAuto:SetWidth(math.floor(w / 2))

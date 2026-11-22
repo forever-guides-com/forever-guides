@@ -37,7 +37,7 @@ ns.AddLocale("enUS", {
   ["sleepbag.close"] = "Hide the bar until the next run",
   ["sleepbag.tip.rule"] = "Every minute of lying adds one stack of Well Rested, up to 3. At 3 every minute of lying renews the duration.",
   ["sleepbag.tip.stacks"] = "Stacks: %s",
-  ["sleepbag.tip.counted"] = "The game hides the number, so the add-on counts one stack per minute of lying (~).",
+  ["sleepbag.tip.counted"] = "The game hides the number, so the addon counts one stack per minute of lying (~).",
   ["sleepbag.tip.next"] = "Next stack in %s",
   ["sleepbag.tip.nextRenew"] = "Next renewal in %s",
   ["sleepbag.tip.left"] = "Well Rested lasts %s more",
@@ -74,7 +74,7 @@ ns.AddLocale("deDE", {
   ["sleepbag.tip.full"] = "Alle Stapel sind da, Liegen erneuert nur die Dauer.",
   ["sleepbag.endedStood"] = "Du stehst wieder auf. Liegedauer: %s.",
   ["sleepbag.endedEarly"] = "Zu früh aufgestanden: %s von etwa %s.",
-  ["sleepbag.endedNoLie"] = "Du hast dich nicht hingelegt, die Schlafsack-Anzeige endet.",
+  ["sleepbag.endedNoLie"] = "Du hast dich nicht hingelegt, die Schlafsackanzeige endet.",
   ["sleepbag.endedAborted"] = "Der Schlafsack wurde unterbrochen.",
   ["sleepbag.endedRested"] = "Gut erholt x%s ist aktiv.",
 })
@@ -274,7 +274,7 @@ local function create()
   f.status:SetHeight(BAR_H)
   f.statusBack = f.status:CreateTexture(nil, "BACKGROUND")
   f.statusBack:SetAllPoints()
-  f.statusBack:SetColorTexture(0, 0, 0, 0.45)
+  f.statusBack:SetColorTexture(ns.Theme.scrim(0.45))
   f.fill = f.status:CreateTexture(nil, "ARTWORK")
   f.fill:SetColorTexture(U.hex(BAR_HEX))
   f.status:SetStatusBarTexture(f.fill)

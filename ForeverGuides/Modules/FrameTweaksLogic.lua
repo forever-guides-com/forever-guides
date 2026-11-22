@@ -72,9 +72,13 @@ for i = 1, 13 do
   FT.DEFAULT[#FT.DEFAULT + 1] = "ContainerFrame" .. i
 end
 
--- Frames that must not be touched in combat, whatever IsProtected says. The world map builds its pins
--- and quest entries from protected calls, which a change of ours (position, zoom) would taint.
+-- Frames that no automatic change of ours (restore, zoom, opacity) touches in combat, whatever IsProtected
+-- says. The world map builds its pins and quest entries from protected calls, which such a change would taint.
 FT.PROTECTED = { PlayerSpellsFrame = true, ProfessionsFrame = true, WorldMapFrame = true }
+
+-- Frames the player's own drag never moves in combat, whatever IsProtected says. The world map is not one of
+-- them: it is dragged when the client does not protect it (see the drag rule in FrameTweaks).
+FT.DRAG_PROTECTED = { PlayerSpellsFrame = true, ProfessionsFrame = true }
 
 -- Windows whose hook work waits for the next frame, so it never runs inside the client's own call.
 FT.DEFERRED = { WorldMapFrame = true }
@@ -227,6 +231,10 @@ end
 
 function FT.Protected(name)
   return FT.PROTECTED[name] == true
+end
+
+function FT.DragProtected(name)
+  return FT.DRAG_PROTECTED[name] == true
 end
 
 -- Is this window handled? Every window of the lists and every detected one, minus the excluded.

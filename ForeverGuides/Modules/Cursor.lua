@@ -38,7 +38,7 @@ ns.AddLocale("enUS", {
   ["cursor.edit.missing"] = "The layout editor is not available.",
   ["cursor.slash.on"] = "Mouse cursor ring: on.",
   ["cursor.slash.off"] = "Mouse cursor ring: off.",
-  ["cursor.slash.reset"] = "Mouse cursor ring options reset. Your layouts stay as they are.",
+  ["cursor.slash.reset"] = "Mouse cursor ring settings reset. Your layouts stay as they are.",
   ["cursor.slash.usage"] = "/fg cursor [on | off | edit | reset]",
   ["binding.cursorRing"] = "Mouse cursor ring on or off",
 })
@@ -47,7 +47,7 @@ ns.AddLocale("deDE", {
   ["cursor.edit.missing"] = "Der Layout-Editor ist nicht verfügbar.",
   ["cursor.slash.on"] = "Mauszeiger-Ring: an.",
   ["cursor.slash.off"] = "Mauszeiger-Ring: aus.",
-  ["cursor.slash.reset"] = "Optionen des Mauszeiger-Rings zurückgesetzt. Deine Layouts bleiben unverändert.",
+  ["cursor.slash.reset"] = "Einstellungen des Mauszeiger-Rings zurückgesetzt. Deine Layouts bleiben unverändert.",
   ["cursor.slash.usage"] = "/fg mauszeiger [an | aus | edit | reset]",
   ["binding.cursorRing"] = "Mauszeiger-Ring ein oder aus",
 })

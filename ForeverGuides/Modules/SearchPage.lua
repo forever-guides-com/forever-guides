@@ -28,7 +28,7 @@ ns.AddLocale("enUS", {
   ["search.recent"] = "Recent searches",
   ["search.recent.sub"] = "Search again",
   ["search.recent.clear"] = "Clear history",
-  ["search.recent.clearSub"] = "Removes the saved searches.",
+  ["search.recent.clearSub"] = "Clears the list of recent searches.",
   ["search.sourceError"] = 'The search source "%s" failed. The other sources keep working.',
   ["search.sourceFailed"] = "Not searched: %s.",
   ["search.best"] = "Best matches",
@@ -60,7 +60,7 @@ ns.AddLocale("enUS", {
 
 ns.AddLocale("deDE", {
   ["search.hint"] = "Begriff eingeben (Strg+F). Pfeiltasten wählen, Enter öffnet, Esc leert. Groß-/Kleinschreibung und Umlaute egal.",
-  ["search.total"] = '%d Treffer für "%s"',
+  ["search.total"] = '%d Treffer für „%s“',
   ["search.none"] = "Nichts gefunden.",
   ["search.none.hint"] = "Prüfe die Schreibweise oder nimm ein kürzeres Wort. Leerzeichen und Umlaute spielen keine Rolle.",
   ["search.empty.text"] = "Alles durchsuchen",
@@ -81,14 +81,14 @@ ns.AddLocale("deDE", {
   ["search.showMore.sub"] = "Zeigt jeden Treffer dieser Gruppe.",
   ["search.recent"] = "Letzte Suchen",
   ["search.recent.sub"] = "Erneut suchen",
-  ["search.recent.clear"] = "Verlauf löschen",
-  ["search.recent.clearSub"] = "Entfernt die gespeicherten Suchen.",
-  ["search.sourceError"] = 'Die Suchquelle "%s" ist ausgefallen. Die anderen Quellen laufen weiter.',
+  ["search.recent.clear"] = "Verlauf leeren",
+  ["search.recent.clearSub"] = "Leert die Liste der letzten Suchen.",
+  ["search.sourceError"] = 'Die Suchquelle „%s“ ist ausgefallen. Die anderen Quellen laufen weiter.',
   ["search.sourceFailed"] = "Nicht durchsucht: %s.",
   ["search.best"] = "Beste Treffer",
   ["search.all"] = "Nach Art",
   ["search.alias"] = "auch bekannt als %s",
-  ["search.didYouMean"] = 'Meintest du "%s"?',
+  ["search.didYouMean"] = 'Meintest du „%s“?',
   ["search.web"] = "Auf forever-guides.com suchen",
   ["search.web.title"] = "Suche auf der Website",
   ["search.web.hint"] = "Link kopieren, im Browser öffnen.",
@@ -172,14 +172,37 @@ end
 -- Quality color of an item hit ("rrggbb"), nil for other kinds and while the client has no quality.
 local function itemHex(item)
   local data = item.kind == "item" and type(item.data) == "table" and item.data or nil
-  if data and type(data.id) == "number" then
-    return ns.ItemInfo.qualityHex(ns.ItemInfo.quality(data.id))
+  local id = data and data.id or ns.SearchTargets.ItemId(item)
+  if type(id) == "number" then
+    return ns.ItemInfo.qualityHex(ns.ItemInfo.quality(id))
   end
 end
 
 -- Identity of a row across two renders of the same query (the hit tables are new each time).
 local function rowKey(item)
   return table.concat({ tostring(item.kind), tostring(item.path or item.name or item.hidden) }, "|")
+end
+
+-- A share code in the box: the view it opens leads the list, a code that does not work says so.
+local function codeRows(q)
+  local PS = ns.PageShare
+  if not (PS and ns.ShareCodeLogic.LooksLikeCode(q)) then
+    return nil
+  end
+  local payload, reason = PS.Decode(q)
+  if payload then
+    return {
+      {
+        sharedView = true,
+        kind = "share",
+        name = string.format(L["pageshare.open"], PS.Label(payload)),
+        sub = string.format(L["pageshare.openSub"], PS.Code(payload) or q),
+        path = payload,
+      },
+    }
+  end
+  local keys = { version = "pageshare.newCode", unknown = "pageshare.unknownCode", private = "pageshare.notShareable" }
+  return { { header = true, name = L[keys[reason] or "pageshare.badCode"] } }
 end
 
 local function recentList()
@@ -248,6 +271,7 @@ local function build(container)
 
   local summary = ns.AddParagraph(view, nil, { role = "text", color = "text" })
   list = K.NewList(view.content, {
+    look = "flat", -- mixed inert group headers and cursor rows, headers must not be boxed
     rowHeight = ROW_HEIGHT,
     bind = function(item)
       if item.header then
@@ -276,7 +300,7 @@ local function build(container)
         return { title = item.name, sub = item.sub, selected = cursor, cursor = cursor }
       elseif item.recent then
         return { title = item.name, sub = L["search.recent.sub"], selected = cursor, cursor = cursor }
-      elseif item.package then
+      elseif item.package or item.sharedView then
         return { title = item.name, sub = item.sub, right = item.right, selected = cursor, cursor = cursor }
       end
       local spec = {
@@ -289,6 +313,7 @@ local function build(container)
         cursor = cursor,
       }
       spec.icon, spec.iconPaint = kindIcon(item)
+      spec.icon = spec.icon or ns.SearchTargets.Icon(item)
       local row = SP.Row(item)
       if row then
         spec.icon, spec.actions, spec.tooltipSpec = row.icon or spec.icon, row.actions, row.tooltipSpec
@@ -400,6 +425,11 @@ local function build(container)
         total = total + settingTotal
       end
       rows[#rows + 1] = SP.PackageRow()
+      local lead = codeRows(q)
+      for i, row in ipairs(lead or {}) do
+        table.insert(rows, i, row)
+        total = total + (row.sharedView and 1 or 0)
+      end
       summary:SetText(total == 0 and L["search.none"] or string.format(L["search.total"], total, q))
       if total == 0 then
         webQuery = q
@@ -416,6 +446,9 @@ local function build(container)
     end
     notes[#notes + 1] = SP.StatusText()
     st.rows, st.total, st.selected = rows, total, nil
+    if rows[1] and rows[1].sharedView then
+      st.selected = rows[1]
+    end
     if previous then
       for _, row in ipairs(rows) do
         if rowKey(row) == previous then
@@ -449,6 +482,8 @@ local function build(container)
       render(st.query)
     elseif item.recent then
       ns.Router:navigate("search/" .. item.name)
+    elseif item.sharedView then
+      ns.Main.Show(item.path)
     elseif item.package then
       SP.EnableMissing()
     elseif item.settingHit then
@@ -456,7 +491,7 @@ local function build(container)
       ns.SettingsSearch.Go(item)
     else
       remember(st.query)
-      if not SP.Open(item) and item.path then
+      if not (SP.Open(item) or ns.SearchTargets.Open(item)) and item.path then
         ns.Router:navigate(item.path)
       end
     end

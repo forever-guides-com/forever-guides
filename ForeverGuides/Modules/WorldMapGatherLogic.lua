@@ -18,10 +18,14 @@ function WL.ZoneMap(mapType)
   return mapType == nil or WIDE[mapType] ~= true
 end
 
+-- A stitched map zooms the canvas far wider than the client's own map. Inside these bounds a symbol keeps
+-- its size on the screen; beyond them it stops following, so a stray scale never makes a degenerate texture.
+WL.SCALE_MIN, WL.SCALE_MAX = 0.01, 100
+
 -- Canvas units per screen px for the canvas scale the client reports (1 when it reports nothing sound).
 function WL.Unit(scale)
   if type(scale) == "number" and scale == scale and scale > 0 and scale < math.huge then
-    return 1 / scale
+    return 1 / math.min(math.max(scale, WL.SCALE_MIN), WL.SCALE_MAX)
   end
   return 1
 end

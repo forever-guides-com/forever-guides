@@ -79,7 +79,8 @@ local function arrowsFor(id, canvas)
 end
 
 -- The click shows the neighbour in Blizzard's own window. SetMapID runs from addon code, so it only runs
--- out of combat and while the client lets this add-on touch the map (ZBL.WorldClickPlan); otherwise nothing
+-- while the client lets this add-on touch the map and, in combat, only when the map is not protected
+-- (ZBL.WorldClickPlan); otherwise nothing
 -- of Blizzard's is called and the player gets a note. The add-on map is not involved.
 local function open(pin, button)
   if button ~= "LeftButton" or ZE.Active() then
@@ -87,7 +88,8 @@ local function open(pin, button)
   end
   ns.HideTooltip()
   local target = pin.arrow.map
-  local plan = ZBL.WorldClickPlan(target, WML.MapID(), ns.InCombat(), ns.ProtectedAllowed(map))
+  local protected = map.IsProtected and map:IsProtected() == true
+  local plan = ZBL.WorldClickPlan(target, WML.MapID(), ns.InCombat(), ns.ProtectedAllowed(map), protected)
   ns.MapOps.Record("arrow click", target)
   if plan == "switch" then
     ns.MapOps.Record("WorldMapFrame:SetMapID", target)

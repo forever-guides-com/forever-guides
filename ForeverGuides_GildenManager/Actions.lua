@@ -125,9 +125,17 @@ FG.On("FG_GUILD_UPDATE", function()
   end
 end)
 
--- The step the backend takes: who, with which identifiers, the target rank or the new text.
-local function stepOf(action, m, value)
-  return { name = m.name, guid = m.guid, index = m.index, toRank = AL.NewRank(action, m), value = value }
+-- The step the backend takes: who, with which identifiers, the rank before and after (toRank: the target
+-- of a jump over several ranks) or the new text.
+local function stepOf(action, m, value, toRank)
+  return {
+    name = m.name,
+    guid = m.guid,
+    index = m.index,
+    fromRank = m.rank,
+    toRank = toRank or AL.NewRank(action, m),
+    value = value,
+  }
 end
 
 -- Sends one action: a stand-in source takes it on its own rows, a dry run sends nothing, else the
@@ -147,7 +155,7 @@ local function dispatch(action, m, value, onClick, noPause, toRank)
   if not noPause and AL.Wait(A.last, clock(), setting("pauseSec")) > 0 then
     return false, "throttle"
   end
-  local status, info = B.Do(action, stepOf(action, m, value), { choice = setting("actionBackend"), onClick = onClick })
+  local status, info = B.Do(action, stepOf(action, m, value, toRank), { choice = setting("actionBackend"), onClick = onClick })
   if status == "sent" then
     A.last = clock()
   end
@@ -535,6 +543,40 @@ end
 
 local runs, driver = {}, nil
 
+-- The game's format strings of the refusals, per reason code of RunLogic.ParseRefusal.
+local function refusalFormats()
+  return {
+    permission = rawget(_G, "ERR_GUILD_PERMISSIONS"),
+    rankTooHigh = rawget(_G, "ERR_GUILD_RANK_TOO_HIGH_S"),
+    rankTooLow = rawget(_G, "ERR_GUILD_RANK_TOO_LOW_S"),
+    notInGuild = rawget(_G, "ERR_GUILD_PLAYER_NOT_IN_GUILD_S"),
+  }
+end
+
+-- The server's own message about a step: open runs confirm the matching command line at once, or end the
+-- oldest waiting step as refused (every command of a click answers once, in order).
+FG.On("CHAT_MSG_SYSTEM", function(_, msg)
+  if #runs == 0 or not FG.ItemInfo.accessible(msg) then
+    return
+  end
+  local parsed = gm.History.Parse(msg)
+  local refusal = not parsed and RL.ParseRefusal(msg, refusalFormats())
+  for _, run in ipairs(runs) do
+    if parsed then
+      run:Confirmed(parsed)
+    elseif refusal then
+      run:Refused(refusal)
+    end
+  end
+end)
+
+-- The combat is over: runs that waited for it go on (the secure button only changes out of combat).
+FG.On("PLAYER_REGEN_ENABLED", function()
+  for _, run in ipairs(runs) do
+    run:Resume()
+  end
+end)
+
 -- Calls Tick of every open run twice a second; a run that ended drops out.
 local function drive(run)
   runs[#runs + 1] = run
@@ -581,7 +623,7 @@ function A.StartRun(entries, opts)
       rule = opts.plan and RL.RuleCheck(opts.plan) or nil,
       disarm = B.Disarm,
       offer = function(step)
-        return B.Unavailable(step.action)
+        return B.Unavailable(step.action, setting("actionBackend"))
       end,
       again = function(step)
         local m = find(GD.Get(), step.key)
@@ -597,6 +639,28 @@ function A.StartRun(entries, opts)
         return dispatch(step.action, m, step.value, function()
           run:Clicked()
         end, true, step.toRank)
+      end,
+      -- One button for several commands. A dry run and a stand-in source never get a button: they take
+      -- the first step through the normal path and the run asks again for the rest.
+      execBatch = function(steps)
+        if GD.Source() or gm.Guild().settings.dryRun then
+          return run.env.exec(steps[1])
+        end
+        local list = {}
+        for _, step in ipairs(steps) do
+          local m = find(GD.Get(), step.key)
+          if not m then
+            break
+          end
+          list[#list + 1] = { action = step.action, name = m.name, fromRank = step.fromRank, toRank = step.toRank }
+        end
+        local button, n = B.ArmBatch(list, settings.batch, function()
+          run:Clicked()
+        end)
+        if not button then
+          return false, n
+        end
+        return "armed", button, n
       end,
       values = function(step)
         local roster = GD.Get()
@@ -624,6 +688,15 @@ function A.StartRun(entries, opts)
           if e.undoOf then
             e.undoOf.undone = true
           end
+        elseif event == "update" and e.stored and e.result == "refused" then
+          -- The game refused it: the change never happened, so it is no log line.
+          local list = gm.Guild().actions
+          for i = #list, 1, -1 do
+            if list[i] == e.stored then
+              table.remove(list, i)
+            end
+          end
+          e.stored = nil
         elseif event == "update" and e.stored and AL.RESULTS[e.result] then
           e.stored.result = e.result
         elseif event == "update" and e.copy and e.result == "verified" then

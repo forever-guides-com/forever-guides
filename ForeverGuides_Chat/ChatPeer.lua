@@ -71,16 +71,7 @@ local function opt(id)
 end
 
 local function homeRealm()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local fn = g(name)
-    if type(fn) == "function" then
-      local ok, realm = pcall(fn)
-      if ok and type(realm) == "string" and realm ~= "" then
-        return realm
-      end
-    end
-  end
-  return ""
+  return FG.Realm.Get() or ""
 end
 
 local function keyOf(name)

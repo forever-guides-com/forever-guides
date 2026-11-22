@@ -29,7 +29,7 @@ ns.AddLocale("enUS", {
   ["drawwin.editor"] = "Open in editor",
   ["drawwin.grip"] = "Drag to resize",
   ["drawwin.unreadable"] = "This drawing could not be read.",
-  ["drawwin.limit"] = "At most %d drawing windows, close one first.",
+  ["drawwin.limit"] = "At most %d drawing windows. Close one first.",
   ["drawwin.usage"] = "Usage: /fg draw window <name>",
 })
 
@@ -38,9 +38,9 @@ ns.AddLocale("deDE", {
   ["drawwin.pinTip"] = "Fixiert Position und Größe.\nEsc schließt nicht mehr, nur X oder dieser Knopf.",
   ["drawwin.close"] = "Fenster schließen",
   ["drawwin.editor"] = "Im Editor öffnen",
-  ["drawwin.grip"] = "Ziehen zum Skalieren",
-  ["drawwin.unreadable"] = "Diese Zeichnung ließ sich nicht lesen.",
-  ["drawwin.limit"] = "Höchstens %d Zeichnungsfenster, erst eines schließen.",
+  ["drawwin.grip"] = "Ziehen, um die Größe zu ändern",
+  ["drawwin.unreadable"] = "Diese Zeichnung konnte nicht gelesen werden.",
+  ["drawwin.limit"] = "Höchstens %d Zeichnungsfenster. Schließe zuerst eines.",
   ["drawwin.usage"] = "Benutzung: /fg draw window <Name>",
 })
 

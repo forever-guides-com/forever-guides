@@ -8,19 +8,31 @@ local Layout = {
   MIN_H = 480,
   MAX_W = 1600,
   MAX_H = 1100,
+  -- The full sidebar is as wide as its longest label needs, within these bounds (SIDEBAR_FULL = the narrowest).
   SIDEBAR_FULL = 184,
+  SIDEBAR_MAX = 220,
   SIDEBAR_ICONS = 44,
   COLLAPSE_BELOW = 860,
   ONE_COLUMN_BELOW = 760,
 }
 ns.Layout = Layout
 
+-- Width of the full sidebar for the room its longest label needs (px, nil = none measured).
+function Layout.sidebarWidth(wanted)
+  local v = tonumber(wanted)
+  if not v or v ~= v then
+    return Layout.SIDEBAR_FULL
+  end
+  return ns.U.clamp(math.ceil(v), Layout.SIDEBAR_FULL, Layout.SIDEBAR_MAX)
+end
+
 -- contentWidth decides columns; the sidebar collapses when the user asked
 -- for it or the window is narrower than the breakpoint. forceFull keeps the full sidebar (the
--- navigation edit mode needs the room for its controls).
-function Layout.compute(width, userCollapsed, forceFull)
+-- navigation edit mode needs the room for its controls). wanted = measured width of the full sidebar
+-- (Layout.sidebarWidth bounds it).
+function Layout.compute(width, userCollapsed, forceFull, wanted)
   local collapsed = not forceFull and (userCollapsed or width < Layout.COLLAPSE_BELOW)
-  local sidebar = collapsed and Layout.SIDEBAR_ICONS or Layout.SIDEBAR_FULL
+  local sidebar = collapsed and Layout.SIDEBAR_ICONS or Layout.sidebarWidth(wanted)
   local content = width - sidebar
   return {
     sidebar = collapsed and "icons" or "full",

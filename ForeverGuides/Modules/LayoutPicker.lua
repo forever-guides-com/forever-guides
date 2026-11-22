@@ -83,7 +83,7 @@ local function createRow(parent)
   local row = CreateFrame("Button", nil, parent)
   row.hl = row:CreateTexture(nil, "BACKGROUND")
   row.hl:SetAllPoints()
-  row.hl:SetColorTexture(1, 1, 1, 0)
+  row.hl:SetColorTexture(ns.Theme.fillColor())
   row.mark = W.Glyph(row, "check", 12, "accent")
   row.mark:SetPoint("LEFT", 6, 0)
   row.badge = W.Text(row, { role = "small", color = "textMuted", justify = "RIGHT" })
@@ -94,10 +94,10 @@ local function createRow(parent)
   row.text:SetJustifyH("LEFT")
   row.text:SetWordWrap(false)
   row:SetScript("OnEnter", function()
-    row.hl:SetColorTexture(1, 1, 1, 0.08)
+    row.hl:SetColorTexture(ns.Theme.fillColor("hover"))
   end)
   row:SetScript("OnLeave", function()
-    row.hl:SetColorTexture(1, 1, 1, row.active and 0.14 or 0)
+    row.hl:SetColorTexture(ns.Theme.fillColor(row.active and "selected" or nil))
   end)
   row:SetScript(
     "OnClick",
@@ -119,7 +119,7 @@ local function bindRow(row, entry, index)
   local owner = popup.owner
   row.entry = entry
   row.active = index == popup.active
-  row.hl:SetColorTexture(1, 1, 1, row.active and 0.14 or 0)
+  row.hl:SetColorTexture(ns.Theme.fillColor(row.active and "selected" or nil))
   local current = owner and entry.id == popup.currentId
   row.mark:SetShown(current == true)
   W.SetText(row.text, nil, entry.name)

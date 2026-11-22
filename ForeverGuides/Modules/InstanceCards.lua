@@ -1,10 +1,12 @@
--- Card grid of the instances: filter bar, one card per instance (picture with plaques, foot with name and
--- facts), the states of an empty grid and the keyboard cursor. The page that owns it (InstancesPage) opens an
+-- Instance overview: filter bar, then the instances as a list (rows with columns, Modules/InstanceListView.lua)
+-- or as cards (picture with plaques, foot with name and facts), both grouped under collapsible level brackets,
+-- the states of an empty list and the keyboard cursor. The page that owns it (InstancesPage) opens an
 -- instance through opts.onOpen / cards.onOpen. Texts and order come from Modules/InstanceListLogic.lua, the
 -- picture from Modules/InstanceArt.lua. A card keeps no text on the picture: every label sits on a plaque.
 local _, ns = ...
 local W, L, Theme, R, K = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.PageKit
 local IL, Art, D = ns.InstanceListLogic, ns.InstanceArt, ns.InstanceDisplay
+local B, LV = ns.InstanceBracketLogic, ns.InstanceListView
 local DA = ns.InstanceDataAccess
 
 local Cards = {}
@@ -19,13 +21,12 @@ ns.AddLocale("enUS", {
   ["instances.card.levelBox.tip"] = "Shows the instances that cover this level.",
   ["instances.card.onlyFav"] = "Favorites only",
   ["instances.card.favFirst"] = "Favorites first",
-  ["instances.card.reset"] = "Reset filters",
   ["instances.card.count"] = "%d of %d",
   ["instances.card.fav"] = "Favorite",
-  ["instances.card.fav.tip"] = "Marks or unmarks this instance. Key F on a focused card.",
+  ["instances.card.fav.tip"] = "Marks this instance as a favorite or removes the mark. Press F on a focused card.",
   ["instances.card.empty"] = "No instance matches.",
   ["instances.card.noFavorites"] = "No favorites yet.",
-  ["instances.card.noFavorites.hint"] = "The star on a card remembers it.",
+  ["instances.card.noFavorites.hint"] = "Click the star on a card to mark it.",
 })
 
 ns.AddLocale("deDE", {
@@ -37,13 +38,12 @@ ns.AddLocale("deDE", {
   ["instances.card.levelBox.tip"] = "Zeigt die Instanzen, die diese Stufe abdecken.",
   ["instances.card.onlyFav"] = "Nur Favoriten",
   ["instances.card.favFirst"] = "Favoriten zuerst",
-  ["instances.card.reset"] = "Filter zurücksetzen",
   ["instances.card.count"] = "%d von %d",
   ["instances.card.fav"] = "Favorit",
-  ["instances.card.fav.tip"] = "Markiert die Instanz oder nimmt die Marke weg. Taste F auf einer fokussierten Karte.",
+  ["instances.card.fav.tip"] = "Markiert die Instanz als Favorit oder entfernt die Markierung. Drücke auf einer fokussierten Karte die Taste F.",
   ["instances.card.empty"] = "Keine Instanz passt.",
   ["instances.card.noFavorites"] = "Noch keine Favoriten.",
-  ["instances.card.noFavorites.hint"] = "Der Stern auf einer Karte merkt sie.",
+  ["instances.card.noFavorites.hint"] = "Klicke den Stern auf einer Karte, um sie zu markieren.",
 })
 
 -- Pixels at 100 percent text size; the heights of text parts come from the font, these are the fixed rest.
@@ -80,7 +80,9 @@ local function setPlaque(p, full, short, iconSpec)
   p.full, p.short, p.shortOn = full, short, false
   p.text:SetText(full)
   if iconSpec then
-    if not p.icon then
+    if p.icon then
+      p.icon:SetSpec(iconSpec)
+    else
       p.icon = K.IconSlot(p, iconSpec)
     end
     p.icon:Show()
@@ -141,18 +143,50 @@ local function showTip(card)
     return
   end
   local name = R.Names(inst.n)
-  ns.ShowTooltip(card, name, nil, { lines = IL.TipLines(inst, L, card.questText), anchor = "ANCHOR_RIGHT" })
+  local lines = IL.TipLines(inst, L, card.questText)
+  for _, extra in ipairs(card.extraTip or {}) do
+    lines[#lines + 1] = extra
+  end
+  ns.ShowTooltip(card, name, nil, { lines = lines, anchor = "ANCHOR_RIGHT" })
 end
 
 local function setHighlight(card, on)
-  card.ring.show(on)
-  card.rim.show(not on)
+  card:SetHover(on)
+end
+
+-- Hover, tooltip and click of a card or a row (the keyboard cursor of the owner shares the rim).
+local function wire(item)
+  item:SetScript("OnEnter", function(self)
+    setHighlight(self, true)
+    showTip(self)
+  end)
+  item:SetScript("OnLeave", function(self)
+    if not (self.owner and self.owner.cursorShown and self.owner.cursorCard == self) then
+      setHighlight(self, false)
+    end
+    ns.HideTooltip()
+  end)
+  item:SetScript(
+    "OnClick",
+    ns.Wrap("instance-card", function(self)
+      if self.owner and self.owner.cursorCard ~= self then
+        self.owner:SetCursor(self.index)
+      end
+      if self.owner then
+        self.owner:Open(self.inst)
+      end
+    end)
+  )
+end
+
+local function newRow(parent)
+  local row = LV.NewRow(parent)
+  wire(row)
+  return row
 end
 
 local function newCard(grid)
-  local card = CreateFrame("Button", nil, grid)
-  W.Fill(card, "surface", 1)
-  card.rim = W.Border(card, "white", 0.3)
+  local card = W.Panel(grid, { frameType = "Button", edgeAlpha = 0.3 })
   card.art = Art.Create(card)
   card.art:SetPoint("TOPLEFT")
   card.top = CreateFrame("Frame", nil, card)
@@ -178,29 +212,7 @@ local function newCard(grid)
   })
   card.name = W.Text(card, { role = "h3", family = "heading", color = "text", wrap = true })
   card.meta = W.Text(card, { role = "ui", color = "textSecondary", wrap = true })
-  card.ring = W.Border(card, "accent2", 1, 2)
-  card.ring.show(false)
-  card:SetScript("OnEnter", function(self)
-    setHighlight(self, true)
-    showTip(self)
-  end)
-  card:SetScript("OnLeave", function(self)
-    if not (self.owner and self.owner.cursorShown and self.owner.cursorCard == self) then
-      setHighlight(self, false)
-    end
-    ns.HideTooltip()
-  end)
-  card:SetScript(
-    "OnClick",
-    ns.Wrap("instance-card", function(self)
-      if self.owner and self.owner.cursorCard ~= self then
-        self.owner:SetCursor(self.index)
-      end
-      if self.owner then
-        self.owner:Open(self.inst)
-      end
-    end)
-  )
+  wire(card)
   return card
 end
 
@@ -306,40 +318,106 @@ end
 
 -- Grid -------------------------------------------------------------------------------------------------
 
+-- Gap below a section header and between two sections, rows of a list.
+local SECTION_GAP, ROW_GAP = 4, 2
+
+local function sectionFrame(self, i)
+  local f = self.sectionFrames[i]
+  if not f then
+    f = LV.NewSection(self.grid, function(section)
+      self:ToggleSection(section.key)
+    end)
+    self.sectionFrames[i] = f
+  end
+  return f
+end
+
+-- Places the section headers and, in the open sections, the cards or the rows; returns the height.
 local function layoutGrid(self, width)
   local grid = self.grid
+  local list = self.cards
+  local isList = self.view == "list"
   local columns = IL.Columns(width)
   local cw = IL.CardWidth(width, columns)
-  local list = self.cards
-  local y, rows = 0, 0
-  for first = 1, #list, columns do
-    local rowH = 0
-    for i = first, math.min(#list, first + columns - 1) do
-      rowH = math.max(rowH, layoutCard(list[i], cw))
-    end
-    for i = first, math.min(#list, first + columns - 1) do
-      local col = i - first
-      list[i]:ClearAllPoints()
-      list[i]:SetPoint("TOPLEFT", grid, "TOPLEFT", col * (cw + IL.GAP), -y)
-      list[i]:SetSize(cw, rowH)
-    end
-    y = y + rowH + IL.GAP
-    rows = rows + 1
+  local y, index = 0, 0
+  local cols, rowH
+  self.header:SetShown(isList)
+  if isList then
+    cols = IL.ListColumns(width, LV.Scale())
+    self.header:ClearAllPoints()
+    self.header:SetPoint("TOPLEFT", grid, "TOPLEFT")
+    self.header:SetWidth(width)
+    y = LV.LayoutHeader(self.header, cols) + SECTION_GAP
+    rowH = list[1] and LV.RowHeight(list[1]) or LV.ROW_MIN
   end
-  local height = math.max(0, y - IL.GAP)
+  for i, section in ipairs(self.sections) do
+    local frame = sectionFrame(self, i)
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", grid, "TOPLEFT", 0, -y)
+    frame:SetWidth(width)
+    y = y + LV.LayoutSection(frame, width) + SECTION_GAP
+    local count = section.closed and 0 or #section.items
+    if isList then
+      for _ = 1, count do
+        index = index + 1
+        local row = list[index]
+        LV.LayoutRow(row, cols, rowH)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", grid, "TOPLEFT", 0, -y)
+        row:SetSize(width, rowH)
+        y = y + rowH + ROW_GAP
+      end
+    else
+      for first = index + 1, index + count, columns do
+        local last = math.min(index + count, first + columns - 1)
+        local rowTop = 0
+        for i2 = first, last do
+          rowTop = math.max(rowTop, layoutCard(list[i2], cw))
+        end
+        for i2 = first, last do
+          list[i2]:ClearAllPoints()
+          list[i2]:SetPoint("TOPLEFT", grid, "TOPLEFT", (i2 - first) * (cw + IL.GAP), -y)
+          list[i2]:SetSize(cw, rowTop)
+        end
+        y = y + rowTop + IL.GAP
+      end
+      index = index + count
+    end
+    y = y + SECTION_GAP
+  end
+  for i = #self.sections + 1, #self.sectionFrames do
+    self.sectionFrames[i]:Hide()
+  end
+  local height = math.max(0, y - SECTION_GAP)
   grid:SetSize(math.max(1, width), math.max(1, height))
-  self.columns = columns
+  self.rowGrid:SetSize(math.max(1, width), math.max(1, height))
+  self.columns = isList and 1 or columns
   return height
 end
 
 -- Filter bar -----------------------------------------------------------------------------------------
 
 local function buildBar(self)
-  local bar = CreateFrame("Frame", nil, self)
   local f = self.filter
+  local bar = K.FilterBar(self, {
+    count = function()
+      return (f.kind ~= "all" and 1 or 0)
+        + (f.faction ~= IL.NewFilter(self.defaultFaction).faction and 1 or 0)
+        + (f.level and 1 or 0)
+        + ((f.query or "") ~= "" and 1 or 0)
+        + (f.favorites and 1 or 0)
+        + (B.Normalize(f.bracket) ~= "all" and 1 or 0)
+    end,
+    reset = function()
+      self:ResetFilter()
+    end,
+  })
   local function changed()
     self:Refresh()
   end
+  local boxH = 26
+  -- Controls are created in reading order (the keyboard focus follows creation order): search, corner button,
+  -- view switch, type, level range, level, faction, checkboxes, sort. The placement is in bar:fgGridLayout.
   self.search = W.EditBox(bar, {
     placeholder = "instances.search",
     clear = true,
@@ -348,15 +426,15 @@ local function buildBar(self)
       changed()
     end,
   })
-  self.sortLabel = W.Text(bar, { key = "instances.sort.label", role = "ui", color = "textSecondary" })
-  self.sortToggle = K.ViewToggle(bar, {
-    views = IL.SORTS,
-    keyPrefix = "instances.sort.",
+  self.cornerButton = self.cornerFactory and self.cornerFactory(bar) or nil
+  self.viewToggle = K.ViewToggle(bar, {
+    views = IL.VIEWS,
     get = function()
-      return f.sort
+      return self.view
     end,
     set = function(v)
-      f.sort = v
+      self.view = v
+      self:Persist("view", v)
       changed()
     end,
   })
@@ -371,7 +449,25 @@ local function buildBar(self)
       changed()
     end,
   })
-  self.levelLabel = W.Text(bar, { key = "instances.card.levelBox", role = "ui", color = "textSecondary" })
+  local options = {}
+  for _, id in ipairs(B.CHOICES) do
+    options[#options + 1] = { value = id, key = "instances.bracket." .. (tonumber(id) and "b" .. id or id) }
+  end
+  self.bracket = W.Dropdown(bar, {
+    key = "instances.bracket.label",
+    width = 150,
+    options = options,
+    get = function()
+      return B.Normalize(f.bracket)
+    end,
+    set = function(v)
+      f.bracket = v
+      self:Persist("bracket", v)
+      changed()
+    end,
+  })
+  self.bracket:SetWidth(150)
+  self.levelLabel = W.Text(bar, { key = "instances.card.levelBox", role = "ui", color = "textMuted" })
   self.levelBox = W.EditBox(bar, {
     placeholder = "instances.card.levelBox.ph",
     tooltip = "instances.card.levelBox",
@@ -389,12 +485,8 @@ local function buildBar(self)
   if self.levelBox.edit.SetNumeric then
     self.levelBox.edit:SetNumeric(true)
   end
-  -- The clear button sets the text from code, which does not report a change.
-  self.levelBox.clearButton:HookScript("OnClick", function()
-    f.level = nil
-    changed()
-  end)
-  self.faction = K.FactionButtons(bar, {
+  self.levelBox:SetWidth(84)
+  self.faction = bar:AddGroup(K.FactionButtons(bar, {
     withAll = true,
     get = function()
       return f.faction
@@ -406,8 +498,8 @@ local function buildBar(self)
       end
       changed()
     end,
-  })
-  self.onlyFav = W.Checkbox(bar, {
+  }))
+  self.onlyFav = bar:AddToggle({
     key = "instances.card.onlyFav",
     get = function()
       return f.favorites
@@ -417,7 +509,7 @@ local function buildBar(self)
       changed()
     end,
   })
-  self.favFirst = W.Checkbox(bar, {
+  self.favFirst = bar:AddToggle({
     key = "instances.card.favFirst",
     get = function()
       return f.favoritesFirst
@@ -427,79 +519,196 @@ local function buildBar(self)
       changed()
     end,
   })
-  self.resetBtn = W.Button(bar, {
-    key = "instances.card.reset",
-    variant = "ghost",
-    onClick = function()
-      self:ResetFilter()
+  self.orderToggle = bar:AddToggle({
+    key = "instances.order.desc",
+    get = function()
+      return f.desc == true
+    end,
+    set = function(on)
+      f.desc = on
+      self:Persist("desc", on)
+      changed()
+    end,
+  })
+  self.sortLabel = W.Text(bar, { key = "instances.sort.label", role = "ui", color = "textSecondary" })
+  self.sortToggle = K.ViewToggle(bar, {
+    views = IL.SORTS,
+    keyPrefix = "instances.sort.",
+    get = function()
+      return f.sort
+    end,
+    set = function(v)
+      f.sort = v
+      self:Persist("sort", v)
+      changed()
     end,
   })
   self.countText = W.Text(bar, { role = "ui", color = "textMuted", justify = "RIGHT" })
-  return bar
-end
+  bar:Refresh()
+  self.resetBtn = bar.resetButton
 
--- Flows the controls of the bar into rows; returns the bar height.
-local function layoutBar(self, width)
-  local bar, gap = self.bar, Cards.BAR_GAP
-  local y, x, rowH = 0, 0, 0
-  local function put(widget, w, h)
-    if x > 0 and x + w > width then
-      y, x, rowH = y + rowH + gap, 0, 0
+  -- Three rows, every item centered on the line of its row. A row keeps its left and right items on one line
+  -- while they fit and wraps the right items under the left ones (still right aligned) when they do not.
+  local owner = self
+  local GAP, LINE_GAP = Theme.space.md, Theme.space.md
+  -- Item: w, h, cy (center of the control, default h / 2), place(x, top).
+  local function item(w, h, cy, place)
+    return { w = w, h = h, cy = cy or h / 2, place = place }
+  end
+  local function at(frame, x, y)
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", bar, "TOPLEFT", x, -y)
+  end
+  local function plain(frame, w, h, cy)
+    return item(w, h, cy, function(x, top)
+      at(frame, x, top)
+    end)
+  end
+  local function span(items)
+    local w = 0
+    for i, it in ipairs(items) do
+      w = w + it.w + (i > 1 and GAP or 0)
     end
-    widget:ClearAllPoints()
-    widget:SetPoint("TOPLEFT", bar, "TOPLEFT", x, -y)
-    x = x + w + gap
-    rowH = math.max(rowH, h)
+    return w
   end
-  local function newRow()
-    if x > 0 then
-      y, x, rowH = y + rowH + gap, 0, 0
+  local function wrap(items, width)
+    local lines, line, x = {}, {}, 0
+    for _, it in ipairs(items) do
+      if #line > 0 and x + GAP + it.w > width then
+        lines[#lines + 1], line, x = line, {}, 0
+      end
+      x = x + (#line > 0 and GAP or 0) + it.w
+      line[#line + 1] = it
+    end
+    if #line > 0 then
+      lines[#lines + 1] = line
+    end
+    return lines
+  end
+  -- Extent of sets of items above and below their common center line.
+  local function extent(...)
+    local above, below = 0, 0
+    for _, items in ipairs({ ... }) do
+      for _, it in ipairs(items) do
+        above, below = math.max(above, it.cy), math.max(below, it.h - it.cy)
+      end
+    end
+    return above, below
+  end
+  local function put(items, x, y, above)
+    for _, it in ipairs(items) do
+      it.place(x, y + above - it.cy)
+      x = x + it.w + GAP
     end
   end
-  local boxH = 26
-  self.search:SetWidth(math.min(width, 360))
-  put(self.search, math.min(width, 360), boxH)
-  -- A label with its control stays together: the pair wraps as one.
-  local function pair(label, control, controlW, controlH)
-    local labelW = ceil(label:GetStringWidth())
-    put(label, labelW + 6 + controlW, math.max(controlH, ceil(label:GetStringHeight())))
-    control:ClearAllPoints()
-    control:SetPoint("LEFT", label, "RIGHT", 6, 0)
+  local function placeRow(left, right, width, y)
+    if #left == 0 and #right == 0 then
+      return y
+    end
+    local both = #left > 0 and #right > 0
+    if span(left) + (both and GAP or 0) + span(right) <= width then
+      local above, below = extent(left, right)
+      put(left, 0, y, above)
+      put(right, width - span(right), y, above)
+      return y + above + below
+    end
+    for _, items in ipairs({ left, right }) do
+      for _, line in ipairs(wrap(items, width)) do
+        local above, below = extent(line)
+        put(line, items == right and (width - span(line)) or 0, y, above)
+        y = y + above + below + Theme.space.sm
+      end
+    end
+    return y - Theme.space.sm
   end
-  pair(self.sortLabel, self.sortToggle, self.sortToggle:GetWidth(), self.sortToggle:GetHeight())
-  newRow()
-  put(self.kindToggle, self.kindToggle:GetWidth(), self.kindToggle:GetHeight())
-  local levelW = 84
-  self.levelBox:SetWidth(levelW)
-  pair(self.levelLabel, self.levelBox, levelW, boxH)
-  newRow()
-  self.faction:SetWidth(width)
-  local fh = self.faction:fgGridLayout(width)
-  self.faction:ClearAllPoints()
-  self.faction:SetPoint("TOPLEFT", bar, "TOPLEFT", 0, -y)
-  y = y + fh + gap
-  x, rowH = 0, 0
-  for _, box in ipairs({ self.onlyFav, self.favFirst }) do
-    local w = math.min(width, 16 + 8 + ceil(box.label:GetStringWidth()) + 4)
-    box:SetWidth(w)
-    put(box, w, math.max(22, ceil(box.label:GetStringHeight())))
+
+  function bar.fgGridLayout(_, width)
+    local function checkbox(box)
+      local w = math.min(width, 16 + 8 + math.ceil(box.label:GetStringWidth()) + 4)
+      box:SetWidth(w)
+      return plain(box, w, 22)
+    end
+
+    -- Row 1: search left, corner button and view switch right.
+    local right = {}
+    local cb = owner.cornerButton
+    if cb then
+      cb:SetWidth(cb:Fit(width))
+      right[#right + 1] = plain(cb, cb:GetWidth(), cb:GetHeight())
+    end
+    local view = owner.viewToggle
+    right[#right + 1] = plain(view, view:GetWidth(), view:GetHeight())
+    local room = width - span(right) - GAP
+    local searchW = room >= 140 and math.min(room, 480) or math.min(width, 480)
+    owner.search:SetWidth(searchW)
+    local y = placeRow({ plain(owner.search, searchW, boxH) }, right, width, 0)
+
+    -- Row 2: type, level range, level, faction. Captions sit above their field, all fields on one line.
+    local fieldY = W.DROPDOWN_FIELD_Y
+    local kind = owner.kindToggle
+    local row2 = {
+      plain(kind, kind:GetWidth(), kind:GetHeight()),
+      plain(owner.bracket, 150, owner.bracket:GetHeight(), fieldY + 12),
+      item(84, fieldY + boxH, fieldY + boxH / 2, function(x, top)
+        at(owner.levelLabel, x, top)
+        at(owner.levelBox, x, top + fieldY)
+      end),
+    }
+    local group = owner.faction
+    local gw = math.min(group.NaturalWidth(), width)
+    group:SetWidth(gw)
+    local gh = group:fgGridLayout(gw)
+    local bh = group.buttons[1] and group.buttons[1]:GetHeight() or 28
+    row2[#row2 + 1] = plain(group, gw, gh, gh - bh / 2)
+    y = placeRow(row2, {}, width, y + LINE_GAP)
+
+    -- Row 3: checkboxes left; filter count and reset, sort and the counter right.
+    local left, tail = {}, {}
+    for _, box in ipairs({ owner.onlyFav, owner.favFirst, owner.orderToggle }) do
+      left[#left + 1] = checkbox(box)
+    end
+    local count, reset = bar.countText, owner.resetBtn
+    if count and count:IsShown() then
+      tail[#tail + 1] = plain(count, math.ceil(count:GetStringWidth()) + 2, math.ceil(count:GetStringHeight()))
+    end
+    if reset and reset:IsShown() then
+      reset:SetWidth(reset:Fit(width))
+      tail[#tail + 1] = plain(reset, reset:GetWidth(), 24)
+    end
+    local label, sort = owner.sortLabel, owner.sortToggle
+    local lw, sh = math.ceil(label:GetStringWidth()), sort:GetHeight()
+    tail[#tail + 1] = item(lw + Theme.space.sm + sort:GetWidth(), sh, sh / 2, function(x, top)
+      at(label, x, top + (sh - math.ceil(label:GetStringHeight())) / 2)
+      at(sort, x + lw + Theme.space.sm, top)
+    end)
+    local total = owner.countText
+    local tw = math.ceil(total:GetStringWidth()) + 2
+    total:SetWidth(tw)
+    tail[#tail + 1] = plain(total, tw, math.ceil(total:GetStringHeight()))
+    y = placeRow(left, tail, width, y + LINE_GAP)
+
+    bar:SetHeight(math.max(1, y))
+    return y
   end
-  local rw = self.resetBtn:Fit(width)
-  self.resetBtn:SetWidth(rw)
-  put(self.resetBtn, rw, self.resetBtn:GetHeight())
-  local cw = ceil(self.countText:GetStringWidth()) + 2
-  self.countText:SetWidth(cw)
-  put(self.countText, cw, ceil(self.countText:GetStringHeight()))
-  y = y + rowH
-  bar:SetSize(math.max(1, width), math.max(1, y))
-  return y
+  return bar
 end
 
 -- Public -----------------------------------------------------------------------------------------------
 
--- :SetFilter(partial) merges known fields (kind, faction, level, query, favorites, favoritesFirst, sort).
+-- :SetFilter(partial) merges known fields (kind, faction, level, query, favorites, favoritesFirst, sort, desc,
+-- bracket).
 function Cards.SetFilter(self, partial)
-  for _, key in ipairs({ "kind", "faction", "level", "query", "favorites", "favoritesFirst", "sort" }) do
+  for _, key in ipairs({
+    "kind",
+    "faction",
+    "level",
+    "query",
+    "favorites",
+    "favoritesFirst",
+    "sort",
+    "desc",
+    "bracket",
+  }) do
     if partial[key] ~= nil then
       self.filter[key] = partial[key]
     end
@@ -512,7 +721,7 @@ end
 
 function Cards.ResetFilter(self)
   local f = IL.NewFilter(self.defaultFaction)
-  f.sort, f.favoritesFirst = self.filter.sort, self.filter.favoritesFirst
+  f.sort, f.desc, f.favoritesFirst = self.filter.sort, self.filter.desc, self.filter.favoritesFirst
   -- In place: the controls of the bar hold this table.
   for key in pairs(self.filter) do
     self.filter[key] = nil
@@ -523,15 +732,32 @@ function Cards.ResetFilter(self)
   if self.onFaction then
     self.onFaction(self.filter.faction)
   end
+  self:Persist("bracket", self.filter.bracket)
   self.search.edit:SetText("")
   self.levelBox.edit:SetText("")
   self:Refresh()
 end
 
-function Cards.Open(self, inst)
+-- tab: the tab of the instance to open ("map" for the map button of a row).
+function Cards.Open(self, inst, tab)
   if inst and self.onOpen then
-    self.onOpen(inst)
+    self.onOpen(inst, tab)
   end
+end
+
+-- Tells the owner a choice that is worth keeping: view, sort, desc, bracket, closed (the set of collapsed
+-- sections).
+function Cards.Persist(self, key, value)
+  if self.onPersist then
+    self.onPersist(key, value)
+  end
+end
+
+-- Collapses or expands a section of the list; the choice is kept.
+function Cards.ToggleSection(self, key)
+  self.closed = B.WithClosed(self.closed, key, not self.closed[key])
+  self:Persist("closed", self.closed)
+  self:Refresh()
 end
 
 -- Moves the keyboard cursor to card `index` (clamped) and shows its rim and tooltip while the grid has focus.
@@ -557,11 +783,41 @@ end
 
 local KEY_MOVES = { LEFT = "left", RIGHT = "right", UP = "up", DOWN = "down", HOME = "home", END = "end" }
 
+-- Up and down inside a section follow the rows of its cards; at the top or the bottom edge the cursor goes to the
+-- neighbour section (same column where it exists).
+local function moveVertical(self, move)
+  local columns = self.columns or 1
+  for i, spot in ipairs(self.spots) do
+    if self.cursor >= spot.first and self.cursor < spot.first + spot.count then
+      local at = self.cursor - spot.first + 1
+      local to = IL.Move(at, spot.count, columns, move)
+      if to ~= at then
+        return spot.first + to - 1
+      end
+      local other = self.spots[i + (move == "up" and -1 or 1)]
+      if not other then
+        return self.cursor
+      end
+      local column = (at - 1) % columns
+      if move == "up" then
+        local lastRowStart = other.first + (math.ceil(other.count / columns) - 1) * columns
+        return math.min(other.first + other.count - 1, lastRowStart + column)
+      end
+      return other.first + math.min(column, other.count - 1)
+    end
+  end
+  return self.cursor
+end
+
 -- Keys of a focused grid. Returns true when the key was used.
 function Cards.HandleKey(self, key)
   local move = KEY_MOVES[key]
   if move then
-    self:SetCursor(IL.Move(self.cursor, #self.cards, self.columns or 1, move))
+    if move == "up" or move == "down" then
+      self:SetCursor(moveVertical(self, move))
+    else
+      self:SetCursor(IL.Move(self.cursor, #self.cards, self.columns or 1, move))
+    end
     return true
   end
   local card = self.cursorCard
@@ -587,29 +843,75 @@ local function questInfo(inst, faction)
   return { status = status, count = #R.Quests(inst, faction) }
 end
 
--- Recomputes the list of the filter and repaints the cards; keeps the cursor on the same instance.
+-- Recomputes the list of the filter and repaints cards or rows in their sections; keeps the cursor on the same
+-- instance.
 function Cards.Refresh(self)
   local hasData = K.HasData("Instances")
-  local list = hasData and IL.Apply(self.filter) or {}
-  local keep = self.cursorCard and self.cursorCard.inst
   local faction = (self.filter.faction == "A" or self.filter.faction == "H") and self.filter.faction or nil
+  local player = B.PlayerLevel()
+  local list = hasData
+      and IL.Apply(self.filter, nil, nil, {
+        playerLevel = player,
+        questCount = function(inst)
+          return questInfo(inst, faction).count
+        end,
+      })
+    or {}
+  local keep = self.cursorCard and self.cursorCard.inst
   self.shown = list
+  self.sections = B.Sections(list, self.filter.desc, self.closed, self.filter.favoritesFirst and isFavorite or nil)
+  local visible, spots = {}, {}
+  for _, section in ipairs(self.sections) do
+    if not section.closed then
+      spots[#spots + 1] = { first = #visible + 1, count = #section.items }
+      for _, inst in ipairs(section.items) do
+        visible[#visible + 1] = inst
+      end
+    end
+  end
+  self.spots = spots
   self.cards = {}
-  self.grid:Sync(list, function(card, inst)
+  local isList = self.view == "list"
+  local on, off = isList and self.rowGrid or self.grid, isList and self.grid or self.rowGrid
+  off:Sync({}, function() end)
+  self.rowGrid:SetShown(isList)
+  on:Sync(visible, function(card, inst)
     self.cards[#self.cards + 1] = card
-    paintCard(card, inst, self, #self.cards, questInfo(inst, faction))
+    local quests = questInfo(inst, faction)
+    if isList then
+      LV.PaintRow(card, inst, self, #self.cards, quests, player)
+    else
+      paintCard(card, inst, self, #self.cards, quests)
+    end
   end)
+  for i, section in ipairs(self.sections) do
+    local frame = sectionFrame(self, i)
+    LV.PaintSection(frame, section)
+    frame:Show()
+  end
+  LV.SetHeader(self.header, self.filter.sort, self.filter.desc)
   self.countText:SetText(string.format(L["instances.card.count"], #list, IL.Total()))
-  self.resetBtn:SetShown(not IL.IsDefault(self.filter, self.defaultFaction))
-  for _, ctl in ipairs({ self.kindToggle, self.sortToggle, self.faction, self.onlyFav, self.favFirst }) do
-    ctl.Refresh()
+  self.bar:Refresh()
+  for _, ctl in ipairs({
+    self.kindToggle,
+    self.sortToggle,
+    self.orderToggle,
+    self.viewToggle,
+    self.bracket,
+    self.faction,
+    self.onlyFav,
+    self.favFirst,
+  }) do
+    if ctl.Refresh then
+      ctl.Refresh()
+    end
   end
   local favorites = D.FavoriteCount()
   self.state = IL.State(hasData, #list, self.filter, favorites)
   self:ShowState()
   local cursor = 1
   if keep then
-    for i, inst in ipairs(list) do
+    for i, inst in ipairs(visible) do
       if inst == keep then
         cursor = i
         break
@@ -635,6 +937,10 @@ function Cards.ShowState(self)
   self.proxy:SetShown(text == nil)
   if text then
     self.empty:SetTexts(L[text[1]], text[2] and L[text[2]] or "")
+    -- Only a filter can empty the list; the other states have nothing to reset.
+    self.empty:SetAction(self.state == "empty" and W.EMPTY_RESET or nil, function()
+      self:ResetFilter()
+    end)
   end
 end
 
@@ -644,7 +950,8 @@ function Cards.Layout(self, width)
   self.width = width
   self.bar:ClearAllPoints()
   self.bar:SetPoint("TOPLEFT", self, "TOPLEFT")
-  local y = layoutBar(self, width) + Cards.BAR_GAP
+  self.bar:SetWidth(width)
+  local y = self.bar:fgGridLayout(width) + Cards.BAR_GAP
   self.grid:ClearAllPoints()
   self.grid:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
   local body
@@ -653,9 +960,9 @@ function Cards.Layout(self, width)
   else
     self.empty:ClearAllPoints()
     self.empty:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-    self.empty:SetSize(width, 160)
     self.empty:Relayout(width)
-    body = 160
+    body = math.max(160, self.empty.minHeight)
+    self.empty:SetSize(width, body)
   end
   self.height = y + body
   self:SetSize(width, math.max(1, self.height))
@@ -669,22 +976,40 @@ function Cards.Release(self)
   end
 end
 
--- opts: onOpen(inst), onFaction(value) after the faction choice or a reset, faction (default of the faction filter: "A", "H"; nil = the player's own), filter (start
--- values, see SetFilter).
+-- opts: onOpen(inst, tab), onFaction(value) after the faction choice or a reset, onPersist(key, value) after a choice
+-- worth keeping (view, sort, desc, bracket, closed), faction (default of the faction filter: "A", "H"; nil = the
+-- player's own), filter (start values, see SetFilter), view ("list" or "cards", default "cards"), closed (set of
+-- collapsed section keys), corner (function(parent) -> button for the first bar row, beside the view switch).
 function Cards.Create(parent, opts)
   opts = opts or {}
   local self = CreateFrame("Frame", nil, parent)
   self.onOpen = opts.onOpen
   self.onFaction = opts.onFaction
+  self.onPersist = opts.onPersist
+  self.view = opts.view == "list" and "list" or "cards"
+  self.closed = B.WithClosed(opts.closed, "", false)
+  self.sections, self.spots, self.sectionFrames = {}, {}, {}
   self.defaultFaction = opts.faction or K.PlayerFaction()
   self.filter = IL.NewFilter(self.defaultFaction)
   for key, value in pairs(opts.filter or {}) do
     self.filter[key] = value
   end
+  self.filter.bracket = B.Normalize(self.filter.bracket)
   self.cards, self.cursor, self.height, self.columns = {}, 1, 0, 1
+  self.cornerFactory = opts.corner
   self.bar = buildBar(self)
   self.grid = K.GridPool(self, 1, newCard, IL.GAP)
-  self.empty = W.EmptyState(self, { text = "instances.card.empty" })
+  self.rowGrid = K.GridPool(self.grid, 1, newRow, ROW_GAP)
+  self.rowGrid:SetPoint("TOPLEFT", self.grid, "TOPLEFT")
+  self.header = LV.NewHeader(self.grid, function(id)
+    local f = self.filter
+    f.desc = f.sort == id and not f.desc or false
+    f.sort = id
+    self:Persist("sort", f.sort)
+    self:Persist("desc", f.desc)
+    self:Refresh()
+  end)
+  self.empty = W.EmptyState(self, { text = "instances.card.empty", icon = "search" })
   self.empty:Hide()
   for name, fn in pairs(Cards) do
     if type(fn) == "function" and name ~= "Create" then
@@ -698,6 +1023,10 @@ function Cards.Create(parent, opts)
   ns.Focus.register(self.proxy, function()
     self:Open(self.cursorCard and self.cursorCard.inst)
   end)
+  self.proxy.fgName = function()
+    local card = self.cursorCard
+    return card and card.inst and ns.T(card.inst.n) or nil
+  end
   self.proxy.fgOnFocus = function(proxy)
     self.cursorShown = true
     if self.cursorCard then

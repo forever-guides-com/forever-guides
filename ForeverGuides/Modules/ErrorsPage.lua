@@ -18,7 +18,7 @@ ns.AddLocale("enUS", {
   ["errcatch.copyOne"] = "Copy entry",
   ["errcatch.noMatch"] = "No error matches the filter.",
   ["errcatch.clear.title"] = "Clear error list",
-  ["errcatch.clear.text"] = "Delete all errors from the list?",
+  ["errcatch.clear.text"] = "Clear all errors from the list?",
 })
 ns.AddLocale("deDE", {
   ["errcatch.filter.scope"] = "Anzeigen",
@@ -34,7 +34,7 @@ ns.AddLocale("deDE", {
   ["errcatch.copyOne"] = "Eintrag kopieren",
   ["errcatch.noMatch"] = "Kein Fehler passt zum Filter.",
   ["errcatch.clear.title"] = "Fehlerliste leeren",
-  ["errcatch.clear.text"] = "Alle Fehler aus der Liste löschen?",
+  ["errcatch.clear.text"] = "Alle Fehler aus der Liste leeren?",
 })
 
 local PAD = 16
@@ -51,7 +51,7 @@ local function createRow(parent)
   row.sel = row:CreateTexture(nil, "BACKGROUND")
   row.sel:SetAllPoints()
   ns.Bind(row, function()
-    hl:SetColorTexture(1, 1, 1, 0.08)
+    hl:SetColorTexture(ns.Theme.fillColor("hover"))
     row.sel:SetColorTexture(ns.Theme.color("action", 0.5))
   end)
   row.time = W.Text(row, { role = "micro", color = "textMuted" })

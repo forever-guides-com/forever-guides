@@ -215,6 +215,24 @@ function G.Promille(fraction)
   return math.min(L.MAX_PROMILLE, floor(fraction * 1000))
 end
 
+-- Map fraction 0..1 to per mille and the tenth of a per mille below it (0..9), nil for anything else.
+function G.Fine(fraction)
+  if not finite(fraction) or fraction < 0 or fraction > 1 then
+    return nil
+  end
+  local units = math.min(L.MAX_PROMILLE * 10 + 9, floor(fraction * 10000))
+  return floor(units / 10), units % 10
+end
+
+-- The fraction 0..1 a decoded position stands for: the middle of its cell, a tenth of a per mille wide with the
+-- fine digits and a whole per mille without them (older clients).
+function G.Fraction(promille, tenth)
+  if tenth ~= nil then
+    return (promille * 10 + tenth + 0.5) / 10000
+  end
+  return promille / 1000
+end
+
 -- Checksum of a list of ids in ascending order. Cache and validity check only, no security.
 function G.Checksum(ids)
   local h = 0
@@ -424,12 +442,24 @@ function ENCODE.P(m)
     return nil, "mode"
   end
   local payload, why = join("|", "map", dec(m.map, 1, L.MAX_MAP), "x", x, "y", y)
-  if payload and m.layer ~= nil then
-    local layer = dec(m.layer, 1, L.MAX_LAYER)
-    if not layer then
-      return nil, "layer"
+  -- Tenths of a per mille (fx, fy: 0 to 9) follow the layer as two digits. The layer field stays "-" without a
+  -- layer, so older clients read the same position and ignore the rest.
+  local fine = nil
+  if payload and (mode == "exact" or mode == "point") and m.fx ~= nil and m.fy ~= nil then
+    if not (finite(m.fx) and finite(m.fy) and m.fx >= 0 and m.fx <= 9 and m.fy >= 0 and m.fy <= 9) then
+      return nil, "fine"
     end
-    payload = payload .. "|" .. layer
+    fine = string.format("%d%d", floor(m.fx), floor(m.fy))
+  end
+  if payload and (m.layer ~= nil or fine) then
+    local layer = "-"
+    if m.layer ~= nil then
+      layer = dec(m.layer, 1, L.MAX_LAYER)
+      if not layer then
+        return nil, "layer"
+      end
+    end
+    payload = payload .. "|" .. layer .. (fine and "|" .. fine or "")
   end
   return payload, why
 end
@@ -554,6 +584,9 @@ function DECODE.P(f)
   end
   -- A trailing field that is not understood yet is left out, the position stays valid.
   msg.layer = decimal(f[4], 1, L.MAX_LAYER)
+  if msg.mode == "point" and type(f[5]) == "string" and f[5]:find("^%d%d$") then
+    msg.fx, msg.fy = tonumber(f[5]:sub(1, 1)), tonumber(f[5]:sub(2, 2))
+  end
   return msg
 end
 

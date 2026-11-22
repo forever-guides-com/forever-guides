@@ -9,6 +9,8 @@
 --                          "<guild id>|<community id>,<community id>" (ids of the directory only), or "|" for
 --                          "I show no logos any more". A reader that does not receive logos, or that finds a
 --                          tail it cannot read, still takes the mark; more fields after the logos are ignored.
+--                          The last field is the add-on version "|V<major>.<minor>.<patch>" (after an empty logo
+--                          field when there are no logos); it names a release and nothing about the player.
 --   R  (empty)             withdrawal: forget me; carries no data
 local _, ns = ...
 
@@ -74,16 +76,28 @@ local SOURCES = { group = true, guild = true, world = true }
 -- The logo tail that says "I show no logos any more".
 PL.NO_LOGOS = "|"
 
+-- "major.minor.patch" of an add-on version string, nil for anything else (a dev build, three digits at most).
+function PL.VersionTag(version)
+  local a, b, c = tostring(version or ""):match("^(%d%d?%d?)%.(%d%d?%d?)%.(%d%d?%d?)")
+  return a and string.format("%d.%d.%d", a, b, c) or nil
+end
+
 -- logos: nil (no tail: this mark says nothing about logos), PL.NO_LOGOS or the body of CrestLogic.Body.
-function PL.Encode(chatOnly, logos)
+-- version: the add-on version string, appended as the last field when it has a readable tag.
+function PL.Encode(chatOnly, logos, version)
   local text = string.format("%d|%d", L.VERSION, PL.FLAG_SHOW + (chatOnly == true and PL.FLAG_CHAT_ONLY or 0))
-  if type(logos) == "string" and logos ~= "" then
-    text = text .. "|" .. logos
+  local tag = PL.VersionTag(version)
+  local body = type(logos) == "string" and logos or ""
+  if tag then
+    return text .. "|" .. body .. "|V" .. tag
+  end
+  if body ~= "" then
+    text = text .. "|" .. body
   end
   return text
 end
 
--- { flags, chatOnly, logos } for exactly the format, nil for anything else (wrong version, a length, a
+-- { flags, chatOnly, logos, version } for exactly the format, nil for anything else (wrong version, a length, a
 -- character outside printable ASCII, a doubled separator, flags without the show bit) and then the reason:
 -- "version" (a mark of another protocol version), "flags" or "format". logos is the raw text of the tail (nil
 -- without one, never read here: CrestMark decodes it only with its own receive consent).
@@ -103,7 +117,16 @@ function PL.Decode(payload)
   end
   local known = flags % KNOWN_FLAGS
   local logos = tail:sub(2)
-  return { flags = known, chatOnly = known >= PL.FLAG_CHAT_ONLY, logos = logos ~= "" and logos or nil }
+  local head, addon = logos:match("^(.-)|V(%d%d?%d?%.%d%d?%d?%.%d%d?%d?)$")
+  if head then
+    logos = head
+  end
+  return {
+    flags = known,
+    chatOnly = known >= PL.FLAG_CHAT_ONLY,
+    logos = logos ~= "" and logos or nil,
+    version = addon,
+  }
 end
 
 function PL.EncodeFarewell()

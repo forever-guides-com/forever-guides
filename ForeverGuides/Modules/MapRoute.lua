@@ -4,17 +4,25 @@
 -- first (styles, dash plan, line budget, edge point), then Attach, which draws. MapPage.lua
 -- hands in what only it knows (positions per view, zone, names) through the Attach context.
 local _, ns = ...
-local W, L, Theme, MI = ns.W, ns.L, ns.Theme, ns.MapIcons
+local W, L, Theme, MI, TL, SL = ns.W, ns.L, ns.Theme, ns.MapIcons, ns.TravelLogic, ns.MapRouteStrokeLogic
 
 local MR = {}
 ns.MapRoute = MR
 
 MR.MAX_LINES = 400
+MR.MAX_PATH_STROKES = SL.BUDGET -- strokes of all walked paths together, own pool next to the 400 lines
+MR.PATH_TOKEN = "heading"
 MR.HIT = 24 -- click and hover area of stops and legs, never smaller than the 24 px target size
 
 local STOP, STOP_OFFSET = 18, 10
 local ARROW, EDGE_MIN, EDGE_INSET = 7, 30, 8
 local LABEL_MAX = 140
+local LINE_SETTINGS = {
+  ["settings.routeLineStyle"] = true,
+  ["settings.routeLineWidth"] = true,
+  ["settings.routeDotSpacing"] = true,
+  ["settings.routeLineAlpha"] = true,
+}
 local SCALES = { 1, 1.5, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64 }
 
 ns.AddLocale("enUS", {
@@ -22,7 +30,7 @@ ns.AddLocale("enUS", {
 })
 
 ns.AddLocale("deDE", {
-  ["map.route.stopTip"] = "Halt %d von %d",
+  ["map.route.stopTip"] = "Stopp %d von %d",
 })
 
 -- Styles ---------------------------------------------------------------------------------------
@@ -36,6 +44,7 @@ MR.STYLES = {
   portal = { kind = "dot", token = "accent2", pattern = { 3, 9 }, jump = true },
   teleport = { kind = "dot", token = "accent2", pattern = { 3, 9 }, jump = true },
   spell = { kind = "dot", token = "accent2", pattern = { 3, 9 }, jump = true },
+  lift = { kind = "thin", token = "accent", pattern = { 3, 3 }, thin = true },
   walk = { kind = "thin", token = "textSecondary", pattern = { 5, 5 }, thin = true },
 }
 
@@ -127,6 +136,43 @@ function MR.EdgePoint(px, py, dx, dy, w, h, inset)
   return px + dx * t, py + dy * t
 end
 
+-- The position of a world point (continent, yards) on the map `uiMap` as fractions, nil without the
+-- client call or a position. Zone maps give values outside 0..1 for points beyond them, which the
+-- stroke clipping handles.
+function MR.MapPos(cont, wx, wy, uiMap)
+  local get, vec = C_Map and C_Map.GetMapPosFromWorldPos, rawget(_G, "CreateVector2D")
+  if type(get) ~= "function" or type(vec) ~= "function" or not (cont and uiMap) then
+    return nil
+  end
+  local ok, _, pos = pcall(get, cont, vec(wx, wy), uiMap)
+  if not (ok and type(pos) == "table") then
+    return nil
+  end
+  local x, y = pos.x, pos.y
+  if x == nil and pos.GetXY then
+    x, y = pos:GetXY()
+  end
+  if type(x) == "number" and type(y) == "number" and x == x and y == y then
+    return x, y
+  end
+end
+
+-- The line settings as one valid table; changes of the setting redraw (see Attach).
+function MR.LineConfig()
+  local s = ns.db and ns.db.settings or {}
+  return {
+    style = SL.Style(s.routeLineStyle),
+    width = SL.Width(s.routeLineWidth),
+    spacing = SL.Spacing(s.routeDotSpacing),
+    alpha = SL.Alpha(s.routeLineAlpha),
+  }
+end
+
+function MR.LineKey()
+  local c = MR.LineConfig()
+  return table.concat({ c.style, c.width, c.spacing, c.alpha }, ":")
+end
+
 -- A text key for a list of steps; the same route gives the same key.
 function MR.Signature(steps)
   if not steps then
@@ -161,6 +207,12 @@ end
 --   picking()           true while a click on a place sets start/goal (no hover areas then)
 --   legTip(i)           tooltip title and text of leg i
 --   hoverChanged(i)     leg i is hovered (nil = none), from the map or from the list
+--   drop(slug, fx, fy, i)  optional, a free point's pin (number i of the plan) was dropped at the canvas
+--                       fractions; true when the plan changed (false puts the pin back)
+--   pinClick(slug, i, button, pin)  optional, a plan pin was clicked with the right mouse button
+--   pathPoint(pt, step) optional, x, y in canvas px of a world point { x, y, uiMap = continent } of a
+--                       walked path, or nil (the leg then falls back to a straight line)
+--   redraw()            optional, what draws again after a line setting changed (default: Paint)
 -- }
 -- Returns the controller: SetRoute, Paint, SetHover, Release, Used, Capped, plus the counters
 -- rebuilds and restyles and the pools.
@@ -171,8 +223,25 @@ function MR.Attach(ctx)
   local lineUsed = { shadow = 0, main = 0 }
   local stops, hits, rings, labels = {}, {}, {}, {}
   local stopUsed, hitUsed, ringUsed, labelUsed = 0, 0, 0, 0
+  local planPins, planUsed = {}, 0
   local lastKey
-  ctl.pool = { lines = lines, stops = stops, hits = hits, rings = rings, labels = labels }
+  -- Walked paths: their own pool (shadow and main lines, per stroke width and dot flag), one stroke
+  -- buffer and one point buffer, reused by every rebuild.
+  local pathLines = { shadow = {}, main = {} }
+  local pathUsed = { shadow = 0, main = 0 }
+  local pathW, pathDot = { shadow = {}, main = {} }, {}
+  local sbuf, pxs, pys = SL.NewBuffer(), {}, {}
+  local cfg = MR.LineConfig()
+  ctl.pool = {
+    lines = lines,
+    stops = stops,
+    hits = hits,
+    rings = rings,
+    labels = labels,
+    plan = planPins,
+    path = pathLines,
+  }
+  ctl.pathThinned = false
 
   local overlay = CreateFrame("Frame", nil, canvas)
   overlay:SetAllPoints()
@@ -181,6 +250,10 @@ function MR.Attach(ctx)
 
   function ctl.Used()
     return lineUsed.shadow + lineUsed.main
+  end
+
+  function ctl.PathUsed()
+    return pathUsed.shadow + pathUsed.main
   end
 
   function ctl.Capped()
@@ -263,6 +336,13 @@ function MR.Attach(ctx)
       end
       lineUsed[kind] = 0
     end
+    for _, kind in ipairs({ "shadow", "main" }) do
+      for i = 1, pathUsed[kind] do
+        pathLines[kind][i]:Hide()
+      end
+      pathUsed[kind] = 0
+    end
+    ctl.pathThinned = false
     for i = 1, stopUsed do
       stops[i]:Hide()
     end
@@ -277,7 +357,10 @@ function MR.Attach(ctx)
       labels[i].bg:Hide()
       labels[i].text:Hide()
     end
-    stopUsed, hitUsed, ringUsed, labelUsed = 0, 0, 0, 0
+    for i = 1, planUsed do
+      planPins[i]:Hide()
+    end
+    stopUsed, hitUsed, ringUsed, labelUsed, planUsed = 0, 0, 0, 0, 0
     ctl.legs = {}
     ctl.capped = false
   end
@@ -299,12 +382,34 @@ function MR.Attach(ctx)
     end
   end
 
+  -- One stroke of a walked path; a dot is the disc texture on a very short line.
+  local function paintStroke(kind, k, lit, dim)
+    local line = pathLines[kind][k]
+    line:SetThickness(pathW[kind][k] + (lit and 2 or 0))
+    if kind == "shadow" then
+      line:SetColorTexture(Theme.color("bg", cfg.alpha * (lit and 0.9 or (dim and 0.2 or 0.7))))
+    elseif pathDot[k] and cfg.disc then
+      MI.Paint(line, true, Theme.color(MR.PATH_TOKEN, cfg.alpha * (lit and 1 or (dim and 0.4 or 1))))
+    else
+      line:SetColorTexture(Theme.color(MR.PATH_TOKEN, cfg.alpha * (lit and 1 or (dim and 0.4 or 1))))
+    end
+  end
+
   local function restyleAll()
     for i, leg in pairs(ctl.legs) do
       local lit = ctl.hover == i
       local dim = ctl.hover ~= nil and not lit
       for _, part in ipairs(leg.parts) do
         paintPart(part, lit, dim)
+      end
+      local p = leg.path
+      if p then
+        for k = p.s1, p.s2 do
+          paintStroke("shadow", k, lit, dim)
+        end
+        for k = p.m1, p.m2 do
+          paintStroke("main", k, lit, dim)
+        end
       end
     end
   end
@@ -479,6 +584,170 @@ function MR.Attach(ctx)
     addHit(leg, mx, my)
   end
 
+  -- The world points of a walking step as canvas px in pxs, pys; the count, or 0 when the step has no
+  -- path or one point cannot be placed (the straight line then stands in).
+  local function pathPoints(step)
+    local pts = step.pts
+    if step.mode ~= "walk" or type(pts) ~= "table" or #pts < 2 or not ctx.pathPoint then
+      return 0
+    end
+    for k = 1, #pts do
+      local x, y = ctx.pathPoint(pts[k], step)
+      if not x then
+        return 0
+      end
+      pxs[k], pys[k] = x, y
+    end
+    return #pts
+  end
+
+  local function acquirePath(kind, w, dot)
+    local k = pathUsed[kind] + 1
+    local line = pathLines[kind][k]
+    if not line then
+      line = canvas:CreateLine(nil, "ARTWORK", nil, kind == "shadow" and 1 or 2)
+      pathLines[kind][k] = line
+    end
+    pathUsed[kind] = k
+    pathW[kind][k] = w
+    if kind == "main" then
+      pathDot[k] = dot
+    end
+    line:ClearAllPoints()
+    return line, k
+  end
+
+  -- A walking step along its path; false when the straight line has to do it.
+  local function drawPath(i, step, cw, ch)
+    if not canvas.CreateLine then
+      return false
+    end
+    local n = pathPoints(step)
+    if n < 2 then
+      return false
+    end
+    SL.Reset(sbuf)
+    SL.Build(sbuf, pxs, pys, n, { 0, 0, cw, ch }, {
+      style = cfg.style,
+      width = cfg.width,
+      spacing = cfg.spacing,
+      budget = MR.MAX_PATH_STROKES - ctl.PathUsed(),
+    })
+    local leg = { i = i, parts = {}, style = MR.Style("walk"), path = { s1 = pathUsed.shadow + 1, m1 = pathUsed.main + 1 } }
+    ctl.legs[i] = leg
+    ctl.pathThinned = ctl.pathThinned or sbuf.thinned
+    for k = 1, sbuf.n do
+      local kind = sbuf.shadow[k] and "shadow" or "main"
+      local line = acquirePath(kind, sbuf.w[k], sbuf.dot[k])
+      line:SetStartPoint("TOPLEFT", canvas, sbuf.x1[k], -sbuf.y1[k])
+      line:SetEndPoint("TOPLEFT", canvas, sbuf.x2[k], -sbuf.y2[k])
+      line:Show()
+    end
+    leg.path.s2, leg.path.m2 = pathUsed.shadow, pathUsed.main
+    if sbuf.n > 0 then
+      local mid = math.ceil(sbuf.n / 2)
+      addHit(leg, (sbuf.x1[mid] + sbuf.x2[mid]) / 2, (sbuf.y1[mid] + sbuf.y2[mid]) / 2)
+    end
+    return true
+  end
+
+  -- The numbered pins of the plan: S, the stops 1..n, Z. A free point's pin can be dragged.
+  local function planRole(i, total)
+    if i == 1 then
+      return L["map.pin.start"], L["map.pin.role.start"], "success"
+    elseif i == total then
+      return L["map.pin.goal"], L["map.pin.role.goal"], "danger"
+    end
+    return tostring(i - 1), string.format(L["map.pin.role.stop"], i - 1), "accent2"
+  end
+
+  -- The pin sits down left of its place, the transfer numbers of the route keep the upper right.
+  local function placePin(b, x, y, cw, ch)
+    b:ClearAllPoints()
+    b:SetPoint(
+      "CENTER",
+      canvas,
+      "TOPLEFT",
+      math.max(STOP / 2, math.min(cw - STOP / 2, x - STOP_OFFSET)),
+      -math.max(STOP / 2, math.min(ch - STOP / 2, y + STOP_OFFSET))
+    )
+  end
+
+  local function endDrag(b)
+    b:SetScript("OnUpdate", nil)
+    b.dragging = false
+    local fx, fy = ns.MapMarkers.CursorFraction(canvas)
+    local moved = fx and ctx.drop and ctx.drop(b.slug, fx, fy, b.planIndex)
+    if not moved then
+      lastKey = nil
+      ctl.Paint()
+    end
+  end
+
+  local function newPlanPin()
+    local b = newStop()
+    b:RegisterForDrag("LeftButton")
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetScript("OnClick", function(self, button)
+      if button == "RightButton" and ctx.pinClick then
+        ctx.pinClick(self.slug, self.planIndex, button, self)
+      end
+    end)
+    b:SetScript("OnDragStart", function(self)
+      if not TL.IsPoint(self.slug) then
+        return
+      end
+      ns.HideTooltip()
+      self.dragging = true
+      self:SetScript("OnUpdate", function()
+        local fx, fy = ns.MapMarkers.CursorFraction(canvas)
+        if fx then
+          placePin(self, fx * canvas:GetWidth(), fy * canvas:GetHeight(), canvas:GetWidth(), canvas:GetHeight())
+        end
+      end)
+    end)
+    b:SetScript("OnDragStop", function(self)
+      if self.dragging then
+        endDrag(self)
+      end
+    end)
+    b:HookScript("OnHide", function(self)
+      self:SetScript("OnUpdate", nil)
+      self.dragging = false
+    end)
+    return b
+  end
+
+  local function drawPlan(zone, cw, ch)
+    local plan = ctl.plan
+    if not plan then
+      return
+    end
+    for i, slug in ipairs(plan) do
+      local x, y = ctx.point(slug)
+      if x and (not zone or ctx.inZone(slug)) then
+        planUsed = planUsed + 1
+        local b = planPins[planUsed]
+        if not b then
+          b = newPlanPin()
+          planPins[planUsed] = b
+        end
+        local label, role, token = planRole(i, #plan)
+        local disc = MI.DiscKnown()
+        MI.Paint(b.ring, disc, Theme.color(token))
+        MI.Paint(b.fill, disc, Theme.color("bg", 0.95))
+        W.SetText(b.num, nil, label)
+        b.slug, b.leg, b.planIndex = slug, nil, i
+        b.tipTitle = string.format(L["map.pin.tip"], role, ctx.name(slug))
+        b.tipText = TL.IsPoint(slug) and L["map.pin.tip.free"] or nil
+        b:SetFrameLevel(overlay:GetFrameLevel() + 2)
+        placePin(b, x, y, cw, ch)
+        b:EnableMouse(not ctx.picking())
+        b:Show()
+      end
+    end
+  end
+
   local function drawStops(steps, zone, cw, ch)
     local total = #steps + 1
     for k = 1, total do
@@ -518,13 +787,19 @@ function MR.Attach(ctx)
     ctl.rebuilds = ctl.rebuilds + 1
     release()
     local steps = ctl.steps
-    if not steps or #steps == 0 or cw < 2 or ch < 2 then
+    if cw < 2 or ch < 2 then
       return
     end
     local zone = ctx.zone()
+    drawPlan(zone, cw, ch)
+    if not steps or #steps == 0 then
+      return
+    end
     local legs = {}
+    cfg = MR.LineConfig()
+    cfg.disc = MI.DiscKnown()
     for i, step in ipairs(steps) do
-      local leg = resolve(i, step, zone, cw, ch)
+      local leg = not drawPath(i, step, cw, ch) and resolve(i, step, zone, cw, ch)
       if leg then
         leg.style = MR.Style(step.mode)
         leg.len = math.sqrt((leg.bx - leg.ax) ^ 2 + (leg.by - leg.ay) ^ 2)
@@ -543,6 +818,12 @@ function MR.Attach(ctx)
     end
     drawStops(steps, zone, cw, ch)
     restyleAll()
+  end
+
+  -- The planned places (start, stops in route order, goal) that get numbered pins, or nil.
+  function ctl.SetPlan(list)
+    ctl.plan = list
+    ctl.planKey = list and table.concat(list, ">") or ""
   end
 
   -- The route to draw (list of steps) or nil. The same route keeps what is drawn.
@@ -567,7 +848,9 @@ function MR.Attach(ctx)
       math.floor(cw),
       math.floor(ch),
       tostring(ctx.picking()),
+      ctl.planKey or "",
       ctl.sig or "",
+      MR.LineKey(),
     }, "#")
     if key ~= lastKey then
       lastKey = key
@@ -579,6 +862,18 @@ function MR.Attach(ctx)
   -- A map that shows again draws the route again, from the pool.
   canvas:HookScript("OnShow", function()
     ctl.Paint()
+  end)
+
+  -- A line setting changed: draw again, by the owner's own redraw when it has one.
+  ns.On("FG_SETTING_CHANGED", function(_, path)
+    if LINE_SETTINGS[path] and canvas:IsVisible() then
+      lastKey = nil
+      if ctx.redraw then
+        ctx.redraw()
+      else
+        ctl.Paint()
+      end
+    end
   end)
 
   -- Colors and text sizes come from the theme: a theme or language change draws once more.

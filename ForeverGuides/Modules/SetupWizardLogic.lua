@@ -1,9 +1,11 @@
 -- Setup wizard logic (no UI): step registry, persisted state, first-run decisions, session
 -- navigation and the reset to defaults. State lives in ForeverGuidesDB.setup:
--- { fresh, done, skipped, version, seenSteps = { [stepId] = true }, baselined, noticeVersion }.
+-- { fresh, done, skipped, version, seenSteps = { [stepId] = true }, seenRevisions = { [stepId] = "1.0.0" }, baselined, noticeVersion }.
 --
 --   SW.RegisterStep({ id, order, titleKey, textKey, since = "0.1.0", when = function() end,
 --     closing = true (summary step: shown again whenever another step is new),
+--     revised = "1.0.0" (a step reworked in that version: shown again to a player who saw an older one),
+--     onClose(how) (a visited step is told how the run ended: "finish", "skip" or "cancel"),
 --     layout = { "title", "text", "controls", ... }, blocks = { name = ... },
 --     controls = { { type = "toggle" | "dropdown" | "slider" | "custom" | "consent", key = "settings.x",
 --     labelKey, hintKey, options = { { value, key|text } }, min, max, step, format(v), invert,
@@ -158,6 +160,9 @@ function SW.State()
   if type(db.setup.seenSteps) ~= "table" then
     db.setup.seenSteps = {}
   end
+  if type(db.setup.seenRevisions) ~= "table" then
+    db.setup.seenRevisions = {}
+  end
   return db.setup
 end
 
@@ -177,20 +182,32 @@ function SW.CompareVersions(a, b)
   return 0
 end
 
+-- A step counts as seen when its id is listed and, for a reworked step (step.revised), the player saw it at that
+-- revision or later.
+local function isSeen(state, step)
+  if not state.seenSteps[step.id] then
+    return false
+  end
+  return not step.revised or SW.CompareVersions(state.seenRevisions[step.id], step.revised) >= 0
+end
+
 -- onlyNew keeps the steps this user has not been shown yet. A closing step (the summary) is shown
 -- again whenever any other step is new, so every run ends with it.
 function SW.ActiveSteps(onlyNew)
-  local seen = onlyNew and SW.State().seenSteps or {}
+  local state = SW.State()
+  local function seenStep(step)
+    return onlyNew and isSeen(state, step)
+  end
   local active, anyNew = {}, false
   for _, step in ipairs(SW.Steps()) do
     if SW.StepActive(step) then
       active[#active + 1] = step
-      anyNew = anyNew or (not seen[step.id] and not step.closing)
+      anyNew = anyNew or (not seenStep(step) and not step.closing)
     end
   end
   local list = {}
   for _, step in ipairs(active) do
-    if not seen[step.id] or (step.closing and anyNew) then
+    if not seenStep(step) or (step.closing and anyNew) then
       list[#list + 1] = step
     end
   end
@@ -214,6 +231,9 @@ function SW.Baseline()
   for _, step in ipairs(SW.Steps()) do
     if SW.CompareVersions(step.since, Store.previousVersion) <= 0 then
       state.seenSteps[step.id] = true
+      if step.revised and SW.CompareVersions(step.revised, Store.previousVersion) <= 0 then
+        state.seenRevisions[step.id] = step.revised
+      end
     end
   end
 end
@@ -259,7 +279,7 @@ function SW.Raw(c)
     return ns.SetupFeatureLogic.MenuRaw()
   elseif c.type == "consent" then
     local Consent = ns.Consent
-    return (Consent.Allows(c.fn, "send", c.aud) and "S" or "") .. (Consent.Allows(c.fn, "receive", c.aud) and "R" or "")
+    return (Consent.Shown(c.fn, "send", c.aud) and "S" or "") .. (Consent.Shown(c.fn, "receive", c.aud) and "R" or "")
   end
   return Store.get(c.key)
 end
@@ -273,7 +293,7 @@ function SW.Get(c, dir)
   elseif c.type == "menu" then
     return ns.SetupFeatureLogic.ParseMenuRaw(ns.SetupFeatureLogic.MenuRaw())
   elseif c.type == "consent" then
-    return DIRECTIONS[dir] == true and ns.Consent.Allows(c.fn, dir, c.aud) or false
+    return DIRECTIONS[dir] == true and ns.Consent.Shown(c.fn, dir, c.aud) or false
   end
   local v = Store.get(c.key)
   if v == nil then
@@ -366,7 +386,8 @@ local function resetFeature(c)
 end
 
 -- Every key any step touches goes back to its Store default, the other settings stay. Sharing goes
--- fully off: every function is withdrawn (by "wizard", written to the consent log). A feature row goes to
+-- fully off: every function is withdrawn (by "wizard", written to the consent log), except that default-on
+-- functions (Consent.DEFAULT_ON) are cleared to "never chosen". A feature row goes to
 -- its shipped state with its menu pages shown, the menu shows every hidden entry again. opts.keepFeatures
 -- leaves the feature rows, their option toggles (owner) and the menu as they are: the first-run skip changes
 -- none of the player's feature choices, the defaults already apply on a fresh install.
@@ -389,6 +410,10 @@ function SW.ResetToDefaults(opts)
   end
   if consent and ns.Consent then
     ns.Consent.WithdrawAll("wizard")
+    -- Functions that are on until switched off go back to "never chosen", not to an explicit off.
+    for fn in pairs(ns.Consent.DEFAULT_ON) do
+      ns.Consent.Clear(fn, "wizard")
+    end
   end
   return count
 end
@@ -631,6 +656,14 @@ local function conclude(self, how)
   local state = SW.State()
   for id in pairs(self.visited) do
     state.seenSteps[id] = true
+  end
+  for _, step in ipairs(self.steps) do
+    if self.visited[step.id] and step.revised then
+      state.seenRevisions[step.id] = step.revised
+    end
+    if self.visited[step.id] and step.onClose then
+      ns.Safe("setup-close", step.onClose, how)
+    end
   end
   state.done = true
   state.version = SW.VERSION

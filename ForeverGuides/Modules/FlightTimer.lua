@@ -39,7 +39,7 @@ ns.AddLocale("deDE", {
   ["flighttimer.showTitle"] = "Ziel anzeigen",
   ["flighttimer.showBackground"] = "Hintergrund anzeigen",
   ["flighttimer.showBar"] = "Fortschrittsbalken anzeigen",
-  ["flighttimer.approx"] = 'Zeiten mit "ca."',
+  ["flighttimer.approx"] = 'Zeiten mit „ca.“',
   ["flighttimer.lock"] = "Position sperren",
   ["flighttimer.fontSize"] = "Schriftgröße",
   ["flighttimer.scale"] = "Skalierung",
@@ -94,7 +94,7 @@ end
 -- "name-realm" of the player, nil while the game does not say.
 local function charId()
   local name = ask("UnitName", "player")
-  local realm = ask("GetNormalizedRealmName") or ask("GetRealmName")
+  local realm = ns.Realm.Get()
   if type(name) == "string" and name ~= "" and type(realm) == "string" and realm ~= "" then
     return name .. "-" .. realm
   end
@@ -439,7 +439,7 @@ local function create()
   f.status:SetValue(0)
   f.statusBack = f.status:CreateTexture(nil, "BACKGROUND")
   f.statusBack:SetAllPoints()
-  f.statusBack:SetColorTexture(0, 0, 0, 0.45)
+  f.statusBack:SetColorTexture(ns.Theme.scrim(0.45))
   f.fill = f.status:CreateTexture(nil, "ARTWORK")
   f.fill:SetColorTexture(1, 1, 1, 1)
   f.status:SetStatusBarTexture(f.fill)

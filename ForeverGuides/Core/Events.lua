@@ -4,6 +4,10 @@
 local _, ns = ...
 
 local listeners = {}
+-- Where each listener was registered ("File.lua:123"), for the performance probe. Weak keys, filled
+-- once per registration, never read on the hot path.
+local sources = setmetatable({}, { __mode = "k" })
+ns.EventSources = sources
 local frame = CreateFrame("Frame")
 
 local function dispatch(event, ...)
@@ -37,6 +41,12 @@ local OPTIONAL = {
   INSPECT_TALENT_READY = true,
   VIGNETTES_UPDATED = true,
   VIGNETTE_MINIMAP_UPDATED = true,
+  NAVIGATION_FRAME_CREATED = true,
+  NAVIGATION_FRAME_DESTROYED = true,
+  BN_CHAT_MSG_ADDON = true,
+  BN_FRIEND_INFO_CHANGED = true,
+  BN_FRIEND_ACCOUNT_ONLINE = true,
+  BN_FRIEND_ACCOUNT_OFFLINE = true,
 }
 
 function ns.On(event, fn)
@@ -52,6 +62,10 @@ function ns.On(event, fn)
     end
   end
   list[#list + 1] = fn
+  if type(debugstack) == "function" then
+    local file, line = (debugstack(2, 1, 0) or ""):match("([^\\/:]+%.lua):(%d+)")
+    sources[fn] = file and (file .. ":" .. line) or nil
+  end
   -- PLAYER_LOGIN fires once; a handler registered after it (a sub-addon loaded in a running session)
   -- would never run. The late handler gets one deferred call, with the event name only. Our own
   -- login must have passed too, so a client that answers IsLoggedIn early on a reload cannot run

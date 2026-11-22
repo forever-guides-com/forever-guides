@@ -13,8 +13,8 @@ ns.WorldMapGuildTab = Tab
 ns.AddLocale("enUS", {
   ["wm.guild.tab.title"] = "Guild members",
   ["wm.guild.tab.tip"] = "Filters, legend and the sharing of your own position.",
-  ["wm.guild.needRecv"] = "Guild members on the map need receiving positions.",
-  ["wm.guild.needSend"] = "Your position is not sent. Guild members with the add-on do not see you.",
+  ["wm.guild.needRecv"] = "To see guild members on the map, switch on receiving positions.",
+  ["wm.guild.needSend"] = "Your position is not sent. Guild members with the addon do not see you.",
   ["wm.guild.show"] = "Show guild members",
   ["wm.guild.showTip"] = "Shows the members who share their position on this map.",
   ["wm.guild.online"] = "Only online",
@@ -29,13 +29,13 @@ ns.AddLocale("enUS", {
   ["wm.guild.legend.old"] = "Older or unconfirmed (ring)",
   ["wm.guild.legend.approx"] = "Approximate place (diamond)",
   ["wm.guild.legend.group"] = "Several members close together (number)",
-  ["wm.guild.legend.rank"] = "Strokes above: high rank (option Rank)",
+  ["wm.guild.legend.rank"] = "Strokes above: high rank (setting Rank)",
   ["wm.guild.own"] = "Your position",
   ["wm.guild.invisible"] = "Invisible",
   ["wm.guild.invisibleTip"] = "Stops sending your position and asks others to remove it.",
   ["wm.guild.accuracy"] = "Accuracy",
   ["wm.guild.accuracy.exact"] = "Exact",
-  ["wm.guild.accuracy.grid"] = "Grid (5 percent of the map)",
+  ["wm.guild.accuracy.grid"] = "Grid (5 % of the map)",
   ["wm.guild.accuracy.zone"] = "Zone only",
   ["wm.guild.minLevelTip"] = "Hides members below this level. The upper limit moves along so the range never turns around.",
   ["wm.guild.maxLevelTip"] = "Hides members above this level. The lower limit moves along so the range never turns around.",
@@ -45,9 +45,9 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["wm.guild.tab.title"] = "Gildenmitglieder",
   ["wm.guild.tab.tip"] = "Filter, Legende und das Teilen deiner eigenen Position.",
-  ["wm.guild.needRecv"] = "Gildenmitglieder auf der Karte brauchen den Empfang von Positionen.",
+  ["wm.guild.needRecv"] = "Für Gildenmitglieder auf der Karte schaltest du den Empfang von Positionen ein.",
   ["wm.guild.needSend"] = "Deine Position wird nicht gesendet. Gildenmitglieder mit dem Addon sehen dich nicht.",
-  ["wm.guild.show"] = "Gildenmitglieder zeigen",
+  ["wm.guild.show"] = "Gildenmitglieder anzeigen",
   ["wm.guild.showTip"] = "Zeigt die Mitglieder, die ihre Position teilen, auf dieser Karte.",
   ["wm.guild.online"] = "Nur online",
   ["wm.guild.onlineTip"] = "Blendet Mitglieder aus, die die Gildenliste als offline zeigt.",
@@ -61,13 +61,13 @@ ns.AddLocale("deDE", {
   ["wm.guild.legend.old"] = "Älter oder unbestätigt (Ring)",
   ["wm.guild.legend.approx"] = "Ungefährer Ort (Raute)",
   ["wm.guild.legend.group"] = "Mehrere Mitglieder dicht beieinander (Zahl)",
-  ["wm.guild.legend.rank"] = "Striche darüber: hoher Rang (Option Rang)",
+  ["wm.guild.legend.rank"] = "Striche darüber: hoher Rang (Einstellung Rang)",
   ["wm.guild.own"] = "Deine Position",
   ["wm.guild.invisible"] = "Unsichtbar",
-  ["wm.guild.invisibleTip"] = "Stoppt das Senden deiner Position und bittet andere, sie zu löschen.",
+  ["wm.guild.invisibleTip"] = "Stoppt das Senden deiner Position und bittet andere, sie zu entfernen.",
   ["wm.guild.accuracy"] = "Genauigkeit",
   ["wm.guild.accuracy.exact"] = "Genau",
-  ["wm.guild.accuracy.grid"] = "Raster (5 Prozent der Karte)",
+  ["wm.guild.accuracy.grid"] = "Raster (5 % der Karte)",
   ["wm.guild.accuracy.zone"] = "Nur Zone",
   ["wm.guild.minLevelTip"] = "Blendet Mitglieder unter dieser Stufe aus. Die Obergrenze zieht mit, damit der Bereich nie verkehrt herum ist.",
   ["wm.guild.maxLevelTip"] = "Blendet Mitglieder über dieser Stufe aus. Die Untergrenze zieht mit, damit der Bereich nie verkehrt herum ist.",
@@ -169,6 +169,21 @@ function Tab.Create(parent, width, opts)
     return leave(s)
   end
 
+  -- What is shared right now; a click opens the consent settings of the function.
+  parts.status = leave(W.Button(pg, {
+    key = "mapshare.status.off",
+    variant = "ghost",
+    height = CHECK_H,
+    tooltip = "mapshare.status.tip",
+    tooltipText = "mapshare.status.tip",
+    opens = true,
+    onClick = function()
+      ns.MapSharePrompt.OpenSettings()
+    end,
+  }))
+  parts.status.fgId = "wm-guild-status"
+  parts.status.label:SetJustifyH("LEFT")
+
   parts.recv = ns.OptInNotice.Banner(pg, {
     fn = "guildMap",
     dir = "receive",
@@ -260,6 +275,8 @@ function Tab.Create(parent, width, opts)
 
   function pg:Layout()
     y = 0
+    W.SetText(parts.status.label, ns.MapSharePrompt.StatusKey())
+    put(parts.status, CHECK_H, width)
     for _, name in ipairs({ "show", "online", "minLevel", "maxLevel", "rank" }) do
       parts[name]:Hide()
     end

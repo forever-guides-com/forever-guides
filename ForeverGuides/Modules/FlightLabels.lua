@@ -19,7 +19,7 @@ ns.AddLocale("deDE", {
   ["flightlabel.heading"] = "Flugmeister",
   ["flightlabel.enable"] = "Zeit am Flugpunkt",
   ["flightlabel.tooltip"] = "Tooltip",
-  ["flightlabel.size"] = "Schrift",
+  ["flightlabel.size"] = "Schriftgröße",
   ["flightlabel.tip"] = "Flugdauer %s",
 })
 
@@ -61,7 +61,7 @@ local function build(button)
   local frame = CreateFrame("Frame", nil, button)
   local bg = frame:CreateTexture(nil, "BACKGROUND")
   bg:SetAllPoints(frame)
-  bg:SetColorTexture(0, 0, 0, 0.85)
+  bg:SetColorTexture(ns.Theme.scrim(0.85))
   local fs = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   fs:SetPoint("CENTER", frame, "CENTER", 0, 0)
   frame:SetPoint("TOP", button, "BOTTOM", 0, -1)

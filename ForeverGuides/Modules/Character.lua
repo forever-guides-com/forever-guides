@@ -19,7 +19,7 @@ ns.AddLocale("enUS", {
   ["character.transmog.title"] = "Transmog",
   ["character.transmog.desc"] = "All unlocked transmog appearances.",
   ["character.transmog.info"] = "The website takes over your unlocked transmog appearances.",
-  ["character.transmog.note"] = "The website cannot read this type yet. The string can already be created.",
+  ["character.transmog.note"] = "The website cannot read this type yet. You can already create the string.",
   ["character.transmog.button"] = "Export transmog",
   ["character.transmog.dialog"] = "Transmog export",
   ["character.link.button"] = "More on the website",
@@ -34,7 +34,7 @@ ns.AddLocale("deDE", {
   ["character.hint"] = "Das Addon sendet nichts. Einfügen auf forever-guides.com > Account > Import.",
   ["character.char.title"] = "Charakter",
   ["character.char.desc"] = "Charakterinfo, Ausrüstung, Taschen und Sekundärwerte.",
-  ["character.char.info"] = "Die Webseite zeigt Name, Klasse und Level in deinem Konto und nutzt dein Item-Level bei Event-Anmeldungen.",
+  ["character.char.info"] = "Die Webseite zeigt Name, Klasse und Stufe in deinem Konto und nutzt dein Itemlevel bei Event-Anmeldungen.",
   ["character.char.button"] = "Charakter exportieren",
   ["character.char.dialog"] = "Charakter-Export",
   ["character.seen.title"] = "Gesehene Items",
@@ -45,7 +45,7 @@ ns.AddLocale("deDE", {
   ["character.transmog.title"] = "Transmog",
   ["character.transmog.desc"] = "Alle freigeschalteten Transmog-Erscheinungen.",
   ["character.transmog.info"] = "Die Webseite übernimmt deine freigeschalteten Transmog-Erscheinungen.",
-  ["character.transmog.note"] = "Die Webseite kann diesen Typ noch nicht lesen. Der String ist schon erzeugbar.",
+  ["character.transmog.note"] = "Die Webseite kann diesen Typ noch nicht lesen. Den String kannst du schon erzeugen.",
   ["character.transmog.button"] = "Transmog exportieren",
   ["character.transmog.dialog"] = "Transmog-Export",
   ["character.link.button"] = "Mehr auf der Webseite",
@@ -101,7 +101,7 @@ local function try(fn, ...)
 end
 
 local function realmName()
-  return try(GetNormalizedRealmName) or try(GetRealmName)
+  return ns.Realm.Get()
 end
 
 -- Fields every envelope needs for the website: name, class token, level, realm.
@@ -367,7 +367,7 @@ end
 
 local function build(container)
   local view = ns.NewPageView(container)
-  ns.AddParagraph(view, "character.intro", { color = "text" })
+  ns.AddIntro(view, "character.intro")
   section(view, "char", characterData, "character.char.info")
   section(view, "seen", itemsSeenData, "character.seen.info")
   if Page.TRANSMOG_IMPORT_READY then

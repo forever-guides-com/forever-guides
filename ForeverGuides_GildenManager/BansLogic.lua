@@ -1,5 +1,6 @@
 -- The ban list, former members and alt groups, no game calls. All of it is local: guild.bans[key] =
--- { name, reason, note, day } with the roster key of the member. A warning is a hint, nothing here
+-- { name, reason, note, day, by, src } with the roster key of the member (by: who added it, src "shared"
+-- for one taken over from an officer's suggestion, never sent on). A warning is a hint, nothing here
 -- invites, removes or changes anyone.
 local _, gm = ...
 if not gm.ext then
@@ -14,6 +15,7 @@ BL.MAX_REASON = 60
 BL.MAX_NOTE = 120
 BL.MAX_BANS = 1000
 BL.MAX_NAME = 48
+BL.MAX_BY = 48
 
 local function whole(v)
   return type(v) == "number" and v == v and v >= 0 and v < math.huge and v == math.floor(v) and v or nil
@@ -60,6 +62,8 @@ local function cleanEntry(key, e)
     reason = line(e.reason, BL.MAX_REASON),
     note = line(e.note, BL.MAX_NOTE),
     day = whole(e.day) or 0,
+    by = line(e.by, BL.MAX_BY),
+    src = e.src == "shared" and "shared" or nil,
   }
 end
 
@@ -90,7 +94,8 @@ function BL.Clean(guild)
 end
 
 -- Adds or replaces the ban of a member. fields: { name, reason, note }. Answers true and the entry, or
--- false and a reason: "name" (empty), "limit" (too many bans).
+-- false and a reason: "name" (empty), "limit" (too many bans). fields.by: who adds it, fields.day: the
+-- day of a taken-over ban (an old entry keeps its own day), fields.src: "shared" for a taken-over one.
 function BL.Set(bans, fields, today)
   local name = PN.Normalize(line(type(fields) == "table" and fields.name or "", BL.MAX_NAME))
   local key = PN.Key(name)
@@ -111,7 +116,9 @@ function BL.Set(bans, fields, today)
     name = name,
     reason = line(fields.reason, BL.MAX_REASON),
     note = line(fields.note, BL.MAX_NOTE),
-    day = old and old.day or whole(today) or 0,
+    day = old and old.day or whole(fields.day) or whole(today) or 0,
+    by = old and old.by ~= "" and old.by or line(fields.by, BL.MAX_BY),
+    src = fields.src == "shared" and not old and "shared" or old and old.src or nil,
   }
   bans[key] = entry
   return true, entry, key
@@ -151,6 +158,22 @@ function BL.Match(guild, key)
   local mainKey = member and member.mainKey or ""
   if mainKey ~= "" and guild.bans[mainKey] then
     return guild.bans[mainKey], mainKey, "main"
+  end
+end
+
+-- Answers a function key -> true when the member, its main or an alt of its group is on the ban list.
+-- One pass over the bans, so a whole roster costs no more than the list.
+function BL.BanIndex(guild)
+  local members, roots = guild.members or {}, {}
+  local function root(key)
+    local m = members[key]
+    return m and m.mainKey ~= "" and m.mainKey or key
+  end
+  for key in pairs(guild.bans) do
+    roots[root(key)] = true
+  end
+  return function(key)
+    return guild.bans[key] ~= nil or roots[root(key)] == true
   end
 end
 

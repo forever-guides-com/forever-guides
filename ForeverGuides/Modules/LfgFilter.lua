@@ -48,7 +48,7 @@ ns.AddLocale("deDE", {
   ["lfg.error"] = "Die Einstellung wurde nicht übernommen.",
   ["lfg.set.panel"] = "Filter-Panel anbieten",
   ["lfg.set.panelHint"] = "Panel und Reiter an der Gruppensuche.\nMit LFG Filter Forever (/lfgf) bleibt der Filter aus.",
-  ["lfg.set.panelAuto"] = "Panel beim Öffnen zeigen",
+  ["lfg.set.panelAuto"] = "Panel beim Öffnen anzeigen",
   ["lfg.set.panelAutoHint"] = "Öffnet mit der Gruppensuche.\nX oder Reiter schließt es bis zum nächsten Öffnen.",
   ["lfg.set.panelDock"] = "Panel am Fenster andocken",
   ["lfg.set.panelDockHint"] = "Schiebt Blizzards Reiter an den Panelrand.\nAus: Panel rechts neben den Reitern.",

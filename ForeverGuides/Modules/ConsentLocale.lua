@@ -8,7 +8,7 @@ local _, ns = ...
 -- last three lines are the same for every function.
 local TAIL = {
   enUS = {
-    "Transfer: through the chat servers of Blizzard, never through a server of the add-on or its website.",
+    "Transfer: through the chat servers of Blizzard, never through a server of the addon or its website.",
     "Withdraw: Settings > Consents, it takes effect at once. Copies that others have already stored cannot be fetched back.",
     "Voluntary: the date of your choice is stored on this computer only.",
   },
@@ -106,18 +106,35 @@ add("presenceMark", { "Presence", "Anwesenheit" }, {
   "Shows other addon users that you use the addon.",
   "Zeigt anderen Addon-Nutzern, dass du das Addon nutzt.",
 }, {
-  "Sent: the sign that you use the addon, with a logo flag.",
-  "Gesendet wird: das Zeichen, dass du das Addon nutzt, mit Logo-Markierung.",
+  "Sent: the sign that you use the addon, with its version and a logo flag.",
+  "Gesendet wird: das Zeichen, dass du das Addon nutzt, mit Version und Logomarkierung.",
 }, {
-  "the sign that you use the add-on and a flag whether your logo shows on nameplates or in chat only. No values, no names beyond the sender.",
+  "the sign that you use the addon, its version and a flag whether your logo shows on nameplates or in chat only. No values, no names beyond the sender.",
   "addon users in your group and guild, as far as you switch them on.",
-  "other users see your logo at your name in chat or on the nameplate and know that you use the add-on.",
+  "other users see your logo at your name in chat or on the nameplate and know that you use the addon.",
   "They keep it in memory only. It is gone at the next login, when they switch receiving off or when you withdraw.",
 }, {
-  "das Zeichen, dass du das Addon nutzt, und eine Markierung, ob dein Logo an Namensplaketten oder nur im Chat erscheint. Keine Werte, keine Namen außer dem Absender.",
+  "das Zeichen, dass du das Addon nutzt, seine Version und eine Markierung, ob dein Logo an Namensplaketten oder nur im Chat erscheint. Keine Werte, keine Namen außer dem Absender.",
   "Addon-Nutzer in deiner Gruppe und Gilde, soweit du sie einschaltest.",
   "andere sehen dein Logo an deinem Namen im Chat oder an der Namensplakette und wissen, dass du das Addon nutzt.",
   "Sie halten es nur im Arbeitsspeicher. Es ist beim nächsten Login weg, wenn sie Empfangen ausschalten oder wenn du widerrufst.",
+})
+add("versionCheck", { "Version check", "Versionsabgleich" }, {
+  "Compares the version number with guild and group so you hear about updates.",
+  "Vergleicht die Versionsnummer mit Gilde und Gruppe, damit du Updates erfährst.",
+}, {
+  "Sent: the version number of the addon, nothing else.",
+  "Gesendet wird: die Versionsnummer des Addons, sonst nichts.",
+}, {
+  "the version number of your addon and the newest important version you know. No names, no values, no questions, no answers. A development build sends nothing.",
+  "addon users in your group and guild, as far as you switch them on. At most once every 30 minutes and never in combat.",
+  "others learn that a newer version exists and see a hint in the footer. A version counts only when two different players report it, one is enough from your own group.",
+  "They keep the newest reported version on their computer until they have installed it.",
+}, {
+  "die Versionsnummer deines Addons und die neueste wichtige Version, die du kennst. Keine Namen, keine Werte, keine Fragen, keine Antworten. Ein Entwicklungsstand sendet nichts.",
+  "Addon-Nutzer in deiner Gruppe und Gilde, soweit du sie einschaltest. Höchstens alle 30 Minuten und nie im Kampf.",
+  "andere erfahren, dass es eine neuere Version gibt, und sehen einen Hinweis in der Fußzeile. Eine Version zählt erst, wenn zwei verschiedene Spieler sie melden, aus deiner eigenen Gruppe reicht einer.",
+  "Sie speichern die neueste gemeldete Version auf ihrem Rechner, bis sie diese selbst installiert haben.",
 })
 add("crestMark", { "Guild and communities", "Gilde und Communitys" }, {
   "Shows the logo of your guild and communities next to your name.",
@@ -126,7 +143,7 @@ add("crestMark", { "Guild and communities", "Gilde und Communitys" }, {
   "Sent: short codes of the logos you choose. Never a name or a picture.",
   "Gesendet wird: kurze Kennungen der Logos, die du wählst. Nie ein Name und nie ein Bild.",
 }, {
-  "short codes of the guild logo and the community logos you choose, only logos that the add-on knows. No names, no pictures, nothing is sent while you choose nothing.",
+  "short codes of the guild logo and the community logos you choose, only logos that the addon knows. No names, no pictures, nothing is sent while you choose nothing.",
   "addon users in your group and guild, as far as you switch them on.",
   "other users see these logos next to your name in chat and know which guild and communities you chose to show.",
   "They keep it in memory only. It is gone at the next login, when they switch receiving off or when you withdraw.",
@@ -143,15 +160,15 @@ add("linkShare", { "Chat links", "Chat-Links" }, {
   "Sent: the content you pick, in the link or by whisper.",
   "Gesendet wird: der Inhalt, den du wählst, im Link oder per Flüstern.",
 }, {
-  "the note, drawing, build, list, layout, element or group you pick. Short content sits in the link, larger content goes by whisper to whoever opens the link, only until /reload or logout. It can contain anything you wrote.",
-  "everyone who sees the link in the chat you send it to, and everyone who opens it. Receiving: links of others become clickable and opening one asks the sender by whisper.",
-  "others open your content in the add-on instead of copying text by hand.",
+  "the note, drawing, build, list, layout, element or group you pick. Short content sits in the link, larger content goes by whisper to whoever opens the link, only until /reload or logout. It can contain anything you wrote. Without a choice: share click sends, readable lines become links. Requests need the switch.",
+  "everyone who sees the line in the chat you send it to, and everyone who opens the link. Receiving: readable lines of others become links, other content is asked from the sender by whisper only with this switch on.",
+  "others open your content in the addon instead of copying text by hand.",
   "Whoever opens it sees the content and can keep a copy. Nobody gets an answer for content you did not share.",
 }, {
-  "die Notiz, Zeichnung, Skillung, Liste, das Layout, Element oder die Gruppe, die du wählst. Kurzer Inhalt steckt im Link, größerer geht per Flüstern an jeden, der den Link öffnet, nur bis /reload oder Logout. Der Inhalt kann alles enthalten, was du geschrieben hast.",
-  "alle, die den Link in dem Chat sehen, in den du ihn sendest, und alle, die ihn öffnen. Empfangen: Links anderer werden klickbar, beim Öffnen fragt das Addon den Absender per Flüstern.",
+  "die Notiz, Zeichnung, Skillung, Liste, das Layout, Element oder die Gruppe, die du wählst. Kurzer Inhalt steckt im Link, größerer geht per Flüstern an jeden, der den Link öffnet, nur bis /reload oder Logout. Der Inhalt kann alles enthalten, was du geschrieben hast. Ohne Wahl: Teilen-Klick sendet, lesbare Zeilen werden Links. Anfragen brauchen Schalter.",
+  "alle, die die Zeile in dem Chat sehen, in den du sie sendest, und alle, die den Link öffnen. Empfangen: lesbare Zeilen anderer werden zu Links, anderen Inhalt fragt das Addon nur mit Schalter per Flüstern an.",
   "andere öffnen deinen Inhalt im Addon, statt Text von Hand zu kopieren.",
-  "Wer ihn öffnet, sieht den Inhalt und kann eine Kopie behalten. Für Inhalt, den du nicht geteilt hast, bekommt niemand eine Antwort.",
+  "Wer ihn öffnet, sieht ihn und kann eine Kopie behalten. Für Inhalt, den du nicht geteilt hast, bekommt niemand eine Antwort.",
 }, false)
 add("guildMap", { "Guild map", "Gildenkarte" }, {
   "Your position for guild members on the map.",
@@ -161,7 +178,7 @@ add("guildMap", { "Guild map", "Gildenkarte" }, {
   "Gesendet wird: Karte und Position, Standard genau (einstellbar).",
 }, {
   "your map and position on it. Default: exact. Under Settings > Map > Guild members on the maps > Your own position you can switch to a grid (5 percent of the map) or zone only. It is a live track of where you are.",
-  "guild members who use the add-on.",
+  "guild members who use the addon.",
   "they see you as a dot on the world map and the minimap. Switch Invisible on to stop it at once. Nothing goes out in combat, instances, battlegrounds or while AFK.",
   "They keep it in memory only and show it while it is current. It is never saved.",
 }, {
@@ -170,6 +187,23 @@ add("guildMap", { "Guild map", "Gildenkarte" }, {
   "sie sehen dich als Punkt auf der Weltkarte und der Minikarte. Mit Unsichtbar stoppst du es sofort. Im Kampf, in Instanzen, Schlachtfeldern und bei AFK geht nichts raus.",
   "Sie halten sie nur im Arbeitsspeicher und zeigen sie, solange sie aktuell ist. Sie wird nie gespeichert.",
 })
+add("friendMap", { "Friends map", "Freundeskarte" }, {
+  "Your position for friends on the map.",
+  "Deine Position für Freunde auf der Karte.",
+}, {
+  "Sent: map and position, exact by default (you can change it).",
+  "Gesendet wird: Karte und Position, Standard genau (einstellbar).",
+}, {
+  "your map and position on it. Default: exact. Under Settings > Map > Guild members on the maps > Your own position you can switch to a grid (5 percent of the map) or zone only. It is a live track of where you are. A short hello tells a friend that you use the addon.",
+  "friends who are online and use the addon, as a whisper or over Battle.net. Never to strangers, and a message of someone who is not your friend is dropped.",
+  "they see you as a dot on the world map and the addon map. Switch Invisible on to stop it at once. Nothing goes out in combat, dungeons, raids, battlegrounds or while AFK.",
+  "They keep it in memory only and show it while it is current. It is never saved.",
+}, {
+  "deine Karte und Position darauf. Standard: genau. Unter Einstellungen > Karte > Gildenmitglieder auf den Karten > Deine eigene Position stellst du auf ein Raster (5 Prozent der Karte) oder nur die Zone um. Es ist eine Live-Spur dessen, wo du bist. Ein kurzes Hallo sagt einem Freund, dass du das Addon nutzt.",
+  "Freunde, die online sind und das Addon nutzen, als Flüstern oder über Battle.net. Nie an Fremde, die Nachricht von jemandem, der nicht dein Freund ist, wird verworfen.",
+  "sie sehen dich als Punkt auf der Weltkarte und der Addon-Karte. Mit Unsichtbar stoppst du es sofort. Im Kampf, in Dungeons, Raids, Schlachtfeldern und bei AFK geht nichts raus.",
+  "Sie halten sie nur im Arbeitsspeicher und zeigen sie, solange sie aktuell ist. Sie wird nie gespeichert.",
+}, false)
 add("crafting", { "Recipes", "Rezepte" }, {
   "Your professions and recipes for guild members who look for a crafter.",
   "Deine Berufe und Rezepte für Gildenmitglieder, die einen Hersteller suchen.",
@@ -178,14 +212,14 @@ add("crafting", { "Recipes", "Rezepte" }, {
   "Gesendet wird: Berufe, Skillstufen und die Rezepte, die du kennst.",
 }, {
   "your professions with skill and maximum and the recipes you know in them as numbers. Only the character you play. A profession appears once you opened its window.",
-  "guild members with the add-on who switched receiving on. Asked who can make a recipe, you whisper an answer to the asker, and only if you know it. Nothing goes to group, friends or strangers. Opening a crafter list asks the guild.",
+  "guild members with the addon who switched receiving on. Asked who can make a recipe, you whisper an answer to the asker, and only if you know it. Nothing goes to group, friends or strangers. Opening a crafter list asks the guild.",
   "they find out who in the guild can craft an item.",
   "They keep your list for up to 14 days or until they delete it. Withdrawing makes everyone online delete it, members who are offline keep it until it expires.",
 }, {
   "deine Berufe mit Stufe und Maximum und die dort bekannten Rezepte als Zahlen. Nur der Charakter, den du spielst. Ein Beruf erscheint, sobald du sein Fenster öffnest.",
-  "Gildenmitglieder mit Addon und Empfangen an. Bei einer Rezept-Frage flüsterst du nur dem Fragenden, nur bei bekanntem Rezept. Nichts geht an Gruppe, Freunde oder Fremde. Eine Hersteller-Liste fragt die Gilde.",
-  "sie sehen, wer in der Gilde einen Gegenstand herstellen kann.",
-  "Sie behalten deine Liste bis zu 14 Tage oder bis zum Löschen. Beim Widerruf löschen Online-Spieler sie sofort, Offline-Spieler bis Ablauf.",
+  "Gildenmitglieder mit Addon und Empfangen an. Bei einer Rezeptfrage flüsterst du nur dem Fragenden, nur bei bekanntem Rezept. Nichts geht an Gruppe, Freunde oder Fremde. Eine Herstellerliste fragt die Gilde.",
+  "sie sehen, wer in der Gilde ein Item herstellen kann.",
+  "Sie behalten deine Liste bis zu 14 Tage oder bis zum Löschen. Beim Widerruf löschen Onlinespieler sie sofort, Offlinespieler bis Ablauf.",
 })
 add("gmShare", { "Share GildenManager", "GildenManager teilen" }, {
   "Join dates, marks and notes to your officers.",
@@ -194,15 +228,15 @@ add("gmShare", { "Share GildenManager", "GildenManager teilen" }, {
   "Sent: join dates, marks and notes, as you choose.",
   "Gesendet wird: Beitrittsdaten, Markierungen und Notizen, wie du wählst.",
 }, {
-  "the categories you switch on in the GildenManager: join dates of members (day, accuracy, source), the marks returned and inactive, and your own notes. Notes are off until you choose them and can hold private text.",
+  "the categories you switch on in the GildenManager: join dates of members (day, accuracy, source), the marks returned and inactive, your own notes and, with its own sending switch, your ban list (name, reason, day, who added it). Notes and bans are off until you choose them and can hold private text.",
   "guild members with the GildenManager, by default in the officer chat. In the guild chat every member sees it. Only senders of the rank you set and above are accepted.",
   "officers use what others know about members without typing it again.",
   "They find your data in an inbox and adopt or discard each entry. Nothing is applied by itself and nothing typed by hand is overwritten.",
 }, {
-  "die Kategorien, die du im GildenManager einschaltest: Beitrittsdaten der Mitglieder (Tag, Genauigkeit, Quelle), die Markierungen zurückgekehrt und inaktiv und deine eigenen Notizen. Notizen sind aus, bis du sie wählst, und können Privates enthalten.",
-  "Gildenmitglieder mit dem GildenManager, standardmäßig im Offizierschat. Im Gildenchat sieht es jedes Mitglied. Angenommen wird nur von Absendern des eingestellten Rangs und besser.",
+  "die Kategorien, die du im Manager einschaltest: Beitrittsdaten (Tag, Genauigkeit, Quelle), die Markierungen zurückgekehrt und inaktiv, eigene Notizen und mit eigenem Schalter die Banliste (Name, Grund, Tag, wer). Notizen und Bans sind aus, bis du sie wählst, und können Privates enthalten.",
+  "Gildenmitglieder mit dem GildenManager, standardmäßig im Offizierschat. Im Gildenchat sieht es jedes Mitglied. Angenommen wird nur ab dem eingestellten Rang.",
   "Offiziere nutzen, was andere über Mitglieder wissen, ohne es neu einzutippen.",
-  "Sie finden deine Daten in einem Eingang und übernehmen oder verwerfen jeden Eintrag. Nichts wird von selbst angewendet und nichts von Hand Eingetragenes überschrieben.",
+  "Sie finden deine Daten im Eingang und übernehmen oder verwerfen jeden Eintrag. Nichts wird von selbst angewendet und nichts von Hand Eingetragenes überschrieben.",
 })
 add("chatPeer", { "Chat extras", "Chat-Extras" }, {
   "Typing, seen and reactions with addon users you whisper.",
@@ -212,28 +246,28 @@ add("chatPeer", { "Chat extras", "Chat-Extras" }, {
   "Gesendet wird: Zeichen für Tippen, Gesehen und Reaktion, nie Nachrichtentext.",
 }, {
   "signs only: that you type (on or off), a 5 character mark of the line you read, or a mark of a line with the number of a reaction symbol. The mark is made from the text and the time of the line, the text cannot be read from it. Never a message text.",
-  "only the addon user of the whisper chat that is open in the messenger, and only if he sent such a sign first or made himself recognizable. Other addons on both computers can read the signs.",
+  "only the addon user of the whisper chat that is open in the messenger, and only if they sent such a sign first or made themselves recognizable. Other addons on both computers can read the signs.",
   'the messenger shows "typing", "seen" and your reactions at the lines.',
   "They show the signs and do not store them. Switching off removes the display at once, a goodbye sign tells partners to remove yours.",
 }, {
-  "nur Zeichen: dass du tippst (an oder aus), eine 5-stellige Marke der Zeile, die du gelesen hast, oder die Marke einer Zeile mit der Nummer eines Reaktionssymbols. Die Marke entsteht aus Text und Zeit der Zeile, den Text kann man daraus nicht lesen. Nie ein Nachrichtentext.",
-  "nur der Addon-Nutzer des Flüster-Chats, der im Messenger offen ist, und nur wenn er zuerst ein solches Zeichen geschickt hat oder sich erkennbar gemacht hat. Andere Addons auf beiden Rechnern können die Zeichen lesen.",
-  'der Messenger zeigt "tippt", "gesehen" und deine Reaktionen an den Zeilen.',
+  "nur Zeichen: dass du tippst (an oder aus), eine 5-stellige Marke der Zeile, die du gelesen hast, oder die Marke einer Zeile mit der Nummer eines Reaktionssymbols. Die Marke entsteht aus Text und Zeit der Zeile, den Text kannst du daraus nicht ablesen. Nie ein Nachrichtentext.",
+  "nur der Addon-Nutzer des Flüsterchats, der im Messenger offen ist, und nur wenn er zuerst ein solches Zeichen geschickt hat oder sich erkennbar gemacht hat. Andere Addons auf beiden Rechnern können die Zeichen lesen.",
+  "der Messenger zeigt „tippt“, „gesehen“ und deine Reaktionen an den Zeilen.",
   "Sie zeigen die Zeichen an und speichern sie nicht. Ausschalten entfernt die Anzeige sofort, ein Abschiedszeichen sagt Partnern, dass sie deine entfernen sollen.",
 }, false)
-add("teamChat", { "Team chats", "Team-Chats" }, {
+add("teamChat", { "Team chats", "Teamchats" }, {
   "Messages and invitations of your teams with addon users.",
   "Nachrichten und Einladungen deiner Teams mit Addon-Nutzern.",
 }, {
   "Sent: team messages, invitations and team data.",
-  "Gesendet wird: Team-Nachrichten, Einladungen und Teamdaten.",
+  "Gesendet wird: Teamnachrichten, Einladungen und Teamdaten.",
 }, {
   "your team messages as plain text, your name for the team, its symbol and the member list, invitations you write, and the answers to them.",
   "only the members of your teams and the players you invite, one hidden addon message per person. Other addons on both computers can read the messages.",
   "you chat with your team like in a group, and members who were offline fetch what they missed from you.",
   "They keep the history of a team on their computer for at most 30 days and 500 messages and delete it when they leave. Admins can change the name, the symbol and the members.",
 }, {
-  "deine Team-Nachrichten als reiner Text, dein Name für das Team, sein Symbol und die Mitgliederliste, Einladungen, die du schreibst, und die Antworten darauf.",
+  "deine Teamnachrichten als reiner Text, dein Name für das Team, sein Symbol und die Mitgliederliste, Einladungen, die du schreibst, und die Antworten darauf.",
   "nur die Mitglieder deiner Teams und die Spieler, die du einlädst, je eine versteckte Addon-Nachricht pro Person. Andere Addons auf beiden Rechnern können die Nachrichten lesen.",
   "du chattest mit deinem Team wie in einer Gruppe, und Mitglieder, die offline waren, holen bei dir nach, was sie verpasst haben.",
   "Sie speichern den Verlauf eines Teams höchstens 30 Tage und 500 Nachrichten auf ihrem Rechner und löschen ihn beim Verlassen. Admins können Name, Symbol und Mitglieder ändern.",
@@ -261,6 +295,8 @@ add(
 local audiences = {
   group = { "Group", "Gruppe" },
   guild = { "Guild", "Gilde" },
+  friends = { "Friends", "Freunde" },
+  bnfriends = { "Battle.net friends", "Battle.net-Freunde" },
   chat = { "Chat", "Chat" },
   world = { "World", "Welt" },
 }
@@ -271,12 +307,16 @@ local flags = {
   send = {
     group = { "Send to group", "An Gruppe senden" },
     guild = { "Send to guild", "An Gilde senden" },
+    friends = { "Send to friends", "An Freunde senden" },
+    bnfriends = { "Send to Battle.net friends", "An Battle.net-Freunde senden" },
     chat = { "Send in chat", "Im Chat senden" },
     world = { "Send to world", "An Welt senden" },
   },
   receive = {
     group = { "Receive from group", "Aus Gruppe empfangen" },
     guild = { "Receive from guild", "Aus Gilde empfangen" },
+    friends = { "Receive from friends", "Von Freunden empfangen" },
+    bnfriends = { "Receive from Battle.net friends", "Von Battle.net-Freunden empfangen" },
     chat = { "Receive from chat", "Aus Chat empfangen" },
     world = { "Receive from world", "Aus Welt empfangen" },
   },
@@ -290,25 +330,25 @@ end
 local shared = {
   ["consent.title"] = { "Share data with other addon users", "Daten mit anderen Addon-Nutzern teilen" },
   ["consent.default"] = {
-    "Off by default. Nothing is sent or received until you switch it on here.",
-    "Standard aus. Nichts wird gesendet oder empfangen, bevor du es hier einschaltest.",
+    "Off by default, except chat links. Everything else waits until you switch it on.",
+    "Standard aus, außer bei Chat-Links. Alles andere wartet, bis du es einschaltest.",
   },
   ["consent.count"] = { "On: %d of %d", "Aktiv: %d von %d" },
   ["consent.withdrawAll"] = { "Switch everything off", "Alles ausschalten" },
   ["consent.withdrawAll.title"] = { "Switch everything off", "Alles ausschalten" },
   ["consent.withdrawAll.confirm"] = {
-    "Switch off all sharing for this account? Sending stops at once. Deleted: presence, logos, guild map, crafter directory, and item levels and professions that came from add-on messages. The open invitations of Teams and the open entries of the GildenManager go as well. Teams and saved chats stay, you delete them in the messenger. GildenManager entries you adopted stay.",
-    "Alles Teilen für dieses Konto ausschalten? Senden endet sofort. Gelöscht werden Anwesenheit, Logos, Gildenkarte, Hersteller-Verzeichnis sowie Itemlevel und Berufe aus Addon-Nachrichten. Auch die offenen Einladungen der Teams und die offenen Einträge im GildenManager verschwinden. Teams und gespeicherte Chats bleiben, du löschst sie im Messenger. Übernommene Einträge im GildenManager bleiben.",
+    "Switch off all sharing for this account? Sending stops at once. Deleted: presence, logos, guild map, crafter directory, and item levels and professions that came from addon messages. The open invitations of Teams and the open entries of the GildenManager go as well. Teams and saved chats stay, you delete them in the messenger. GildenManager entries you adopted stay.",
+    "Alles Teilen für dieses Konto ausschalten? Senden endet sofort. Gelöscht werden Anwesenheit, Logos, Gildenkarte, Herstellerverzeichnis sowie Itemlevel und Berufe aus Addon-Nachrichten. Auch die offenen Einladungen der Teams und die offenen Einträge im GildenManager verschwinden. Teams und gespeicherte Chats bleiben, du löschst sie im Messenger. Übernommene Einträge im GildenManager bleiben.",
   },
-  ["consent.privacy"] = { "Privacy info", "Datenschutz-Info" },
+  ["consent.privacy"] = { "Privacy info", "Datenschutzinfo" },
   ["consent.privacy.hint"] = { "Select the text and copy it with Ctrl+C", "Text markieren und mit Strg+C kopieren" },
   ["consent.privacy.body"] = {
     "Sharing with other addon users is off until you switch it on, per function, direction and audience. Sending and receiving are separate.\n"
-      .. "Data goes from player to player through the chat servers of Blizzard. Nothing is sent to the author of the add-on or to a website.\n"
+      .. "Data goes from player to player through the chat servers of Blizzard. Nothing is sent to the author of the addon or to a website.\n"
       .. "Other players in the channel and their addons can read the messages. Receivers store names, realms and values on their computer.\n"
       .. "Whoever receives a guild function sends one small question to the guild (who is there?) with no data about themselves. Whoever has sending on answers it, at most once per function and minute.\n"
       .. "You can switch off at any time, it takes effect at once. Copies others have stored stay with them.\n"
-      .. "This text describes what the add-on does. It is not legal advice.",
+      .. "This text describes what the addon does. It is not legal advice.",
     "Teilen mit anderen Addon-Nutzern ist aus, bis du es einschaltest, je Funktion, Richtung und Zielgruppe. Senden und Empfangen sind getrennt.\n"
       .. "Die Daten gehen von Spieler zu Spieler über die Chat-Server von Blizzard. Sie gehen nie an den Entwickler des Addons oder an eine Website.\n"
       .. "Andere Spieler im Kanal und ihre Addons können die Nachrichten mitlesen. Empfänger speichern Namen, Realms und Werte auf ihrem Rechner.\n"
@@ -317,12 +357,17 @@ local shared = {
       .. "Dieser Text beschreibt, was das Addon tut. Er ist keine Rechtsberatung.",
   },
   ["consent.empty"] = {
-    "No function is available yet. Functions appear here once they are part of the add-on.",
+    "No function is available yet. Functions appear here once they are part of the addon.",
     "Noch keine Funktion verfügbar. Funktionen erscheinen hier, sobald sie Teil des Addons sind.",
   },
   ["consent.send"] = { "Send", "Senden" },
   ["consent.receive"] = { "Receive", "Empfangen" },
   ["consent.since"] = { "since %s", "seit %s" },
+  -- Shown instead of the date while the player never chose (Consent.DEFAULT_ON); requests and answers stay off.
+  ["consent.default.on.send"] = { "Default: share click on", "Standard: Klick-Teilen an" },
+  ["consent.default.on.receive"] = { "Default: links on", "Standard: Links an" },
+  ["consent.default.version.send"] = { "Default: on", "Standard: an" },
+  ["consent.default.version.receive"] = { "Default: on", "Standard: an" },
   ["consent.scope"] = { "For this character", "Für diesen Charakter" },
   ["consent.scope.account"] = { "Like account", "Wie Konto" },
   ["consent.scope.char"] = { "Own setting", "Eigene Einstellung" },
@@ -365,11 +410,11 @@ local shared = {
     "Die Funktion ist noch nicht gestartet. Sie startet mit dem ersten Schalter.",
   },
   ["consent.why.roster"] = {
-    "The guild list is still loading, the add-on waits for it.",
+    "The guild list is still loading, the addon waits for it.",
     "Die Gildenliste lädt noch, das Addon wartet darauf.",
   },
   ["consent.why.trial"] = {
-    "This looks like a trial account. Trial accounts cannot send add-on messages, and the game reports no error.",
+    "This looks like a trial account. Trial accounts cannot send addon messages, and the game reports no error.",
     "Das sieht nach einem Probekonto aus. Probekonten können keine Addon-Nachrichten senden, das Spiel meldet dabei keinen Fehler.",
   },
   ["consent.why.combat"] = { "Paused in combat.", "Pausiert im Kampf." },
@@ -377,11 +422,11 @@ local shared = {
   ["consent.why.afk"] = { "Paused while you are away.", "Pausiert, solange du abwesend bist." },
   ["consent.why.hidden"] = { "You are hidden, nothing is sent.", "Du bist unsichtbar, es wird nichts gesendet." },
   ["consent.why.restricted"] = {
-    "The game blocks add-on messages right now (restriction).",
+    "The game blocks addon messages right now (restriction).",
     "Das Spiel sperrt Addon-Nachrichten gerade (Einschränkung).",
   },
   ["consent.why.throttle"] = {
-    "Send limit reached, the add-on waits.",
+    "Send limit reached, the addon waits.",
     "Sendegrenze erreicht, das Addon wartet.",
   },
   ["consent.why.refused"] = {
@@ -389,19 +434,19 @@ local shared = {
     "Das Spiel hat die letzte Nachricht abgelehnt. /fg diag share nennt den Code.",
   },
   ["consent.why.silent"] = {
-    "Nobody with the add-on has answered yet. Either nobody in the guild sends this function, or they play on trial accounts.",
+    "Nobody with the addon has answered yet. Either nobody in the guild sends this function, or they play on trial accounts.",
     "Noch hat niemand mit dem Addon geantwortet. Entweder sendet niemand in der Gilde diese Funktion, oder es sind Probekonten.",
   },
   ["consent.why.inactive"] = { "Not active right now.", "Gerade nicht aktiv." },
   ["consent.why.empty"] = { "There is nothing to send yet.", "Es gibt noch nichts zu senden." },
   ["consent.bulk.title"] = { "Switch on all", "Alle einschalten" },
   ["consent.bulk.confirm.send"] = {
-    "Switch on sending for %d functions?\nOther add-on users in the matching channels can then receive your data.\nDetails: Privacy info. You can switch off at any time.",
-    "Senden für %d Funktionen einschalten?\nAndere Addon-Nutzer in den passenden Kanälen können deine Daten dann empfangen.\nDetails: Datenschutz-Info. Du kannst jederzeit ausschalten.",
+    "Switch on sending for %d functions?\nOther addon users in the matching channels can then receive your data.\nDetails: Privacy info. You can switch off at any time.",
+    "Senden für %d Funktionen einschalten?\nAndere Addon-Nutzer in den passenden Kanälen können deine Daten dann empfangen.\nDetails: Datenschutzinfo. Du kannst jederzeit ausschalten.",
   },
   ["consent.bulk.confirm.receive"] = {
-    "Switch on receiving for %d functions?\nData of other add-on users is then stored on your computer.\nDetails: Privacy info. You can switch off at any time.",
-    "Empfangen für %d Funktionen einschalten?\nDaten anderer Addon-Nutzer werden dann auf deinem Rechner gespeichert.\nDetails: Datenschutz-Info. Du kannst jederzeit ausschalten.",
+    "Switch on receiving for %d functions?\nThe addon then stores data of other addon users on your computer.\nDetails: Privacy info. You can switch off at any time.",
+    "Empfangen für %d Funktionen einschalten?\nDaten anderer Addon-Nutzer speichert das Addon dann auf deinem Rechner.\nDetails: Datenschutzinfo. Du kannst jederzeit ausschalten.",
   },
   ["consent.bulk.confirm.aud"] = {
     "All audiences of these functions are included.",
@@ -409,17 +454,17 @@ local shared = {
   },
   ["consent.chat.title"] = { "Chat lines in your name", "Chat-Zeilen in deinem Namen" },
   ["consent.chat.hint"] = {
-    "The add-on writes these lines into normal chat. Everyone in the channel sees them, not only addon users. You change them at the function.",
+    "The addon writes these lines into normal chat. Everyone in the channel sees them, not only addon users. You change them at the function.",
     "Das Addon schreibt diese Zeilen in den normalen Chat. Alle im Kanal sehen sie, nicht nur Addon-Nutzer. Ändern kannst du sie bei der Funktion.",
   },
-  ["consent.chat.reset"] = { "Instance reset to group", "Instanz-Reset an Gruppe" },
+  ["consent.chat.reset"] = { "Instance reset to group", "Instanzreset an Gruppe" },
   ["consent.chat.xp"] = { "Level-up line to", "Stufenaufstieg an" },
   ["consent.chat.invite"] = { "Reply to invite requests", "Antwort auf Einladungen" },
   ["consent.chat.none"] = { "nobody", "niemanden" },
   ["consent.chat.say"] = { "Say", "Sagen" },
   ["consent.chat.inspect"] = {
-    "Reading the group: item level of group members comes from the inspect function of the game. No add-on message is sent. The switch is under Guild and contacts.",
-    "Gruppe lesen: Das Itemlevel von Gruppenmitgliedern kommt aus der Betrachten-Funktion des Spiels. Es wird keine Addon-Nachricht gesendet. Der Schalter steht unter Gilde und Kontakte.",
+    "Reading the group: item level of group members comes from the inspect function of the game. The addon sends no message. The switch is under Guild and contacts.",
+    "Gruppe lesen: Das Itemlevel von Gruppenmitgliedern kommt aus der Betrachten-Funktion des Spiels. Das Addon sendet dabei keine Nachricht. Der Schalter steht unter Gilde und Kontakte.",
   },
   ["consent.chat.who"] = {
     "Who query: only after your click. It asks the game server about one contact and sends nothing to addon users.",

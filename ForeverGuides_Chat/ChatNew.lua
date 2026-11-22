@@ -35,13 +35,7 @@ local function try(fn, ...)
 end
 
 local function homeRealm()
-  for _, name in ipairs({ "GetNormalizedRealmName", "GetRealmName" }) do
-    local realm = try(global(name))
-    if type(realm) == "string" and realm ~= "" then
-      return realm
-    end
-  end
-  return nil
+  return FG.Realm.Get()
 end
 
 -- Rules (no frames) ---------------------------------------------------------------------------------------------

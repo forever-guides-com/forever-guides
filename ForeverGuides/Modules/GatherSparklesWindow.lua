@@ -18,20 +18,20 @@ ns.AddLocale("enUS", {
   ["sparkles.win.kindTip"] = "Shows and edits the effect for this kind of object.",
   ["sparkles.win.style"] = "Choose a style",
   ["sparkles.win.chosen"] = "Chosen: %s",
-  ["sparkles.win.tileTip"] = "Click to use this style for %s.",
+  ["sparkles.win.tileTip"] = "Uses this style for %s.",
   ["sparkles.win.autoTip"] = "Automatic uses %s for this kind.",
   ["sparkles.win.noPreview"] = "No preview",
   ["sparkles.win.autoName"] = "%s (%s)",
 })
 ns.AddLocale("deDE", {
-  ["sparkles.win.title"] = "Sammelstellen-Effekte",
+  ["sparkles.win.title"] = "Effekte für Sammelpunkte",
   ["sparkles.win.close"] = "Fenster schließen",
   ["sparkles.win.kinds"] = "Objektarten",
   ["sparkles.win.kindTip"] = "Zeigt und bearbeitet den Effekt dieser Objektart.",
   ["sparkles.win.style"] = "Stil wählen",
   ["sparkles.win.chosen"] = "Gewählt: %s",
-  ["sparkles.win.tileTip"] = "Klicken, um diesen Stil für %s zu nutzen.",
-  ["sparkles.win.autoTip"] = "Automatisch nimmt für diese Art %s.",
+  ["sparkles.win.tileTip"] = "Wählt diesen Stil für %s.",
+  ["sparkles.win.autoTip"] = "Automatisch verwendet für diese Art %s.",
   ["sparkles.win.noPreview"] = "Keine Vorschau",
   ["sparkles.win.autoName"] = "%s (%s)",
 })
@@ -270,7 +270,7 @@ local function newTile(parent, index)
   tile.markBack:SetDrawLayer("OVERLAY", 6)
   tile.markBack:SetSize(18, 18)
   tile.markBack:SetPoint("TOPRIGHT", tile.preview, "TOPRIGHT", -2, -2)
-  tile.markBack:SetColorTexture(0, 0, 0, 0.75)
+  tile.markBack:SetColorTexture(ns.Theme.scrim(0.75))
   tile.markFrame = CreateFrame("Frame", nil, tile.preview)
   tile.markFrame:SetAllPoints(tile.markBack)
   tile.mark = W.CheckMark(tile.markFrame, 14, "accent2")

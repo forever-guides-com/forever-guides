@@ -19,18 +19,17 @@ ns.AddLocale("enUS", {
   ["invite.chat.failed"] = "Invite failed: %s (%s)",
   ["invite.reply.group"] = "Inviting you, %s.",
   ["invite.reply.guild"] = "Guild invite for you, %s.",
-  ["invite.why.no-api"] = "Not available in this client.",
-  ["invite.why.combat"] = "Not possible in combat.",
-  ["invite.why.offline"] = "The player is offline.",
-  ["invite.why.faction"] = "The player belongs to the other faction.",
-  ["invite.why.in-group"] = "The player is already in your group.",
-  ["invite.why.group-full"] = "Your group is full.",
-  ["invite.why.not-leader"] = "Only the group leader can invite.",
-  ["invite.why.error"] = "The game refused the invite.",
+  ["invite.why.no-api"] = "Not available in this client",
+  ["invite.why.combat"] = "Not possible in combat",
+  ["invite.why.offline"] = "Player offline",
+  ["invite.why.faction"] = "Other faction",
+  ["invite.why.in-group"] = "Already in group",
+  ["invite.why.group-full"] = "Group full",
+  ["invite.why.not-leader"] = "Not group leader",
+  ["invite.why.error"] = "Refused by the game",
   ["invite.fb.line"] = "%s whispered %s: %s",
   ["invite.fb.invited"] = "invited to the group",
   ["invite.fb.guild-ready"] = "guild invite is ready, click the button on screen",
-  ["invite.fb.guild-waiting"] = "in combat, the guild invite waits until it ends",
   ["invite.fb.guild-sent"] = "invited to the guild",
   ["invite.fb.guild-blocked"] = "the game blocked the direct call, click the button once more",
   ["invite.fb.guild-secure"] = "guild invite command sent, the game reports the result",
@@ -68,21 +67,20 @@ ns.AddLocale("deDE", {
   ["invite.chat.failed"] = "Einladung fehlgeschlagen: %s (%s)",
   ["invite.reply.group"] = "Ich lade dich ein, %s.",
   ["invite.reply.guild"] = "Gildeneinladung für dich, %s.",
-  ["invite.why.no-api"] = "In diesem Client nicht verfügbar.",
-  ["invite.why.combat"] = "Im Kampf nicht möglich.",
-  ["invite.why.offline"] = "Der Spieler ist offline.",
-  ["invite.why.faction"] = "Der Spieler gehört zur anderen Fraktion.",
-  ["invite.why.in-group"] = "Der Spieler ist schon in deiner Gruppe.",
-  ["invite.why.group-full"] = "Deine Gruppe ist voll.",
-  ["invite.why.not-leader"] = "Nur der Gruppenleiter kann einladen.",
-  ["invite.why.error"] = "Das Spiel hat die Einladung abgelehnt.",
+  ["invite.why.no-api"] = "In diesem Client nicht verfügbar",
+  ["invite.why.combat"] = "Im Kampf nicht möglich",
+  ["invite.why.offline"] = "Spieler offline",
+  ["invite.why.faction"] = "Andere Fraktion",
+  ["invite.why.in-group"] = "Schon in der Gruppe",
+  ["invite.why.group-full"] = "Gruppe voll",
+  ["invite.why.not-leader"] = "Kein Gruppenleiter",
+  ["invite.why.error"] = "Vom Spiel abgelehnt",
   ["invite.fb.line"] = "%s hat %s geflüstert: %s",
   ["invite.fb.invited"] = "in die Gruppe eingeladen",
   ["invite.fb.guild-ready"] = "Gildeneinladung bereit, klicke den Knopf auf dem Bildschirm",
-  ["invite.fb.guild-waiting"] = "im Kampf, die Gildeneinladung wartet bis zum Kampfende",
   ["invite.fb.guild-sent"] = "in die Gilde eingeladen",
   ["invite.fb.guild-blocked"] = "das Spiel hat den direkten Aufruf blockiert, klicke den Knopf noch einmal",
-  ["invite.fb.guild-secure"] = "Gilden-Einladungsbefehl gesendet, das Spiel meldet das Ergebnis",
+  ["invite.fb.guild-secure"] = "Befehl für die Gildeneinladung gesendet, das Spiel meldet das Ergebnis",
   ["invite.fb.guild-link"] = "das Spiel nimmt diese Einladung nur an, wenn du sie selbst eingibst: kopiere den Befehl aus dem Fenster (Strg+C), füge ihn im Chat ein (Strg+V) und drücke Enter, oder tippe /ginvite %s",
   ["invite.menu.guild"] = "In die Gilde einladen (Befehl kopieren)",
   ["invite.fb.guild-combat"] = "im Kampf, die Gildeneinladung wartet",
@@ -504,7 +502,7 @@ local function reply(kind, cfg, name, battleNetId)
   if battleNetId then
     protected("BNSendWhisper", battleNetId, text)
   else
-    protected("SendChatMessage", text, "WHISPER", nil, name)
+    pcall(ns.ChatSafe.Send, text, "WHISPER", name)
   end
 end
 
@@ -663,7 +661,7 @@ local function process(kind, text, sender, guid, label, battleNetId, missing)
             ns.InvitePrompt.OpenCopy(target)
           end
         elseif state ~= "queued" then
-          feedback(cfg, who, keyword, state == "ready" and "guild-ready" or "guild-waiting")
+          feedback(cfg, who, keyword, "guild-ready")
         end
       else
         result, reason = "failed", why

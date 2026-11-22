@@ -45,13 +45,25 @@ end
 
 -- Choices ---------------------------------------------------------------------------------------
 
+-- True for an instance whose first floor is made of minimap pieces (floor.mm): it has no tile art to draw on.
+-- Dalaran is mixed: floor 1 is a crop, the composed Underbelly follows it and is not offered.
+local function composed(entry)
+  return type(entry) == "table" and type(entry.floors) == "table" and entry.floors[1] ~= nil and entry.floors[1].mm == true
+end
+
 -- Number of floors with a map of a DungeonAssets name (0: none yet, "map coming soon").
 function DM.FloorCount(key)
   local entry = assets()[key]
-  if not entry or entry.soon or type(entry.floors) ~= "table" then
+  if not entry or entry.soon or type(entry.floors) ~= "table" or composed(entry) then
     return 0
   end
-  return #entry.floors
+  local count = 0
+  for _, floor in ipairs(entry.floors) do
+    if not floor.mm then
+      count = count + 1
+    end
+  end
+  return count
 end
 
 -- "Floor 2", or the name the data gives the floor.
@@ -105,8 +117,8 @@ end
 
 local function instanceChoices()
   local names, list = instanceNames(), {}
-  for key in pairs(assets()) do
-    if D.validMapKey(key) then
+  for key, entry in pairs(assets()) do
+    if D.validMapKey(key) and not composed(entry) then
       local floors = DM.FloorCount(key)
       local n = names[key]
       local sub = L["dmap.soon"]

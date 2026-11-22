@@ -16,9 +16,9 @@ ns.AddLocale("enUS", {
   ["zb.legend"] = "Zone transition",
   ["zb.legend.guess"] = "Zone transition, estimated",
   ["zb.failed"] = "The map could not be switched.",
-  ["zb.combat"] = "The map cannot be switched in combat.",
+  ["zb.combat"] = "The map cannot be switched right now.",
   ["zb.set.world"] = "Show zone transitions in the world map",
-  ["zb.set.addon"] = "Show zone transitions on the add-on map",
+  ["zb.set.addon"] = "Show zone transitions on the addon map",
   ["zb.set.guess"] = "Show estimated zone transitions",
   ["zb.set.guessHint"] = "An estimated arrow sits in the middle of a shared border, not at a road, and only between zones that a walking path joins in the travel data. Dashed on the map. A real crossing replaces the estimates of its zone pair.",
   ["zb.state.estimated"] = "Estimated, no confirmed path",
@@ -28,14 +28,14 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["zb.levels"] = "Stufen %d-%d",
-  ["zb.hint"] = "Klicken: Karte wechseln",
+  ["zb.hint"] = "Klick: Karte wechseln",
   ["zb.legend"] = "Zonenübergang",
   ["zb.legend.guess"] = "Zonenübergang, geschätzt",
   ["zb.failed"] = "Die Karte ließ sich nicht wechseln.",
-  ["zb.combat"] = "Im Kampf lässt sich die Karte nicht wechseln.",
+  ["zb.combat"] = "Die Karte lässt sich gerade nicht wechseln.",
   ["zb.set.world"] = "Zonenübergänge in der Weltkarte anzeigen",
   ["zb.set.addon"] = "Zonenübergänge auf der Addon-Karte anzeigen",
-  ["zb.set.guess"] = "Geschätzte Zonenübergänge zeigen",
+  ["zb.set.guess"] = "Geschätzte Zonenübergänge anzeigen",
   ["zb.set.guessHint"] = "Ein geschätzter Pfeil sitzt in der Mitte einer gemeinsamen Grenze, nicht an einer Straße, und nur zwischen Zonen, die in den Reisedaten ein Laufweg verbindet. Auf der Karte gestrichelt. Ein echter Übergang ersetzt die geschätzten Pfeile seines Zonenpaars.",
   ["zb.state.estimated"] = "geschätzt, kein bestätigter Weg",
   ["zb.state.recorded"] = "aufgenommen",
@@ -611,13 +611,14 @@ function ZBL.TooltipLines(arrow, L, T, hintKey)
 end
 
 -- What a click on an arrow of Blizzard's world map does with the map the window shows: "switch" (the neighbour
--- becomes the shown map), "same" (it is shown already), "combat" and "blocked" (the client does not let this
--- add-on touch the map now, nothing is called) or "invalid" (the arrow has no usable UiMapID).
-function ZBL.WorldClickPlan(target, shown, inCombat, allowed)
+-- becomes the shown map), "same" (it is shown already), "combat" (in combat with a protected map) and "blocked"
+-- (the client does not let this add-on touch the map now, nothing is called) or "invalid" (the arrow has no
+-- usable UiMapID). Combat alone does not block: an unprotected map the client allows may switch.
+function ZBL.WorldClickPlan(target, shown, inCombat, allowed, protected)
   if type(target) ~= "number" or target ~= target or target <= 0 or target % 1 ~= 0 then
     return "invalid"
   end
-  if inCombat then
+  if inCombat and protected then
     return "combat"
   end
   if not allowed then

@@ -30,10 +30,10 @@ ns.AddLocale("enUS", {
   ["wp.export"] = "Export...",
   ["wp.clear"] = "Remove all",
   ["wp.clearTip"] = "Removes every waypoint that is not pinned.",
-  ["wp.empty"] = "No waypoints: paste coordinates or click Set here.",
+  ["wp.empty"] = "No waypoints yet. Paste coordinates or click \"Set here\".",
   ["wp.pinned"] = "pinned",
   ["wp.act.remove"] = "Remove waypoint",
-  ["wp.act.pin"] = "Pin (stays after Remove all and on arrival)",
+  ["wp.act.pin"] = "Pin: stays after \"Remove all\" and on arrival",
   ["wp.act.unpin"] = "Unpin",
   ["wp.act.share"] = "Share",
   ["wp.act.edit"] = "Edit title, note and color",
@@ -63,11 +63,33 @@ ns.AddLocale("enUS", {
   ["wp.set.heading"] = "Arrow and behavior",
   ["wp.set.arrow"] = "Show the arrow",
   ["wp.set.radius"] = "Arrival radius",
-  ["wp.set.autoClear"] = "Remove a waypoint when I arrive",
-  ["wp.set.autoClearHint"] = "Pinned stay, the next waypoint becomes active.",
-  ["wp.set.native"] = "Also mark it on the world map",
-  ["wp.set.nativeHint"] = "Active waypoint as the game map pin.",
-  ["wp.set.nativeMissing"] = "Client has no map pins, no effect.",
+  ["wp.set.autoClear"] = "Remove waypoint on arrival",
+  ["wp.set.autoClearHint"] = "Pinned waypoints stay. The next waypoint becomes active.",
+  ["wp.set.keepOnArrival"] = "Keep the marker at the last target",
+  ["wp.set.keepOnArrivalHint"] = "The marker does not disappear on arrival. It stays until you remove the waypoint. A route still moves on stop by stop.",
+  ["wp.set.native"] = "Also set a pin on the world map",
+  ["wp.set.nativeHint"] = "Shows the active waypoint as a pin on the game's world map.",
+  ["wp.set.nativeMissing"] = "This game version has no map pins. The setting has no effect.",
+  ["wp.set.screenNav"] = "On-screen navigation",
+  ["wp.set.screenNavHint"] = "Shows a marker with light beam, distance and arrival time at the target in the world, plus an arrow at the screen edge while the target is off screen. Turns on the game setting for it and restores it when you switch this off. Without it, only the arrow window guides you.",
+  ["wp.set.navBeam"] = "Light beam",
+  ["wp.set.navMarker"] = "Show marker in the world",
+  ["wp.set.navNear"] = "Close to the target",
+  ["wp.set.navNear.keep"] = "No change",
+  ["wp.set.navNear.marker"] = "Hide the light beam",
+  ["wp.set.navNear.native"] = "Show the game's pin",
+  ["wp.set.navNearDistance"] = "Distance to the target",
+  ["wp.set.navNearHint"] = "Switches to the chosen display within this distance of the target.",
+  ["wp.set.navReplaceQuest"] = "Replace the quest marker",
+  ["wp.set.navReplaceQuestHint"] = "Shows the addon marker instead of the game's diamond for your tracked quest. Needs on-screen navigation.",
+  ["wp.set.navBeamHeight"] = "Beam height",
+  ["wp.set.navBeamHeight.edge"] = "Up to the top of the screen",
+  ["wp.set.navBeamHeight.short"] = "Short",
+  ["wp.set.navBeamHeight.medium"] = "Medium",
+  ["wp.set.navBeamHeight.long"] = "Long",
+  ["wp.set.adopt"] = "Adopt game map pins",
+  ["wp.set.adoptHint"] = "A pin you set in the game (on the map, at a flight point, from a shared link) becomes a waypoint in the addon. Removing the pin in the game removes the waypoint too.",
+  ["wp.set.navSize"] = "Marker size",
   ["wp.set.locked"] = "Lock the arrow position",
   ["wp.set.scale"] = "Arrow size",
   ["wp.set.look"] = "Arrow window appearance...",
@@ -76,8 +98,8 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["page.waypoints"] = "Wegpunkte",
   ["wp.title"] = "Wegpunkte",
-  ["wp.close"] = "Wegpunkt-Liste schließen",
-  ["wp.grip"] = "Ziehen zum Skalieren",
+  ["wp.close"] = "Wegpunktliste schließen",
+  ["wp.grip"] = "Ziehen, um die Größe zu ändern",
   ["wp.tab.list"] = "Liste",
   ["wp.tab.settings"] = "Einstellungen",
   ["wp.input.placeholder"] = "Koordinaten oder /way-Text einfügen",
@@ -89,10 +111,10 @@ ns.AddLocale("deDE", {
   ["wp.export"] = "Exportieren...",
   ["wp.clear"] = "Alle entfernen",
   ["wp.clearTip"] = "Entfernt jeden Wegpunkt, der nicht angeheftet ist.",
-  ["wp.empty"] = "Keine Wegpunkte: Koordinaten einfügen oder Hier setzen.",
+  ["wp.empty"] = "Noch keine Wegpunkte. Füge Koordinaten ein oder klicke auf „Hier setzen“.",
   ["wp.pinned"] = "angeheftet",
   ["wp.act.remove"] = "Wegpunkt entfernen",
-  ["wp.act.pin"] = "Anheften (bleibt nach Alle entfernen und bei Ankunft)",
+  ["wp.act.pin"] = "Anheften: bleibt nach „Alle entfernen“ und bei Ankunft",
   ["wp.act.unpin"] = "Lösen",
   ["wp.act.share"] = "Teilen",
   ["wp.act.edit"] = "Titel, Notiz und Farbe ändern",
@@ -123,14 +145,36 @@ ns.AddLocale("deDE", {
   ["wp.set.arrow"] = "Pfeil anzeigen",
   ["wp.set.radius"] = "Ankunftsradius",
   ["wp.set.autoClear"] = "Wegpunkt bei Ankunft entfernen",
-  ["wp.set.autoClearHint"] = "Angeheftete bleiben, der nächste Wegpunkt wird aktiv.",
-  ["wp.set.native"] = "Zusätzlich auf der Weltkarte markieren",
-  ["wp.set.nativeHint"] = "Aktiver Wegpunkt als Kartenmarkierung des Spiels.",
-  ["wp.set.nativeMissing"] = "Client ohne Kartenmarkierung, ohne Wirkung.",
+  ["wp.set.autoClearHint"] = "Angeheftete Wegpunkte bleiben. Der nächste Wegpunkt wird aktiv.",
+  ["wp.set.keepOnArrival"] = "Markierung am letzten Ziel behalten",
+  ["wp.set.keepOnArrivalHint"] = "Die Markierung bleibt bei Ankunft bestehen und verschwindet erst, wenn du den Wegpunkt entfernst. Eine Route geht trotzdem Stopp für Stopp weiter.",
+  ["wp.set.native"] = "Zusätzlich Pin auf der Weltkarte setzen",
+  ["wp.set.nativeHint"] = "Zeigt den aktiven Wegpunkt als Pin auf der Weltkarte des Spiels.",
+  ["wp.set.nativeMissing"] = "Diese Spielversion hat keine Kartenpins. Die Einstellung hat keine Wirkung.",
+  ["wp.set.screenNav"] = "Bildschirmnavigation",
+  ["wp.set.screenNavHint"] = "Zeigt am Ziel in der Spielwelt eine Markierung mit Lichtstrahl, Entfernung und Ankunftszeit, am Bildschirmrand einen Pfeil, solange das Ziel außerhalb des Bildes liegt. Schaltet dafür die Spieleinstellung ein und setzt sie beim Ausschalten zurück. Ohne sie führt nur das Pfeilfenster.",
+  ["wp.set.navBeam"] = "Lichtstrahl",
+  ["wp.set.navMarker"] = "Markierung in der Spielwelt anzeigen",
+  ["wp.set.navNear"] = "Nahe am Ziel",
+  ["wp.set.navNear.keep"] = "Keine Änderung",
+  ["wp.set.navNear.marker"] = "Lichtstrahl ausblenden",
+  ["wp.set.navNear.native"] = "Pin des Spiels anzeigen",
+  ["wp.set.navNearDistance"] = "Entfernung zum Ziel",
+  ["wp.set.navNearHint"] = "Wechselt innerhalb dieser Entfernung zum Ziel auf die gewählte Anzeige.",
+  ["wp.set.navReplaceQuest"] = "Questmarkierung ersetzen",
+  ["wp.set.navReplaceQuestHint"] = "Zeigt die Markierung des Addons statt der Raute des Spiels für die verfolgte Quest. Braucht die Bildschirmnavigation.",
+  ["wp.set.navBeamHeight"] = "Höhe des Lichtstrahls",
+  ["wp.set.navBeamHeight.edge"] = "Bis zum oberen Bildschirmrand",
+  ["wp.set.navBeamHeight.short"] = "Kurz",
+  ["wp.set.navBeamHeight.medium"] = "Mittel",
+  ["wp.set.navBeamHeight.long"] = "Lang",
+  ["wp.set.adopt"] = "Kartenpins des Spiels übernehmen",
+  ["wp.set.adoptHint"] = "Ein Pin, den du im Spiel setzt (auf der Karte, an einem Flugpunkt, über einen geteilten Link), wird zu einem Wegpunkt im Addon. Entfernst du den Pin im Spiel, verschwindet der Wegpunkt mit.",
+  ["wp.set.navSize"] = "Größe der Markierung",
   ["wp.set.locked"] = "Position des Pfeils sperren",
-  ["wp.set.scale"] = "Pfeil-Größe",
-  ["wp.set.look"] = "Aussehen des Pfeil-Fensters...",
-  ["wp.set.lookHint"] = "Erst Wegpunkt setzen, dann Pfeil-Fenster anpassen.",
+  ["wp.set.scale"] = "Pfeilgröße",
+  ["wp.set.look"] = "Aussehen des Pfeilfensters...",
+  ["wp.set.lookHint"] = "Setze zuerst einen Wegpunkt, dann kannst du das Pfeilfenster anpassen.",
 })
 
 -- Dialogs --------------------------------------------------------------------------------------
@@ -309,6 +353,38 @@ local function distanceText(wp)
   return yards and WL.formatDistance(yards, ns.GetActiveLocale()) or ""
 end
 
+local rowMenu
+
+-- Context menu of a row: Next (to the top), pin, remove; shares the menu of the map pins.
+local function openRowMenu(wp, row)
+  rowMenu = rowMenu or ns.MapMarkers.NewMenu({
+    {
+      id = "next",
+      key = "map.marker.next",
+      run = function(w)
+        WP.MoveToTop(w.id)
+      end,
+    },
+    {
+      id = "pin",
+      keyFor = function(w)
+        return w.pinned and "map.marker.unpin" or "map.marker.pin"
+      end,
+      run = function(w)
+        WP.SetPinned(w.id, not w.pinned)
+      end,
+    },
+    {
+      id = "remove",
+      key = "map.marker.remove",
+      run = function(w)
+        WP.Remove(w.id)
+      end,
+    },
+  })
+  rowMenu.Open(wp, row)
+end
+
 local function bindRow(wp)
   local active = WP.data().active == wp.id
   local sub = string.format("%s · %s", WP.MapName(wp.map), WL.coordText(wp.x, wp.y))
@@ -425,11 +501,13 @@ local function buildList(pane, view)
   view.buttons:SetPoint("TOPLEFT", input, "BOTTOMLEFT", 0, -6)
   view.buttons:SetPoint("TOPRIGHT", input, "BOTTOMRIGHT", 0, -6)
   view.list = K.NewList(pane, {
-    rowHeight = 42,
+    look = "boxed",
+    rowHeight = 44,
     bind = bindRow,
     onClick = function(wp)
       WP.Activate(wp.id)
     end,
+    onRightClick = openRowMenu,
   })
   view.list:SetPoint("TOPLEFT", view.buttons, "BOTTOMLEFT", 0, -6)
   view.list:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", 0, 0)
@@ -479,12 +557,37 @@ local function buildSettings(pane, view)
   view.stack:Add(radius, { height = 42, gap = 10 })
   view.controls[#view.controls + 1] = radius
   addToggle(view, "wp.set.autoClear", "autoClear", "wp.set.autoClearHint")
+  addToggle(view, "wp.set.keepOnArrival", "keepOnArrival", "wp.set.keepOnArrivalHint")
   addToggle(
     view,
     "wp.set.native",
     "nativeMarker",
     ns.can.userWaypoint and "wp.set.nativeHint" or "wp.set.nativeMissing"
   )
+  addToggle(view, "wp.set.adopt", "adoptNative", "wp.set.adoptHint")
+  addToggle(view, "wp.set.screenNav", "screenNav", "wp.set.screenNavHint")
+  addToggle(view, "wp.set.navBeam", "navBeam")
+  local beamHeight = WP.BeamHeightDropdown(view.content)
+  view.stack:Add(beamHeight, { height = 46, width = 240, gap = 10 })
+  view.controls[#view.controls + 1] = beamHeight
+  local navSize = W.Slider(view.content, {
+    key = "wp.set.navSize",
+    min = 50,
+    max = 200,
+    step = 5,
+    applyOn = "release",
+    get = function()
+      return math.floor(WP.Settings().navSize * 100 + 0.5)
+    end,
+    set = function(v)
+      WP.SetSetting("navSize", v / 100)
+    end,
+    format = function(v)
+      return string.format("%d%%", v)
+    end,
+  })
+  view.stack:Add(navSize, { height = 42, gap = 10 })
+  view.controls[#view.controls + 1] = navSize
   addToggle(view, "wp.set.locked", "locked")
   local scale = W.Slider(view.content, {
     key = "wp.set.scale",

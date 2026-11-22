@@ -37,14 +37,14 @@ ns.AddLocale("enUS", {
 ns.AddLocale("deDE", {
   ["page.durability"] = "Haltbarkeit",
   ["dur.win.title"] = "Haltbarkeit",
-  ["dur.win.close"] = "Haltbarkeits-Fenster schließen",
+  ["dur.win.close"] = "Haltbarkeitsfenster schließen",
   ["dur.win.open"] = "Im Addon öffnen",
   ["dur.win.scaleTip"] = "Ziehen verschiebt, {key:windowScale} ändert die Größe.",
-  ["dur.win.grip"] = "Zum Ändern der Größe ziehen",
+  ["dur.win.grip"] = "Ziehen, um die Größe zu ändern",
   ["dur.page.intro"] = "Zustand deiner Ausrüstung: Symbol, Prozent und ein Balken je Teil. Die Werte aktualisieren sich nach Kämpfen, Reparaturen und beim Wechsel der Ausrüstung.",
   ["dur.page.window"] = "In einem Fenster öffnen",
   ["dur.page.settings"] = "Einstellungen",
-  ["binding.durability"] = "Haltbarkeits-Fenster ein oder aus",
+  ["binding.durability"] = "Haltbarkeitsfenster ein oder aus",
 })
 
 local frame
@@ -459,7 +459,7 @@ ns.RegisterPage({
   aliases = { "haltbarkeit", "durability", "reparatur", "repair", "ausruestung", "ausrüstung", "equipment", "armor" },
   build = function(container)
     local view = ns.NewPageView(container)
-    ns.AddParagraph(view, "dur.page.intro")
+    ns.AddIntro(view, "dur.page.intro")
     view.stack:Add(
       W.Action(view.content, {
         label = "act.open",

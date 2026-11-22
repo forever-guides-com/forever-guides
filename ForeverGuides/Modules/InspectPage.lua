@@ -163,8 +163,8 @@ ns.AddLocale(
     ["gs.quick.talents"] = "Talents",
     ["gs.quick.guild"] = "Guild",
     ["gs.setting.heading"] = "Inspect",
-    ["gs.setting.panel"] = "Short view at the inspect window",
-    ["gs.setting.panel.tip"] = "Main totals next to the window.",
+    ["gs.setting.panel"] = "Short view beside the inspect window",
+    ["gs.setting.panel.tip"] = "Shows the main totals next to the window.",
   })
 )
 ns.AddLocale(
@@ -176,7 +176,7 @@ ns.AddLocale(
     ["gs.slots"] = "Ausrüstung",
     ["gs.totals"] = "Summen (aus Ausrüstung berechnet)",
     ["gs.info"] = "Aus Ausrüstung berechnet",
-    ["gs.info.text"] = "Nur Ausrüstung: ohne Talente, Buffs, Setboni und Basiswerte\nStat: Wert vom Item\nText: aus Tooltip-Zeile gelesen",
+    ["gs.info.text"] = "Nur Ausrüstung: ohne Talente, Buffs, Setboni und Basiswerte\nStat: Wert vom Item\nText: aus Tooltipzeile gelesen",
     ["gs.note.gear"] = "Nur Ausrüstung: ohne Talente, Buffs, Setboni und Basiswerte",
     ["gs.note.uncached"] = "%d Items noch nicht geladen",
     ["gs.group.primary"] = "Primärwerte",
@@ -207,8 +207,8 @@ ns.AddLocale(
     ["gs.quick.talents"] = "Talente",
     ["gs.quick.guild"] = "Gilde",
     ["gs.setting.heading"] = "Betrachten",
-    ["gs.setting.panel"] = "Kurzansicht am Betrachten-Fenster",
-    ["gs.setting.panel.tip"] = "Wichtigste Summen neben dem Fenster.",
+    ["gs.setting.panel"] = "Kurzansicht neben dem Betrachten-Fenster",
+    ["gs.setting.panel.tip"] = "Zeigt die wichtigsten Summen neben dem Fenster.",
   })
 )
 
@@ -683,13 +683,13 @@ local function newCell(parent, slotId)
   cell.icon:SetPoint("BOTTOMRIGHT", cell, "BOTTOMRIGHT", -ICON_INSET, ICON_INSET)
   cell.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
   cell.strip = cell:CreateTexture(nil, "ARTWORK")
-  cell.strip:SetColorTexture(0, 0, 0, 0.6)
+  cell.strip:SetColorTexture(ns.Theme.scrim(0.6))
   cell.flag = cell:CreateTexture(nil, "ARTWORK")
-  cell.flag:SetColorTexture(0, 0, 0, 0.7)
+  cell.flag:SetColorTexture(ns.Theme.scrim(0.7))
   cell.border = W.Border(cell, "white", 0.25, 2)
   local hover = cell:CreateTexture(nil, "HIGHLIGHT")
   hover:SetAllPoints()
-  hover:SetColorTexture(1, 1, 1, 0.12)
+  hover:SetColorTexture(Theme.fillColor("hover"))
   cell.level = W.Text(cell, { role = "micro", color = "text" })
   cell.level:SetPoint("BOTTOMLEFT", cell, "BOTTOMLEFT", ICON_INSET + 1, ICON_INSET + 1)
   cell.sockets = W.Text(cell, { role = "micro", color = "danger", justify = "RIGHT" })
@@ -1618,6 +1618,7 @@ end)
 
 ns.RegisterPage({
   id = "inspect",
+  shareable = false,
   order = 220,
   group = "character",
   title = "page.inspect",

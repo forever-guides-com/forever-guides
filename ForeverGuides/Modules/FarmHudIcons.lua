@@ -9,8 +9,11 @@ local Icons = {}
 ns.FarmHudIcons = Icons
 
 -- Seconds between two looks at the frames already hidden (add-ons show their buttons again) and between two
--- searches for new ones (the search walks every frame of the game).
+-- quick searches for new ones (children of the minimap, LibDBIcon). The walk over every frame of the game runs
+-- in slices of WALK_SLICE frames per tick, so it never stalls one frame, and starts again WALK_PAUSE seconds
+-- after it ended.
 local RECHECK, DISCOVER = 0.5, 2
+local WALK_SLICE, WALK_PAUSE = 150, 10
 
 -- Game frames that stay: the minimap itself, its ping, the compass and the buffs and trackers that hang near the
 -- cluster. Every other frame on the minimap is hidden, the game's own buttons (tracking, mail, zoom, zone text,
@@ -33,6 +36,8 @@ local KINDS = { Button = true, CheckButton = true, Frame = true }
 local HOPS, ICON_MAX, POINTS_MAX = 3, 64, 16
 
 local hidden, hiddenSet = {}, {}
+-- Walk over every frame: nil = waiting, false = start at the first frame, else the last frame looked at.
+local walkCursor, sinceWalk = nil, 0
 local sinceRecheck, sinceDiscover = 0, 0
 
 local function call(fn, ...)
@@ -150,10 +155,27 @@ local function take(f)
   end
 end
 
--- Every shown frame or small texture of other add-ons that hangs on the minimap, hidden and remembered.
-function Icons.Sweep()
-  local list, rootSet = roots()
-  local own = ownFrame()
+-- One frame of the walk over every frame: shown and anchored to the minimap.
+local function anchoredShown(f, rootSet, own)
+  local ok, hangs = pcall(function()
+    return call(f.IsShown, f) == true and reaches(f, rootSet, own, HOPS)
+  end)
+  return ok and hangs
+end
+
+local function hideFound(found, rootSet, own)
+  for _, f in ipairs(found) do
+    -- One odd frame never aborts the sweep.
+    pcall(function()
+      if kept(f, rootSet, own) == nil then
+        take(f)
+      end
+    end)
+  end
+end
+
+-- The frames that are cheap to find: children of the minimap roots, textures on the minimap, LibDBIcon buttons.
+local function quickFound(list)
   local found = {}
   for _, root in ipairs(list) do
     local ok, children = pcall(function()
@@ -172,32 +194,64 @@ function Icons.Sweep()
       found[#found + 1] = region
     end
   end
-  local enumerate = rawget(_G, "EnumerateFrames")
-  if type(enumerate) == "function" then
-    local f = call(enumerate)
-    while f do
-      local ok, hangs = pcall(function()
-        return call(f.IsShown, f) == true and reaches(f, rootSet, own, HOPS)
-      end)
-      if ok and hangs then
-        found[#found + 1] = f
-      end
-      f = call(enumerate, f)
-    end
-  end
   local dbicon = call(rawget(_G, "LibStub"), "LibDBIcon-1.0", true)
   if type(dbicon) == "table" and type(dbicon.GetButtonList) == "function" then
     for _, name in ipairs(call(dbicon.GetButtonList, dbicon) or {}) do
       found[#found + 1] = call(dbicon.GetMinimapButton, dbicon, name)
     end
   end
-  for _, f in ipairs(found) do
-    -- One odd frame never aborts the sweep.
-    pcall(function()
-      if kept(f, rootSet, own) == nil then
-        take(f)
+  return found
+end
+
+-- The children, textures and LibDBIcon buttons on the minimap, hidden and remembered. Cheap enough for every tick.
+function Icons.QuickSweep()
+  local list, rootSet = roots()
+  hideFound(quickFound(list), rootSet, ownFrame())
+end
+
+-- Every shown frame or small texture of other add-ons that hangs on the minimap, hidden and remembered. Walks
+-- every frame of the game at once: only for entering the HUD and the diagnosis, the tick walks in slices.
+function Icons.Sweep()
+  local list, rootSet = roots()
+  local own = ownFrame()
+  local found = quickFound(list)
+  local enumerate = rawget(_G, "EnumerateFrames")
+  if type(enumerate) == "function" then
+    local f = call(enumerate)
+    while f do
+      if anchoredShown(f, rootSet, own) then
+        found[#found + 1] = f
       end
-    end)
+      f = call(enumerate, f)
+    end
+  end
+  hideFound(found, rootSet, own)
+  walkCursor, sinceWalk = nil, 0
+end
+
+-- Goes on with the walk over every frame for at most WALK_SLICE frames. A frame never goes away in the game, so
+-- the cursor stays valid between ticks.
+local function walkStep()
+  local enumerate = rawget(_G, "EnumerateFrames")
+  if type(enumerate) ~= "function" then
+    return
+  end
+  local _, rootSet = roots()
+  local own = ownFrame()
+  local found = {}
+  local f = walkCursor == false and call(enumerate) or call(enumerate, walkCursor)
+  local n = 0
+  while f and n < WALK_SLICE do
+    if anchoredShown(f, rootSet, own) then
+      found[#found + 1] = f
+    end
+    n = n + 1
+    walkCursor = f
+    f = call(enumerate, f)
+  end
+  hideFound(found, rootSet, own)
+  if not f then
+    walkCursor, sinceWalk = nil, 0
   end
 end
 
@@ -240,9 +294,17 @@ end
 function Icons.Tick(dt)
   dt = tonumber(dt) or 0
   sinceRecheck, sinceDiscover = sinceRecheck + dt, sinceDiscover + dt
+  if walkCursor ~= nil then
+    walkStep()
+  else
+    sinceWalk = sinceWalk + dt
+    if sinceWalk >= WALK_PAUSE then
+      walkCursor = false
+    end
+  end
   if sinceDiscover >= DISCOVER then
     sinceRecheck, sinceDiscover = 0, 0
-    Icons.Sweep()
+    Icons.QuickSweep()
   elseif sinceRecheck >= RECHECK then
     sinceRecheck = 0
     for _, f in ipairs(hidden) do
@@ -258,6 +320,7 @@ function Icons.Restore()
   local list = hidden
   hidden, hiddenSet = {}, {}
   sinceRecheck, sinceDiscover = 0, 0
+  walkCursor, sinceWalk = nil, 0
   for _, f in ipairs(list) do
     pcall(f.Show, f)
   end

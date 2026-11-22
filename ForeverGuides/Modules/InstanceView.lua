@@ -8,7 +8,11 @@ local W, L, Theme, R, K = ns.W, ns.L, ns.Theme, ns.RefLogic, ns.PageKit
 
 ns.AddLocale("enUS", {
   ["instances.map"] = "Map",
-  ["instances.map.tip"] = "Show the entrance on the world map",
+  ["instances.banner.facts"] = "Key facts",
+  ["instances.split.back"] = "‹ Back to the list",
+  ["instances.split.back.tip"] = "Returns to the list (Esc).",
+  ["instances.tabs.more"] = "More",
+  ["instances.map.tip"] = "Shows the entrance on the world map.",
   ["instances.map.none"] = "No entrance position in the data for this instance.",
   ["instances.dtab.items"] = "Items",
   ["instances.head.quests.one"] = "1 quest",
@@ -22,16 +26,16 @@ ns.AddLocale("enUS", {
   ["instances.bosses.rare"] = "rare",
   ["instances.spell.unknown"] = "Spell %d",
   ["instances.spell.unknownMeta"] = "not known to this client",
-  ["instances.items.loot"] = "No loot tables in the data yet.\nItems you find yourself are recorded by the loot capture.",
+  ["instances.items.loot"] = "No loot tables in the data yet.\nThe loot capture records items you find yourself.",
   ["instances.items.open"] = "Open loot capture",
   ["instances.items.none"] = "No items recorded for this instance yet.",
   ["instances.items.from"] = "Reward for: %s",
   ["instances.quest.weak"] = "Weakly confirmed: no quest ID in the data, details may be incomplete.",
   ["instances.gap.badge"] = "Data incomplete",
   ["instances.gap.title"] = "Data incomplete",
-  ["instances.gap.hint"] = "Missing means not recorded yet, not that it does not exist.",
-  ["instances.gap.head"] = "Data stand: incomplete",
-  ["instances.gap.complete"] = "Data stand: nothing missing",
+  ["instances.gap.hint"] = "Missing only means not recorded yet. It may still exist.",
+  ["instances.gap.head"] = "Data status: incomplete",
+  ["instances.gap.complete"] = "Data status: nothing missing",
   ["instances.gap.id"] = "No game instance ID.",
   ["instances.gap.name"] = "Instance name in English only.",
   ["instances.gap.level"] = "Level not recorded.",
@@ -50,7 +54,11 @@ ns.AddLocale("enUS", {
 
 ns.AddLocale("deDE", {
   ["instances.map"] = "Karte",
-  ["instances.map.tip"] = "Eingang auf der Weltkarte zeigen",
+  ["instances.banner.facts"] = "Eckdaten",
+  ["instances.split.back"] = "‹ Zurück zur Liste",
+  ["instances.split.back.tip"] = "Zurück zur Liste (Esc).",
+  ["instances.tabs.more"] = "Mehr",
+  ["instances.map.tip"] = "Zeigt den Eingang auf der Weltkarte.",
   ["instances.map.none"] = "Für diese Instanz ist in den Daten kein Eingang erfasst.",
   ["instances.dtab.items"] = "Items",
   ["instances.head.quests.one"] = "1 Quest",
@@ -63,18 +71,18 @@ ns.AddLocale("deDE", {
   ["instances.bosses.position"] = "Boss %d von %d",
   ["instances.bosses.rare"] = "selten",
   ["instances.spell.unknown"] = "Zauber %d",
-  ["instances.spell.unknownMeta"] = "dem Client unbekannt",
-  ["instances.items.loot"] = "Noch keine Beutetabellen in den Daten.\nWas du selbst findest, erfasst die Beute-Erfassung.",
-  ["instances.items.open"] = "Beute-Erfassung öffnen",
+  ["instances.spell.unknownMeta"] = "diesem Client unbekannt",
+  ["instances.items.loot"] = "Noch keine Beutetabellen in den Daten.\nDie Beuteerfassung erfasst, was du selbst findest.",
+  ["instances.items.open"] = "Beuteerfassung öffnen",
   ["instances.items.none"] = "Für diese Instanz sind noch keine Items erfasst.",
   ["instances.items.from"] = "Belohnung für: %s",
   ["instances.quest.weak"] = "Schwach belegt: keine Quest-ID in den Daten, Angaben können unvollständig sein.",
   ["instances.gap.badge"] = "Daten unvollständig",
   ["instances.gap.title"] = "Daten unvollständig",
-  ["instances.gap.hint"] = "Fehlt heißt noch nicht erfasst, nicht dass es das nicht gibt.",
+  ["instances.gap.hint"] = "„Fehlt“ heißt nur: noch nicht erfasst. Es kann trotzdem existieren.",
   ["instances.gap.head"] = "Datenstand: unvollständig",
   ["instances.gap.complete"] = "Datenstand: nichts fehlt",
-  ["instances.gap.id"] = "Keine Spiel-Instanz-ID.",
+  ["instances.gap.id"] = "Keine Instanz-ID des Spiels.",
   ["instances.gap.name"] = "Instanzname nur auf Englisch.",
   ["instances.gap.level"] = "Stufe nicht erfasst.",
   ["instances.gap.levelRange"] = "Stufenbereich fehlt, nur die empfohlene Stufe ist bekannt.",
@@ -135,19 +143,24 @@ local function call(fn, ...)
   end
 end
 
+-- Name of an instance quest in the client language (the title of the game when the data has none).
+function IV.QuestName(q)
+  return ns.QuestNames and ns.QuestNames.Name(q) or ns.T(q.n)
+end
+
 -- Lines of one quest, the head line first. Shared by the quest text and the quest rows.
 function IV.QuestLines(q, byId)
   local function names(ids)
     local out = {}
     for _, id in ipairs(ids) do
-      out[#out + 1] = byId[id] and ns.T(byId[id].n) or ("#" .. id)
+      out[#out + 1] = byId[id] and IV.QuestName(byId[id]) or ("#" .. id)
     end
     return table.concat(out, ", ")
   end
   local lines = {
     Theme.hexText(
       "accent2",
-      string.format(L["instances.quest.head"], ns.T(q.n) or "?", IV.Plural(q.l), IV.Plural(q.rq))
+      string.format(L["instances.quest.head"], IV.QuestName(q) or "?", IV.Plural(q.l), IV.Plural(q.rq))
     ),
   }
   if q.sn then
@@ -271,7 +284,7 @@ function IV.Rewards(inst, faction)
           byId[r.id] = entry
         end
       end
-      entry.quests[#entry.quests + 1] = ns.T(q.n) or "?"
+      entry.quests[#entry.quests + 1] = IV.QuestName(q) or "?"
     end
   end
   return out
@@ -447,9 +460,10 @@ end
 
 -- Header ------------------------------------------------------------------------------------------
 
-local BAND_H = 120 -- height of the loading screen band, the name sits on a dark strip at its foot
-local STRIP_PAD = 8
-local BUTTON_H = 26
+local BUTTON_H = 22
+local CHIP_H = 22
+local CHIP_PAD = 8
+local ROW_GAP = 4
 
 -- Map button with the icon and the short label (W.Action). Without a place it stays focusable but
 -- dimmed and the tooltip says why (same rule as the dim list actions).
@@ -511,31 +525,126 @@ local function newGapButton(parent)
   return b
 end
 
--- Band with the loading screen and the name on a dark strip, below it the numbers and the buttons of the chosen
--- instance. fgGridLayout(width) places everything and returns the height, so a page Stack can hold it.
-function IV.Header(parent)
+-- One fact of the banner: a dark label with text.
+local function newChip(parent)
+  local c = CreateFrame("Frame", nil, parent)
+  c:SetHeight(CHIP_H)
+  c.fill = c:CreateTexture(nil, "BACKGROUND")
+  c.fill:SetAllPoints()
+  ns.Bind(c.fill, function(t)
+    t:SetColorTexture(Theme.scrim(Theme.highContrast() and 0.92 or 0.7))
+  end)
+  c.text = W.Text(c, { role = "ui", color = "text" })
+  c.text:SetPoint("CENTER")
+  return c
+end
+
+local function chipWidth(chip)
+  return math.ceil(chip.text:GetStringWidth()) + 2 * CHIP_PAD
+end
+
+-- Facts of the banner as { text } chips, in reading order: level entry, group size, counts, kill progress, and the
+-- mark of an announced instance. Plain words, so no fact depends on color.
+function IV.BannerChips(inst, faction)
+  local info = ns.InstanceLevelLogic.Of(inst, L)
+  local chips = {}
+  local second = {}
+  for _, bit in ipairs({ info.entryText or false, info.recommendedText or false }) do
+    if bit then
+      second[#second + 1] = bit
+    end
+  end
+  if #second > 0 then
+    chips[#chips + 1] = { text = table.concat(second, " · ") }
+  end
+  chips[#chips + 1] = { text = ns.InstanceListLogic.PlayersText(inst, L) }
+  local bosses = #(inst.bo or {})
+  local quests = #R.Quests(inst, faction)
+  chips[#chips + 1] = {
+    text = string.format(L["instances.bosses.count." .. (bosses == 1 and "one" or "other")], bosses)
+      .. " · "
+      .. string.format(L["instances.head.quests." .. (quests == 1 and "one" or "other")], quests),
+    counts = true,
+  }
+  local progress = ns.BossProgress and type(inst.id) == "number" and ns.BossProgress.WingSummary(inst) or nil
+  if progress then
+    chips[#chips + 1] = { text = ns.BossProgress.SummaryText(progress) }
+  end
+  if info.announced then
+    chips[#chips + 1] = {
+      text = Theme.hexText("warning", info.announcedText .. (info.releaseText and (" · " .. info.releaseText) or "")),
+    }
+  elseif info.releaseText then
+    chips[#chips + 1] = { text = Theme.hexText("textMuted", info.releaseText) }
+  end
+  return chips
+end
+
+-- Compact banner: the loading screen behind a dark gradient, left the name with "level · zone" (and the buttons
+-- "All instances" and "Reset" above it), right the fact chips, the map button and the data hint. The page measures
+-- it (:Measure) before it asks the layout logic and places it with :Apply(width, layout).
+-- opts.onBack: the click of the back button.
+function IV.Header(parent, opts)
   local f = CreateFrame("Frame", nil, parent)
   f.art = ns.InstanceArt.Create(f)
-  -- A child frame draws above the art, so the strip and the names live in one frame over it.
+  -- A child frame draws above the art, so the gradient and the texts live in one frame over it.
   f.over = CreateFrame("Frame", nil, f)
   f.over:SetFrameLevel(f.art:GetFrameLevel() + 2)
-  f.strip = f.over:CreateTexture(nil, "BACKGROUND")
-  f.strip:SetPoint("BOTTOMLEFT")
-  f.strip:SetPoint("BOTTOMRIGHT")
-  ns.Bind(f.strip, function(t)
-    -- At least 70 percent black behind the text (contrast on any picture), more in high contrast.
-    t:SetColorTexture(0, 0, 0, Theme.highContrast() and 0.92 or 0.78)
+  f.shade = f.over:CreateTexture(nil, "BACKGROUND")
+  f.shade:SetAllPoints()
+  ns.Bind(f.shade, function(t)
+    -- At least 60 percent black behind any text (AA contrast on every picture), more in high contrast.
+    local strong, weak = Theme.highContrast() and 0.95 or 0.88, Theme.highContrast() and 0.92 or 0.6
+    t:SetColorTexture(1, 1, 1, 1)
+    local color = rawget(_G, "CreateColor")
+    local ok = type(t.SetGradient) == "function"
+      and type(color) == "function"
+      and pcall(t.SetGradient, t, "HORIZONTAL", color(0, 0, 0, strong), color(0, 0, 0, weak))
+    if not ok then
+      t:SetColorTexture(Theme.scrim(strong))
+    end
   end)
-  f.name = W.Text(f.over, { role = "h2", family = "heading", color = "accent2", wrap = true })
-  f.alt = W.Text(f.over, { role = "ui", color = "textSecondary", wrap = true })
-  f.meta = W.Text(f, { role = "ui", color = "textSecondary", wrap = true })
-  f.mapButton = newMapButton(f, function()
+  f.name = W.Text(f.over, { role = "h2", family = "heading", color = "accent2" })
+  f.name:SetWordWrap(false)
+  f.sub = W.Text(f.over, { role = "ui", color = "textSecondary" })
+  f.sub:SetWordWrap(false)
+  f.back = W.Action(f.over, {
+    label = "instances.back",
+    icon = "chevron-left",
+    variant = "ghost",
+    height = BUTTON_H,
+    opens = false,
+    tooltip = "instances.back",
+    tooltipText = "instances.back.tip",
+    onClick = opts and opts.onBack,
+  })
+  f.reset = ns.InstanceReset.Button(f.over)
+  f.reset:SetVariant("ghost")
+  f.reset:SetHeight(BUTTON_H)
+  f.mapButton = newMapButton(f.over, function()
     local place = f.mapButton.fgPlace
     if place then
       K.PlaceOnMap(place)
     end
   end)
-  f.gapButton = newGapButton(f)
+  f.gapButton = newGapButton(f.over)
+  f.chips, f.chipData = {}, {}
+  f.summary = newChip(f.over)
+  f.summary:EnableMouse(true)
+  local function showFacts()
+    ns.ShowTooltip(f.summary, L["instances.banner.facts"], f.fgFactsTip or "")
+  end
+  f.summary:SetScript("OnEnter", showFacts)
+  f.summary:SetScript("OnLeave", ns.HideTooltip)
+  f.summary.fgName = function()
+    return f.summary.text:GetText()
+  end
+  f.summary.fgDescription = function()
+    return f.fgFactsTip
+  end
+  f.summary.fgOnFocus, f.summary.fgOnBlur = showFacts, ns.HideTooltip
+  ns.Focus.register(f.summary, function() end)
+  f.summary:Hide()
 
   function f:SetInstance(inst, faction)
     self:SetShown(inst ~= nil)
@@ -544,65 +653,161 @@ function IV.Header(parent)
     end
     -- self.inst keeps the last instance shown while the cards are on screen.
     self.inst = inst
-    local name, other = R.Names(inst.n)
-    self.name:SetText(name or "?")
-    self.alt:SetText(other or "")
-    self.alt:SetShown(other ~= nil)
-    self.meta:SetText(IV.HeadText(inst, faction))
+    local name = R.Names(inst.n)
+    self.name:SetText(IV.Dual(inst.n) or "?")
+    local info = ns.InstanceLevelLogic.Of(inst, L)
+    local zone = inst.loc and R.Names(inst.loc) or nil
+    self.sub:SetText(zone and (info.text .. " · " .. zone) or info.text)
+    self.chipData = IV.BannerChips(inst, faction)
+    local counts = ""
+    for i, data in ipairs(self.chipData) do
+      local chip = self.chips[i]
+      if not chip then
+        chip = newChip(self.over)
+        self.chips[i] = chip
+      end
+      chip.text:SetText(data.text)
+      if data.counts then
+        counts = data.text
+      end
+    end
+    -- The summary keeps the counts, the tooltip names every fact of the instance.
+    self.summary.text:SetText(counts .. " · …")
+    self.fgFactsTip = IV.HeadText(inst, faction)
     local entrance = IV.Entrance(inst)
     self.mapButton:SetPlace(
       entrance and { map = entrance.m, x = entrance.x, y = entrance.y, label = name or inst.n.en } or nil
     )
     self.gapButton.fgLines = IV.GapLines(inst)
-    self.gapButton:SetShown(#self.gapButton.fgLines > 0)
+    self.hasGap = #self.gapButton.fgLines > 0
     self.art:SetInstance(inst)
   end
 
-  function f:fgGridLayout(width)
-    -- The strip grows with the text (font size, second line), the band with the strip.
-    self.name:SetWidth(math.max(1, width - 2 * STRIP_PAD))
-    self.alt:SetWidth(math.max(1, width - 2 * STRIP_PAD))
-    local textH = math.ceil(self.name:GetStringHeight())
-    if self.alt:IsShown() then
-      textH = textH + 2 + math.ceil(self.alt:GetStringHeight())
+  -- Widths the layout logic needs: { nameW, chipWidths, actionW, summaryW }.
+  function f:Measure()
+    local chipWidths, actions = {}, {}
+    for i = 1, #self.chipData do
+      chipWidths[i] = chipWidth(self.chips[i])
     end
-    local stripH = textH + 2 * STRIP_PAD
-    local bandH = math.max(BAND_H, stripH + 16)
-    self.art:ClearAllPoints()
-    self.art:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-    self.art:Layout(width, bandH)
-    self.over:ClearAllPoints()
-    self.over:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
-    self.over:SetSize(width, bandH)
-    self.strip:SetHeight(stripH)
-    self.name:ClearAllPoints()
-    self.name:SetPoint("TOPLEFT", self.over, "BOTTOMLEFT", STRIP_PAD, stripH - STRIP_PAD)
-    if self.alt:IsShown() then
-      self.alt:ClearAllPoints()
-      self.alt:SetPoint("TOPLEFT", self.name, "BOTTOMLEFT", 0, -2)
-    end
-    local y = bandH + 8
-    self.meta:ClearAllPoints()
-    self.meta:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-    self.meta:SetWidth(width)
-    y = y + math.ceil(self.meta:GetStringHeight()) + 8
     self.mapButton:SetWidth(self.mapButton:Fit())
-    self.mapButton:ClearAllPoints()
-    self.mapButton:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
-    if self.gapButton:IsShown() then
-      local gapW = math.min(self.gapButton:Fit(width), width)
-      self.gapButton:SetWidth(gapW)
-      self.gapButton:ClearAllPoints()
-      if self.mapButton:GetWidth() + 8 + gapW <= width then
-        self.gapButton:SetPoint("LEFT", self.mapButton, "RIGHT", 8, 0)
+    actions[1] = self.mapButton:GetWidth()
+    if self.hasGap then
+      actions[2] = self.gapButton:Fit(400)
+    end
+    return {
+      nameW = math.ceil(self.name:GetStringWidth()),
+      buttonsW = self.back:Fit() + 6 + self.reset:Fit(),
+      chipWidths = chipWidths,
+      actionW = actions,
+      summaryW = chipWidth(self.summary),
+    }
+  end
+
+  -- Items of the right block in reading order: the chips (or the summary), the map button, the data hint.
+  local function rightItems(self, layout)
+    local items = {}
+    if not layout.bannerCollapsed then
+      if layout.chipsMode == "wrap" then
+        for i = 1, #self.chipData do
+          items[#items + 1] = self.chips[i]
+        end
       else
-        y = y + BUTTON_H + 6
-        self.gapButton:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -y)
+        items[#items + 1] = self.summary
       end
     end
-    y = y + BUTTON_H
-    self:SetHeight(y)
-    return y
+    if not layout.bannerCollapsed then
+      items[#items + 1] = self.mapButton
+      if self.hasGap then
+        items[#items + 1] = self.gapButton
+      end
+    end
+    return items
+  end
+
+  -- Places everything for a layout of the logic (width: the page column). Returns the height.
+  function f:Apply(width, layout)
+    local ILL = ns.InstanceLayoutLogic
+    local PADX, collapsed, h = ILL.BANNER_PAD, layout.bannerCollapsed, layout.bannerH
+    self.art:ClearAllPoints()
+    self.art:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    self.art:Layout(width, h)
+    self.over:ClearAllPoints()
+    self.over:SetPoint("TOPLEFT", self, "TOPLEFT", 0, 0)
+    self.over:SetSize(width, h)
+
+    -- Left block.
+    -- Both buttons keep their label while the row has room; the reset gives its label up first, then the back button.
+    local avail = width - 2 * PADX
+    local backW = self.back:Fit(avail - self.reset:Fit(0) - 6)
+    self.back:SetWidth(backW)
+    self.reset:SetWidth(self.reset:Fit(avail - backW - 6))
+    for _, frame in ipairs({ self.back, self.reset, self.name, self.sub }) do
+      frame:ClearAllPoints()
+    end
+    self.sub:SetShown(not collapsed)
+    local nameW = math.max(40, layout.nameW)
+    if collapsed then
+      self.back:SetPoint("LEFT", self.over, "LEFT", PADX, 0)
+      self.reset:SetPoint("LEFT", self.back, "RIGHT", 6, 0)
+      self.name:SetPoint("LEFT", self.reset, "RIGHT", 10, 0)
+      local used = self.back:GetWidth() + self.reset:GetWidth() + 3 * PADX + 6
+      self.name:SetWidth(math.max(40, math.min(nameW, width - used)))
+    else
+      self.back:SetPoint("TOPLEFT", self.over, "TOPLEFT", PADX, -6)
+      self.reset:SetPoint("LEFT", self.back, "RIGHT", 6, 0)
+      self.name:SetPoint("TOPLEFT", self.over, "TOPLEFT", PADX, -32)
+      self.name:SetWidth(nameW)
+      self.sub:SetPoint("TOPLEFT", self.name, "BOTTOMLEFT", 0, -2)
+      self.sub:SetWidth(nameW)
+    end
+
+    -- Right block, packed into lines and aligned to the right padding.
+    local items = rightItems(self, layout)
+    for i, chip in ipairs(self.chips) do
+      chip:SetShown(not collapsed and layout.chipsMode == "wrap" and i <= #self.chipData)
+    end
+    self.summary:SetShown(not collapsed and layout.chipsMode == "summary")
+    self.mapButton:SetShown(not collapsed)
+    self.gapButton:SetShown(self.hasGap == true and not collapsed)
+    local room = layout.chipRoom
+    local gap = ILL.CHIP_GAP
+    local widths, lines, line, x = {}, {}, {}, 0
+    for i, item in ipairs(items) do
+      local w = item:GetWidth()
+      if item == self.gapButton then
+        w = math.min(item:Fit(room), room)
+      elseif item ~= self.mapButton then
+        w = chipWidth(item)
+      end
+      item:SetWidth(w)
+      widths[i] = w
+      if x > 0 and x + w > room then
+        lines[#lines + 1], line, x = line, {}, 0
+      end
+      line[#line + 1] = i
+      x = x + w + gap
+    end
+    lines[#lines + 1] = line
+    local blockH = #lines * BUTTON_H + (#lines - 1) * ROW_GAP
+    local top = math.max(2, math.floor((h - blockH) / 2))
+    if layout.bannerStacked then
+      top = ILL.BANNER_H + ILL.STACK_GAP
+    end
+    for n, indexes in ipairs(lines) do
+      local lineW = -gap
+      for _, i in ipairs(indexes) do
+        lineW = lineW + widths[i] + gap
+      end
+      local cx = width - PADX - lineW
+      for _, i in ipairs(indexes) do
+        local item = items[i]
+        item:ClearAllPoints()
+        item:SetPoint("TOPLEFT", self.over, "TOPLEFT", cx, -(top + (n - 1) * (BUTTON_H + ROW_GAP)))
+        cx = cx + widths[i] + gap
+      end
+    end
+    self:SetSize(width, h)
+    return h
   end
 
   return f
@@ -616,7 +821,7 @@ local function newLine(row)
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(Theme.fillColor("line"))
   end)
 end
 
@@ -640,13 +845,18 @@ local function makeBossRow(parent, opts)
   -- Abilities known by name only (no spell ID): a plain line, no chips without a symbol.
   row.names = W.Text(row, { role = "micro", color = "textSecondary", wrap = true })
   newLine(row)
+  -- Page link of this boss (instances/<slug>/bosses/<eid>), hidden for a boss without an ID.
+  row.share = ns.PageShare.Button(row, {})
   -- Portrait and name open the 3D model of a boss that has one.
   row.modelPic = ns.BossModelWindow.Hotspot(row, row.portrait)
   row.modelName = ns.BossModelWindow.Hotspot(row, row.name, true)
 
   function row:fgLayout(width)
     local textX = IV.PORTRAIT + 12
-    local textW = math.max(40, width - textX)
+    local shareW = self.share:IsShown() and (self.share:GetWidth() + 8) or 0
+    local textW = math.max(40, width - textX - shareW)
+    self.share:ClearAllPoints()
+    self.share:SetPoint("TOPRIGHT", self, "TOPRIGHT", 0, -PAD)
     self.portrait:ClearAllPoints()
     self.portrait:SetPoint("TOPLEFT", self, "TOPLEFT", 0, -PAD)
     self.name:ClearAllPoints()
@@ -683,7 +893,7 @@ local function makeBossRow(parent, opts)
         y = y + math.ceil(self.names:GetStringHeight()) + 2
       end
     end
-    return math.max(IV.PORTRAIT + PAD * 2, y + PAD)
+    return math.max(IV.PORTRAIT + PAD * 2, y + PAD, self.share:IsShown() and (PAD * 2 + self.share:GetHeight()) or 0)
   end
   return row
 end
@@ -724,10 +934,19 @@ function IV.BossLevel(boss)
   return type(boss.lvl) == "number" and string.format(L["instances.bosses.level"], boss.lvl) or nil
 end
 
+-- Page link of a boss: instances/<slug>/bosses/<eid>, nil when the data has no encounter ID.
+function IV.BossSharePayload(inst, boss)
+  if not (inst and boss and type(boss.eid) == "number") then
+    return nil
+  end
+  return "instances/" .. R.InstanceSlug(inst) .. "/bosses/" .. boss.eid
+end
+
 -- item = { inst, boss, index }; heading rows also take position and total (place among the regular bosses) or
 -- rare = true.
 local function paintBossRow(row, item)
   local boss = item.boss
+  row.share:SetTarget(IV.BossSharePayload(item.inst, boss))
   local progress = IV.ProgressText(item.inst, item.index)
   if row.heading then
     row.name:SetText(IV.Dual(boss.n) or "?")
@@ -777,7 +996,7 @@ local function makeQuestRow(parent)
   local row = CreateFrame("Frame", nil, parent)
   row.title = W.Text(row, { role = "ui", color = "accent2", wrap = true })
   row.body = W.Text(row, { role = "ui", color = "textSecondary", wrap = true })
-  row.actions = W.MapActionButtons(row)
+  row.actions = W.MapActionButtons(row, { share = true })
   newLine(row)
 
   function row:fgLayout(width)
@@ -818,6 +1037,7 @@ local function paintQuestRow(row, item)
   row.body:SetShown(#body > 0)
   local place = q.m and q.x and q.y and { map = q.m, x = q.x, y = q.y, label = q.sn or ns.T(q.n) } or nil
   row.actions:SetPlace(place)
+  row.actions:SetShare(ns.QuestChainView.SharePayload(item.inst, { id = q.id }))
 end
 
 -- Pooled lists. Each one takes the instance and the faction ("A", "H" or nil) with :SetInstance.
@@ -861,7 +1081,7 @@ function IV.QuestList(parent)
       mixed = mixed or q.f == "A" or q.f == "H"
     end
     for _, q in ipairs(quests) do
-      items[#items + 1] = { quest = q, lines = IV.QuestLines(q, byId), mixed = mixed }
+      items[#items + 1] = { inst = inst, quest = q, lines = IV.QuestLines(q, byId), mixed = mixed }
     end
     self.count = #items
     self:Sync(items, paintQuestRow)

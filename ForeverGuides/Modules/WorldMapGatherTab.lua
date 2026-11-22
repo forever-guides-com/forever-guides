@@ -2,10 +2,10 @@
 -- explored look: its own switch with the banner of its data add-on, it does not depend on the spots. Then
 -- the spots: the main switch and below it the display choice of materials (ns.GatherFilterUI), which only
 -- applies while the main switch is on (dimmed, with a tooltip that says why, while it is off). The bar calls
--- Layout(avail) with the room it has and gets the height the tab needs; the list of materials takes what is
--- left and scrolls.
+-- Layout(avail) with the room it has and gets the height the tab needs. The choice of materials is one line
+-- per area with a button that opens its filter window (ns.GatherPick), so the tab stays short.
 local _, ns = ...
-local W, K = ns.W, ns.PageKit
+local W = ns.W
 local B = ns.BlizzardLinks
 
 local Tab = {}
@@ -16,28 +16,28 @@ ns.AddLocale("enUS", {
   ["wm.gather.show"] = "Show spots on the map",
   ["wm.gather.showTip"] = "Main switch for ore veins, herbs, chests and fishing schools on the zone map of this window. The choice of materials, chests and schools below only applies while it is on.",
   ["wm.gather.reveal"] = "Show map as explored",
-  ["wm.gather.revealTip"] = "Draws every area of a zone map as if you had explored it. Works on its own, independent of the spots. Off puts the normal look back.",
+  ["wm.gather.revealTip"] = "Draws every area of a zone map as if you had explored it. Works independently of the spots. Switching it off restores the normal look.",
   ["wm.gather.rares"] = "Rare enemy scanner (map, minimap, alert)",
-  ["wm.gather.raresTip"] = "Marks the known places of rare enemies on the zone map of this window. Hover a skull for level, elite status and loot.",
+  ["wm.gather.raresTip"] = "Marks the known places of rare enemies on the zone map of this window. Hover over a skull to see level, elite status and loot.",
   ["wm.gather.spots"] = "Spots",
   ["wm.gather.spotsOffTip"] = 'The spots are switched off. Switch on "Show spots on the map" first, then the choice below takes effect.',
   ["wm.gather.hint"] = "Spots and explored areas show on zone maps, not on the world or continent map.",
 })
 ns.AddLocale("deDE", {
   ["wm.gather.tab"] = "Sammeln",
-  ["wm.gather.show"] = "Fundorte auf der Karte zeigen",
+  ["wm.gather.show"] = "Fundorte auf der Karte anzeigen",
   ["wm.gather.showTip"] = "Hauptschalter für Erzadern, Kräuter, Truhen und Fischschwärme auf der Zonenkarte dieses Fensters. Die Auswahl von Materialien, Truhen und Schwärmen darunter wirkt nur, solange er an ist.",
-  ["wm.gather.reveal"] = "Karte als erkundet zeigen",
-  ["wm.gather.revealTip"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Wirkt für sich allein, unabhängig von den Fundorten. Aus stellt die normale Darstellung wieder her.",
+  ["wm.gather.reveal"] = "Karte als erkundet anzeigen",
+  ["wm.gather.revealTip"] = "Zeichnet jedes Gebiet einer Zonenkarte so, als hättest du es erkundet. Wirkt unabhängig von den Fundorten. Ausgeschaltet gilt wieder die normale Darstellung.",
   ["wm.gather.rares"] = "Scanner für seltene Gegner (Karte, Minimap, Hinweis)",
-  ["wm.gather.raresTip"] = "Markiert die bekannten Orte seltener Gegner auf der Zonenkarte dieses Fensters. Fahre über einen Totenkopf für Stufe, Elite-Status und Beute.",
+  ["wm.gather.raresTip"] = "Markiert die bekannten Orte seltener Gegner auf der Zonenkarte dieses Fensters. Fahre mit der Maus über einen Totenkopf, um Stufe, Elitestatus und Beute zu sehen.",
   ["wm.gather.spots"] = "Fundorte",
-  ["wm.gather.spotsOffTip"] = 'Die Fundorte sind ausgeschaltet. Schalte zuerst "Fundorte auf der Karte zeigen" ein, dann wirkt die Auswahl darunter.',
+  ["wm.gather.spotsOffTip"] = 'Die Fundorte sind ausgeschaltet. Schalte zuerst „Fundorte auf der Karte anzeigen“ ein, dann wirkt die Auswahl darunter.',
   ["wm.gather.hint"] = "Fundorte und erkundete Gebiete erscheinen auf Zonenkarten, nicht auf der Welt- oder Kontinentkarte.",
 })
 
 local CHECK_H, GAP = 22, 4
-local MIN_ROWS = 3
+local LABEL_INSET = 24 -- box (16) plus the gap to the label (8)
 
 local function on(path)
   return ns.Store.get(path) ~= false
@@ -67,8 +67,22 @@ function Tab.Create(parent, width, opts)
     B.LeaveFocusRing(c)
     return c
   end
+  -- Long labels wrap into a second line instead of being cut; returns the row height.
+  local function place(c, y)
+    c:ClearAllPoints()
+    c:SetPoint("TOPLEFT", c:GetParent(), "TOPLEFT", 0, -y)
+    c:SetWidth(width)
+    c.label:ClearAllPoints()
+    c.label:SetPoint("LEFT", c.box, "RIGHT", 8, 0)
+    local h = math.max(CHECK_H, W.FitLabel(c.label, width - LABEL_INSET) + 4)
+    c:SetHeight(h)
+    c:Refresh()
+    return h
+  end
   local show = check("wm.gather.show", "settings.gather.worldmap")
   local reveal = check("wm.gather.reveal", "settings.worldMapReveal")
+  local levels = check("zl.set.labels", "settings.mapZoneLevels")
+  levels.fgId = "wm-gather-levels"
   -- The quick switch of the map tab is the main switch of the scanner, so it also wakes it up from off.
   local rares = check("wm.gather.rares", "settings.rares")
   show.fgId, reveal.fgId, rares.fgId = "wm-gather-show", "wm-gather-reveal", "wm-gather-rares"
@@ -83,7 +97,7 @@ function Tab.Create(parent, width, opts)
   })
   local hint = W.Text(pg, { key = "wm.gather.hint", role = "micro", color = "textMuted", wrap = true })
   local spots = W.Text(pg, { key = "wm.gather.spots", role = "ui", family = "heading", color = "accent2" })
-  local filter = ns.GatherFilterUI.Build(pg, { leaveFocusRing = true })
+  local filter = ns.GatherFilterUI.Build(pg, { leaveFocusRing = true, windowed = true })
   local fishing = ns.WorldMapFishing.Build(pg, width, { relayout = relayout })
   -- Over the choice of materials while the spots are off: it takes the clicks and says why nothing happens.
   local shield = CreateFrame("Frame", nil, pg)
@@ -93,18 +107,11 @@ function Tab.Create(parent, width, opts)
   W.AttachTooltip(shield, "wm.gather.show", "wm.gather.spotsOffTip")
   shield:Hide()
 
-  function pg:Layout(avail)
+  function pg:Layout()
     local y = 0
-    reveal:ClearAllPoints()
-    reveal:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
-    reveal:SetWidth(width)
-    reveal:Refresh()
-    y = y + CHECK_H + GAP
-    rares:ClearAllPoints()
-    rares:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
-    rares:SetWidth(width)
-    rares:Refresh()
-    y = y + CHECK_H + GAP
+    y = y + place(reveal, y) + GAP
+    y = y + place(levels, y) + GAP
+    y = y + place(rares, y) + GAP
     local wanted = on("settings.worldMapReveal") and ns.MapReveal.BannerWanted(false)
     if banner:Update(wanted) then
       banner:ClearAllPoints()
@@ -119,11 +126,7 @@ function Tab.Create(parent, width, opts)
     spots:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
     spots:SetWidth(width)
     y = y + 16 + GAP
-    show:ClearAllPoints()
-    show:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
-    show:SetWidth(width)
-    show:Refresh()
-    y = y + CHECK_H + GAP
+    y = y + place(show, y) + GAP
     filter:ClearAllPoints()
     filter:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
     filter:SetWidth(width)
@@ -133,13 +136,7 @@ function Tab.Create(parent, width, opts)
     shield:SetShown(not spotsOn)
     fishing:Update()
     local fishingHeight = fishing:Layout(width)
-    -- The control needs its two rows of switches and a gap above the list; the list takes what the group
-    -- Fishing leaves, at least a few rows. A tab taller than the panel scrolls.
-    local rowH = K.scaledHeight(26)
-    local room = (avail or 0) - y - (ns.GatherFilterUI.TOP + 6) - fishingHeight - 2 * GAP
-    local rows = math.max(MIN_ROWS, math.min(ns.GatherFilterUI.LIST_ROWS, math.floor(room / rowH)))
-    local height = filter:SetListHeight(rows * rowH)
-    y = y + height + 2 * GAP
+    y = y + filter:Height() + 2 * GAP
     fishing:ClearAllPoints()
     fishing:SetPoint("TOPLEFT", pg, "TOPLEFT", 0, -y)
     pg:SetSize(width, y + fishingHeight)
@@ -149,6 +146,7 @@ function Tab.Create(parent, width, opts)
   pg.parts = {
     show = show,
     reveal = reveal,
+    levels = levels,
     rares = rares,
     banner = banner,
     hint = hint,

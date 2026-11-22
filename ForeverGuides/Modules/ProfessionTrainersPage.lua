@@ -4,7 +4,8 @@
 -- a position, a tooltip with the safety of the entry. Data: ns.ProfessionRouteData and
 -- ns.ProfessionTrainers (load-on-demand add-on), logic: ProfessionTrainersLogic.
 local _, ns = ...
-local W, L, Theme, K = ns.W, ns.L, ns.Theme, ns.PageKit
+local Theme = ns.Theme
+local W, L, K = ns.W, ns.L, ns.PageKit
 local R, PL, Data = ns.ProfessionRouteLogic, ns.ProfessionTrainersLogic, ns.ProfessionRouteData
 
 ns.AddLocale("enUS", {
@@ -40,8 +41,8 @@ ns.AddLocale("enUS", {
   ["proftrainers.noPos"] = "Location unknown, coordinates missing",
   ["proftrainers.total"] = "Trainers: %d, with coordinates: %d",
   ["proftrainers.empty"] = "No trainers for this selection.",
-  ["proftrainers.mapTip"] = "Show the trainer's zone on the map",
-  ["proftrainers.markerTip"] = "Set a waypoint at the trainer",
+  ["proftrainers.mapTip"] = "Shows the zone of the trainer on the map.",
+  ["proftrainers.markerTip"] = "Sets a waypoint at the trainer.",
 })
 
 ns.AddLocale("deDE", {
@@ -77,8 +78,8 @@ ns.AddLocale("deDE", {
   ["proftrainers.noPos"] = "Standort unbekannt, Koordinaten fehlen",
   ["proftrainers.total"] = "Lehrer: %d, davon mit Koordinaten: %d",
   ["proftrainers.empty"] = "Keine Lehrer für diese Auswahl.",
-  ["proftrainers.mapTip"] = "Zone des Lehrers auf der Karte zeigen",
-  ["proftrainers.markerTip"] = "Wegpunkt am Lehrer setzen",
+  ["proftrainers.mapTip"] = "Zeigt die Zone des Lehrers auf der Karte.",
+  ["proftrainers.markerTip"] = "Setzt einen Wegpunkt beim Lehrer.",
 })
 
 -- Four text lines: name, profession and ranks, faction and place, position. The buttons sit top
@@ -86,10 +87,6 @@ ns.AddLocale("deDE", {
 local ROW_HEIGHT = 72
 local ROW_ACTION_TOP = 5
 local MIN_ROWS = 3
-local CONTROL_W = 200
-local FIELD_W = 220
-local CONTROL_GAP = 12
-local CONTROL_H = 46
 
 local FACTION_KEY = { A = "kit.faction.A", H = "kit.faction.H", N = "proftrainers.neutral" }
 
@@ -138,15 +135,15 @@ local function createRow(parent)
   K.RowHover(row, { extraFrames = { row.actions.map, row.actions.marker } })
   row.actions:SetPoint("TOPRIGHT", -8, -ROW_ACTION_TOP)
   row.title = W.Text(row, { role = "ui" })
-  row.ranks = W.Text(row, { role = "micro", color = "textSecondary" })
-  row.place = W.Text(row, { role = "micro", color = "textSecondary" })
-  row.pos = W.Text(row, { role = "micro", color = "textMuted" })
+  row.ranks = W.Meta(row)
+  row.place = W.Meta(row)
+  row.pos = W.Meta(row)
   row.line = row:CreateTexture(nil, "ARTWORK")
   row.line:SetPoint("BOTTOMLEFT")
   row.line:SetPoint("BOTTOMRIGHT")
   row.line:SetHeight(1)
   ns.Bind(row, function()
-    row.line:SetColorTexture(1, 1, 1, Theme.lineAlpha())
+    row.line:SetColorTexture(ns.Theme.fillColor("line"))
   end)
   return row
 end
@@ -198,15 +195,16 @@ local function build(container)
     faction = K.PlayerFaction() or "all",
     query = "",
   }
+  ns.PageState.Bind(view, state, { "slug", "rank", "faction", "query" })
   -- All trainers of the loaded data, filled by load().
   local all = {}
   local refresh
 
-  ns.AddParagraph(view, "proftrainers.intro")
-  local source = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 4 })
-  local counts = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = 4 })
+  ns.AddIntro(view, "proftrainers.intro")
+  local source = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted", gap = Theme.space.xs })
+  local counts = ns.AddParagraph(view, nil, { role = "small", gap = Theme.space.xs })
   local limits = ns.AddParagraph(view, nil, { role = "micro", color = "textMuted" })
-  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = 12 })
+  local hint = ns.AddParagraph(view, nil, { role = "ui", color = "warning", gap = Theme.space.md })
   -- Instead of the hint while the data add-on is off or missing: the button that switches it on.
   local banner = ns.PackageUI.Banner(view.content, Data.ADDON, {
     onLoaded = function()
@@ -216,7 +214,7 @@ local function build(container)
       view:Layout()
     end,
   })
-  s:Add(banner, { gap = 12 })
+  s:Add(banner, { gap = Theme.space.md })
 
   -- Controls: profession, rank, search, wrapped to the width.
   local professionOptions = { { value = "all", key = "proftrainers.professionAll" } }
@@ -227,10 +225,23 @@ local function build(container)
   for _, rank in ipairs(PL.RANKS) do
     rankOptions[#rankOptions + 1] = { value = rank, text = rankName(rank) }
   end
-  local controls = CreateFrame("Frame", nil, view.content)
-  local professionDd = W.Dropdown(controls, {
+  local search
+  local function clearFilters()
+    state.slug, state.rank, state.faction, state.query = "all", "all", K.PlayerFaction() or "all", ""
+    search.edit:SetText("")
+    refresh()
+  end
+  local filters = K.FilterBar(view.content, {
+    count = function()
+      return (state.slug ~= "all" and 1 or 0)
+        + (state.rank ~= "all" and 1 or 0)
+        + (state.faction ~= (K.PlayerFaction() or "all") and 1 or 0)
+        + (state.query ~= "" and 1 or 0)
+    end,
+    reset = clearFilters,
+  })
+  local professionDd = filters:AddDropdown({
     key = "proftrainers.profession",
-    width = CONTROL_W,
     options = professionOptions,
     tooltip = "proftrainers.profession",
     tooltipText = "proftrainers.professionTip",
@@ -242,10 +253,8 @@ local function build(container)
       refresh()
     end,
   })
-  professionDd:SetWidth(CONTROL_W)
-  local rankDd = W.Dropdown(controls, {
+  local rankDd = filters:AddDropdown({
     key = "proftrainers.rank",
-    width = CONTROL_W,
     options = rankOptions,
     tooltip = "proftrainers.rank",
     tooltipText = "proftrainers.rankTip",
@@ -257,39 +266,17 @@ local function build(container)
       refresh()
     end,
   })
-  rankDd:SetWidth(CONTROL_W)
-  local searchBox = CreateFrame("Frame", nil, controls)
-  searchBox:SetSize(FIELD_W, CONTROL_H)
-  W.Text(searchBox, { key = "proftrainers.search", role = "ui" }):SetPoint("TOPLEFT")
-  local search = W.EditBox(searchBox, {
+  search = filters:AddSearch({
+    key = "proftrainers.search",
+    text = state.query,
     placeholder = "proftrainers.searchPh",
-    clear = true,
+    width = 220,
     onChange = function(text)
       state.query = text
       refresh()
     end,
   })
-  search:SetPoint("TOPLEFT", 0, -18)
-  search:SetWidth(FIELD_W)
-  function controls:fgGridLayout(width)
-    local x, y = 0, 0
-    for _, item in ipairs({ professionDd, rankDd, searchBox }) do
-      local w = item:GetWidth()
-      if x > 0 and x + w > width then
-        x, y = 0, y + CONTROL_H + 8
-      end
-      item:ClearAllPoints()
-      item:SetPoint("TOPLEFT", self, "TOPLEFT", x, -y)
-      x = x + w + CONTROL_GAP
-    end
-    local h = y + CONTROL_H
-    self:SetHeight(h)
-    return h
-  end
-  s:Add(controls, { gap = 10 })
-  K.Anchor("FG.ProfTrainers.Controls", controls)
-
-  local factionButtons = K.FactionButtons(view.content, {
+  local factionButtons = filters:AddGroup(K.FactionButtons(filters, {
     withAll = true,
     get = function()
       return state.faction
@@ -298,10 +285,11 @@ local function build(container)
       state.faction = v
       refresh()
     end,
-  })
-  s:Add(factionButtons, { gap = 10 })
+  }))
+  s:Add(filters, { gap = Theme.space.md })
+  K.Anchor("FG.ProfTrainers.Controls", filters)
 
-  local total = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = 6 })
+  local total = ns.AddParagraph(view, nil, { role = "ui", color = "accent2", gap = Theme.space.sm })
 
   local list = W.ScrollList(view.content, {
     rowHeight = K.scaledHeight(ROW_HEIGHT),
@@ -315,9 +303,9 @@ local function build(container)
     self:SetHeight(h)
     return h
   end
-  s:Add(list, { gap = 14 })
+  s:Add(list, { gap = Theme.space.lg })
   K.Anchor("FG.ProfTrainers.List", list)
-  local empty = ns.AddParagraph(view, "proftrainers.empty", { role = "ui" })
+  local empty = view.stack:Add(W.EmptyState(view.content, { text = "proftrainers.empty", icon = "search", compact = true }))
 
   -- Reads the trainers of every profession (loads the data add-on on the first call).
   local function load()
@@ -374,6 +362,7 @@ local function build(container)
     professionDd.Refresh()
     rankDd.Refresh()
     factionButtons.Refresh()
+    filters:Refresh()
     local offered = banner:Update(#all == 0 and missing == true)
     hint:SetShown(#all == 0 and not offered)
     if #all == 0 then
@@ -391,6 +380,9 @@ local function build(container)
     total:SetText(string.format(L["proftrainers.total"], n, placed))
     total:SetShown(#all > 0)
     list:SetShown(n > 0)
+    empty:SetAction(filters:IsFiltered() and W.EMPTY_RESET or nil, function()
+      filters:Reset()
+    end)
     empty:SetShown(#all > 0 and n == 0)
     list:SetData(shown)
     view:Layout()

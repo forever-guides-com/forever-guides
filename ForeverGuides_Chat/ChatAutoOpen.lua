@@ -1,9 +1,8 @@
 -- Forever Chat, opening the window by itself (game access): a new line of a kind whose switch is on (whisper,
 -- group, raid, guild, channel; all off by default) shows the window on that chat. The rules are in
 -- ChatOpenLogic.lua. It never takes the keyboard focus (the input line stays as it is, Enter stays with the
--- game chat), never opens over an open window, and in combat only shows a window that is built already, a
--- line that came too early opens it when the combat ends. A window the player closed stays closed until a chat
--- begins. Nothing here sends anything or touches the chat of the game.
+-- game chat) and never opens over an open window. It opens in combat too (the window is made of plain frames).
+-- A window the player closed stays closed until a chat begins. Nothing here sends anything or touches the chat of the game.
 local _, chat = ...
 if not chat.hook then
   return
@@ -16,7 +15,6 @@ local AutoOpen = {}
 chat.AutoOpen = AutoOpen
 
 local state = OL.NewState()
-local pending
 local watching = {}
 
 local function options()
@@ -33,8 +31,6 @@ end
 local function gameState()
   return {
     running = chat.Ingest ~= nil and chat.Ingest.IsRunning(),
-    built = chat.Window.Frame() ~= nil,
-    combat = FG.InCombat(),
     restricted = restricted(),
     shown = chat.Window.IsShown(),
     dismissed = state.dismissed,
@@ -54,7 +50,6 @@ end
 
 -- Opens the window on the chat of a candidate without moving the focus. True when it opened.
 local function open(cand)
-  pending = nil
   if not chat.Hooks.OpenFor(cand.key) then
     return false
   end
@@ -64,11 +59,9 @@ end
 
 -- Decides for a candidate { key, kind, fresh }. True when the window opened.
 function AutoOpen.Consider(cand)
-  local st = gameState()
-  if OL.ShouldOpen(options(), cand, st) then
+  if OL.ShouldOpen(options(), cand, gameState()) then
     return open(cand)
   end
-  pending = OL.ShouldWait(options(), cand, st) and cand or nil
   return false
 end
 
@@ -81,26 +74,6 @@ function AutoOpen.OnUpdate(keys)
   end
   return false
 end
-
--- True while a line waits for the end of the combat.
-function AutoOpen.Pending()
-  return pending ~= nil
-end
-
-FG.On("PLAYER_REGEN_ENABLED", function()
-  if pending then
-    local cand = pending
-    pending = nil
-    FG.Safe("chatautoopen", AutoOpen.Consider, cand)
-  end
-end)
-
--- Without the messenger no window opens: a waiting line goes.
-FG.On("FG_SUBADDON_CHANGED", function(_, id)
-  if id == "chat" then
-    pending = nil
-  end
-end)
 
 OL.Seed(state, chat.convs)
 

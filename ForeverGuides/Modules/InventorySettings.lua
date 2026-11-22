@@ -9,7 +9,7 @@ ns.InventorySettings = S
 
 ns.AddLocale("enUS", {
   ["inv.set.heading"] = "Inventory",
-  ["inv.set.hint"] = "Items of all characters in the tooltip.\nStored locally only. Nothing shown? /fg inventory checks it.",
+  ["inv.set.hint"] = "Shows the items of all characters in the tooltip.\nThe addon stores them locally only. Nothing shown? Run /fg inventory.",
   ["inv.set.enable"] = "Inventory in tooltip",
   ["inv.set.bank"] = "Record bank",
   ["inv.set.mail"] = "Record mail",
@@ -27,7 +27,7 @@ ns.AddLocale("enUS", {
 })
 ns.AddLocale("deDE", {
   ["inv.set.heading"] = "Bestand",
-  ["inv.set.hint"] = "Items aller Charaktere im Tooltip.\nNur lokal gespeichert. Nichts zu sehen? /fg inventar prüft es.",
+  ["inv.set.hint"] = "Zeigt die Items aller Charaktere im Tooltip.\nDas Addon speichert sie nur lokal. Nichts zu sehen? Prüfe mit /fg inventar.",
   ["inv.set.enable"] = "Bestand im Tooltip",
   ["inv.set.bank"] = "Bank erfassen",
   ["inv.set.mail"] = "Post erfassen",
@@ -45,13 +45,10 @@ ns.AddLocale("deDE", {
 })
 
 local TOGGLES = {
-  { "inventoryTooltip", "inv.set.enable" },
   { "inventoryBank", "inv.set.bank" },
   { "inventoryMail", "inv.set.mail" },
   { "inventoryGuildBank", "inv.set.guildBank" },
   { "inventoryFaction", "inv.set.faction" },
-  { "inventoryCurrentFirst", "inv.set.currentFirst" },
-  { "inventoryColors", "inv.set.colors" },
 }
 
 function S.Add(view)
@@ -71,25 +68,28 @@ function S.Add(view)
     control.fgId = "inventory-" .. key
     target.stack:Add(control, { height = 24, gap = 6 })
   end
-  for i = 1, 3 do
+  -- The switch for the tooltip and its look moved to the settings area Tooltips (Modules/GameUiSettings.lua).
+  for i = 1, 2 do
     toggle(view, TOGGLES[i])
   end
-  -- The other stores, the look of the tooltip and the buttons: behind "More settings".
+  -- The other stores and the buttons: behind "More settings".
   local more = W.Accordion(view, { id = view.id or "inventory.stock" })
-  for i = 4, #TOGGLES do
+  for i = 3, #TOGGLES do
     toggle(more, TOGGLES[i])
   end
-  local price = W.Toggle(more.content, {
-    key = "inv.set.priceTooltip",
+  local bagSlots = W.Toggle(more.content, {
+    key = "inv.set.bagSlots",
     get = function()
-      return Store.get("settings.priceDb.tooltip") ~= false
+      return Store.get("settings.bagFreeSlots") ~= false
     end,
     set = function(v)
-      Store.set("settings.priceDb.tooltip", v)
+      Store.set("settings.bagFreeSlots", v)
     end,
+    tooltip = "inv.set.bagSlots",
+    tooltipText = "inv.set.bagSlotsHint",
   })
-  price.fgId = "inventory-priceTooltip"
-  more.stack:Add(price, { height = 24, gap = 6 })
+  bagSlots.fgId = "inventory-bagFreeSlots"
+  more.stack:Add(bagSlots, { height = 24, gap = 6 })
   local rescan = W.Action(more.content, {
     label = "act.refresh",
     icon = "refresh",

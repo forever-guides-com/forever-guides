@@ -161,6 +161,17 @@ function ns.GetCVar(name)
   end
 end
 
+-- Writes a console variable; false when the client refuses it (a protected variable, an unknown name).
+function ns.SetCVar(name, value)
+  local api = rawget(_G, "C_CVar")
+  local set = type(api) == "table" and api.SetCVar or rawget(_G, "SetCVar")
+  if type(set) ~= "function" then
+    return false
+  end
+  local ok, result = pcall(set, name, value)
+  return ok and result ~= false
+end
+
 -- Addon restrictions (C_RestrictedActions): while one is active the client refuses addon calls
 -- on Blizzard frames and on some functions and raises ADDON_ACTION_BLOCKED/FORBIDDEN, which no
 -- pcall can stop. Names are keys of Enum.AddOnRestrictionType: Combat, Encounter, ChallengeMode,
@@ -187,6 +198,31 @@ end
 function ns.InCombat()
   local fn = rawget(_G, "InCombatLockdown")
   return type(fn) == "function" and fn() == true
+end
+
+-- Combat lock the player opted into ("Lock in combat", settings.combatLock, off by default): true only in
+-- combat lockdown with the option on. Every check that only exists to keep our own UI quiet in a fight asks
+-- this instead of ns.InCombat(), so nothing of ours is locked unless the player wants it.
+function ns.CombatLocked()
+  local settings = ns.db and ns.db.settings
+  return type(settings) == "table" and settings.combatLock == true and ns.InCombat()
+end
+
+local BLOCKED_NOTICE_GAP = 4
+local blockedAt
+
+-- For what Blizzard forbids in combat (protected frames, secure buttons, macros, bindings): the caller has
+-- already seen that the call is not allowed and does nothing. This shows one throttled line and returns
+-- true, so the call site reads `if ns.CombatBlocked() then return end`. Nothing is queued for later.
+function ns.CombatBlocked(reason)
+  local now = type(GetTime) == "function" and GetTime() or 0
+  if blockedAt == nil or now - blockedAt >= BLOCKED_NOTICE_GAP then
+    blockedAt = now
+    if ns.Notify and ns.L then
+      ns.Notify(ns.L["combat.blocked"], "warning", { reason = reason })
+    end
+  end
+  return true
 end
 
 -- May this addon call protected methods (Show, Hide, SetPoint, ...) on the frame right now? The

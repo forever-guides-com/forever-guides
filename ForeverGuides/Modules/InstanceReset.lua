@@ -29,7 +29,7 @@ ns.AddLocale("enUS", {
   ["ireset.blocked.api"] = "This client has no reset function.",
   ["ireset.set.heading"] = "Instances",
   ["ireset.set.announce"] = "Report resets in group chat",
-  ["ireset.set.announceTip"] = "After you reset instances, one line with their names goes to the party, raid or instance chat. Only in groups, never alone.",
+  ["ireset.set.announceTip"] = "After you reset instances, one line with their names goes to the group, raid or instance chat. Only in groups, never alone.",
 })
 ns.AddLocale("deDE", {
   ["act.reset"] = "Zurücksetzen",
@@ -47,7 +47,7 @@ ns.AddLocale("deDE", {
   ["ireset.blocked.api"] = "Dieser Client hat keine Funktion zum Zurücksetzen.",
   ["ireset.set.heading"] = "Instanzen",
   ["ireset.set.announce"] = "Zurücksetzen im Gruppenchat melden",
-  ["ireset.set.announceTip"] = "Nach dem Zurücksetzen geht eine Zeile mit den Namen in den Gruppen-, Schlachtzugs- oder Instanzchat. Nur in Gruppen, nie allein.",
+  ["ireset.set.announceTip"] = "Nach dem Zurücksetzen geht eine Zeile mit den Namen in den Gruppen-, Raid- oder Instanzchat. Nur in Gruppen, nie allein.",
 })
 
 R.EVENT = "FG_INSTANCES_RESET"
@@ -148,7 +148,7 @@ local function post(text)
   if type(send) ~= "function" then
     return false
   end
-  return (pcall(send, text, target))
+  return (pcall(ns.ChatSafe.Send, text, target, nil, send))
 end
 
 local function announce(names)

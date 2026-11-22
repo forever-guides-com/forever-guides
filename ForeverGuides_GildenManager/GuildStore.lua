@@ -37,7 +37,7 @@ local function resolve()
     return nil
   end
   if type(realm) ~= "string" or realm == "" then
-    realm = call("GetNormalizedRealmName") or call("GetRealmName")
+    realm = FG.Realm.Get()
   end
   local key = GS.Key(name, realm)
   return key and { key = key, name = name, realm = type(realm) == "string" and realm or "" } or nil
