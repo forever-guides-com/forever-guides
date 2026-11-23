@@ -5,8 +5,24 @@ ns.Data.Changelog = {
   v = 1,
   versions = {
     {
+      version = "1.1.1",
+      date = "2026-11-23",
+      important = true,
+      popup = true,
+      highlights = {
+        { head = { de = "Questziel auf dem Bildschirm", en = "Quest target on screen" }, text = { de = "Das Spiel zeigt es seit dem Client-Update nicht mehr, unsere Bildschirmnavigation zeigt es mit Lichtstrahl.", en = "The game stopped showing it with the last client update, our screen navigation shows it with a light beam." }, go = "settings:map.navigation" },
+        { head = { de = "Menü je Charakter", en = "Menu per character" }, text = { de = "Das Konto-Menü gilt für alle, ein Charakter ändert nur einzelne Punkte wie Farbe oder Sichtbarkeit.", en = "The account menu applies to all, a character only changes single points such as color or visibility." }, go = "settings:menu.main" },
+      },
+      changed = {
+        { de = "Bildschirmnavigation: Sie ist bei neuen Installationen standardmäßig an, ein Hinweis im Neuerungen-Fenster erklärt sie und schaltet sie um.", en = "Screen navigation: It is on by default for new installs, and a note in the news window explains it and switches it.", go = "settings:map.navigation" },
+        { de = "Menü: Das Menü eines Charakters speichert nur noch eigene Änderungen auf dem Konto-Menü. Das Fenster zeigt, welches Menü aktiv ist, und jede Einstellung lässt sich einzeln zurücksetzen.", en = "Menu: A character's menu now stores only its own changes on top of the account menu. The window shows which menu is active, and every setting can be reset on its own.", go = "settings:menu.main" },
+        { de = "Neuerungen: Das Fenster beim Login erscheint nur noch bei ausgewählten Versionen, alle anderen Updates stehen nur im Changelog.", en = "News: The login window only opens for selected versions, every other update is listed in the changelog only." },
+      },
+    },
+    {
       version = "1.1.0",
       date = "2026-11-22",
+      popup = true,
       highlights = {
         { head = { de = "Menü anpassen", en = "Customize menu" }, text = { de = "Ein eigenes Fenster mit Vorschau, darin Farbe, Name, Reihenfolge und Sichtbarkeit jedes Bereichs.", en = "A window of its own with a preview, for color, name, order and visibility of every section." }, go = "settings:menu.main" },
         { head = { de = "Aufgeräumtes Menü", en = "Tidier menu" }, text = { de = "Jeder Bereich liegt in einem eigenen Kasten, neu installiert ist nur die Übersicht offen.", en = "Every section sits in a box of its own, a fresh install opens only the overview." } },
@@ -28,6 +44,7 @@ ns.Data.Changelog = {
     {
       version = "1.0.1",
       date = "2026-11-22",
+      popup = true,
       highlights = {
         { head = { de = "Neuerungsfenster", en = "News window" }, text = { de = "Erscheint jetzt nach jedem Update zuverlässig, auch nach einer Neuinstallation.", en = "Now shows reliably after every update, also after a fresh install." } },
       },
@@ -221,20 +238,6 @@ ns.Data.Changelog = {
       fixed = {
         { de = "Instanzen: Die Dungeonkarte zeigt im Kloster, in Düsterbruch und in der Schwarzfelsspitze die Bosse aller Flügel, jeder mit seinem Flügel.", en = "Instances: The dungeon map shows the bosses of every wing in Scarlet Monastery, Dire Maul and Blackrock Spire, each with its wing.", go = "instances" },
         { de = "Instanzen: Besiegt und Sperren stimmen jetzt je Flügel, vorher zeigte etwa Schönufer den Stand von Herod.", en = "Instances: Defeated states and lockouts now match per wing, before Fairbanks showed the state of Herod.", go = "instances" },
-      },
-    },
-    {
-      version = "0.8.2",
-      date = "2026-11-14",
-      highlights = {
-      },
-      added = {
-        { de = "Seltene Gegner: Drei Stufen direkt oben in den Einstellungen: auf den Karten mit Hinweis, nur Hinweis in der Bildschirmmitte oder aus.", en = "Rare enemies: Three modes right at the top of the settings: on the maps with alert, only the alert in the screen center or off.", go = "settings:map.rares" },
-        { de = "Setup: Die Zeile Seltene Gegner hat die Haken \"Auf den Karten\" und \"Hinweis bei Fund\". Ohne Karte bleibt nur der Hinweis.", en = "Setup: The rare enemies row has the options \"On the maps\" and \"Alert when found\". Without the map only the alert stays.", go = "settings:setup.wizard" },
-      },
-      changed = {
-        { de = "Seltene Gegner: Die einzelnen Schalter für Weltkarte, Minikarte und Hinweis stehen jetzt unter Weitere Einstellungen.", en = "Rare enemies: The single switches for world map, minimap and alert are now under More settings.", go = "settings:map.rares" },
-        { de = "Setup: Sammelpunkte funkeln steht wieder in einer eigenen Zeile, die Sätze unter Sammeln und Seltene Gegner zeigt der Tooltip.", en = "Setup: Gathering sparkles has a line of its own again, the tooltip shows the sentences of Gathering and Rare enemies.", go = "settings:setup.wizard" },
       },
     },
   },

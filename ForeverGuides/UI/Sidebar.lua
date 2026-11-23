@@ -235,6 +235,7 @@ function Sidebar.Create(parent)
         ns.NavEditor.Open(group)
       end,
     })
+    ns.NavEditor.PencilTip(pencil, "nav.customizeGroup")
     pencil:SetPoint("RIGHT", header, "RIGHT", -4, 0)
     pencil:SetAlpha(0)
     for _, script in ipairs({ "OnEnter", "OnLeave" }) do

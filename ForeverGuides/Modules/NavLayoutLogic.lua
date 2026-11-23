@@ -8,15 +8,20 @@
 --                hidden = { [pageId] = true }, names = { [pageId] = text } } }
 -- nil means "the default menu". Ids the registry does not know (a sub-addon that is switched off)
 -- stay in a stored layout and are ignored by Resolve, so the entry comes back to its place later.
--- The layout lives in two layers: settings.nav (all characters) and the character store (nav), which
--- wins. Neither key has a default in Core/Store.lua: an absent key is the state "follows the layer
--- below", an empty table would count as an override.
+-- The layout lives in two layers: settings.nav (all characters) and the character store (nav). The
+-- character layer holds OVERRIDES only (v = 2): the menu a character sees is the account layout with the
+-- overrides applied per field (NL.Merge). An override has the shape of a layout, with these differences:
+--   hidden maps may hold true and false (false shows an entry the account hides);
+--   colors may hold "none" (no color although the account has one), names and pages.group "" (default
+--   name, default group); an order list replaces that one account list, an empty list means the default
+--   order. Neither key has a default in Core/Store.lua: an absent key is the state "follows the layer
+--   below", an empty table would count as an override.
 --
 -- base = { groups = { groupId, .. } (default order), pages = { page, .. } (default order, each with
 -- id and group) }; NL.Base() builds it from the sidebar and the router.
 local _, ns = ...
 
-local NL = { VERSION = 1, MAX_NAME = 24 }
+local NL = { VERSION = 1, CHAR_VERSION = 2, NONE = "none", MAX_NAME = 24 }
 ns.NavLayout = NL
 
 -- Pages that always stay in the menu: without them the user could not get back to the settings.
@@ -81,8 +86,11 @@ local function cleanMap(map, keep)
   local out, n = {}, 0
   if type(map) == "table" then
     for _, id in ipairs(sortedKeys(map)) do
-      local value = validId(id) and keep(map[id])
-      if value and n < MAX_MAP then
+      local value
+      if validId(id) then
+        value = keep(map[id])
+      end
+      if value ~= nil and n < MAX_MAP then
         out[id] = value
         n = n + 1
       end
@@ -104,8 +112,32 @@ local function isTrue(v)
   return v == true or nil
 end
 
--- Always a complete, fresh structure (never the table that came in).
-local function normalized(raw)
+-- Value rules of the character layer (see the header).
+local function isBool(v)
+  if type(v) == "boolean" then
+    return v
+  end
+end
+
+local function charColor(v)
+  return v == NL.NONE and v or NL.CleanColor(v)
+end
+
+local function charName(v)
+  return v == "" and v or NL.CleanName(v)
+end
+
+local function plainGroup(g)
+  return validId(g) and g or nil
+end
+
+local function charGroup(g)
+  return g == "" and g or plainGroup(g)
+end
+
+-- Always a complete, fresh structure (never the table that came in). char = true reads the override
+-- format of the character layer.
+local function normalized(raw, char)
   raw = type(raw) == "table" and raw or {}
   local groups = type(raw.groups) == "table" and raw.groups or {}
   local pages = type(raw.pages) == "table" and raw.pages or {}
@@ -113,28 +145,26 @@ local function normalized(raw)
   if type(pages.order) == "table" then
     local n = 0
     for _, g in ipairs(sortedKeys(pages.order)) do
-      local list = validId(g) and cleanList(pages.order[g])
-      if list and #list > 0 and n < MAX_LIST then
+      local list = validId(g) and type(pages.order[g]) == "table" and cleanList(pages.order[g])
+      if list and (char or #list > 0) and n < MAX_LIST then
         order[g] = list
         n = n + 1
       end
     end
   end
   return {
-    v = NL.VERSION,
+    v = char and NL.CHAR_VERSION or NL.VERSION,
     groups = {
       order = cleanList(groups.order),
-      hidden = cleanMap(groups.hidden, isTrue),
-      names = cleanMap(groups.names, NL.CleanName),
-      colors = cleanMap(groups.colors, NL.CleanColor),
+      hidden = cleanMap(groups.hidden, char and isBool or isTrue),
+      names = cleanMap(groups.names, char and charName or NL.CleanName),
+      colors = cleanMap(groups.colors, char and charColor or NL.CleanColor),
     },
     pages = {
       order = order,
-      group = cleanMap(pages.group, function(g)
-        return validId(g) and g or nil
-      end),
-      hidden = cleanMap(pages.hidden, isTrue),
-      names = cleanMap(pages.names, NL.CleanName),
+      group = cleanMap(pages.group, char and charGroup or plainGroup),
+      hidden = cleanMap(pages.hidden, char and isBool or isTrue),
+      names = cleanMap(pages.names, char and charName or NL.CleanName),
     },
   }
 end
@@ -160,18 +190,110 @@ function NL.Sanitize(raw)
   return not isEmpty(n) and n or nil
 end
 
--- Character override first, then the account layout, else nil (default). A damaged value is skipped.
--- Second result: "char", "account" or "default".
+-- Validates and trims character overrides (v = 2). Same result rules as Sanitize.
+function NL.SanitizeOverrides(raw)
+  if type(raw) ~= "table" or raw.v ~= NL.CHAR_VERSION then
+    return nil
+  end
+  local n = normalized(raw, true)
+  return not isEmpty(n) and n or nil
+end
+
+local function overlay(target, over, removes)
+  for k, v in pairs(over) do
+    if v == removes then
+      target[k] = nil
+    else
+      target[k] = v
+    end
+  end
+end
+
+-- The account layout with the overrides applied per field. Returns a clean layout or nil (default).
+function NL.Merge(account, overrides)
+  local a, o = normalized(account), normalized(overrides, true)
+  if #o.groups.order > 0 then
+    a.groups.order = o.groups.order
+  end
+  for g, list in pairs(o.pages.order) do
+    a.pages.order[g] = #list > 0 and list or nil
+  end
+  overlay(a.groups.hidden, o.groups.hidden, false)
+  overlay(a.groups.names, o.groups.names, "")
+  overlay(a.groups.colors, o.groups.colors, NL.NONE)
+  overlay(a.pages.group, o.pages.group, "")
+  overlay(a.pages.hidden, o.pages.hidden, false)
+  overlay(a.pages.names, o.pages.names, "")
+  return NL.Sanitize(a)
+end
+
+local function sameList(a, b)
+  if #a ~= #b then
+    return false
+  end
+  for i, v in ipairs(a) do
+    if b[i] ~= v then
+      return false
+    end
+  end
+  return true
+end
+
+local function diffMap(out, acc, eff, absent)
+  for k, v in pairs(eff) do
+    if acc[k] ~= v then
+      out[k] = v
+    end
+  end
+  for k in pairs(acc) do
+    if eff[k] == nil then
+      out[k] = absent
+    end
+  end
+end
+
+-- The overrides that turn the account layout into `effective`: only what differs (nil when nothing).
+-- defaultGroups (optional) is the default group order, written when the effective menu has no group order
+-- of its own and the account has one.
+function NL.Diff(account, effective, defaultGroups)
+  local a, e, o = normalized(account), normalized(effective), normalized(nil, true)
+  if not sameList(a.groups.order, e.groups.order) then
+    o.groups.order = #e.groups.order > 0 and e.groups.order or cleanList(defaultGroups)
+  end
+  for g, list in pairs(e.pages.order) do
+    if not sameList(a.pages.order[g] or {}, list) then
+      o.pages.order[g] = list
+    end
+  end
+  for g in pairs(a.pages.order) do
+    if e.pages.order[g] == nil then
+      o.pages.order[g] = {}
+    end
+  end
+  diffMap(o.groups.hidden, a.groups.hidden, e.groups.hidden, false)
+  diffMap(o.groups.names, a.groups.names, e.groups.names, "")
+  diffMap(o.groups.colors, a.groups.colors, e.groups.colors, NL.NONE)
+  diffMap(o.pages.group, a.pages.group, e.pages.group, "")
+  diffMap(o.pages.hidden, a.pages.hidden, e.pages.hidden, false)
+  diffMap(o.pages.names, a.pages.names, e.pages.names, "")
+  return NL.SanitizeOverrides(o)
+end
+
+-- Overrides without the entries that equal the account value (an account change can make one redundant).
+local function pruned(account, overrides)
+  local ov = NL.SanitizeOverrides(overrides)
+  return ov and NL.Diff(account, NL.Merge(account, ov)) or nil
+end
+
+-- What a character sees: the account layout with its overrides. Second result: "char" (at least one
+-- override), "account" or "default". A damaged value is skipped.
 function NL.Pick(charNav, accountNav)
-  local layout = NL.Sanitize(charNav)
-  if layout then
-    return layout, "char"
+  local account = NL.Sanitize(accountNav)
+  local ov = pruned(account, charNav)
+  if ov then
+    return NL.Merge(account, ov), "char"
   end
-  layout = NL.Sanitize(accountNav)
-  if layout then
-    return layout, "account"
-  end
-  return nil, "default"
+  return account, account and "account" or "default"
 end
 
 local function indexOf(list, id)
@@ -638,18 +760,53 @@ local function charNav()
   return ns.charDB and ns.charDB.nav
 end
 
--- The layout this character sees, and the layer it comes from.
-function NL.Layout()
-  return NL.Pick(charNav(), accountNav())
+local function defaultGroups()
+  return ns.Sidebar and ns.Sidebar.GROUPS
 end
 
--- The layer an edit works on. "char" starts from what this character sees now (an edit then writes
--- its own copy), "account" is the layout of all characters.
+-- The layout of all characters (nil = default).
+function NL.AccountLayout()
+  return (NL.Pick(nil, accountNav()))
+end
+
+-- This character's overrides, nil without any. A character layout from before the layers (a full copy
+-- without v = 2) is converted once, here: the overrides are its difference to the account layout, so
+-- the menu of that character does not change. A layout of an unknown version is ignored and kept.
+function NL.Overrides()
+  local raw = charNav()
+  if type(raw) ~= "table" then
+    return nil
+  end
+  local account = NL.Sanitize(accountNav())
+  if raw.v == NL.CHAR_VERSION then
+    return pruned(account, raw)
+  end
+  if raw.v ~= nil and raw.v ~= NL.VERSION then
+    return nil
+  end
+  local copy = NL.Sanitize(raw)
+  local ov = copy and NL.Diff(account, copy, defaultGroups())
+  ns.Store.setChar("nav", ov)
+  return ov
+end
+
+-- The layout this character sees, and the layer it comes from ("default", "account", "char").
+function NL.Layout()
+  return NL.Pick(NL.Overrides(), accountNav())
+end
+
+-- Same as the first result of NL.Layout.
+function NL.Effective()
+  return (NL.Layout())
+end
+
+-- The layout an edit starts from. "char" is what this character sees now (the edit then stores only the
+-- difference to the account layout), "account" is the layout of all characters.
 function NL.EditLayout(scope)
   if scope == "char" then
-    return (NL.Layout())
+    return NL.Effective()
   end
-  return (NL.Pick(nil, accountNav()))
+  return NL.AccountLayout()
 end
 
 -- The color of a group box in the layout this character sees ("rrggbb"), nil for the theme fill.
@@ -658,33 +815,126 @@ function NL.GroupColor(groupId)
   return layout and layout.groups.colors[groupId] or nil
 end
 
+-- True when this character has at least one override.
 function NL.HasCharLayout()
-  return NL.Sanitize(charNav()) ~= nil
+  return NL.Overrides() ~= nil
 end
 
--- Writes a layout (validated again) to the layer and tells the sidebar.
+local function countKeys(map)
+  local n = 0
+  for _ in pairs(map) do
+    n = n + 1
+  end
+  return n
+end
+
+-- Number of single settings this character overrides (a changed order list counts once).
+function NL.OverrideCount()
+  local o = NL.Overrides()
+  if not o then
+    return 0
+  end
+  local n = #o.groups.order > 0 and 1 or 0
+  for _, map in ipairs({ o.pages.order, o.groups.hidden, o.groups.names, o.groups.colors, o.pages.group, o.pages.hidden, o.pages.names }) do
+    n = n + countKeys(map)
+  end
+  return n
+end
+
+local FIELDS = {
+  group = { color = "colors", name = "names", hidden = "hidden" },
+  page = { name = "names", hidden = "hidden" },
+}
+
+local function section(o, kind)
+  return kind == "group" and o.groups or o.pages
+end
+
+-- Whether this character overrides one setting. kind "group" or "page", field "color" (groups), "name",
+-- "hidden", "group" and "order". For a page, "group" and "order" are the same override, its place
+-- (group and position). For a group, "order" is the order of all groups (one list).
+function NL.IsOverridden(kind, id, field)
+  local o = NL.Overrides()
+  if not o or not FIELDS[kind] then
+    return false
+  end
+  if field == "order" or field == "group" then
+    if kind == "group" then
+      return field == "order" and #o.groups.order > 0
+    end
+    if o.pages.group[id] ~= nil then
+      return true
+    end
+    for _, list in pairs(o.pages.order) do
+      if indexOf(list, id) then
+        return true
+      end
+    end
+    return false
+  end
+  local key = FIELDS[kind][field]
+  return key ~= nil and section(o, kind)[key][id] ~= nil
+end
+
+-- Writes a layout (validated again) to the layer and tells the sidebar. For "char" the layout is the
+-- overrides (v = 2).
 function NL.Save(scope, layout)
-  layout = NL.Sanitize(layout)
   if scope == "char" then
-    ns.Store.setChar("nav", layout)
+    ns.Store.setChar("nav", NL.SanitizeOverrides(layout))
   else
-    ns.Store.set("settings.nav", layout)
+    ns.Store.set("settings.nav", NL.Sanitize(layout))
   end
   ns.Emit("FG_NAV_CHANGED", scope)
 end
 
--- Runs one edit (NL.Move, NL.Step, NL.SetHidden, NL.Rename, NL.SetColor) on a layer and saves it when it changed
--- something. Returns whether it did.
+-- Removes one override of this character so the setting follows the account again. Returns whether there
+-- was one. For a page, "group" and "order" remove its whole place override (the group, and the order lists
+-- that hold it or belong to its account group).
+function NL.ClearOverride(kind, id, field)
+  if not NL.IsOverridden(kind, id, field) then
+    return false
+  end
+  local o = NL.Overrides()
+  if field == "order" or field == "group" then
+    if kind == "group" then
+      o.groups.order = {}
+    else
+      o.pages.group[id] = nil
+      local base = NL.Base()
+      local view = NL.Resolve(base.groups, base.pages, NL.AccountLayout(), true)
+      local at = findPage(view, id)
+      local home = at and view.groups[at].id
+      for g, list in pairs(o.pages.order) do
+        if g == home or indexOf(list, id) then
+          o.pages.order[g] = nil
+        end
+      end
+    end
+  else
+    section(o, kind)[FIELDS[kind][field]][id] = nil
+  end
+  NL.Save("char", o)
+  return true
+end
+
+-- What a layer stores for an edited layout: the char layer only the difference to the account layout.
+local function stored(scope, layout)
+  return scope == "char" and NL.Diff(NL.AccountLayout(), layout, defaultGroups()) or layout
+end
+
+-- Runs one edit (NL.Move, NL.Step, NL.SetHidden, NL.Rename, NL.SetColor) on a layer and saves it when it
+-- changed something. The char scope runs it on the layout this character sees and stores the difference
+-- to the account layout. Returns whether it changed something.
 function NL.Apply(scope, op, ...)
   local layout, ok = NL[op](NL.EditLayout(scope), NL.Base(), ...)
   if ok then
-    NL.Save(scope, layout)
+    NL.Save(scope, stored(scope, layout))
   end
   return ok
 end
 
--- The layer a bulk edit of the setup wizard writes to: the layer this character sees, so the menu is
--- right at once (a character with its own layout keeps it, otherwise the account layout of all characters).
+-- The layer a bulk edit of the setup wizard writes to: the character when it has overrides (the menu is
+-- right at once), otherwise the account layout of all characters.
 function NL.EffectiveScope()
   return NL.HasCharLayout() and "char" or "account"
 end
@@ -695,11 +945,12 @@ end
 function NL.SetHiddenMany(scope, list)
   local layout, changed, refused = NL.SetHiddenBatch(NL.EditLayout(scope), NL.Base(), list)
   if changed then
-    NL.Save(scope, layout)
+    NL.Save(scope, stored(scope, layout))
   end
   return changed, refused
 end
 
+-- "account" clears the layout of all characters, "char" all overrides of this character.
 function NL.ResetLayer(scope)
   NL.Save(scope, nil)
 end

@@ -190,6 +190,7 @@ function C.Build(data, locale, limit)
         date = C.Date(item.date, locale),
         beta = item.beta == true,
         important = item.important == true,
+        popup = item.popup == true,
         sections = {},
         count = 0,
       }
@@ -244,10 +245,16 @@ end
 -- News window after an update: versions shown at most, in the window.
 C.NEWS_VERSIONS = 2
 
+-- Whether a version opens the news window at all: only one marked "**Popup**" or "**Wichtig**" in CHANGELOG.md
+-- (popup / important). Every other version only appears on the changelog page.
+function C.Announces(item)
+  return item.popup == true or item.important == true
+end
+
 -- What the news window shows: { shown = { version views }, seenTo = version, important = boolean } or nil for no
 -- window. `versions` is C.Build output (newest first), `seen` the newest version seen before, `current` the version
 -- running now (a version above it is not installed yet, an unparsable one is a development build: no window).
--- Only versions with highlights show. With `enabled` false only important versions show. Important versions come
+-- Only versions with highlights show, and only those C.Announces lets through. With `enabled` false only important versions show. Important versions come
 -- first, then the newest, at most NEWS_VERSIONS. seenTo is the newest version the window answers for.
 function C.News(versions, seen, current, enabled)
   if not C.Parse(current) then
@@ -265,7 +272,7 @@ function C.News(versions, seen, current, enabled)
   end
   local shown, seenTo, important = {}, nil, false
   for _, item in ipairs(fresh) do
-    if enabled or item.important then
+    if (enabled or item.important) and C.Announces(item) then
       seenTo = seenTo or item.version
       if #item.highlights > 0 then
         shown[#shown + 1] = item

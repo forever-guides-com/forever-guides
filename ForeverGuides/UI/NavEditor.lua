@@ -19,16 +19,28 @@ ns.AddLocale("enUS", {
   ["nav.edit.lockedGroup"] = "This group holds an entry that always stays in the menu.",
   ["nav.edit.rename"] = "Rename",
   ["nav.edit.scope"] = "Only this character",
-  ["nav.edit.scopeHint"] = "Off: the layout applies to all your characters. On: this character gets its own layout.",
-  ["nav.edit.scopeNotice"] = "This character has its own layout, which wins over this one.",
-  ["nav.edit.reset"] = "Reset to default",
+  ["nav.edit.scopeHint"] = "Off: your changes apply to all characters. On: you change only this character. Everything it does not change keeps following the account menu.",
+  ["nav.edit.resetAccount"] = "Reset account menu",
+  ["nav.edit.resetChar"] = "Remove own changes for %s",
   ["nav.reset.title"] = "Reset navigation",
   ["nav.reset.textAccount"] = "All entries and groups return to their default place, name and visibility for all characters.",
-  ["nav.reset.textChar"] = "This character stops using its own layout and follows the layout of all characters again.",
+  ["nav.reset.textChar"] = "%s stops using own changes and follows the account menu again.",
   ["nav.editor.title"] = "Customize menu",
   ["nav.editor.hint"] = "Click a group or entry to change it. Changes apply at once. Shift+Up and Shift+Down move the selection.",
   ["nav.editor.scopeAll"] = "All characters",
-  ["nav.editor.scopeChar"] = "This character only",
+  ["nav.editor.scopeChar"] = "Only %s",
+  ["nav.editor.statusAccount"] = "You are editing the menu for all characters.",
+  ["nav.editor.statusOwnOne"] = "%s has 1 own change.",
+  ["nav.editor.statusOwnMany"] = "%s has %d own changes.",
+  ["nav.editor.statusChar"] = "You are editing only %s. Everything without an own change comes from the account menu.",
+  ["nav.editor.markChar"] = "Own setting for %s",
+  ["nav.editor.markAccount"] = "Overridden for %s",
+  ["nav.editor.fromAccount"] = "From the account",
+  ["nav.editor.useAccount"] = "Use account setting",
+  ["nav.editor.useAccountHint"] = "Removes the own setting. It follows the account menu again.",
+  ["nav.layer.account"] = "Account menu",
+  ["nav.layer.ownOne"] = "Account menu + 1 own change for %s",
+  ["nav.layer.ownMany"] = "Account menu + %d own changes for %s",
   ["nav.editor.group"] = "Group",
   ["nav.editor.page"] = "Entry",
   ["nav.editor.name"] = "Name",
@@ -59,16 +71,28 @@ ns.AddLocale("deDE", {
   ["nav.edit.lockedGroup"] = "Diese Gruppe enthält einen Eintrag, der immer im Menü bleibt.",
   ["nav.edit.rename"] = "Umbenennen",
   ["nav.edit.scope"] = "Nur dieser Charakter",
-  ["nav.edit.scopeHint"] = "Aus: Die Anordnung gilt für alle deine Charaktere. An: Dieser Charakter bekommt eine eigene Anordnung.",
-  ["nav.edit.scopeNotice"] = "Dieser Charakter hat eine eigene Anordnung, sie hat Vorrang.",
-  ["nav.edit.reset"] = "Auf Standard zurücksetzen",
+  ["nav.edit.scopeHint"] = "Aus: Deine Änderungen gelten für alle Charaktere. An: Du änderst nur diesen Charakter. Alles, was er nicht ändert, folgt weiter dem Konto-Menü.",
+  ["nav.edit.resetAccount"] = "Konto-Menü zurücksetzen",
+  ["nav.edit.resetChar"] = "Eigene Änderungen für %s entfernen",
   ["nav.reset.title"] = "Navigation zurücksetzen",
   ["nav.reset.textAccount"] = "Alle Einträge und Gruppen kehren für alle Charaktere zu Standardplatz, Standardname und Standardsichtbarkeit zurück.",
-  ["nav.reset.textChar"] = "Dieser Charakter nutzt seine eigene Anordnung nicht mehr und folgt wieder der Anordnung für alle Charaktere.",
+  ["nav.reset.textChar"] = "%s nutzt keine eigenen Änderungen mehr und folgt wieder dem Konto-Menü.",
   ["nav.editor.title"] = "Menü anpassen",
   ["nav.editor.hint"] = "Klicke eine Gruppe oder einen Eintrag an, um sie zu ändern. Änderungen gelten sofort. Umschalt+Hoch und Umschalt+Runter verschieben die Auswahl.",
   ["nav.editor.scopeAll"] = "Alle Charaktere",
-  ["nav.editor.scopeChar"] = "Nur dieser Charakter",
+  ["nav.editor.scopeChar"] = "Nur %s",
+  ["nav.editor.statusAccount"] = "Du bearbeitest das Menü für alle Charaktere.",
+  ["nav.editor.statusOwnOne"] = "%s hat 1 eigene Änderung.",
+  ["nav.editor.statusOwnMany"] = "%s hat %d eigene Änderungen.",
+  ["nav.editor.statusChar"] = "Du bearbeitest nur %s. Alles ohne eigene Änderung kommt vom Konto-Menü.",
+  ["nav.editor.markChar"] = "Eigene Einstellung für %s",
+  ["nav.editor.markAccount"] = "Für %s überschrieben",
+  ["nav.editor.fromAccount"] = "Vom Konto",
+  ["nav.editor.useAccount"] = "Vom Konto übernehmen",
+  ["nav.editor.useAccountHint"] = "Entfernt die eigene Einstellung. Sie folgt wieder dem Konto-Menü.",
+  ["nav.layer.account"] = "Konto-Menü",
+  ["nav.layer.ownOne"] = "Konto-Menü + 1 eigene Änderung für %s",
+  ["nav.layer.ownMany"] = "Konto-Menü + %d eigene Änderungen für %s",
   ["nav.editor.group"] = "Gruppe",
   ["nav.editor.page"] = "Eintrag",
   ["nav.editor.name"] = "Name",
@@ -92,7 +116,7 @@ ns.AddLocale("deDE", {
   ["nav.editor.tone.8"] = "Schiefer",
 })
 
-local WIDTH, HEIGHT, PAD = 640, 540, 16
+local WIDTH, HEIGHT, PAD = 640, 580, 16
 local LIST_W, COLUMN_GAP = 270, 16
 local CONFIG_W = WIDTH - 2 * PAD - LIST_W - COLUMN_GAP
 local ROW_H, BOX_PAD, BOX_GAP = 24, 3, 6
@@ -114,10 +138,60 @@ function NE.SetScope(value)
   ns.Emit("FG_NAV_SCOPE", scope)
 end
 
+local function charName()
+  return UnitName("player") or "?"
+end
+
+-- Texts that name the character and the layer in use (the window, the pencil tooltips and the tests read them).
+function NE.StatusText(layer)
+  layer = layer or NE.Scope()
+  local name = charName()
+  if layer == "char" then
+    return string.format(L["nav.editor.statusChar"], name)
+  end
+  local n = NL.OverrideCount()
+  if n == 0 then
+    return L["nav.editor.statusAccount"]
+  end
+  local own = n == 1 and string.format(L["nav.editor.statusOwnOne"], name) or string.format(L["nav.editor.statusOwnMany"], name, n)
+  return L["nav.editor.statusAccount"] .. " " .. own
+end
+
+-- "Account menu" or "Account menu + 3 own changes for <character>".
+function NE.LayerText()
+  local n = NL.OverrideCount()
+  if n == 0 then
+    return L["nav.layer.account"]
+  end
+  return n == 1 and string.format(L["nav.layer.ownOne"], charName()) or string.format(L["nav.layer.ownMany"], n, charName())
+end
+
+function NE.ScopeCharText()
+  return string.format(L["nav.editor.scopeChar"], charName())
+end
+
+function NE.ResetText(layer)
+  return layer == "char" and string.format(L["nav.edit.resetChar"], charName()) or L["nav.edit.resetAccount"]
+end
+
 function NE.RequestReset(layer)
   layer = layer or NE.Scope()
-  ns.Dialogs.Confirm("nav.reset.title", layer == "char" and "nav.reset.textChar" or "nav.reset.textAccount", function()
+  local opts = layer == "char" and { text = string.format(L["nav.reset.textChar"], charName()) } or nil
+  ns.Dialogs.Confirm("nav.reset.title", layer ~= "char" and "nav.reset.textAccount" or nil, function()
     NL.ResetLayer(layer)
+  end, nil, opts)
+end
+
+-- Tooltip of a pencil: the title, an optional hint, and the layer in use as the last line. Hooked after the
+-- button's own tooltip, so it replaces it.
+function NE.PencilTip(button, titleKey, hintKey)
+  button:HookScript("OnEnter", function(self)
+    local lines = {}
+    if hintKey then
+      lines[1] = L[hintKey]
+    end
+    lines[#lines + 1] = NE.LayerText()
+    ns.ShowTooltip(self, L[titleKey], table.concat(lines, "\n"), { hint = L["action.opensWindow"] })
   end)
 end
 
@@ -207,9 +281,12 @@ local function newRow(kind, id, page)
   -- A hidden entry keeps its text color (contrast) and wears this marker.
   r.eye = W.Glyph(r, "eye-off", 12, "textMuted")
   r.eye:SetPoint("RIGHT", -8, 0)
+  -- An own setting of this character: a pin (accent in the character scope, muted in the account scope).
+  r.mark = W.Glyph(r, "pin", 12, "accent")
+  r.mark:SetPoint("RIGHT", r.eye, "LEFT", -4, 0)
   r.label = W.Text(r, { role = page and "ui" or "micro", color = "textSecondary" })
   r.label:SetPoint("LEFT", r.icon or r, r.icon and "RIGHT" or "LEFT", r.icon and 8 or 10, 0)
-  r.label:SetPoint("RIGHT", r.eye, "LEFT", -4, 0)
+  r.label:SetPoint("RIGHT", r.mark, "LEFT", -4, 0)
   ns.Bind(r, paintRow)
   r:SetScript(
     "OnClick",
@@ -220,7 +297,14 @@ local function newRow(kind, id, page)
   r:SetScript("OnEnter", function(self)
     self.hover = true
     paintRow(self)
-    ns.ShowTooltip(self, self.label:GetText(), self.hidden and L["nav.editor.hidden"] or nil)
+    local lines = {}
+    if self.hidden then
+      lines[#lines + 1] = L["nav.editor.hidden"]
+    end
+    if self.markText then
+      lines[#lines + 1] = self.markText
+    end
+    ns.ShowTooltip(self, self.label:GetText(), #lines > 0 and table.concat(lines, "\n") or nil)
   end)
   r:SetScript("OnLeave", function(self)
     self.hover = false
@@ -271,6 +355,23 @@ local function boxFor(id)
   return boxes[id]
 end
 
+local MARK_FIELDS = { group = { "color", "name", "hidden" }, page = { "name", "hidden", "group" } }
+
+-- The tooltip text of the character marker of one entry, nil when this character does not override it.
+local function markText(kind, id)
+  for _, field in ipairs(MARK_FIELDS[kind]) do
+    if NL.IsOverridden(kind, id, field) then
+      return string.format(L[NE.Scope() == "char" and "nav.editor.markChar" or "nav.editor.markAccount"], charName())
+    end
+  end
+end
+
+local function setMark(r)
+  r.markText = NL.OverrideCount() > 0 and markText(r.kind, r.id) or nil
+  r.mark:SetShown(r.markText ~= nil)
+  r.mark:SetColorToken(NE.Scope() == "char" and "accent" or "textMuted")
+end
+
 local function refreshList(view)
   for _, r in pairs(rows) do
     r:Hide()
@@ -290,6 +391,7 @@ local function refreshList(view)
     h.entry, h.hidden = g, g.hidden
     W.SetText(h.label, nil, shownName("group", g.id, g))
     h.eye:SetShown(g.hidden)
+    setMark(h)
     h:ClearAllPoints()
     h:SetPoint("TOPLEFT", content, "TOPLEFT", BOX_PAD + 2, y)
     h:SetPoint("RIGHT", content, "RIGHT", -(BOX_PAD + 2), 0)
@@ -302,6 +404,7 @@ local function refreshList(view)
       r.entry, r.hidden = p, p.hidden
       W.SetText(r.label, nil, shownName("page", p.id, p))
       r.eye:SetShown(p.hidden)
+      setMark(r)
       r:ClearAllPoints()
       r:SetPoint("TOPLEFT", content, "TOPLEFT", BOX_PAD + 2, y)
       r:SetPoint("RIGHT", content, "RIGHT", -(BOX_PAD + 2), 0)
@@ -419,6 +522,30 @@ end
 
 local function setVisible(kind, id, entry)
   apply("SetHidden", kind, id, not entry.hidden)
+end
+
+-- The line under a field in the character scope: "From the account", or the action that drops the own setting.
+local NOTE_FIELDS = { "name", "color", "hidden", "place" }
+local PLACE_FIELD = { group = "order", page = "group" }
+
+local function newNote(c, field)
+  local n = { field = field }
+  n.inherit = W.Text(c, { key = "nav.editor.fromAccount", role = "micro", color = "textMuted" })
+  n.use = W.Action(c, {
+    key = "nav.editor.useAccount",
+    icon = "reset",
+    height = 24,
+    width = 170,
+    tooltip = "nav.editor.useAccount",
+    tooltipText = "nav.editor.useAccountHint",
+    onClick = function()
+      local t = d.target
+      if t then
+        NL.ClearOverride(t.kind, t.id, n.target)
+      end
+    end,
+  })
+  return n
 end
 
 local function newConfig()
@@ -549,6 +676,11 @@ local function newConfig()
     end,
   })
 
+  cfg.notes = {}
+  for _, field in ipairs(NOTE_FIELDS) do
+    cfg.notes[field] = newNote(c, field)
+  end
+
   cfg.options = {}
   cfg.moveTo = W.Dropdown(c, {
     key = "nav.editor.moveTo",
@@ -582,9 +714,27 @@ local function refreshConfig(view)
     frame:SetPoint("TOPLEFT", d.config.content, "TOPLEFT", x, -y)
     y = y + h + (gap or 0)
   end
+  -- Character scope only: the inheritance line of a field. `field` is the NOTE_FIELDS name.
+  local function note(field, gap)
+    local n = cfg.notes[field]
+    local own = NE.Scope() == "char"
+    n.target = field == "place" and PLACE_FIELD[sel.kind] or field
+    local overridden = own and NL.IsOverridden(sel.kind, sel.id, n.target)
+    n.use:SetShown(overridden)
+    n.inherit:SetShown(own and not overridden)
+    if overridden then
+      put(n.use, 0, 24, gap)
+    elseif own then
+      put(n.inherit, 2, 14, gap)
+    end
+  end
   if not entry then
     for _, name in ipairs({ "heading", "nameLabel", "nameBox", "resetName", "colorLabel", "grid", "custom", "none", "visible", "up", "down", "moveTo" }) do
       cfg[name]:Hide()
+    end
+    for _, n in pairs(cfg.notes) do
+      n.inherit:Hide()
+      n.use:Hide()
     end
     return
   end
@@ -601,7 +751,8 @@ local function refreshConfig(view)
   cfg.resetName:Show()
   cfg.resetName:ClearAllPoints()
   cfg.resetName:SetPoint("TOPLEFT", d.config.content, "TOPLEFT", width - 26, -y)
-  y = y + 26 + 14
+  y = y + 26 + 4
+  note("name", 10)
   if not cfg.nameBox.edit:HasFocus() then
     cfg.nameBox.target = nil
     cfg.nameBox.edit:SetText(shownName(sel.kind, sel.id, entry))
@@ -620,7 +771,10 @@ local function refreshConfig(view)
     cfg.custom:SetPoint("TOPLEFT", d.config.content, "TOPLEFT", 0, -y)
     cfg.none:ClearAllPoints()
     cfg.none:SetPoint("LEFT", cfg.custom, "RIGHT", 8, 0)
-    y = y + 28 + 14
+    y = y + 28 + 4
+    note("color", 10)
+  else
+    note("color")
   end
 
   local locked = isGroup and entry.locked or entry.protected
@@ -628,7 +782,8 @@ local function refreshConfig(view)
   cfg.visible:SetIcon(entry.hidden and "eye-off" or "eye")
   cfg.visible:SetSelected(not entry.hidden)
   cfg.visible:SetEnabled(not locked)
-  put(cfg.visible, 0, 28, 8)
+  put(cfg.visible, 0, 28, 4)
+  note("hidden", 10)
 
   cfg.up:Show()
   cfg.down:Show()
@@ -638,7 +793,7 @@ local function refreshConfig(view)
   cfg.up:SetPoint("TOPLEFT", d.config.content, "TOPLEFT", 0, -y)
   cfg.down:ClearAllPoints()
   cfg.down:SetPoint("LEFT", cfg.up, "RIGHT", 8, 0)
-  y = y + 28 + 14
+  y = y + 28 + 10
 
   cfg.moveTo:SetShown(not isGroup)
   if not isGroup then
@@ -649,28 +804,42 @@ local function refreshConfig(view)
       cfg.options[#cfg.options + 1] = { value = g.id, text = shownName("group", g.id, g) }
     end
     cfg.moveTo:Refresh()
-    put(cfg.moveTo, 0, cfg.moveTo:GetHeight(), 0)
+    put(cfg.moveTo, 0, cfg.moveTo:GetHeight(), 4)
   end
+  note("place")
   d.config:SetContentHeight(y + 8)
 end
 
 -- Window -------------------------------------------------------------------------------------------
 
+local function fitButton(button, text, min, max)
+  W.SetText(button.label, nil, text)
+  button.fgName = function()
+    return text
+  end
+  button:SetWidth(math.max(min, math.min(max, button:FullWidth())))
+end
+
 local function layout()
   local scopeNow = NE.Scope()
+  local inner = WIDTH - 2 * PAD
   d.scopeAll:SetSelected(scopeNow == "account")
   d.scopeChar:SetSelected(scopeNow == "char")
-  local notice = scopeNow == "account" and NL.HasCharLayout()
-  d.notice:SetShown(notice)
-  d.hint:SetWidth(WIDTH - 2 * PAD)
-  d.notice:SetWidth(WIDTH - 2 * PAD)
-  local top = TOP_Y + 26 + 8 + math.ceil(d.hint:GetStringHeight())
-  d.notice:ClearAllPoints()
-  d.notice:SetPoint("TOPLEFT", d, "TOPLEFT", PAD, -top - 2)
-  if notice then
-    top = top + 2 + math.ceil(d.notice:GetStringHeight())
-  end
-  top = top + 10
+  fitButton(d.scopeChar, NE.ScopeCharText(), 120, 260)
+  fitButton(d.reset, NE.ResetText(scopeNow), 130, inner)
+  W.SetText(d.status, nil, NE.StatusText(scopeNow))
+  d.status:SetWidth(inner)
+  d.hint:SetWidth(inner)
+  local top = TOP_Y + math.ceil(d.status:GetStringHeight()) + 8
+  d.scopeAll:ClearAllPoints()
+  d.scopeAll:SetPoint("TOPLEFT", d, "TOPLEFT", PAD, -top)
+  top = top + 26 + 6
+  d.reset:ClearAllPoints()
+  d.reset:SetPoint("TOPLEFT", d, "TOPLEFT", PAD, -top)
+  top = top + 26 + 8
+  d.hint:ClearAllPoints()
+  d.hint:SetPoint("TOPLEFT", d, "TOPLEFT", PAD, -top)
+  top = top + math.ceil(d.hint:GetStringHeight()) + 10
   d.list:ClearAllPoints()
   d.list:SetPoint("TOPLEFT", d, "TOPLEFT", PAD, -top)
   d.list:SetPoint("BOTTOMLEFT", d, "BOTTOMLEFT", PAD, PAD)
@@ -730,6 +899,8 @@ end
 local function build()
   d = ns.Dialogs.Create("ForeverGuidesNavEditor", WIDTH, HEIGHT)
   W.SetText(d.title, "nav.editor.title")
+  d.status = W.Text(d, { text = " ", role = "ui", color = "text", wrap = true })
+  d.status:SetPoint("TOPLEFT", PAD, -TOP_Y)
   d.scopeAll = W.Action(d, {
     key = "nav.editor.scopeAll",
     width = 150,
@@ -740,32 +911,37 @@ local function build()
       NE.SetScope("account")
     end,
   })
-  d.scopeAll:SetPoint("TOPLEFT", PAD, -TOP_Y)
+  d.scopeAll:SetPoint("TOPLEFT", PAD, -TOP_Y - 24)
+  -- The label names the character, so it is set on every layout.
   d.scopeChar = W.Action(d, {
-    key = "nav.editor.scopeChar",
+    text = " ",
+    manual = true,
     width = 190,
     height = 26,
-    tooltip = "nav.editor.scopeChar",
-    tooltipText = "nav.edit.scopeHint",
     onClick = function()
       NE.SetScope("char")
     end,
   })
   d.scopeChar:SetPoint("LEFT", d.scopeAll, "RIGHT", 8, 0)
   d.reset = W.Action(d, {
-    key = "nav.edit.reset",
+    text = " ",
+    manual = true,
     icon = "reset",
-    width = 130,
+    width = 200,
     height = 26,
-    tooltip = "nav.edit.reset",
     onClick = function()
       NE.RequestReset()
     end,
   })
-  d.reset:SetPoint("TOPRIGHT", -PAD, -TOP_Y)
+  d.reset:SetPoint("TOPLEFT", PAD, -TOP_Y - 56)
   d.hint = W.Text(d, { key = "nav.editor.hint", role = "micro", color = "textSecondary", wrap = true })
-  d.hint:SetPoint("TOPLEFT", d.scopeAll, "BOTTOMLEFT", 0, -8)
-  d.notice = W.Text(d, { key = "nav.edit.scopeNotice", role = "micro", color = "warning", wrap = true })
+  d.hint:SetPoint("TOPLEFT", PAD, -TOP_Y - 90)
+  for _, button in ipairs({ d.scopeChar, d.reset }) do
+    button:HookScript("OnEnter", function(self)
+      ns.ShowTooltip(self, self.fgName(), L["nav.edit.scopeHint"])
+    end)
+    button:HookScript("OnLeave", ns.HideTooltip)
+  end
   d.list = W.ScrollArea(d)
   newConfig()
   d:HookScript("OnShow", function()
@@ -914,6 +1090,7 @@ function NE.Attach(f)
       NE.Toggle()
     end,
   })
+  NE.PencilTip(e.toggle, "nav.edit.toggle", "nav.edit.toggleHint")
   e.toggle.fgId = "nav-edit-toggle"
   e.toggle:SetPoint("TOPRIGHT", -38, -6)
   NE.PaintHint(e.toggle)

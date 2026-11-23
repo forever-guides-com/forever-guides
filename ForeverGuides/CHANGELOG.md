@@ -4,6 +4,14 @@ All notable changes to Forever Guides are documented in this file, and the forma
 
 Versions follow major.minor.patch.
 
+## [1.1.1] - 2026-11-23
+
+### Changed
+
+- Screen navigation: It is on by default for new installs, and a note in the news window explains it and switches it.
+- Menu: A character's menu now stores only its own changes on top of the account menu. The window shows which menu is active, and every setting can be reset on its own.
+- News: The login window only opens for selected versions, every other update is listed in the changelog only.
+
 ## [1.1.0] - 2026-11-22
 
 ### Added
@@ -834,6 +842,7 @@ Versions follow major.minor.patch.
 - The addon makes no network connections. It only reads and writes game data and the saved variables of your account.
 - The gathering spots feature changes graphics settings of the game while it is on. You can switch it off at any time, and the original settings are restored.
 
+[1.1.1]: https://github.com/forever-guides-com/forever-guides/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/forever-guides-com/forever-guides/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/forever-guides-com/forever-guides/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/forever-guides-com/forever-guides/compare/v0.10.2...v1.0.0

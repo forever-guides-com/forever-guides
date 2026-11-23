@@ -855,9 +855,9 @@ Store.defaults = {
       -- The last target stays on arrival (no toast, no removal) until the player clears it.
       keepOnArrival = false,
       nativeMarker = true,
-      -- Screen navigation (Modules/WaypointNav.lua): off until the player turns it on; navCvarBefore is the
+      -- Screen navigation (Modules/WaypointNav.lua): on for new installs (saves keep their value); navCvarBefore is the
       -- showInGameNavigation value to restore ("" = we changed nothing).
-      screenNav = false,
+      screenNav = true,
       navCvarBefore = "",
       -- Light beam above the marker and the marker size (factor).
       navBeam = true,

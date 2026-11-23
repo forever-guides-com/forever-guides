@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.1
+
+### Changed
+
+- Screen navigation: It is on by default for new installs, and a note in the news window explains it and switches it.
+- Menu: A character's menu now stores only its own changes on top of the account menu. The window shows which menu is active, and every setting can be reset on its own.
+- News: The login window only opens for selected versions, every other update is listed in the changelog only.
+
 ## 1.1.0
 
 ### Added

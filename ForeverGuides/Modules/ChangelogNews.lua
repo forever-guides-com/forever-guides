@@ -31,6 +31,14 @@ ns.AddLocale("enUS", {
   ["news.cat.tools"] = "Tools",
   ["news.cat.map"] = "Map",
   ["news.cat.settings"] = "Settings",
+  ["news.callout.screennav.text"] = "Since a client update the game no longer shows the quest target marker. Our screen navigation shows it to you with a light beam.",
+  ["news.callout.screennav.toggle"] = "Screen navigation",
+  ["news.callout.screennav.beam"] = "Light beam",
+  ["news.callout.screennav.open"] = "Open settings",
+  ["news.callout.screennav.image"] = "The marker of the screen navigation with light beam, distance and arrival time",
+  ["news.callout.screennav.imageOld"] = "The quest marker of the game, which is no longer shown",
+  ["news.callout.screennav.captionOld"] = "Before (game)",
+  ["news.callout.screennav.captionNew"] = "Now (Forever Guides)",
 })
 ns.AddLocale("deDE", {
   ["news.title"] = "Neuerungen",
@@ -51,6 +59,14 @@ ns.AddLocale("deDE", {
   ["news.cat.tools"] = "Werkzeuge",
   ["news.cat.map"] = "Karte",
   ["news.cat.settings"] = "Einstellungen",
+  ["news.callout.screennav.text"] = "Das Spiel zeigt seit einem Client-Update den Questziel-Marker nicht mehr. Unsere Bildschirmnavigation zeigt ihn dir mit Lichtstrahl.",
+  ["news.callout.screennav.toggle"] = "Bildschirmnavigation",
+  ["news.callout.screennav.beam"] = "Lichtstrahl",
+  ["news.callout.screennav.open"] = "Zu den Einstellungen",
+  ["news.callout.screennav.image"] = "Die Markierung der Bildschirmnavigation mit Lichtstrahl, Entfernung und Ankunftszeit",
+  ["news.callout.screennav.imageOld"] = "Die Questmarkierung des Spiels, die nicht mehr angezeigt wird",
+  ["news.callout.screennav.captionOld"] = "Vorher (Spiel)",
+  ["news.callout.screennav.captionNew"] = "Jetzt (Forever Guides)",
 })
 
 -- Seconds after the login until the window may open, and the wait before a deferred try.
@@ -65,6 +81,31 @@ local OPEN_SIZE = 22
 -- Share of the screen height the window may take; taller content scrolls between the header and the footer.
 local MAX_SCREEN = 0.95
 local GUTTER = 12
+
+-- Callouts: an extra card inside the block of one version (key = version string), shown whenever that version is
+-- in the plan. pictures are shown side by side with an arrow between them, each { file, w, h, canvas, label,
+-- caption }: the picture in Media/News is w x h at the top left of a canvas x canvas texture, label (accessible
+-- name) and caption are locale keys. text / open are locale keys; toggles lists { key, setting } pairs, setting
+-- being the Waypoints setting the toggle switches; settings is the settings card the button opens.
+N.CALLOUTS = {
+  ["1.1.1"] = {
+    pictures = {
+      { file = "OldDiamond.png", w = 100, h = 97, canvas = 128, label = "news.callout.screennav.imageOld", caption = "news.callout.screennav.captionOld" },
+      { file = "ScreenNav.png", w = 158, h = 179, canvas = 256, label = "news.callout.screennav.image", caption = "news.callout.screennav.captionNew" },
+    },
+    text = "news.callout.screennav.text",
+    toggles = {
+      { key = "news.callout.screennav.toggle", setting = "screenNav" },
+      { key = "news.callout.screennav.beam", setting = "navBeam" },
+    },
+    open = "news.callout.screennav.open",
+    settings = "map.navigation",
+  },
+}
+local MEDIA = "Interface\\AddOns\\ForeverGuides\\Media\\News\\"
+local CALLOUT_PAD, CALLOUT_PIC_H, CALLOUT_CAPTION_W, CALLOUT_ARROW = 10, 110, 120, 20
+-- Narrowest width a callout toggle keeps beside another one.
+local CALLOUT_TOGGLE_W = 200
 
 local frame
 local done = false
@@ -102,38 +143,6 @@ local function placeHighlight(row, item, body, x, y, width)
     y = y + 2 + row.links:fgGridLayout(width)
   end
   return y - top
-end
-
--- One version card: the headlines and sentences of its highlights, pooled by position, in one or two columns.
-local function fillBody(card, width, body)
-  card.rows = card.rows or {}
-  local cols, colW = 1, width
-  if width >= HIGHLIGHT_MIN * 2 + COL_GAP then
-    cols, colW = ns.CardFlow.Columns(width, HIGHLIGHT_MIN, COL_GAP, 2)
-  end
-  local heights = {}
-  for i, item in ipairs(card.items) do
-    local row = card.rows[i]
-    if not row then
-      row = {
-        head = W.Text(body, { role = "ui", color = "heading", wrap = true }),
-        text = W.Text(body, { role = "small", color = "textSecondary", wrap = true }),
-        links = W.WebLinks(body),
-      }
-      card.rows[i] = row
-    end
-    heights[i] = placeHighlight(row, item, body, 0, 0, colW)
-  end
-  local places, total = ns.CardFlow.Place(heights, cols, colW, GAP)
-  for i, item in ipairs(card.items) do
-    placeHighlight(card.rows[i], item, body, places[i].x, places[i].y, colW)
-  end
-  for i = #card.items + 1, #card.rows do
-    card.rows[i].head:Hide()
-    card.rows[i].text:Hide()
-    card.rows[i].links:SetShown(false)
-  end
-  return total
 end
 
 -- Feature overview -------------------------------------------------------------------------------------------
@@ -469,6 +478,180 @@ local function fillFeatures(card, window, width, body)
   return total
 end
 
+-- Callout card ------------------------------------------------------------------------------------------
+
+local function newPicture(c, pic)
+  local slot = CreateFrame("Frame", nil, c)
+  slot.picture = CreateFrame("Frame", nil, slot)
+  slot.picture:EnableMouse(true)
+  slot.picture.tex = slot.picture:CreateTexture(nil, "ARTWORK")
+  slot.picture.tex:SetAllPoints()
+  slot.picture.tex:SetTexture(MEDIA .. pic.file)
+  slot.picture.tex:SetTexCoord(0, pic.w / pic.canvas, 0, pic.h / pic.canvas)
+  slot.picture.fgName = function()
+    return L[pic.label]
+  end
+  slot.picture:SetScript("OnEnter", function(self)
+    ns.ShowTooltip(self, L[pic.label])
+  end)
+  slot.picture:SetScript("OnLeave", ns.HideTooltip)
+  slot.caption = W.Text(slot, { key = pic.caption, role = "micro", color = "textSecondary", wrap = true, justify = "CENTER" })
+  slot.pic = pic
+  return slot
+end
+
+local function newCallout(card, spec)
+  local c = CreateFrame("Frame", nil, card.fgBodyFrame)
+  W.Fill(c, "surface2")
+  W.Border(c, "white", 0.4)
+  c.spec = spec
+  c.slots = {}
+  for i, pic in ipairs(spec.pictures) do
+    c.slots[i] = newPicture(c, pic)
+  end
+  c.arrow = W.Glyph(c, "chevron-right", CALLOUT_ARROW, "textSecondary")
+  c.text = W.Text(c, { key = spec.text, role = "small", color = "textSecondary", wrap = true })
+  c.toggles = {}
+  for i, t in ipairs(spec.toggles) do
+    c.toggles[i] = W.Toggle(c, {
+      key = t.key,
+      get = function()
+        return ns.Waypoints.Settings()[t.setting]
+      end,
+      set = function(on)
+        ns.Waypoints.SetSetting(t.setting, on)
+      end,
+    })
+  end
+  c.toggle = c.toggles[1]
+  c.open = W.Action(c, {
+    key = spec.open,
+    icon = "gear",
+    opens = true,
+    onClick = function()
+      local entry = resolveEntry({ settings = spec.settings, label = spec.open })
+      openBeside(card.window, entry and entry.go)
+    end,
+  })
+  return c
+end
+
+-- Places the callout at y of the body for the given width; answers its height. The before/after pair is
+-- centered, the pictures share one height and shrink together when the width is short.
+local function layoutCallout(c, y, width)
+  local inner = width - CALLOUT_PAD * 2
+  local pics = c.spec.pictures
+  local slotW, picW = {}, {}
+  local sum = 0
+  for i, pic in ipairs(pics) do
+    picW[i] = pic.w * CALLOUT_PIC_H / pic.h
+    slotW[i] = math.max(picW[i], CALLOUT_CAPTION_W)
+    sum = sum + slotW[i]
+  end
+  local fixed = CALLOUT_ARROW + GAP * 2
+  local s = math.min(1, math.max(0.1, (inner - fixed) / sum))
+  local total = sum * s + fixed
+  local x = (width - total) / 2
+  local top = CALLOUT_PAD
+  local rowH = 0
+  c.arrow:ClearAllPoints()
+  for i, slot in ipairs(c.slots) do
+    local sw, ph = math.floor(slotW[i] * s), math.floor(CALLOUT_PIC_H * s)
+    local pw = math.floor(picW[i] * s)
+    slot:ClearAllPoints()
+    slot:SetPoint("TOPLEFT", c, "TOPLEFT", x, -top)
+    slot.picture:ClearAllPoints()
+    slot.picture:SetPoint("TOP", slot, "TOP", 0, 0)
+    slot.picture:SetSize(pw, ph)
+    slot.caption:ClearAllPoints()
+    slot.caption:SetPoint("TOPLEFT", slot, "TOPLEFT", 0, -ph - 4)
+    local ch = W.FitLabel(slot.caption, sw)
+    slot.caption:SetWidth(sw)
+    slot:SetSize(sw, ph + 4 + ch)
+    rowH = math.max(rowH, ph + 4 + ch)
+    x = x + sw
+    if i < #c.slots then
+      c.arrow:SetPoint("TOPLEFT", c, "TOPLEFT", x + GAP, -top - (ph - CALLOUT_ARROW) / 2)
+      x = x + fixed
+    end
+  end
+  local cy = top + rowH + GAP
+  c.text:ClearAllPoints()
+  c.text:SetPoint("TOPLEFT", c, "TOPLEFT", CALLOUT_PAD, -cy)
+  cy = cy + W.FitLabel(c.text, inner) + GAP
+  -- Toggles side by side while each keeps CALLOUT_TOGGLE_W, else one under the other.
+  local n = #c.toggles
+  local perRow = (n > 1 and (inner - GAP * (n - 1)) / n >= CALLOUT_TOGGLE_W) and n or 1
+  local tw = (inner - GAP * (perRow - 1)) / perRow
+  local rowTop, rowMax = cy, 0
+  for i, t in ipairs(c.toggles) do
+    local col = (i - 1) % perRow
+    if col == 0 and i > 1 then
+      rowTop = rowTop + rowMax + GAP
+      rowMax = 0
+    end
+    t:ClearAllPoints()
+    t:SetPoint("TOPLEFT", c, "TOPLEFT", CALLOUT_PAD + col * (tw + GAP), -rowTop)
+    t:SetWidth(tw)
+    rowMax = math.max(rowMax, t:fgGridLayout(tw))
+  end
+  cy = rowTop + rowMax + GAP
+  c.open:ClearAllPoints()
+  c.open:SetPoint("TOPLEFT", c, "TOPLEFT", CALLOUT_PAD, -cy)
+  c.open:SetWidth(math.min(c.open:FullWidth(), inner))
+  cy = cy + c.open:GetHeight() + CALLOUT_PAD
+  c:ClearAllPoints()
+  c:SetPoint("TOPLEFT", c:GetParent(), "TOPLEFT", 0, -y)
+  c:SetSize(width, cy)
+  for _, t in ipairs(c.toggles) do
+    t:Refresh()
+  end
+  c:Show()
+  return cy
+end
+
+-- One version card: the headlines and sentences of its highlights, pooled by position, in one or two columns.
+local function fillBody(card, width, body)
+  card.rows = card.rows or {}
+  local cols, colW = 1, width
+  if width >= HIGHLIGHT_MIN * 2 + COL_GAP then
+    cols, colW = ns.CardFlow.Columns(width, HIGHLIGHT_MIN, COL_GAP, 2)
+  end
+  local heights = {}
+  for i, item in ipairs(card.items) do
+    local row = card.rows[i]
+    if not row then
+      row = {
+        head = W.Text(body, { role = "ui", color = "heading", wrap = true }),
+        text = W.Text(body, { role = "small", color = "textSecondary", wrap = true }),
+        links = W.WebLinks(body),
+      }
+      card.rows[i] = row
+    end
+    heights[i] = placeHighlight(row, item, body, 0, 0, colW)
+  end
+  local places, total = ns.CardFlow.Place(heights, cols, colW, GAP)
+  for i, item in ipairs(card.items) do
+    placeHighlight(card.rows[i], item, body, places[i].x, places[i].y, colW)
+  end
+  for i = #card.items + 1, #card.rows do
+    card.rows[i].head:Hide()
+    card.rows[i].text:Hide()
+    card.rows[i].links:SetShown(false)
+  end
+  card.callouts = card.callouts or {}
+  card.fgBodyFrame = body
+  local spec = N.CALLOUTS[card.version]
+  for version, c in pairs(card.callouts) do
+    c:SetShown(version == card.version)
+  end
+  if spec then
+    card.callouts[card.version] = card.callouts[card.version] or newCallout(card, spec)
+    total = total + (total > 0 and GAP or 0) + layoutCallout(card.callouts[card.version], total + (total > 0 and GAP or 0), width)
+  end
+  return total
+end
+
 local function build()
   local d = ns.Dialogs.Create("ForeverGuidesNews", WIDTH, 300)
   d.lang, d.langDE, d.langEN = K.LanguageToggle(d)
@@ -621,6 +804,7 @@ local function fill(d, plan)
       d.cards[i] = card
     end
     card.items = view.highlights
+    card.version, card.window = view.version, d
     card.fgTitleText = string.format(L["changelog.version"], view.version)
     card:SetCount(nil)
     if view.important then
@@ -671,6 +855,19 @@ function N.ShowCurrent()
   return N.Show(N.CurrentPlan(), N.CurrentPlan)
 end
 
+-- The toggle of a callout follows the setting when it changes elsewhere.
+ns.On("FG_WAYPOINTS_CHANGED", function(_, kind)
+  if frame and frame:IsShown() and kind == "settings" then
+    for _, card in ipairs(frame.cards) do
+      for _, c in pairs(card.callouts or {}) do
+        for _, t in ipairs(c.toggles) do
+          t:Refresh()
+        end
+      end
+    end
+  end
+end)
+
 function N.Frame()
   return frame
 end
@@ -692,7 +889,19 @@ function N.PlanFrom(seen)
       recent[#recent + 1] = item
     end
   end
-  return Logic.News(recent, "0.0.0", ns.version, N.Enabled())
+  -- Without a seen mark (fresh install or no mark yet) only the newest announced version shows, next to the
+  -- feature overview; the older ones still count as seen.
+  local plan = Logic.News(recent, "0.0.0", ns.version, N.Enabled())
+  if plan then
+    table.sort(plan.shown, function(a, b)
+      return Logic.Compare(a.version, b.version) > 0
+    end)
+    for i = #plan.shown, 2, -1 do
+      plan.shown[i] = nil
+    end
+    plan.important = plan.shown[1].important == true
+  end
+  return plan
 end
 
 function N.Plan()
